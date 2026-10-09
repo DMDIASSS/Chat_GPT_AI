@@ -1,0 +1,5 @@
+cpp_backend/
+data/
+.venv/
+__pycache__/
+.pytest_cache/

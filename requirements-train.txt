@@ -1,0 +1,3 @@
+numpy>=1.26,<3
+rlgym[rl-sim]
+rlgym-ppo @ git+https://github.com/AechPro/rlgym-ppo.git

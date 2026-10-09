@@ -1,0 +1,9 @@
+[blue_loadout]
+team_color_id = 29
+custom_color_id = 0
+car_id = 23
+
+[orange_loadout]
+team_color_id = 69
+custom_color_id = 0
+car_id = 23

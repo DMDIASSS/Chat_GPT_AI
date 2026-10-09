@@ -1,0 +1,13 @@
+#:schema https://rlbot.org/schemas/agent.json
+[settings]
+agent_id = "chatgpt-ai/chat-gpt-ai/v1"
+name = "Chat GPT AI"
+loadout_file = "loadout.toml"
+run_command = ".\\.venv\\Scripts\\python.exe bot.py"
+
+[details]
+description = "A self-trained RLGym RocketSim 1v1 bot. Offline play only."
+fun_fact = "Trains with PPO self-play and optional replay-based imitation learning."
+developer = "Chat GPT AI project"
+language = "python"
+tags = ["1v1"]
