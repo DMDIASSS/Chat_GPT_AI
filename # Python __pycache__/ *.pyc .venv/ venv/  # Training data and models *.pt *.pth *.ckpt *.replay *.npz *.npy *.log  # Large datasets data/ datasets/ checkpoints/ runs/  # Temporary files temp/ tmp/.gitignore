@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Training data and models
+*.pt
+*.pth
+*.ckpt
+*.replay
+*.npz
+*.npy
+*.log
+
+# Large datasets
+data/
+datasets/
+checkpoints/
+runs/
+
+# Temporary files
+temp/
+tmp/
+.env
+.env.*
