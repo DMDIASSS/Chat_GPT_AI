@@ -1,0 +1,17 @@
+{
+  "name": "shooting_v1",
+  "preset": "Precise Shooting 1v1",
+  "created_utc": "2026-10-10T03:32:49.478025+00:00",
+  "status": "not_started",
+  "settings": {
+    "mode": "shooting",
+    "blue": 1,
+    "orange": 1,
+    "lr": 0.0001,
+    "entropy": 0.025,
+    "setup": "random"
+  },
+  "notes": "GigaLearn policy, not native Nexto. Validity of competitive improvement unverified.",
+  "seed_checkpoint": null,
+  "parent_models_read_only": true
+}

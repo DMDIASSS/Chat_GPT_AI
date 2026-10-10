@@ -1,0 +1,147 @@
+{
+  "completed_rounds": 5,
+  "created_utc": "2026-10-10T09:51:41.333447+00:00",
+  "experiment": "tri_teacher_challenger_01",
+  "history": [
+    {
+      "elapsed_seconds": 0.09,
+      "fatal": false,
+      "full_requested_steps_saved": false,
+      "new_checkpoint": 0,
+      "old_checkpoint": 0,
+      "paused": false,
+      "return_code": 1,
+      "round": 1,
+      "started_utc": "2026-10-10T09:51:41.429510+00:00",
+      "success": false,
+      "teachers_ppo_iterations": {
+        "cycle9": 0,
+        "nexto": 0,
+        "wavedash": 0
+      }
+    },
+    {
+      "elapsed_seconds": 0.09,
+      "fatal": false,
+      "full_requested_steps_saved": false,
+      "new_checkpoint": 0,
+      "old_checkpoint": 0,
+      "paused": false,
+      "return_code": 1,
+      "round": 1,
+      "started_utc": "2026-10-10T09:51:58.388089+00:00",
+      "success": false,
+      "teachers_ppo_iterations": {
+        "cycle9": 0,
+        "nexto": 0,
+        "wavedash": 0
+      }
+    },
+    {
+      "elapsed_seconds": 359.03,
+      "fatal": false,
+      "full_requested_steps_saved": true,
+      "new_checkpoint": 200360,
+      "old_checkpoint": 0,
+      "paused": false,
+      "return_code": 0,
+      "round": 1,
+      "started_utc": "2026-10-10T10:05:15.221915+00:00",
+      "success": true,
+      "teachers_ppo_iterations": {
+        "cycle9": 16,
+        "nexto": 16,
+        "wavedash": 16
+      }
+    },
+    {
+      "elapsed_seconds": 333.33,
+      "fatal": false,
+      "full_requested_steps_saved": true,
+      "new_checkpoint": 400340,
+      "old_checkpoint": 200360,
+      "paused": false,
+      "return_code": 0,
+      "round": 2,
+      "started_utc": "2026-10-10T10:10:48.558998+00:00",
+      "success": true,
+      "teachers_ppo_iterations": {
+        "cycle9": 16,
+        "nexto": 16,
+        "wavedash": 16
+      }
+    },
+    {
+      "elapsed_seconds": 425.2,
+      "fatal": false,
+      "full_requested_steps_saved": true,
+      "new_checkpoint": 601136,
+      "old_checkpoint": 400340,
+      "paused": false,
+      "return_code": 0,
+      "round": 3,
+      "started_utc": "2026-10-10T10:17:53.776289+00:00",
+      "success": true,
+      "teachers_ppo_iterations": {
+        "cycle9": 16,
+        "nexto": 16,
+        "wavedash": 16
+      }
+    },
+    {
+      "elapsed_seconds": 412.3,
+      "fatal": false,
+      "full_requested_steps_saved": true,
+      "new_checkpoint": 801444,
+      "old_checkpoint": 601136,
+      "paused": false,
+      "return_code": 0,
+      "round": 4,
+      "started_utc": "2026-10-10T10:24:46.089271+00:00",
+      "success": true,
+      "teachers_ppo_iterations": {
+        "cycle9": 16,
+        "nexto": 16,
+        "wavedash": 16
+      }
+    },
+    {
+      "elapsed_seconds": 337.8,
+      "fatal": false,
+      "full_requested_steps_saved": true,
+      "new_checkpoint": 1001160,
+      "old_checkpoint": 801444,
+      "paused": false,
+      "return_code": 0,
+      "round": 5,
+      "started_utc": "2026-10-10T10:30:23.905587+00:00",
+      "success": true,
+      "teachers_ppo_iterations": {
+        "cycle9": 15,
+        "nexto": 17,
+        "wavedash": 16
+      }
+    }
+  ],
+  "kind": "GIGALEARN_EXTENDED_TRI_TEACHER_V1",
+  "last_checkpoint_step": 1001160,
+  "last_started_utc": "2026-10-10T09:59:16.198855+00:00",
+  "last_updated_utc": "2026-10-10T10:30:23.912587+00:00",
+  "note": "Experimental 1v1 PPO against frozen native teacher actors; no auto promotion.",
+  "opponents": [
+    "nexto",
+    "cycle9",
+    "wavedash"
+  ],
+  "original_baseline": "nexto_rotation_01",
+  "original_seed_read_only": "E:\\Downloads\\Chat_GPT_AI\\GigaLearn_Project\\Research_Hub\\experiments\\nexto_rotation_01\\checkpoints\\12996",
+  "rotation_student_steps": 65536,
+  "round_steps": 196608,
+  "status": "finished",
+  "training_config": {
+    "games": 4,
+    "rotation": 65536,
+    "save_every": 32768,
+    "seed_base": 734891
+  }
+}

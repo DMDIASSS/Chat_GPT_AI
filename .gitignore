@@ -1,5 +1,62 @@
-cpp_backend/
-data/
+# Python
 .venv/
 __pycache__/
 .pytest_cache/
+*.pyc
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Existing exclusions
+cpp_backend/
+data/
+
+# Backups
+backups/
+backup_before_grounded_*/
+
+# Generated reports
+benchmark_reports/
+model_tournament_reports/
+
+# Archives
+*.zip
+
+# Trained model files
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# GigaLearn generated builds
+GigaLearn_Project/build*/
+
+# Training checkpoints
+**/checkpoints/
+**/checkpoint/
+*.lt
+
+# Compiler artifacts
+*.obj
+*.tlog
+*.pdb
+
+# Backup files
+*.bak
+
+# Generated training results
+GigaLearn_Project/Research_Hub/Curriculum_V2/TAS_Input_Pilot/results/
+GigaLearn_Project/Research_Hub/Curriculum_V2/TAS_Replay_Link/results/
+GigaLearn_Project/Research_Hub/Curriculum_V2/TAS_Replay_Link/linked_replays/
+GigaLearn_Project/Research_Hub/Curriculum_V2/results/
+GigaLearn_Project/Research_Hub/Curriculum_V2/run_data/
+
+# Evaluation outputs
+GigaLearn_Project/Research_Hub/evaluations/
+GigaLearn_Project/Research_Hub/Watch_GigaLearn/reports/

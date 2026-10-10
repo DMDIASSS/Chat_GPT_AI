@@ -17,6 +17,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import threading
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -59,14 +61,17 @@ class Client:
         self.token = token
         self.delay = delay
         self._last = None
+        self._throttle_lock = threading.Lock()
         self.opener = opener or urllib.request.urlopen
 
     def get(self, url, binary=False):
         valid_url(url)
         for attempt in range(5):
-            if self._last is not None:
-                time.sleep(max(0.0, self.delay - (time.monotonic() - self._last)))
-            self._last = time.monotonic()
+            # Share the API request-start throttle across download workers.
+            with self._throttle_lock:
+                if self._last is not None:
+                    time.sleep(max(0.0, self.delay - (time.monotonic() - self._last)))
+                self._last = time.monotonic()
             request = urllib.request.Request(url, headers={
                 'Authorization': self.token,
                 'User-Agent': 'ChatGPT-AI-ReplayDownloader/1.0',
@@ -110,6 +115,7 @@ class HourlyBudget:
     def __init__(self, path, hourly_limit=180):
         self.path = path
         self.limit = hourly_limit
+        self._lock = threading.Lock()
         try:
             self.events = collections.deque(json.loads(path.read_text(encoding='utf-8')))
         except (FileNotFoundError, json.JSONDecodeError, ValueError):
@@ -117,25 +123,29 @@ class HourlyBudget:
 
     def before_download(self):
         while True:
-            now = time.time()
-            while self.events and now - self.events[0] >= 3600:
-                self.events.popleft()
-            if len(self.events) < self.limit:
-                self.events.append(now)
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                self.path.write_text(json.dumps(list(self.events)), encoding='utf-8')
-                return
-            wait = max(2, self.events[0] + 3601 - now)
-            print(f'Hourly download budget reached ({self.limit}); pausing {wait/60:.1f} min. Ctrl+C is safe.', flush=True)
-            time.sleep(wait)
+            with self._lock:
+                now=time.time()
+                while self.events and now-self.events[0]>=3600:
+                    self.events.popleft()
+                if len(self.events)<self.limit:
+                    self.events.append(now)
+                    self.path.parent.mkdir(parents=True,exist_ok=True)
+                    self.path.write_text(json.dumps(list(self.events)),encoding='utf-8')
+                    return
+                wait=max(2,self.events[0]+3601-now)
+            print(f'Hourly replay budget reached; waiting {wait/60:.1f} minutes.',flush=True)
+            time.sleep(min(wait,60))
 
 
 def args_parser():
     p = argparse.ArgumentParser(description='Download public Rocket League replays via Ballchasing API')
+    p.add_argument('--after',default=None,help='Earliest replay YYYY-MM-DD (optional)')
+    p.add_argument('--before',default=None,help='Latest replay YYYY-MM-DD (optional)')
+    p.add_argument('--refresh-search',action='store_true',help='Revisit the newest page; downloaded UUIDs are skipped, files are never removed')
     p.add_argument('--playlist', choices=['all'] + PLAYLISTS, default='ranked-duels',
                    help='all means ranked 1v1, 2v2, solo 3v3, standard 3v3')
-    p.add_argument('--rank', choices=['gc3-ssl', 'gc-plus'], default='gc3-ssl',
-                   help='gc3-ssl attempts precise API rank filter; gc-plus uses documented broader filter')
+    p.add_argument('--rank', choices=['gc3-ssl', 'gc-plus'], default='gc-plus',
+                   help='gc-plus is API-documented GC1+; gc3-ssl is unsupported and will fail explicitly')
     p.add_argument('--max-files', type=int, default=50, help='New downloads to make in this run; 0 = keep paginating to the end')
     p.add_argument('--from-ids', type=Path, help='Download UUIDs from a text file instead of querying the search API')
     p.add_argument('--output', type=Path, default=ROOT/'data'/'replays')
@@ -143,17 +153,24 @@ def args_parser():
                    help='Limit replay download attempts per hour; default safely below regular-user limit of 200')
     p.add_argument('--page-size', type=int, default=150, help='API result items per page (1..200)')
     p.add_argument('--list-only', action='store_true', help='Check that search works and print first 10 replay IDs; download nothing')
+    p.add_argument('--workers', type=int, default=2, help='Parallel download workers, 1..3; shared API throttle')
+    p.add_argument('--pause-file', type=Path, default=None, help='Pause at safe batch boundary if this file exists')
     return p
 
 
-def search_url(playlist, rank, page_size):
+def search_url(playlist, rank, page_size, after=None, before=None):
     q = [('playlist', item) for item in (PLAYLISTS if playlist == 'all' else [playlist])]
-    # The website accepts numeric ranks, but API docs do not clearly describe GC3/SSL.
-    # A community API wrapper indicates SSL is supported. Let server validate values.
+    # Ballchasing API documentation lists GRAND-CHAMPION as highest allowed
+    # rank value (not GC3, SSL or website numeric values 21/22).
     if rank == 'gc3-ssl':
-        q.extend([('min-rank', 'grand-champion-3'), ('max-rank', 'supersonic-legend')])
-    else:
-        q.append(('min-rank', 'grand-champion'))
+        raise ValueError('Exact GC3/SSL rank filtering is NOT documented by Ballchasing API. '
+                         'Choose gc-plus (Grand Champion and above), then curate manually. '
+                         'Never label those downloads "verified SSL".')
+    if rank != 'gc-plus':
+        raise ValueError(f'Unknown rank filter: {rank}')
+    q.append(('min-rank','grand-champion'))
+    if after:q.append(('replay-date-after',after+'T00:00:00Z'))
+    if before:q.append(('replay-date-before',before+'T23:59:59Z'))
     q.extend([('count', str(page_size)), ('sort-by', 'replay-date'), ('sort-dir', 'desc')])
     return API_ROOT + 'replays?' + urllib.parse.urlencode(q)
 
@@ -190,10 +207,12 @@ def store_file(client, budget, rid, output):
 
 
 def run(args, client, budget):
-    if args.max_files < 0 or not 1 <= args.page_size <= 200 or not 1 <= args.hour_limit <= 200:
-        raise ValueError('max-files must be >=0, page-size 1..200 and hour-limit 1..200')
+    if args.max_files < 0 or not 1 <= args.page_size <= 200 or not 1 <= args.hour_limit <= 200 or not 1 <= args.workers <= 3:
+        raise ValueError('max-files >=0, page-size 1..200, hour-limit 1..200, workers 1..3')
     args.output.mkdir(parents=True, exist_ok=True)
     new_files = skipped = failed = 0
+    def wants_pause():
+        return bool(args.pause_file and args.pause_file.exists())
     if args.from_ids:
         ids = load_ids(args.from_ids)
         print(f'Using {len(ids)} replay IDs from {args.from_ids} (NOT paginating beyond that saved list).')
@@ -203,6 +222,8 @@ def run(args, client, budget):
         out = args.output/'saved-page'
         out.mkdir(parents=True, exist_ok=True)
         for index, rid in enumerate(ids, 1):
+            if wants_pause():
+                print('PAUSED: rerun same command to continue; existing files skipped.');break
             if args.max_files and new_files >= args.max_files:
                 break
             try:
@@ -224,15 +245,16 @@ def run(args, client, budget):
 
     out = args.output / ('all-ranked' if args.playlist == 'all' else args.playlist)
     out.mkdir(parents=True, exist_ok=True)
-    first = search_url(args.playlist, args.rank, args.page_size)
+    first = search_url(args.playlist, args.rank, args.page_size, args.after, args.before)
     key = hashlib.sha256(first.encode('utf-8')).hexdigest()[:12]
     state_path = out / f'download_state_{key}.json'
     state = json.loads(state_path.read_text(encoding='utf-8')) if state_path.exists() else {}
-    if state.get('finished'):
-        print('Search reached its last page in an earlier run; no new results for this sorted snapshot.')
-        print('To search newer matches later, delete', state_path)
+    if state.get('finished') and not (args.refresh_search or args.list_only):
+        print('Search reached its last page in an earlier run; use --refresh-search to check for newer replays. Existing downloads will be skipped.')
         return 0
-    next_url = state.get('next_url') or first
+    if args.refresh_search:
+        print('Refreshing Ballchasing search from newest page. Files on disk will be preserved.', flush=True)
+    next_url = first if args.refresh_search or args.list_only else (state.get('next_url') or first)
     page_no = 0
     seen_page_urls = set()
     while next_url:
@@ -242,12 +264,7 @@ def run(args, client, budget):
         valid_url(next_url)
         try:
             payload = client.get(next_url)
-        except RequestError as exc:
-            if exc.status == 400 and args.rank == 'gc3-ssl':
-                raise RuntimeError(
-                    'Ballchasing rejected the experimental GC3-SSL API rank values. '
-                    'No broader replays were downloaded. Re-run with --rank gc-plus '
-                    '(GC1 and above, NOT your exact filter), or save the precise website search as HTML.') from exc
+        except RequestError:
             raise
         items = payload.get('list', [])
         after = payload.get('next')
@@ -257,37 +274,56 @@ def run(args, client, budget):
             for item in items[:10]:
                 print(' ', item.get('id'), item.get('playlist_id'), item.get('replay_title', ''))
             return 0
-        for item in items:
-            if args.max_files and new_files >= args.max_files:
-                break
-            rid = replay_id(item.get('id'))
-            if not rid or item.get('visibility') not in ('public', None):
-                continue
-            if item.get('playlist_id') not in (PLAYLISTS if args.playlist == 'all' else [args.playlist]):
-                continue
-            destination = out / item['playlist_id'] if args.playlist == 'all' else out
-            destination.mkdir(parents=True, exist_ok=True)
-            try:
-                result = store_file(client, budget, rid, destination)
-                if result == 'new':
-                    new_files += 1
-                else:
-                    skipped += 1
-            except RequestError as exc:
-                if exc.status in (401, 403, 429):
-                    raise
-                failed += 1
-                print('  FAILED', rid, exc, flush=True)
-            except (ValueError, RuntimeError, OSError) as exc:
-                failed += 1
-                print('  FAILED', rid, exc, flush=True)
-        # If we stopped partway through this page, resume this same page next time.
-        done_page = (not args.max_files or new_files < args.max_files)
-        if done_page:
-            next_url = after
-            atomic_json(state_path, {'next_url': next_url, 'finished': not bool(next_url), 'last_page': page_no})
-        else:
-            atomic_json(state_path, {'next_url': next_url, 'finished': False, 'last_page': page_no})
+        # Keep the page cursor until every item in it has been handled. When
+        # max-files or Pause interrupts a page, revisit that page on resume;
+        # existing UUID files will be skipped. Never jump past unprocessed IDs.
+        active={}
+        partial=False
+        failures_on_page=0
+        i=0
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            while i<len(items) or active:
+                while i<len(items) and len(active)<args.workers:
+                    if wants_pause() or (args.max_files and new_files+len(active)>=args.max_files):
+                        partial=True
+                        break
+                    item=items[i]
+                    i+=1
+                    rid=replay_id(item.get('id'))
+                    if not rid or item.get('visibility') not in ('public',None):continue
+                    if item.get('playlist_id') not in (PLAYLISTS if args.playlist=='all' else [args.playlist]):continue
+                    destination=out/item['playlist_id'] if args.playlist=='all' else out
+                    destination.mkdir(parents=True,exist_ok=True)
+                    target=destination/(rid+'.replay')
+                    if target.exists() and target.stat().st_size>0:
+                        skipped+=1
+                        continue
+                    active[executor.submit(store_file,client,budget,rid,destination)]=rid
+                if not active:break
+                done,_=wait(active,return_when=FIRST_COMPLETED)
+                for future in done:
+                    rid=active.pop(future)
+                    try:
+                        result=future.result()
+                        if result=='new':new_files+=1
+                        else:skipped+=1
+                    except RequestError as exc:
+                        if exc.status in (401,403,429):raise
+                        failed+=1;failures_on_page+=1
+                        print('  FAILED',rid,exc,flush=True)
+                    except (ValueError,RuntimeError,OSError) as exc:
+                        failed+=1;failures_on_page+=1
+                        print('  FAILED',rid,exc,flush=True)
+                if partial and not active:break
+        partial=partial or i<len(items) or bool(failures_on_page) or wants_pause()
+        if partial:
+            atomic_json(state_path, {'next_url':next_url,'finished':False,'last_page':page_no})
+            if wants_pause():print('PAUSED: in-flight files saved; repeat command to resume.',flush=True)
+            break
+        next_url=after
+        atomic_json(state_path, {'next_url':next_url,'finished':not bool(next_url),'last_page':page_no})
+        if wants_pause():
+            print('PAUSED at page boundary. Repeat command to resume.',flush=True)
             break
     print(f'Finished: new={new_files}, already-on-disk={skipped}, failed={failed}.')
     return new_files
@@ -298,12 +334,18 @@ def main(argv=None):
     if args.playlist != 'ranked-duels' and not args.from_ids:
         print('NOTE: Your existing behavior-cloning converter currently accepts ONLY 1v1.', flush=True)
     if args.rank == 'gc3-ssl' and not args.from_ids:
-        print('NOTE: Exact GC3-SSL API ranks are experimental; site may reject them.', flush=True)
+        raise ValueError('Exact GC3/SSL rank filter is not in the published Ballchasing API. Use gc-plus (GC1+) or --from-ids.')
     token = os.environ.get('BALLCHASING_TOKEN', '').strip()
     if not token:
         token = getpass.getpass('Paste your Ballchasing API token (hidden): ').strip()
     if not token:
         raise ValueError('No token entered. Generate one at https://ballchasing.com/upload')
+    for value in (args.after,args.before):
+        if value:
+            try:dt.date.fromisoformat(value)
+            except ValueError as exc:raise ValueError('Dates must use YYYY-MM-DD') from exc
+    if args.after and args.before and args.after>args.before:
+        raise ValueError('Replay after date cannot be after before date')
     output = args.output.resolve()
     budget = HourlyBudget(output / '.download_attempts_last_hour.json', args.hour_limit)
     client = Client(token)

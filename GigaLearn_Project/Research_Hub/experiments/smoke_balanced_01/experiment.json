@@ -1,0 +1,18 @@
+{
+  "name": "smoke_balanced_01",
+  "preset": "Balanced 1v1",
+  "created_utc": "2026-10-10T02:58:35.548096+00:00",
+  "status": "exited_or_stopped",
+  "settings": {
+    "mode": "balanced",
+    "blue": 1,
+    "orange": 1,
+    "lr": 0.00015,
+    "entropy": 0.035,
+    "setup": "mixed"
+  },
+  "notes": "GigaLearn policy, not native Nexto. Validity of competitive improvement unverified.",
+  "seed_checkpoint": null,
+  "parent_models_read_only": true,
+  "last_started_utc": "2026-10-10T03:23:02.567325+00:00"
+}

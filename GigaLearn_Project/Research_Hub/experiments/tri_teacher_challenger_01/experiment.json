@@ -1,0 +1,37 @@
+{
+  "name": "tri_teacher_challenger_01",
+  "preset": "Frozen Nexto Rotation 1v1",
+  "status": "exited_or_stopped",
+  "created_utc": "2026-10-10T09:51:41.330444+00:00",
+  "settings": {
+    "mode": "balanced",
+    "blue": 1,
+    "orange": 1,
+    "lr": 0.0001,
+    "entropy": 0.02,
+    "setup": "random"
+  },
+  "notes": "New experimental GigaLearn student against frozen native Nexto actors. NOT competitive verified.",
+  "seed_checkpoint": {
+    "source_read_only": "E:\\Downloads\\Chat_GPT_AI\\GigaLearn_Project\\Research_Hub\\experiments\\nexto_rotation_01\\checkpoints\\12996",
+    "files": {
+      "CRITIC.lt": "f6bdf1c3c7f7de6a58a4577b5b5d3d6dcc72d8690cf04861f2dc366535d6c313",
+      "CRITIC_OPTIM.lt": "859178a34d9f1e6eb19142e7b8b7787fcaf5d934f964148d4b8b74fe8dcb36e0",
+      "POLICY.lt": "ad423b9bc2dc918086152658ba449e4f24b243e4010c8250edfff1b0ec82708a",
+      "POLICY_OPTIM.lt": "757c3acc41dcb169c268cb903f682e7d7ba8e8ef9be265f35df25afaa16ffaa1",
+      "RUNNING_STATS.json": "d8ba2d3b86fb7b957dee9076b1f355480eeb220e23d86025a13b8988416cde02",
+      "SHARED_HEAD.lt": "cc13ad77f46dbb66f2fa5a772492872eaa37f3efec47f4f666e9f5888d60663c",
+      "SHARED_HEAD_OPTIM.lt": "9c22aee5cf855e5588cc52341b0843c15d3d4ff6b3702d515e6a24fcffd40480"
+    }
+  },
+  "parent_models_read_only": true,
+  "frozen_bridge_config": {
+    "teachers": [
+      "nexto",
+      "cycle9",
+      "wavedash"
+    ],
+    "active": false
+  },
+  "last_frozen_return_code": 0
+}

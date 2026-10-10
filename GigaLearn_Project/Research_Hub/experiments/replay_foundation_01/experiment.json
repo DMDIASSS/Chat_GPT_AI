@@ -1,0 +1,28 @@
+{
+  "name": "replay_foundation_01",
+  "preset": "Balanced 1v1",
+  "created_utc": "2026-10-10T06:39:48.036299+00:00",
+  "status": "not_started",
+  "settings": {
+    "mode": "balanced",
+    "blue": 1,
+    "orange": 1,
+    "lr": 0.00015,
+    "entropy": 0.035,
+    "setup": "mixed"
+  },
+  "notes": "GigaLearn policy, not native Nexto. Validity of competitive improvement unverified.",
+  "seed_checkpoint": {
+    "source_read_only": "E:\\Downloads\\Chat_GPT_AI\\GigaLearn_Project\\Research_Hub\\Curriculum_V2\\results\\replay_bc_20261010T063353Z_3ec99db\\checkpoint\\0",
+    "files": {
+      "POLICY.lt": "9920253839b707de23353c889cb92182bc225a462087e2d9d5eeeb72f00ade93",
+      "POLICY_OPTIM.lt": "aba5f41a06fbba59a4d9085436d614d05654e16230a6f486ad6e6a0a6fe19bbf",
+      "SHARED_HEAD.lt": "25268727988ecbde31dae518c738096bcfa87084ec603a3aceab9f48e80c0ccd",
+      "SHARED_HEAD_OPTIM.lt": "fd2e940c401ccf6863fc8b431ba909f46b1ef43db3191ffdd41dc9a82542ce18",
+      "CRITIC.lt": "2ee59aa6d7e115d22541441738c64da999b0d9b051c7195d61e36c8e1ec80e9d",
+      "CRITIC_OPTIM.lt": "24110aae2f311d32e7045f027053ab9113dafdde72a12282e8af65453eaad6e8",
+      "RUNNING_STATS.json": "2cb2ea3943f7e67882ce8a4d3fc2cd588922ec64f9ccc2ae59677eadef22199c"
+    }
+  },
+  "parent_models_read_only": true
+}

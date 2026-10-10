@@ -1,0 +1,172 @@
+{
+  "files": [
+    {
+      "file": "360 m,akuf.data",
+      "sha256": "cff800dcea8f63fa3b555704968c1e39ee450c39aa94b2fa5b19137e3d65a67c",
+      "version": 1,
+      "frames": 555,
+      "frame_bytes": 32,
+      "trailer_bytes": 128,
+      "estimated_seconds_at_120hz": 4.625,
+      "important": "Fields are RAW. Button-mask and float meanings have NOT been validated against plugin source.",
+      "flag_values": {
+        "0": 307,
+        "2": 2,
+        "12": 187,
+        "18": 1,
+        "30": 1,
+        "32": 4,
+        "34": 15,
+        "50": 1,
+        "64": 37
+      },
+      "raw_float_ranges": {
+        "raw_float_1": [
+          -1.0,
+          1.0
+        ],
+        "raw_float_2": [
+          -0.999959,
+          0.999959
+        ],
+        "raw_float_3": [
+          -0.999959,
+          0.999959
+        ],
+        "raw_float_4": [
+          -0.999959,
+          0.999959
+        ],
+        "raw_float_5": [
+          -1.0,
+          1.0
+        ],
+        "raw_float_6": [
+          -0.999959,
+          0.999959
+        ],
+        "raw_float_7": [
+          -0.999959,
+          0.999959
+        ]
+      },
+      "starting_state_trailer_hex": "0000000000000000000000000e4f354534d78e43ca0e884195ffffff9307000000000000413dd5446b13af43cf48193f8e0b03bc2499493d8778d5be01c528187e3d4145f093a443e33ac2422f10000030780000ff780000733ee54422ff9943fe2813c15a7c0abdcae0ec3f75ab1fbf01c528180100000000008040ae47a13f"
+    },
+    {
+      "file": "2 player tas.data",
+      "sha256": "541eae0055a0aa1e0f71eaceb098b82e41304724e31dd03ff2d8034e97981073",
+      "version": 1,
+      "frames": 1030,
+      "frame_bytes": 32,
+      "trailer_bytes": 128,
+      "estimated_seconds_at_120hz": 8.583,
+      "important": "Fields are RAW. Button-mask and float meanings have NOT been validated against plugin source.",
+      "flag_values": {
+        "0": 236,
+        "1": 91,
+        "2": 38,
+        "3": 4,
+        "12": 358,
+        "13": 216,
+        "14": 12,
+        "15": 9,
+        "18": 4,
+        "19": 1,
+        "30": 8,
+        "31": 9,
+        "32": 12,
+        "33": 18,
+        "34": 6,
+        "45": 7,
+        "50": 1
+      },
+      "raw_float_ranges": {
+        "raw_float_1": [
+          -1.0,
+          1.0
+        ],
+        "raw_float_2": [
+          -0.999962,
+          0.999962
+        ],
+        "raw_float_3": [
+          -0.999962,
+          0.999962
+        ],
+        "raw_float_4": [
+          -0.999962,
+          0.999962
+        ],
+        "raw_float_5": [
+          -1.0,
+          1.0
+        ],
+        "raw_float_6": [
+          -0.999962,
+          0.999962
+        ],
+        "raw_float_7": [
+          -0.999962,
+          0.999962
+        ]
+      },
+      "starting_state_trailer_hex": "0000000000000000000000003d8e8645147e1cc40000b0419cffffffd24b00000000000000000000000000002631c83e000000000000000000000000010000000000000000000000ae47c44200000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000204100002041"
+    },
+    {
+      "file": "!a dominus flip reset #1.data",
+      "sha256": "be686f46e3df5681e571650226c07d93f32410e9e2b9ea50e22662522082e24f",
+      "version": 1,
+      "frames": 807,
+      "frame_bytes": 32,
+      "trailer_bytes": 128,
+      "estimated_seconds_at_120hz": 6.725,
+      "important": "Fields are RAW. Button-mask and float meanings have NOT been validated against plugin source.",
+      "flag_values": {
+        "0": 489,
+        "1": 67,
+        "2": 16,
+        "12": 146,
+        "13": 15,
+        "14": 13,
+        "18": 4,
+        "30": 2,
+        "64": 40,
+        "66": 1,
+        "76": 13,
+        "82": 1
+      },
+      "raw_float_ranges": {
+        "raw_float_1": [
+          0.0,
+          1.0
+        ],
+        "raw_float_2": [
+          -0.999959,
+          0.999959
+        ],
+        "raw_float_3": [
+          -0.999959,
+          0.999959
+        ],
+        "raw_float_4": [
+          -0.999959,
+          0.999959
+        ],
+        "raw_float_5": [
+          -1.0,
+          1.0
+        ],
+        "raw_float_6": [
+          -0.999959,
+          0.999959
+        ],
+        "raw_float_7": [
+          -0.999959,
+          0.999959
+        ]
+      },
+      "starting_state_trailer_hex": "0000000000000000000000004ceb3445c5338e43cd05884198ffffffa2070000000000006a6dd544b242b043664c103f8494ccbb6b7f233deff5e3be017d673639d240459a03a4431b4fc242ea0f00004e7800000e7900000c45e544a0039a435e5cdac05a7c0abdcae0ec3f75ab1fbf017d67360100000000002041ae47a13f"
+    }
+  ],
+  "errors": []
+}

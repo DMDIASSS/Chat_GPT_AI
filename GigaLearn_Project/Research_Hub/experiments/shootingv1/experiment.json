@@ -1,0 +1,29 @@
+{
+  "name": "shootingv1",
+  "preset": "Precise Shooting 1v1",
+  "created_utc": "2026-10-10T03:35:21.746268+00:00",
+  "status": "exited_or_stopped",
+  "settings": {
+    "mode": "shooting",
+    "blue": 1,
+    "orange": 1,
+    "lr": 0.0001,
+    "entropy": 0.025,
+    "setup": "random"
+  },
+  "notes": "GigaLearn policy, not native Nexto. Validity of competitive improvement unverified.",
+  "seed_checkpoint": {
+    "source_read_only": "E:\\Downloads\\Chat_GPT_AI\\GigaLearn_Project\\Research_Hub\\experiments\\smoke_balanced_01\\checkpoints\\2398176",
+    "files": {
+      "POLICY.lt": "11a1e08f61a75c7eb036acdfb0e59b884be752eae67f6d9c110dbf1da40aebda",
+      "POLICY_OPTIM.lt": "a69d655de6e7a52dd9bfe85c41db7bb82b492816a5ceb42ee31e2763607687ed",
+      "SHARED_HEAD.lt": "aa615c1baacdf55a029654e1874d80a59b540dc867675658b3d5447d48d973cc",
+      "SHARED_HEAD_OPTIM.lt": "e533a3974211841d365cf8cf9e22a30879a09af73728dd2f526074e12749a869",
+      "CRITIC.lt": "0c173ca57a0f2c1474a10ce9860518d42617e7977643424661c5d943026494ed",
+      "CRITIC_OPTIM.lt": "a030d1770b9d65ca4b5531e47a3d4800b98b452e9979a8b4b8ef5c8f660f2f2c",
+      "RUNNING_STATS.json": "fa62df376a9e07c4155a8a7fdd03c1d521518a04301ff3fcaa580425a092ebaa"
+    }
+  },
+  "parent_models_read_only": true,
+  "last_started_utc": "2026-10-10T03:35:43.114690+00:00"
+}

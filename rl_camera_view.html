@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Chat GPT AI · Rocket League Camera</title><style>
+:root{color-scheme:dark;font-family:Inter,Segoe UI,Arial,sans-serif}*{box-sizing:border-box}body{margin:0;background:#171b20;color:#fff;overflow:hidden}canvas{width:100vw;height:100vh;display:block}header{position:absolute;top:16px;left:50%;transform:translateX(-50%);font-weight:800;font-size:24px;text-shadow:0 2px 8px #000;pointer-events:none}.blue{color:#58b4ff}.orange{color:#ffae52}#hud{position:absolute;bottom:20px;left:22px;padding:14px 19px;border-radius:15px;background:#181d23dc;backdrop-filter:blur(10px)}#hud strong{font-size:28px;color:#fbbf24}#hud div{font-size:12px;color:#93a8c2}aside{position:absolute;right:20px;top:20px;width:295px;background:#1c2229e9;border:1px solid #40516d;border-radius:17px;padding:16px;box-shadow:0 8px 25px #0008;transition:.2s}aside.closed{right:-315px}h1{font-size:16px;margin:0 0 5px}p{font-size:12px;color:#9db0cc;line-height:1.6;margin:0 0 14px}label{display:flex;align-items:center;justify-content:space-between;margin:12px 0 4px;font-size:12px;color:#ced8e8}input[type=range]{width:100%;accent-color:#89aab8}select{background:#263953;color:white;border:1px solid #4a5d78;border-radius:8px;padding:6px}button{background:#36434f;border:1px solid #547bbc;border-radius:9px;padding:9px 12px;color:white;cursor:pointer}button:hover{background:#475765}.buttons{display:flex;gap:6px;flex-wrap:wrap}.keys{border-top:1px solid #33445f;margin-top:14px;padding-top:11px;font-size:11px;line-height:1.8;color:#a4b5d0}kbd{background:#334359;border-radius:5px;padding:2px 5px;color:#f2f7fe}#toggle{position:absolute;top:20px;right:20px;z-index:2;display:none}.tag{padding:3px 7px;background:#203d5b;border-radius:6px}#error{position:absolute;top:16px;left:16px;background:#5e1d2c;padding:12px;max-width:40vw;border-radius:9px;display:none}#banner{position:absolute;bottom:16px;right:340px;font-size:12px;color:#a5c8f7;background:#0b1725bc;border-radius:9px;padding:7px 12px} @media(max-width:650px){aside{width:240px;right:7px;top:7px}aside.closed{right:-250px}#toggle{right:7px;top:7px}#banner{right:10px;bottom:10px}}
+</style></head><body><canvas id="view"></canvas><header><span class="blue" id="bscore">0</span> &nbsp;:&nbsp; <span class="orange" id="oscore">0</span></header><div id="hud"><strong id="boost">--</strong><div>BOOST · <span id="camlabel">BALL CAM ON</span></div><div id="playing">Waiting for RocketSim…</div></div><div id="error"></div><div id="banner">Stylized physics viewer · not Rocket League's engine</div><button id="toggle">Camera ⚙</button>
+<aside id="panel"><h1>CAMERA SETTINGS</h1><p>Independent Rocket League-style follow camera. Adjustments don't affect the AI.</p><div class="buttons"><button id="ballcam">Ball cam: ON (C)</button><button id="focus">Watch Blue (Tab)</button><button id="reset">Reset</button></div>
+<label>Distance <span id="distance-v"></span></label><input id="distance" type="range" min="180" max="600" step="5" value="280">
+<label>Height <span id="height-v"></span></label><input id="height" type="range" min="40" max="250" step="5" value="110">
+<label>Angle <span id="angle-v"></span></label><input id="angle" type="range" min="-15" max="5" step="1" value="-4">
+<label>FOV <span id="fov-v"></span></label><input id="fov" type="range" min="60" max="115" step="1" value="110">
+<label>Stiffness <span id="stiffness-v"></span></label><input id="stiffness" type="range" min="0" max="100" step="5" value="75">
+<div class="keys"><kbd>C</kbd> Toggle ball cam &nbsp; <kbd>Tab</kbd> Switch team &nbsp; <kbd>H</kbd> Hide panel &nbsp; <kbd>1</kbd>/<kbd>2</kbd> Blue / Orange.<br>Refresh to reconnect. Controls update immediately.</div></aside>
+<script>
+'use strict';const canvas=document.getElementById('view'),ctx=canvas.getContext('2d');let frame=null, focus=0,ballCam=true,cam=null;
+const $=id=>document.getElementById(id),defaults={distance:280,height:110,angle:-4,fov:110,stiffness:75};const settings={...defaults};
+for(const k of Object.keys(defaults)){let saved;try{saved=localStorage.getItem('rlcam-'+k)}catch(e){}if(saved!==null&&saved!==undefined&&Number.isFinite(+saved))settings[k]=+saved;$(k).value=settings[k];$(k+'-v').textContent=settings[k]+(k==='angle'||k==='fov'?'°':'');$(k).addEventListener('input',e=>{settings[k]=+e.target.value;$(k+'-v').textContent=settings[k]+(k==='angle'||k==='fov'?'°':'');try{localStorage.setItem('rlcam-'+k,settings[k])}catch(e){}})}
+function setBall(v){ballCam=!!v;$('ballcam').textContent=`Ball cam: ${ballCam?'ON':'OFF'} (C)`;$('camlabel').textContent=`BALL CAM ${ballCam?'ON':'OFF'}`}
+function setFocus(n){focus=n;cam=null;$('focus').textContent=`Watch ${focus?'Orange':'Blue'} (Tab)`}
+$('ballcam').onclick=()=>setBall(!ballCam);$('focus').onclick=()=>setFocus(1-focus);$('reset').onclick=()=>{for(const k of Object.keys(defaults)){$(k).value=defaults[k];$(k).dispatchEvent(new Event('input'))}};
+$('toggle').onclick=()=>{$('panel').classList.remove('closed');$('toggle').style.display='none'};
+window.addEventListener('keydown',e=>{if(e.key==='c'||e.key==='C')setBall(!ballCam);if(e.key==='Tab'){e.preventDefault();setFocus(1-focus)}if(e.key==='1')setFocus(0);if(e.key==='2')setFocus(1);if(e.key==='h'||e.key==='H'){$('panel').classList.toggle('closed');$('toggle').style.display=$('panel').classList.contains('closed')?'block':'none'}});
+const add=(a,b)=>a.map((n,i)=>n+b[i]),sub=(a,b)=>a.map((n,i)=>n-b[i]),mul=(a,s)=>a.map(n=>n*s),dot=(a,b)=>a.reduce((s,n,i)=>s+n*b[i],0),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],norm=a=>{let d=Math.hypot(...a)||1;return mul(a,1/d)},lerp=(a,b,k)=>add(mul(a,1-k),mul(b,k));
+let projected,viewFwd;
+function line3(a,b,color='#477c9a',width=1){const x=projected(a),y=projected(b);if(!x||!y)return;ctx.beginPath();ctx.moveTo(x[0],x[1]);ctx.lineTo(y[0],y[1]);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke()}
+function poly(points,color,stroke){
+// Clip convex geometry against the near plane so the arena floor stays visible
+// when a corner is behind the chase camera.
+let depth=p=>dot(sub(p,cam.eye),viewFwd);let clipped=[];
+for(let i=0;i<points.length;i++){let a=points[i],b=points[(i+1)%points.length],da=depth(a),db=depth(b),aa=da>=15,bb=db>=15;
+if(aa)clipped.push(a);if(aa!==bb){let t=(15-da)/(db-da);clipped.push(lerp(a,b,t))}}
+if(clipped.length<3)return;let x=clipped.map(projected);if(x.some(p=>!p))return;
+ctx.beginPath();x.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fillStyle=color;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1.2;ctx.stroke()}}
+function goal(y,color){let near=y>0?5120:-5120;let w=850,h=650;for(let dx of [-1,1])line3([dx*w,near,0],[dx*w,near,h],color,3);line3([-w,near,h],[w,near,h],color,3);for(let dx of [-1,1])line3([dx*w,near,h],[dx*w,near+(y>0?420:-420),h],color,1.5)}
+function drawCar(car,clr){
+// Moderately detailed Octane-like silhouette built from solids, not bright wireframes.
+// All surfaces are positioned from the RocketSim car rotation and ground contact.
+let p=car.pos,forward=norm(car.forward),right=norm(car.right||[-forward[1],forward[0],0]),up=norm(car.up||[0,0,1]);
+let v=(x,y,z)=>add(add(add(p,mul(forward,x)),mul(right,y)),mul(up,z));
+let dark='#20282d',trim='#52616a',glass='#35434b',highlight='#9ca9af';
+// Wheels are separate thick quads beside the body; dark tread and metallic hubs.
+for(let x of [-78,72])for(let side of [-1,1]){
+ const y=side*63;
+ poly([v(x-28,y,4),v(x+28,y,4),v(x+30,y,46),v(x-30,y,46)],'#16191c','#11191e');
+ poly([v(x-15,y+side*3,13),v(x+15,y+side*3,13),v(x+16,y+side*3,37),v(x-16,y+side*3,37)],'#717b80','#252c33');
+}
+const A=v(-112,-54,18),B=v(111,-54,18),C=v(111,54,18),D=v(-112,54,18),
+      E=v(-96,-54,60),F=v(91,-54,60),G=v(91,54,60),H=v(-96,54,60);
+poly([A,B,F,E],clr,'#1d2226');poly([D,C,G,H],clr,'#1d2226');
+poly([A,B,C,D],dark);poly([E,F,G,H],clr,'#35434a');poly([B,C,G,F],clr,'#1e262c');
+// Cabin: angled windshield, black glass with silver trim, rear windscreen.
+let c1=v(-56,-43,66),c2=v(39,-43,66),c3=v(39,43,66),c4=v(-56,43,66);
+let r1=v(-38,-37,112),r2=v(10,-37,112),r3=v(10,37,112),r4=v(-38,37,112);
+poly([c1,c2,r2,r1],glass,trim);poly([c4,c3,r3,r4],glass);poly([r1,r2,r3,r4],clr,'#7d898e');
+poly([c2,c3,r3,r2],glass,'#45535a');poly([c1,c4,r4,r1],glass,'#45535a');
+// Muted headlights, dark grill, rear lights and small rear spoiler.
+poly([v(110,-38,33),v(110,38,33),v(110,38,47),v(110,-38,47)],'#29363c');
+for(let side of [-1,1]){
+let y=side*44;
+poly([v(112,y-9,42),v(112,y+9,42),v(112,y+9,53),v(112,y-9,53)],'#d3d0b2');
+poly([v(-113,y-11,35),v(-113,y+11,35),v(-113,y+11,48),v(-113,y-11,48)],'#8f4040');
+}
+line3(v(-119,-52,85),v(-119,52,85),trim,3);
+// Slight drop shadow helps cars read against the field.
+}
+function drawBall(b){let p=projected(b.pos);if(!p)return;let r=Math.max(3,Math.min(110,(settings.fov<80?60000:48000)/(p[2]+200)));ctx.beginPath();ctx.arc(p[0],p[1],r,0,Math.PI*2);ctx.fillStyle='#f3eee0';ctx.shadowColor='#eaf1fa';ctx.shadowBlur=15;ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='#63778e';ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.arc(p[0]-r*.3,p[1]-r*.24,r*.34,0,Math.PI*2);ctx.fillStyle='#9daeb7';ctx.fill()}
+function draw(){const w=canvas.width=window.innerWidth*devicePixelRatio,h=canvas.height=window.innerHeight*devicePixelRatio;ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#202a2e';ctx.fillRect(0,0,w,h);
+const grd=ctx.createLinearGradient(0,0,0,h);grd.addColorStop(0,'#3b4a51');grd.addColorStop(.6,'#34454b');grd.addColorStop(1,'#283938');ctx.fillStyle=grd;ctx.fillRect(0,0,w,h);
+if(!frame||!frame.cars||frame.cars.length<2){requestAnimationFrame(draw);return}
+const player=frame.cars[focus],other=frame.cars[1-focus],ball=frame.ball.pos;let forward=norm([player.forward[0],player.forward[1],0]);const dist=settings.distance,ang=settings.angle*Math.PI/180;
+const wantedEye=add(add(player.pos,mul(forward,-dist)),[0,0,settings.height+30]);let wantedLook=ballCam?ball:add(player.pos,mul(forward,1700));wantedLook=add(wantedLook,[0,0,ballCam?0:120+Math.tan(ang)*1200]);
+// When ballcam is off the view stays behind the car. When on, target tracks ball.
+if(!cam)cam={eye:wantedEye,look:wantedLook};let stiffness=Math.max(.02,Math.min(1,.035+(settings.stiffness/100)*.23));cam.eye=lerp(cam.eye,wantedEye,stiffness);cam.look=lerp(cam.look,wantedLook,stiffness);
+viewFwd=norm(sub(cam.look,cam.eye));if(Math.abs(dot(viewFwd,[0,0,1]))>.995)viewFwd=norm(add(viewFwd,[.02,0,0]));let viewRight=norm(cross(viewFwd,[0,0,1]));let viewUp=norm(cross(viewRight,viewFwd));let lens=(.5*w)/Math.tan(settings.fov*Math.PI/360);
+projected=p=>{let rel=sub(p,cam.eye),depth=dot(rel,viewFwd);if(depth<15)return null;return [w/2+dot(rel,viewRight)*lens/depth,h*.55-dot(rel,viewUp)*lens/depth,depth]};
+// Field floor and markings, in Unreal units.
+poly([[-4096,-5120,0],[4096,-5120,0],[4096,5120,0],[-4096,5120,0]],'#23443d');
+for(let x=-4000;x<=4000;x+=1000)line3([x,-5120,5],[x,5120,5],'#335951',1);
+for(let y=-5000;y<=5000;y+=1000)line3([-4096,y,5],[4096,y,5],'#335951',1);
+for(let x of [-4096,4096])line3([x,-5120,12],[x,5120,12],'#9cafb1',2);
+for(let y of [-5120,5120])line3([-4096,y,12],[4096,y,12],'#9cafb1',2);
+line3([-4096,0,8],[4096,0,8],'#acbab5',2);let last=[1000,0,8];for(let a=.15;a<=Math.PI*2+.15;a+=.15){let cur=[1000*Math.cos(a),1000*Math.sin(a),8];line3(last,cur,'#9ed0c0',1.5);last=cur}
+goal(-1,'#4f92c3');goal(1,'#cb935f');
+let carDraw=[player,other].sort((a,b)=>{const ap=projected(a.pos),bp=projected(b.pos);return(bp?.[2]||0)-(ap?.[2]||0)});for(const c of carDraw)drawCar(c,c.team==='blue'?'#477c9c':'#b87946');drawBall(frame.ball);
+$('boost').textContent=Math.round(player.boost);$('playing').textContent=`${player.team.toUpperCase()} · ${ballCam?'Tracking ball':'Following car'}`;$('bscore').textContent=frame.score?.blue??0;$('oscore').textContent=frame.score?.orange??0;
+requestAnimationFrame(draw)}requestAnimationFrame(draw);
+async function poll(){try{let r=await fetch('/state',{cache:'no-store'}),d=await r.json();if(d.error){$('error').style.display='block';$('error').textContent=d.error}else $('error').style.display='none';if(d.frame)frame=d.frame}catch(e){$('error').style.display='block';$('error').textContent='Waiting for local Python server…'}}setInterval(poll,70);poll();
+</script></body></html>
