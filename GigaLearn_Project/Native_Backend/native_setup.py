@@ -74,9 +74,30 @@ def meshes():
 
 
 def tool(name):
-    found=shutil.which(name) or str(Path(sys.executable).parent/(name+'.exe' if os.name=='nt' else name))
+    local=Path(sys.executable).parent/(name+'.exe' if os.name=='nt' else name)
+    found=str(local) if local.is_file() else shutil.which(name)
+    if not found:raise ValueError('Install '+name+' in this Python environment')
     if not Path(found).is_file():raise ValueError('Install '+name+' in this Python environment')
     return found
+
+
+def cuda_configuration(torch):
+    env=os.environ.copy()
+    if not torch.version.cuda:return [],env
+    arch_list=env.get('TORCH_CUDA_ARCH_LIST','').strip()
+    if not arch_list:
+        if not torch.cuda.is_available():
+            raise ValueError('CUDA-enabled Torch needs an explicit build architecture when no GPU is readable. Set TORCH_CUDA_ARCH_LIST to your GPU capability (for example 7.5), then rebuild.')
+        arch_list=';'.join(sorted({f'{major}.{minor}' for major,minor in
+            (torch.cuda.get_device_capability(i) for i in range(torch.cuda.device_count()))}))
+    architectures=[]
+    for token in re.split(r'[;\s]+',arch_list):
+        match=re.fullmatch(r'(\d+)\.(\d+)([a-z]?)(?:\+PTX)?',token)
+        if not match:raise ValueError('Use numeric TORCH_CUDA_ARCH_LIST values, for example 7.5 or 8.6+PTX')
+        architectures.append(''.join(match.groups()))
+    env['TORCH_CUDA_ARCH_LIST']=arch_list
+    print('Explicit CUDA architectures:',arch_list,flush=True)
+    return ['-DCMAKE_CUDA_ARCHITECTURES='+(';'.join(dict.fromkeys(architectures)))],env
 
 
 def build(source,folder,jobs):
@@ -85,12 +106,13 @@ def build(source,folder,jobs):
     if os.name=='nt' and not shutil.which('cl'):raise ValueError('Open x64 Native Tools Command Prompt for VS 2022, or use NATIVE_2_BUILD.bat')
     cmake=tool('cmake')
     ninja=tool('ninja')
+    cuda_args,build_env=cuda_configuration(torch)
     library,include=python_paths();folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
     command([cmake,'-S',HERE,'-B',folder,'-G','Ninja',f'-DGIGALEARN_SOURCE={Path(source).resolve()}',
         f'-DCMAKE_MAKE_PROGRAM={ninja}','-DCMAKE_BUILD_TYPE=Release',f'-DCMAKE_PREFIX_PATH={torch.utils.cmake_prefix_path}',
         f'-DPython_EXECUTABLE={sys.executable}',f'-DPYTHON_EXECUTABLE={sys.executable}',
-        f'-DPYTHON_LIBRARY={library}',f'-DPYTHON_INCLUDE_DIR={include}'])
-    command([cmake,'--build',folder,'--target','SlaterGigaNative','-j',str(jobs)])
+        f'-DPYTHON_LIBRARY={library}',f'-DPYTHON_INCLUDE_DIR={include}',*cuda_args],env=build_env)
+    command([cmake,'--build',folder,'--target','SlaterGigaNative','-j',str(jobs)],env=build_env)
 
 
 def parse_log(text):
@@ -166,7 +188,7 @@ def main():
     if a.command=='check':
         import torch
         library,include=python_paths()
-        print(json.dumps({'python':sys.executable,'torch':torch.__version__,'cuda_available':torch.cuda.is_available(),
+        print(json.dumps({'python':sys.executable,'torch':torch.__version__,'torch_cuda_version':torch.version.cuda,'cuda_available':torch.cuda.is_available(),
             'compiler':shutil.which('cl') or shutil.which('g++'),'cmake':tool('cmake'),
             'python_library':str(library),'python_headers':str(include),'meshes':str(meshes()),
             'nexto_checkpoint_directly_loadable':False},indent=2));return

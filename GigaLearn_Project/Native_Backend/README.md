@@ -45,6 +45,12 @@ CUDA execution remain local checks. For CUDA, use a compatible CUDA-enabled
 PyTorch/LibTorch and CUDA toolkit; the helper checks the selected PyTorch install.
 `--device auto` chooses CUDA when supported. CPU is the default smoke/benchmark.
 Do not replace your main Python environment merely to experiment with CUDA.
+The helper prefers venv CMake/Ninja over system tools. CUDA-enabled Torch builds
+set both CMake's CUDA architecture and `TORCH_CUDA_ARCH_LIST` from readable GPUs,
+avoiding empty architecture errors on repeated Torch discovery. If building
+without a readable GPU, set a numeric `TORCH_CUDA_ARCH_LIST` explicitly (for
+example `7.5` for a capability-7.5 GPU). Use a CUDA toolkit compatible with the
+CUDA version reported by `torch.version.cuda`; do not infer it from driver version.
 
 ## Actual backend behavior
 

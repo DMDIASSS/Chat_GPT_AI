@@ -3,6 +3,7 @@ import importlib.util
 import hashlib
 import json
 import subprocess
+from types import SimpleNamespace
 import pytest
 
 
@@ -79,3 +80,32 @@ def test_git_apply_crlf_output_is_verified_and_normalized(tmp_path,monkeypatch):
     m.patch_source(source)
     assert all((source/name).read_bytes()==patched for name in ('a.h','b.h'))
     m.patch_source(source)
+
+
+def test_tool_prefers_venv_over_system_cmake(tmp_path,monkeypatch):
+    m=load();python=tmp_path/'python';cmake=tmp_path/'cmake';cmake.write_text('venv tool')
+    monkeypatch.setattr(m.sys,'executable',str(python));monkeypatch.setattr(m.shutil,'which',lambda name:'/system/cmake')
+    assert m.tool('cmake')==str(cmake)
+
+
+def test_cuda_gpu_capability_populates_both_architecture_settings(monkeypatch):
+    m=load();monkeypatch.delenv('TORCH_CUDA_ARCH_LIST',raising=False)
+    torch=SimpleNamespace(version=SimpleNamespace(cuda='12.6'),cuda=SimpleNamespace(
+        is_available=lambda:True,device_count=lambda:2,get_device_capability=lambda i:(7,5)))
+    args,env=m.cuda_configuration(torch)
+    assert args==['-DCMAKE_CUDA_ARCHITECTURES=75']
+    assert env['TORCH_CUDA_ARCH_LIST']=='7.5'
+
+
+def test_cuda_explicit_override_and_cpu_build(monkeypatch):
+    m=load();monkeypatch.setenv('TORCH_CUDA_ARCH_LIST','7.5;8.6+PTX')
+    args,env=m.cuda_configuration(SimpleNamespace(version=SimpleNamespace(cuda='12.6')))
+    assert args==['-DCMAKE_CUDA_ARCHITECTURES=75;86']
+    assert env['TORCH_CUDA_ARCH_LIST']=='7.5;8.6+PTX'
+    assert m.cuda_configuration(SimpleNamespace(version=SimpleNamespace(cuda=None)))[0]==[]
+
+
+def test_cuda_missing_gpu_requests_architecture(monkeypatch):
+    m=load();monkeypatch.delenv('TORCH_CUDA_ARCH_LIST',raising=False)
+    torch=SimpleNamespace(version=SimpleNamespace(cuda='12.6'),cuda=SimpleNamespace(is_available=lambda:False))
+    with pytest.raises(ValueError,match='TORCH_CUDA_ARCH_LIST'):m.cuda_configuration(torch)
