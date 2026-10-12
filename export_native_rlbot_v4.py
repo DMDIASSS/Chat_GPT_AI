@@ -36,3 +36,19 @@ def export_native(checkpoint,name,output=None,*,scripted_kickoff=False):
         if checkpoint_identity(tmp/'checkpoint')['files']!=identity['files']:raise RuntimeError('Export weight mismatch')
         tmp.rename(target);print('SUCCESS: exported native bot at',target,flush=True);return target
     except BaseException:shutil.rmtree(tmp,ignore_errors=True);raise
+
+def refresh_native_exports():
+    """Update only native bot wrappers; preserve weights and kickoff choices."""
+    updated=0
+    for info in OUTPUT.glob('*/EXPORT_INFO.json'):
+        doc=json.loads(info.read_text(encoding='utf8'))
+        if doc.get('format')!='RLBot v4 native 230/90':continue
+        folder=info.parent;checkpoint_identity(folder/'checkpoint')
+        bot=folder/'bot.py';backup=folder/'bot.py.before_native_control_fix'
+        if bot.exists() and not backup.exists():shutil.copy2(bot,backup)
+        source=(ROOT/'native_rlbot_v4.py').read_text(encoding='utf8').replace('SCRIPTED_KICKOFF=True','SCRIPTED_KICKOFF='+str(bool(doc['hardcoded_kickoffs'])))
+        temp=folder/'bot.py.updating';temp.write_text(source,encoding='utf8');temp.replace(bot)
+        print('Updated native wrapper:',folder,'scripted kickoff:',doc['hardcoded_kickoffs'],flush=True);updated+=1
+    print('Updated',updated,'native exports. Restart these bots in RLBot.',flush=True)
+
+if __name__=='__main__':refresh_native_exports()

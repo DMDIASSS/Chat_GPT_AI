@@ -19,6 +19,12 @@ def test_export_and_packet_inference(tmp_path,monkeypatch,scripted):
     assert checkpoint_identity(SOURCE)==before
     assert checkpoint_identity(target/'checkpoint')['files']==before['files']
     with pytest.raises(FileExistsError):export_native(SOURCE,'NativeTest',tmp_path)
+    import export_native_rlbot_v4 as exporter
+    monkeypatch.setattr(exporter,'OUTPUT',tmp_path)
+    (target/'bot.py').write_text('# old wrapper')
+    exporter.refresh_native_exports()
+    assert (target/'bot.py.before_native_control_fix').read_text()=='# old wrapper'
+    assert checkpoint_identity(target/'checkpoint')['files']==before['files']
     base=types.ModuleType('rlbot.agents.base_agent');base.BaseAgent=object;base.SimpleControllerState=lambda **kw:S(**kw)
     monkeypatch.setitem(sys.modules,'rlbot',types.ModuleType('rlbot'));monkeypatch.setitem(sys.modules,'rlbot.agents',types.ModuleType('rlbot.agents'))
     monkeypatch.setitem(sys.modules,'rlbot.agents.base_agent',base)
@@ -40,3 +46,25 @@ def test_export_and_packet_inference(tmp_path,monkeypatch,scripted):
         if scripted and tick==0:assert controls.throttle==1 and controls.boost
     if not scripted:assert bot.clock.kickoff_index==-1
     p.game_info.seconds_elapsed=0;bot.get_output(p)
+
+
+def test_native_controls_resume_immediately_after_kickoff(tmp_path,monkeypatch):
+    # Run the packaged wrapper with a known nonzero policy, independent of weights.
+    base=types.ModuleType('rlbot.agents.base_agent');base.BaseAgent=object;base.SimpleControllerState=lambda **kw:S(**kw)
+    monkeypatch.setitem(sys.modules,'rlbot',types.ModuleType('rlbot'));monkeypatch.setitem(sys.modules,'rlbot.agents',types.ModuleType('rlbot.agents'))
+    monkeypatch.setitem(sys.modules,'rlbot.agents.base_agent',base)
+    fake=types.ModuleType('native_actor');fake.NativeActor=object;fake.infer=lambda *args:0
+    fake.nexto_actions=lambda:np.array([[1,0,0,0,0,0,0,0]],dtype=np.float32)
+    monkeypatch.setitem(sys.modules,'native_actor',fake)
+    spec=importlib.util.spec_from_file_location('test_native_bot',Path('native_rlbot_v4.py'));mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+    from slater_nexto_scheduler_v038b import NextoV4Clock
+    bot=mod.NativeBot();bot.index=0;bot.actor=object();bot.clock=NextoV4Clock(hardcoded=True,stochastic=False)
+    bot.previous=np.zeros(8,dtype=np.float32);bot.pending=bot.previous.copy();bot.held=bot.previous.copy()
+    bot.last_time=None;bot.tick=0;bot.selected=-1;bot.jumps={};bot.last_diagnostic=None;bot.script_applied=False
+    state=dict(cars=[dict(pos=[0,-4608,17],team=0,previous=[0]*8),dict(pos=[0,4608,17],team=1)],ball=dict(pos=[0,0,93]))
+    bot.native_packet=lambda p:state
+    p=S(game_info=S(seconds_elapsed=0,is_kickoff_pause=True),game_cars=[S(has_wheel_contact=True,boost=33)])
+    for tick in range(180):
+        p.game_info.seconds_elapsed=tick/120;p.game_info.is_kickoff_pause=tick<120
+        out=bot.get_output(p)
+        if tick>=120:assert out.throttle==1 and not out.boost and not out.jump

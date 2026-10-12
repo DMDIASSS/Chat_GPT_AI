@@ -25,7 +25,7 @@ class NativeBot(BaseAgent):
         torch.set_num_threads(1)
         self.actor=NativeActor(HERE/'checkpoint');self.clock=NextoV4Clock(hardcoded=SCRIPTED_KICKOFF,stochastic=False)
         self.previous=np.zeros(8,dtype=np.float32);self.held=self.previous.copy();self.pending=self.previous.copy()
-        self.last_time=None;self.tick=0;self.jumps={}
+        self.last_time=None;self.tick=0;self.jumps={};self.selected=-1;self.last_diagnostic=None;self.script_applied=False
         field=self.get_field_info();locations=np.load(HERE/'boost_locations.npy')
         pads=np.array([vector(field.boost_pads[i].location) for i in range(field.num_boosts)])
         if len(pads)!=34:raise ValueError('Native export supports standard Soccar boost pads only')
@@ -60,11 +60,21 @@ class NativeBot(BaseAgent):
             positions=np.array([c['pos'][:2] for c in state['cars']]);teams=np.array([c['team'] for c in state['cars']])
             for _ in range(elapsed):
                 state['cars'][self.index]['previous']=self.previous.tolist()
-                if self.tick%8==0:self.pending=nexto_actions()[infer(self.actor,state,self.index+1)].copy()
+                if self.tick%8==0:
+                    self.selected=infer(self.actor,state,self.index+1)
+                    self.pending=nexto_actions()[self.selected].copy()
                 if self.tick%8==1:self.held=self.pending.copy()
                 frame=self.clock.frame(is_kickoff_pause=p.game_info.is_kickoff_pause,ball_xy=state['ball']['pos'][:2],
                     positions=positions,teams=teams,index=self.index,infer=lambda prev,beta:(0,self.held))
-                self.previous=frame.controls.copy();self.tick+=1
+                self.script_applied=frame.script_applied
+                self.previous=frame.controls.copy() if frame.script_applied else self.held.copy()
+                self.tick+=1
         a=self.previous
+        if elapsed and (self.last_diagnostic is None or now-self.last_diagnostic>=5 or now<self.last_diagnostic):
+            self.last_diagnostic=now
+            print('NATIVE_OUTPUT', 'time',round(now,2),'policy_action',self.selected,
+                  'policy_controls',self.pending.tolist(),'sent_controls',a.tolist(),
+                  'script',self.script_applied,'ground',bool(p.game_cars[self.index].has_wheel_contact),
+                  'boost',p.game_cars[self.index].boost,flush=True)
         return SimpleControllerState(throttle=float(a[0]),steer=float(a[1]),pitch=float(a[2]),yaw=float(a[3]),roll=float(a[4]),
                                      jump=bool(a[5]),boost=bool(a[6]),handbrake=bool(a[7]))
