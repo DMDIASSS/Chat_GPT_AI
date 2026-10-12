@@ -1,5 +1,9 @@
 # Native GigaLearn + replay preparation
 
+For the new replay, focused practice and independent selection workflow, follow
+[SLATER_NATIVE_QUALITY_README.md](../../SLATER_NATIVE_QUALITY_README.md).
+This page describes the original native setup and individual commands.
+
 A tested CPU C++ training path for the pinned public GigaLearn archive, with a
 fixed observation layout, replay pretraining/reset banks, bounded iterations,
 resume, pause and throughput reports. New files/results stay under
@@ -38,7 +42,7 @@ The standalone CMake target builds GigaLearn, RLGymCPP and RocketSim, without th
 unnecessary RLBot executable. Compatibility fixes cover broken relative paths,
 case-sensitive headers, monotonic timer types and portable C++20 iterator traits.
 The patch refuses unknown contents instead of overwriting a customized checkout.
-Windows CRLF and LF copies of the exact pinned source are both accepted. All six
+Windows CRLF and LF copies of the exact pinned source are both accepted. All eight
 source files must match known original or patched text before any line endings
 are normalized. Actual code edits and partial patches still stop the setup.
 If an older installer reports `Unexpected source contents` on an unedited

@@ -28,23 +28,27 @@ def fetch(url,path,commit):
 def patch_source(path):
     path=Path(path)
     if subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'],text=True).strip()!=GIGA:raise ValueError('Unexpected GigaLearn commit')
-    manifest=read_json(HERE/'patch_manifest.json');states=[];normalized=[]
+    manifest=read_json(HERE/'patch_manifest.json');states=[];normalized=[];is_original=True;is_current=True;is_legacy=True
     for name,values in manifest.items():
         raw=(path/name).read_bytes()
         canonical=raw.replace(b'\r\n',b'\n')
         h=hashlib.sha256(canonical).hexdigest()
+        is_original &= h==values['original'];is_current &= h==values['patched']
+        is_legacy &= 'legacy' in values and h==values['legacy']
         if h==values['original']:states.append('original')
         elif h==values['patched']:states.append('patched')
+        elif h==values.get('legacy'):states.append('legacy')
         else:raise ValueError('Unexpected source contents (even after CRLF normalization): '+name+'; no blind overwrite')
         if raw!=canonical:normalized.append((path/name,canonical))
     # Validate every file before changing any bytes. Only known source text may
     # be normalized; a user edit or partial patch must leave the checkout intact.
-    if len(set(states))!=1:raise ValueError('Partial patch; preserve checkout and use a fresh source folder')
+    if not (is_original or is_current or is_legacy):raise ValueError('Partial patch; preserve checkout and use a fresh source folder')
     for file,canonical in normalized:file.write_bytes(canonical)
     if normalized:print('Normalized Windows CRLF line endings in',len(normalized),'verified source files.',flush=True)
-    if set(states)=={'patched'}:print('Known compatibility patch already applied.');return
-    command(['git','-C',path,'apply','--check',HERE/'compatibility.patch'])
-    command(['git','-C',path,'apply',HERE/'compatibility.patch'])
+    if is_current:print('Known compatibility patch already applied.');return
+    patch=HERE/('campaign.patch' if is_legacy else 'compatibility.patch')
+    command(['git','-C',path,'apply','--check',patch])
+    command(['git','-C',path,'apply',patch])
     patched_files=[]
     for name,values in manifest.items():
         file=path/name;raw=file.read_bytes();canonical=raw.replace(b'\r\n',b'\n')
@@ -152,20 +156,35 @@ def process_result(text,code,logfile):
         raise RuntimeError(f'Native executable returned zero but did not verify training: {exc}\nLog: {logfile}\n{tail}') from exc
 
 
+def binary_identity(build):
+    build=Path(build).resolve();exe=build/('SlaterGigaNative.exe' if os.name=='nt' else 'SlaterGigaNative')
+    library=build/'giga'/('GigaLearnCPP.dll' if os.name=='nt' else 'libGigaLearnCPP.so')
+    if not exe.is_file() or not library.is_file():raise ValueError('Complete native executable/library build required')
+    shadow=build/library.name
+    if shadow.is_file() and sha256(shadow)!=sha256(library):raise ValueError('Stale native library beside executable; rebuild to refresh the copy')
+    return {'binary_sha':sha256(exe),'library_sha':sha256(library)}
+
+
 def run(a,resume=False):
+    if not 0<=a.decisions<=100000000:raise ValueError('Additional decision budget must be 0..100000000')
     if not a.run or not a.run.replace('_','').replace('-','').isalnum():raise ValueError('Use an ASCII run name')
     run=BASE/'runs'/a.run
     if run.exists() and not resume:raise FileExistsError('Run exists: use resume or a new run name')
     binary=Path(a.build_dir).resolve()/('SlaterGigaNative.exe' if os.name=='nt' else 'SlaterGigaNative')
     if not binary.is_file():raise ValueError('Build the native executable first')
     profile={'games':a.games,'steps':a.steps,'threads':a.threads,'players':a.players,'device':a.device,
-             'width':a.width,'depth':a.depth,'bank':str(Path(a.replay_bank).resolve()) if a.replay_bank else None}
+             'width':a.width,'depth':a.depth,'bank':str(Path(a.replay_bank).resolve()) if a.replay_bank else None,
+             'campaign':bool(a.campaign),'focus':a.focus,'old_chance':a.old_chance,'save_every':a.save_every,
+             'frozen':[str(Path(p).resolve()) for p in a.frozen_checkpoint or []]}
     if resume:
         saved=read_json(run/'protocol.json')
         if not saved:raise ValueError('No saved native run')
         profile=saved['profile']
-    identity={'profile':profile,'binary_sha':sha256(binary),'gigalearn_commit':GIGA,
+    identity={'profile':profile,**binary_identity(a.build_dir),'gigalearn_commit':GIGA,
               'bank_sha':sha256(profile['bank']) if profile['bank'] else None}
+    if profile.get('frozen'):
+        from slater_native_actor import checkpoint_identity
+        identity['frozen']=[checkpoint_identity(p) for p in profile['frozen']]
     run.mkdir(parents=True,exist_ok=True)
     with process_lock(run/'runner.lock'):
         old=read_json(run/'protocol.json')
@@ -178,10 +197,25 @@ def run(a,resume=False):
                 if not all((source/f).is_file() for f in required):raise ValueError('Initial native checkpoint is incomplete; Nexto .pt is not compatible')
                 shutil.copytree(source,run/'checkpoints'/source.name)
                 atomic_json(run/'source_checkpoint.json',{'path':str(source),'hashes':{f:sha256(source/f) for f in required}})
+            if profile.get('campaign') and profile.get('frozen'):
+                from slater_native_actor import NativeActor,checkpoint_identity
+                if not a.initial_checkpoint:raise ValueError('Seeding frozen policies requires an initial native checkpoint')
+                if len(profile['frozen'])>8:raise ValueError('Use at most eight frozen native policies')
+                for index,path in enumerate(profile['frozen']):
+                    model=NativeActor(path)
+                    if (model.width,model.depth)!=(profile['width'],profile['depth']):raise ValueError('Frozen native architectures must match the learner')
+                    slot=run/'checkpoints/policy_versions'/str(index);slot.mkdir(parents=True,exist_ok=True)
+                    for name in ('POLICY.lt','SHARED_HEAD.lt'):shutil.copy2(Path(path)/name,slot/name)
+                    atomic_json(slot/'STATS.json',{'skill_ratings':{}})
+                atomic_json(run/'frozen_sources.json',identity['frozen'])
             atomic_json(run/'protocol.json',identity)
         pause=run/'pause.flag';pause.unlink(missing_ok=True)
         args=[binary,'--meshes',a.meshes or meshes(),'--checkpoints',run/'checkpoints','--iterations',a.iterations]
         for k in ('games','steps','threads','players','device','width','depth'):args+=['--'+k,str(profile[k])]
+        if a.decisions:args+=['--decisions',str(a.decisions)]
+        if profile.get('campaign'):
+            args+=['--campaign','1','--focus',profile['focus'],'--old-chance',str(profile['old_chance']),
+                '--save-every',str(profile['save_every'])]
         if profile['bank']:args+=['--replay-bank',profile['bank'],'--bc-epochs',str(0 if resume else a.bc_epochs)]
         env=runtime_environment(binary,pause)
         logfile=run/f'training_{time.time_ns()}.log';started=time.perf_counter()
@@ -213,6 +247,10 @@ def main():
     p.add_argument('--iterations',type=int,default=6);p.add_argument('--threads',type=int,default=2);p.add_argument('--players',type=int,default=1)
     p.add_argument('--device',choices=('cpu','cuda','auto'),default='cpu');p.add_argument('--width',type=int,default=128);p.add_argument('--depth',type=int,default=2)
     p.add_argument('--initial-checkpoint');p.add_argument('--replay-bank');p.add_argument('--bc-epochs',type=int,default=2)
+    p.add_argument('--campaign',action='store_true');p.add_argument('--focus',default='mixed')
+    p.add_argument('--old-chance',type=float,default=.4);p.add_argument('--save-every',type=int,default=500000)
+    p.add_argument('--frozen-checkpoint',action='append')
+    p.add_argument('--decisions',type=int,default=0,help='Additional trained-player decision budget, checked at iteration boundaries')
     p.add_argument('--input');p.add_argument('--output');p.add_argument('--replicar-exe',default='replicar')
     a=p.parse_args()
     if a.command=='check':
