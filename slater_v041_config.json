@@ -1,0 +1,31 @@
+{
+  "run_name": "overnight01",
+  "opponents": {
+    "nexto": null,
+    "cycle9": null,
+    "wavedash": "data/rlbot_exports/wavedash/nexto-model.pt",
+    "original_champion": null,
+    "v70": null,
+    "v60": null
+  },
+  "rollout_steps": 512,
+  "updates_per_trial": 3,
+  "episode_steps": 450,
+  "eval_steps": 600,
+  "screen_seeds": 1,
+  "promotion_seeds": 3,
+  "small_mutation": 0.012,
+  "large_mutation": 0.065,
+  "promote_margin": 0.13,
+  "max_archive": 10,
+  "min_disk_gb": 2,
+  "save_every_update": true,
+  "generation_candidates_limit": 6,
+  "teacher_weight_small": 0.30,
+  "teacher_weight_large": 0.10,
+  "actor_lr_small": 0.000002,
+  "actor_lr_large": 0.000008,
+  "epochs": 2,
+  "minibatch": 128,
+  "limit_generations": 0
+}

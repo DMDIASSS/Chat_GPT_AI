@@ -1,0 +1,6 @@
+numpy>=1.26
+# Pin tested, mutually compatible RLGym/RocketSim wheels in your existing .venv
+rlgym[rl-sim]
+rlgym-tools>=2.6
+# install CPU or CUDA PyTorch matching your host platform
+# torch
