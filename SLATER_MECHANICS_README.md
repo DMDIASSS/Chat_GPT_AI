@@ -181,10 +181,11 @@ candidate; a null path means no candidate passed retention yet.
 Native actors remain compatible with the existing exporter:
 
 ```bat
-.venv\Scripts\python.exe export_rlbot_v4.py --checkpoint "data/isolated/mechanics_curriculum/mechanics01/update_000020.pt" --name SlaterMechanics01
+.venv\Scripts\python.exe export_rlbot_v4.py --checkpoint "data/isolated/mechanics_curriculum/mechanics01/update_000020.pt" --name SlaterMechanics01 --scripted-kickoff
 ```
 
-Replace the example path with the retained checkpoint and use a new export name.
+Replace the example path with the retained checkpoint from `selected.json` and use a new export name.
+`--scripted-kickoff` enables the Nexto controller in the RLBot wrapper; the model weights alone do not include that controller.
 The exporter requires your existing RLBot template. Test the export locally in
 Rocket League before treating it as an improved playing bot.
 

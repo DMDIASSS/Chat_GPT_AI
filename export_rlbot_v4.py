@@ -49,7 +49,16 @@ def model_from_checkpoint(path):
  model.eval()
  return model
 
-def export(checkpoint,name,output=None):
+def kickoff_settings(source, scripted):
+ # Require the known Nexto wrapper and both configurable constructor defaults.
+ if scripted and 'self.maybe_do_kickoff(packet, ticks_elapsed)' not in source:
+  raise ValueError('RLBot template lacks the scripted kickoff controller')
+ for key,value in [('hardcoded_kickoffs',scripted),('stochastic_kickoffs',False)]:
+  source,count=re.subn(r'\b'+key+r'\s*=\s*(True|False)\b',key+'='+str(value),source)
+  if count!=1:raise ValueError(f'Expected one {key} constructor setting; found {count}')
+ return source
+
+def export(checkpoint,name,output=None,*,scripted_kickoff=False):
  import torch
  name=validate_name(name);output=Path(OUTPUT if output is None else output).resolve()
  origin=None if checkpoint is None else Path(checkpoint).resolve()
@@ -71,9 +80,7 @@ def export(checkpoint,name,output=None):
   expected=model.state_dict();actual=loaded.state_dict()
   for key in expected:
    if not torch.equal(expected[key],actual[key]):raise RuntimeError(f'Weight mismatch after export: {key}')
-  # Do not force Nexto's scripted kickoffs on experimental policy.
-  b=(tmp/'bot.py').read_text(encoding='utf8')
-  b=b.replace('hardcoded_kickoffs=True, stochastic_kickoffs=True','hardcoded_kickoffs=False, stochastic_kickoffs=False')
+  b=kickoff_settings((tmp/'bot.py').read_text(encoding='utf8'),scripted_kickoff)
   (tmp/'bot.py').write_text(b,encoding='utf8')
   (tmp/'requirements.txt').write_text('rlbot==1.*\nrlgym-compat==1.0.2\nnumpy\ntorch\n',encoding='utf8')
   (tmp/'bot.cfg').write_text(f'''[Locations]
@@ -92,7 +99,7 @@ tags = 1v1
 ''',encoding='utf8')
   (tmp/'EXPORT_INFO.json').write_text(json.dumps({'format':'RLBot v4 legacy','name':name,'source':str(origin) if origin else 'original Nexto',
        'source_sha256':original_checksum,'torchscript_sha256':sha(tmp/'nexto-model.pt'),
-       'hardcoded_kickoffs':False,'online_play_supported':False},indent=2),encoding='utf8')
+       'hardcoded_kickoffs':scripted_kickoff,'stochastic_kickoffs':False,'online_play_supported':False},indent=2),encoding='utf8')
   (tmp/'README_IMPORT.txt').write_text('RLBot v4 only (not RLBot v5). Use bot.cfg with compatible RLBot 4 Python environment.\n'
        'Avoid online matchmaking. Nexto derived weights/code non-commercial CC BY-NC-SA 4.0.\n'
        'RLBot v5 requires an independent port; do not rename bot.cfg to bot.toml.\n',encoding='utf8')
@@ -108,6 +115,7 @@ tags = 1v1
 def main():
  parser=argparse.ArgumentParser(description=__doc__)
  parser.add_argument('--checkpoint',type=Path,default=None)
+ parser.add_argument('--scripted-kickoff',action='store_true',help='Enable Nexto scripted kickoff controller')
  parser.add_argument('--original',action='store_true')
  parser.add_argument('--list',action='store_true')
  parser.add_argument('--name',default='AFK_Cycle9')
@@ -116,5 +124,5 @@ def main():
   for p in discover():print(p.relative_to(ROOT))
   return
  if args.original and args.checkpoint:parser.error('Choose checkpoint or --original, not both')
- export(None if args.original else (args.checkpoint or DEFAULT),args.name)
+ export(None if args.original else (args.checkpoint or DEFAULT),args.name,scripted_kickoff=args.scripted_kickoff)
 if __name__=='__main__':main()
