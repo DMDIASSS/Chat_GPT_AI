@@ -18,3 +18,12 @@ extension-loading interfaces are unavailable); current live-site main bundle
 (network access returned 403); real Car Soccer gameplay / WebRTC friend rooms.
 The actual Chrome extension storage/messaging and live site must be checked on
 Windows. No unsupported claim of live parity or improved strength is made.
+
+4.2.1 compatibility repair (main-DaNpiwbA.js supplied by user):
+- Verified all six physics hooks and updated minified game bindings.
+- Patched complete uploaded module passes Node syntax checking.
+- test_game_bundle.mjs passes runtime startup, state observation, scripted
+  kickoff, neural handoff, neutral controls and online provider restoration.
+- Existing test_runtime.mjs also passes for the previous build.
+- These runtime tests use simulated browser/game objects; live rendering,
+  Chrome debugger interception and real multiplayer gameplay remain untested.

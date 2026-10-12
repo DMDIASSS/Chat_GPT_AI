@@ -1,6 +1,23 @@
 import { createScriptedKickoff } from './kickoff.mjs';
 export function transformMainSource(source) {
+  // Names are scoped to each verified game build. Only our injected fragments
+  // are translated; never rename identifiers in the game's original module.
+  const currentBuild = source.includes('D=new ak(Zh.load().botId)');
+  const names = currentBuild
+    ? {Pc:'Ic', ce:'oe', ic:'sc', sk:'ak', Gf:'Df', te:'ee', Ra:'Pa', zn:'Vn'}
+    : {};
+  const fragment = text => text.replace(/\b(Pc|ce|ic|sk|Gf|te|Ra|zn)\b/g, name => names[name] || name);
+  if (currentBuild) {
+    for (const signature of [
+      'class ak{', 'class Df{', 'De=51,Cc=8,Pa=8,Vn=R.CARS+Pa*De',
+      'ee={throttle:0,steer:0,pitch:0,yaw:0,roll:0,jump:!1,boost:!1,handbrake:!1}'
+    ]) {
+      if (!source.includes(signature)) throw new Error('Unsupported game build: ' + signature);
+    }
+  }
   const replaceExact = (needle, replacement, label, expected = 1) => {
+    needle = fragment(needle);
+    replacement = fragment(replacement);
     const count = source.split(needle).length - 1;
     if (count !== expected) {
       throw new Error(`${label}: expected ${expected} match(es), found ${count}`);
@@ -596,7 +613,7 @@ D.onError=`;
     'window.__GCTrainerRuntime=__GCT4'
   ];
   for (const marker of required) {
-    if (!source.includes(marker)) throw new Error(`post-transform marker missing: ${marker}`);
+    if (!source.includes(fragment(marker))) throw new Error(`post-transform marker missing: ${marker}`);
   }
 
   // The whole point of v4.1: the multiplayer tick expression must remain
