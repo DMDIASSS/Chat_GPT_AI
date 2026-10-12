@@ -469,6 +469,9 @@ class ControlCenter(tk.Tk):
         ttk.Label(row,text='Checkpoint').pack(side='left',padx=(0,8))
         ttk.Entry(row,textvariable=self.rl_checkpoint,width=83).pack(side='left',padx=(0,8))
         ttk.Button(row,text='Browse…',command=self.pick_rl_checkpoint).pack(side='left')
+        self.rl_scripted_kickoff=tk.BooleanVar(value=True)
+        ttk.Checkbutton(p,text='Scripted Nexto kickoff (ON by default)',
+                        variable=self.rl_scripted_kickoff).pack(anchor='w',pady=4)
         self._line_buttons(p,[('Export selected model to RLBot v4',self.export_rlbot),
                              ('Export original Nexto',lambda:self.export_rlbot(original=True)),
                              ('Open exports',lambda:self.open_folder(ROOT/'data'/'rlbot_exports'))])
@@ -664,9 +667,11 @@ class ControlCenter(tk.Tk):
             messagebox.showerror('Invalid name','Letters/digits/_/- only, maximum 60 characters');return
         if not messagebox.askyesno('Export separate RLBot v4 bot',
                 f'Copy {"original Nexto" if original else str(path)} into an isolated RLBot v4 bot named {name}?\n'
+                f'Scripted kickoff: {"ON" if self.rl_scripted_kickoff.get() else "OFF"}.\n'
                 'No existing exports or checkpoints are overwritten.'):
             return
         args=[str(PYTHON),str(ROOT/'export_rlbot_v4.py'),'--name',name]
+        if self.rl_scripted_kickoff.get():args.append('--scripted-kickoff')
         args+=['--original'] if original else ['--checkpoint',str(path)]
         self._spawn('RLBot v4 export',args,category='export')
 
