@@ -90,3 +90,30 @@ def test_replay_preparation_failure_has_persistent_diagnostics(tmp_path,monkeypa
     with pytest.raises(RuntimeError,match='parser failed'):overnight.run('fixture')
     report=read_json(tmp_path/'status.json')
     assert report['status']=='ERROR' and report['reason']=='parser failed'
+
+def test_refresh_trains_new_bank_and_keeps_previous_bank(tmp_path,monkeypatch):
+    old=tmp_path/'old.bin';old.write_bytes(b'protected old bank')
+    fresh=tmp_path/'fresh.bin';fresh.write_bytes(b'prepared fresh bank')
+    s=state();s.update(cycle=4,active_bank=str(old),active_bank_sha=overnight.sha256(old))
+    cfg=tmp_path/'supply.json';atomic_json(cfg,{'enabled':True});monkeypatch.setattr(overnight.supply,'CONFIG',cfg)
+    pack={'inputs':'inputs','dataset':'dataset','bank':str(fresh)}
+    monkeypatch.setattr(overnight.supply,'batch',lambda *a,**k:pack)
+    monkeypatch.setattr(overnight,'child',lambda *a,**k:None)
+    monkeypatch.setattr(overnight,'shortlist',lambda *a,**k:[{'path':'seed'}])
+    learned=[]
+    monkeypatch.setattr(overnight,'learn',lambda *a,**k:learned.append((a,k)) or [Path('new_checkpoint')])
+    monkeypatch.setattr(overnight,'screen',lambda *a,**k:None)
+    overnight.refresh_replays('run',tmp_path,s,{}, {},'build',tmp_path/'pause.flag')
+    assert s['active_bank']==str(fresh) and s['replay_refresh_cycle']==4
+    assert learned[0][0][2]==str(fresh) and learned[0][1]['bc_epochs']==2
+    assert old.read_bytes()==b'protected old bank'
+
+def test_failed_fresh_parser_keeps_training_bank(tmp_path,monkeypatch):
+    s=state();s.update(cycle=4,active_bank='protected bank')
+    cfg=tmp_path/'supply.json';atomic_json(cfg,{'enabled':True});monkeypatch.setattr(overnight.supply,'CONFIG',cfg)
+    monkeypatch.setattr(overnight.supply,'batch',lambda *a,**k:{'inputs':'input','dataset':'data','bank':'new'})
+    def fail(*a,**k):raise RuntimeError('parser failure')
+    monkeypatch.setattr(overnight,'child',fail)
+    overnight.refresh_replays('run',tmp_path,s,{}, {},'build',None)
+    assert s['active_bank']=='protected bank'
+    assert read_json(tmp_path/'replay_supply_status.json')['using_cached_bank']

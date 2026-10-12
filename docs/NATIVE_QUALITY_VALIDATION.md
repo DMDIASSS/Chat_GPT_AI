@@ -37,3 +37,23 @@ checkpoint screens, mechanics assessment and fresh confirmation. A second
 cycle was paused during screening and resumed to completion; all previously
 screened native/Nexto file identities remained unchanged. These fixtures use
 short test budgets and do not establish the user's local model strength.
+
+## Optional replay supply and learner kickoff imitation
+
+The new C++ kickoff imitation phase was compiled and executed. With 16
+demonstration episodes and two epochs, validation CE fell from 3.32692 to
+2.65253. It recorded 5,376 scripted physics ticks and all seven teacher stages.
+Parameter comparisons confirmed that the policy head changed, while the shared
+features, critic and original checkpoint stayed unchanged. This measures
+teacher imitation, not live kickoff strength.
+
+A complete reduced-budget overnight cycle then ran replay BC, kickoff
+imitation, mixed/focused PPO against scripted frozen native opponents, saved
+checkpoint screens, script-off learner comparisons and independent selection.
+The tests cover exact rank metadata filtering, API quotas/429 cooldowns,
+independent dataset fallback, cached-bank retention and raw learner controls
+with scripted rivals.
+
+Ballchasing and Kaggle endpoints returned network access failures in this
+cloud. Live authentication, current remote file listings and successful API
+downloads remain local checks; fixture tests do not establish those outcomes.

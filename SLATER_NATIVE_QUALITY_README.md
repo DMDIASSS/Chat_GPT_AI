@@ -37,7 +37,7 @@ require a new campaign name. This campaign stops after two rounds.
 
 `NATIVE_8_SELECT_ONLY.bat` compares the existing models without new training,
 using your existing `ranked_duels_bank01.bin` and a separate
-`native_quality_screen01` campaign. Its screen results do not replace the full
+`native_quality_screen02` campaign. Its screen results do not replace the full
 campaign's independent final comparison.
 
 ## What it runs
@@ -75,7 +75,7 @@ campaign's independent final comparison.
 The full campaign writes to:
 
 ```text
-data\isolated\native_quality\campaigns\native_quality01\
+data\isolated\native_quality\campaigns\native_quality02\
 ```
 
 Read `selected.json` for `playing_checkpoint`, `native_checkpoint` and the
@@ -91,7 +91,7 @@ and frozen finalists. Each round also records `weaknesses.json`.
 `untouched_replay_test.json` contains the final replay diagnostic.
 
 New native training runs and logs stay under
-`data\isolated\gigalearn_native\runs\native_quality01_*`.
+`data\isolated\gigalearn_native\runs\native_quality02_*`.
 Replays and existing weights are preserved. Old native runs pin their binary
 identity, so they cannot resume with this changed executable; the campaign
 instead copies their complete checkpoint into a new run.

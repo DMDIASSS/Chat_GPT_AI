@@ -144,7 +144,7 @@ def runtime_environment(binary,pause,*,windows=None):
     return env
 
 
-def process_result(text,code,logfile):
+def process_result(text,code,logfile,*,allow_empty_pause=False):
     status=f'0x{code & 0xffffffff:08X}'
     tail='\n'.join(text.splitlines()[-20:])[-4000:] or '(No output from native executable.)'
     if code:
@@ -153,6 +153,11 @@ def process_result(text,code,logfile):
         raise RuntimeError(f'Native executable exited with code {code} ({status}). {hint}\nLog: {logfile}\n{tail}')
     try:return parse_log(text)
     except ValueError as exc:
+        done=re.findall(r'SLATER_GIGA_COMPLETE iterations=(\d+) timesteps=(\d+)',text)
+        if allow_empty_pause and done and 'Collection Steps/Second:' not in text and 'Overall Steps/Second:' not in text:
+            iterations,timesteps=map(int,done[-1])
+            return {'total_iterations':iterations,'total_timesteps':timesteps,'paused_before_collection':True,
+                'note':'Saved pause before PPO collection; no throughput measurements were taken.'}
         raise RuntimeError(f'Native executable returned zero but did not verify training: {exc}\nLog: {logfile}\n{tail}') from exc
 
 
@@ -175,6 +180,7 @@ def run(a,resume=False):
     profile={'games':a.games,'steps':a.steps,'threads':a.threads,'players':a.players,'device':a.device,
              'width':a.width,'depth':a.depth,'bank':str(Path(a.replay_bank).resolve()) if a.replay_bank else None,
              'campaign':bool(a.campaign),'focus':a.focus,'old_chance':a.old_chance,'save_every':a.save_every,
+             'kickoff_epochs':getattr(a,'kickoff_epochs',0),'kickoff_demos':getattr(a,'kickoff_demos',32),
              'frozen':[str(Path(p).resolve()) for p in a.frozen_checkpoint or []]}
     if resume:
         saved=read_json(run/'protocol.json')
@@ -217,6 +223,8 @@ def run(a,resume=False):
             args+=['--campaign','1','--focus',profile['focus'],'--old-chance',str(profile['old_chance']),
                 '--save-every',str(profile['save_every'])]
         if profile['bank']:args+=['--replay-bank',profile['bank'],'--bc-epochs',str(0 if resume else a.bc_epochs)]
+        args+=['--kickoff-epochs',str(0 if resume else profile.get('kickoff_epochs',0)),
+            '--kickoff-demos',str(profile.get('kickoff_demos',32))]
         env=runtime_environment(binary,pause)
         logfile=run/f'training_{time.time_ns()}.log';started=time.perf_counter()
         with logfile.open('w',encoding='utf8') as f:
@@ -224,7 +232,7 @@ def run(a,resume=False):
             for line in proc.stdout:f.write(line);f.flush();print(line,end='',flush=True)
             code=proc.wait()
         text=logfile.read_text(encoding='utf8')
-        try:result=process_result(text,code,logfile)
+        try:result=process_result(text,code,logfile,allow_empty_pause=pause.exists())
         except RuntimeError as exc:
             atomic_json(run/'failure.json',{'exit_code':code,'exit_hex':f'0x{code & 0xffffffff:08X}',
                 'log':str(logfile),'error':str(exc)})
@@ -251,6 +259,7 @@ def main():
     p.add_argument('--old-chance',type=float,default=.4);p.add_argument('--save-every',type=int,default=500000)
     p.add_argument('--frozen-checkpoint',action='append')
     p.add_argument('--decisions',type=int,default=0,help='Additional trained-player decision budget, checked at iteration boundaries')
+    p.add_argument('--kickoff-epochs',type=int,default=0);p.add_argument('--kickoff-demos',type=int,default=32)
     p.add_argument('--input');p.add_argument('--output');p.add_argument('--replicar-exe',default='replicar')
     a=p.parse_args()
     if a.command=='check':

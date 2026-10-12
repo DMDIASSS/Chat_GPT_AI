@@ -12,6 +12,7 @@
 #include "ReplayBC.h"
 #include "NativeProbe.h"
 #include "Campaign.h"
+#include "KickoffBC.h"
 #include <cstdlib>
 #include <iostream>
 #include <filesystem>
@@ -41,7 +42,7 @@ void envSet(const char* key,const std::string& value){
 int main(int argc,char** argv){
  try{
     std::string meshes,checkpoint,device="cpu",bank,probe,probeOut;int steps=4096,iterations=2,threads=2,bcEpochs=0,width=128,depth=2;
-    float oldChance=.4f;int saveEvery=0;
+    float oldChance=.4f;int saveEvery=0,kickoffEpochs=0,kickoffDemos=32;
     uint64_t decisionBudget=0;
     for(int i=1;i<argc;i++){
       std::string key=argv[i];if(i+1>=argc)throw std::runtime_error("Missing value for "+key);
@@ -51,6 +52,7 @@ int main(int argc,char** argv){
       else if(key=="--campaign")campaign=std::stoi(value)!=0;else if(key=="--focus")campaignFocus=value;
       else if(key=="--old-chance")oldChance=std::stof(value);else if(key=="--save-every")saveEvery=std::stoi(value);
       else if(key=="--decisions")decisionBudget=std::stoull(value);
+      else if(key=="--kickoff-epochs")kickoffEpochs=std::stoi(value);else if(key=="--kickoff-demos")kickoffDemos=std::stoi(value);
       else if(key=="--width")width=std::stoi(value);else if(key=="--depth")depth=std::stoi(value);else if(key=="--replay-bank")bank=value;else if(key=="--bc-epochs")bcEpochs=std::stoi(value);else if(key=="--device")device=value;else if(key=="--games")games=std::stoi(value);
       else if(key=="--steps")steps=std::stoi(value);else if(key=="--iterations")iterations=std::stoi(value);
       else if(key=="--threads")threads=std::stoi(value);else if(key=="--players")players=std::stoi(value);
@@ -58,6 +60,7 @@ int main(int argc,char** argv){
     }
     if(meshes.empty()||checkpoint.empty()||games<2||games>1024||steps<512||iterations<1||threads<1||threads>32||players<1||players>3||width<64||width>1024||depth<1||depth>6||bcEpochs<0||bcEpochs>10)
        throw std::runtime_error("Invalid/missing meshes, checkpoints or training limits");
+    if(kickoffEpochs<0||kickoffEpochs>5||kickoffDemos<10||kickoffDemos>128)throw std::runtime_error("Invalid kickoff imitation budget");
     torch::set_num_threads(threads);torch::set_num_interop_threads(1);
     RocketSim::Init(meshes);
     LearnerConfig cfg{};cfg.numGames=games;cfg.tickSkip=8;cfg.actionDelay=1;cfg.randomSeed=20261012;
@@ -89,6 +92,7 @@ int main(int argc,char** argv){
     });
     if(!probe.empty()){if(probeOut.empty())throw std::runtime_error("Missing probe output");nativeProbe(learner,probe,probeOut);return 0;}
     replayBC(learner,bcEpochs);
+    kickoffBC(learner,kickoffEpochs,kickoffDemos);
     envSet("SLATER_GL_STOP_ITERATION",std::to_string(learner->totalIterations+iterations));
     if(decisionBudget)envSet("SLATER_GL_STOP_TIMESTEP",std::to_string(learner->totalTimesteps+decisionBudget));
     std::cout<<"SLATER_GIGA_BEGIN games="<<games<<" steps="<<steps<<" device="<<device<<" architecture=GIGALEARN_MLP"<<std::endl;

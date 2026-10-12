@@ -70,21 +70,28 @@ public:
 class CampaignAction : public RLGC::DefaultAction {
     uint64_t kickoffOrigin=0;bool active=false;
 public:
+    static int ScriptStage(uint64_t tick){
+        const int duration[]={44,16,8,4,4,52,40};int stage=0;
+        for(;stage<6&&tick>=duration[stage];stage++)tick-=duration[stage];return stage;
+    }
+    static RLGC::Action ScriptAction(uint64_t tick){
+        const float stages[][8]={{1,0,0,0,0,0,1,0},{1,-1,0,0,0,0,1,0},
+            {1,0,0,0,0,1,1,0},{1,0,0,0,0,0,1,0},{1,0,-.7f,.8f,0,1,1,0},{1,0,1,0,0,0,1,0},{1,0,.5f,0,1,0,0,0}};
+        RLGC::Action action;auto& stage=stages[ScriptStage(tick)];for(int i=0;i<8;i++)action[i]=stage[i];return action;
+    }
     void ApplyPhysicsControls(RocketSim::Arena* arena)override{
         auto marker=std::getenv("SLATER_GL_FROZEN_TEAM");if(!marker||std::atoi(marker)<0){active=false;return;}
         int team=std::atoi(marker);auto ball=arena->ball->GetState();bool proxy=ball.pos.Length2D()<1&&ball.pos.z<100;
         if(!proxy){active=false;return;}if(!active){active=true;kickoffOrigin=arena->tickCount;}
         auto tick=arena->tickCount-kickoffOrigin;if(tick>=168||ball.pos.y!=0)return;
-        const int duration[]={44,16,8,4,4,52,40};const float stages[][8]={{1,0,0,0,0,0,1,0},{1,-1,0,0,0,0,1,0},
-            {1,0,0,0,0,1,1,0},{1,0,0,0,0,0,1,0},{1,0,-.7f,.8f,0,1,1,0},{1,0,1,0,0,0,1,0},{1,0,.5f,0,1,0,0,0}};
-        int stage=0;for(;stage<6&&tick>=duration[stage];stage++)tick-=duration[stage];
+        auto action=ScriptAction(tick);
         float closest=1e20;for(auto* c:arena->GetCars())closest=std::min(closest,c->GetState().pos.Dist2D(ball.pos));
         for(auto* car:arena->GetCars())if(int(car->team)==team){
             auto state=car->GetState();float distance=state.pos.Dist2D(ball.pos);if(std::abs(distance-closest)>10)continue;
             bool taking=true;for(auto* other:arena->GetCars())if(other!=car&&other->team==car->team&&std::abs(other->GetState().pos.Dist2D(ball.pos)-distance)<=10){
                 bool left=team==0?other->GetState().pos.x<state.pos.x:other->GetState().pos.x>state.pos.x;if(!left)taking=false;
             }
-            if(taking){auto& a=stages[stage];car->controls.throttle=a[0];car->controls.steer=a[1];car->controls.pitch=a[2];car->controls.yaw=a[3];
+            if(taking){auto& a=action;car->controls.throttle=a[0];car->controls.steer=a[1];car->controls.pitch=a[2];car->controls.yaw=a[3];
                 car->controls.roll=a[4];car->controls.jump=a[5];car->controls.boost=a[6];car->controls.handbrake=a[7];frozenScriptTicks++;}
         }
     }

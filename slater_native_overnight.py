@@ -10,14 +10,16 @@ from slater_v041_core import atomic_json,read_json,sha256,process_lock
 from slater_native_actor import NativeActor,checkpoint_identity
 from slater_native_eval import evaluate,paired_verdict,model_identity,identity_digest,EvaluationPaused,check_pause,code_identity
 from slater_native_campaign import ROOT,BASE,helper,paths,discover,frozen_rivals,checkpoints,SKILLS,guard
+import slater_replay_supply as supply
 
 DEFAULT={
     'games':64,'steps':32768,'threads':2,'decisions_per_chunk':1000000,
-    'iteration_limit':200,'old_chance':.4,'bc_epochs':5,
+    'iteration_limit':200,'old_chance':1.,'bc_epochs':5,
     'screen_seeds':2,'screen_seconds':45,'skill_seeds':2,'skill_seconds':8,
     'confirm_every':3,'confirm_seeds':12,'confirm_seconds':90,
     'min_disk_gb':10,'family_alpha':.05,
     'exploration_margin':.5,
+    'kickoff_epochs':1,'kickoff_demos':32,
 }
 SCREEN_SEED=5100000000
 QUALITY_BANK=ROOT/'data/isolated/ranked_duels_quality_bank01.bin'
@@ -27,7 +29,7 @@ def validate(cfg):
         ('decisions_per_chunk',1000,10000000),('iteration_limit',1,2000),
         ('bc_epochs',0,10),('screen_seeds',1,8),('screen_seconds',8,120),
         ('skill_seeds',1,8),('skill_seconds',8,30),('confirm_every',1,100),
-        ('confirm_seeds',8,64),('confirm_seconds',8,300)):
+        ('confirm_seeds',8,64),('confirm_seconds',8,300),('kickoff_epochs',0,5),('kickoff_demos',10,128)):
         if not isinstance(cfg[key],int) or not low<=cfg[key]<=high:raise ValueError('Invalid '+key)
     if not 0<=cfg['old_chance']<=1 or not 0<cfg['family_alpha']<=.05 or cfg['min_disk_gb']<0 or not 0<=cfg['exploration_margin']<=2:
         raise ValueError('Invalid opponent probability, error budget or disk floor')
@@ -51,6 +53,7 @@ def shortlist(folder,registry,state,limit=10):
         'overall_shortlist':rows[:limit],'models_preserved':len(rows),
         'confirmed_playing_checkpoint':state['confirmed_playing'],
         'specialists':state.get('specialists',{}),
+        'unscripted_learner_report':state.get('unscripted_learner_report'),
         'note':'All screens use the same rivals, seeds and colors. These are exploratory scores, not an independent best-model guarantee.'}
     atomic_json(folder/'shortlist.json',report)
     lines=['# Overnight checkpoint shortlist','',report['note'],'',
@@ -62,6 +65,8 @@ def shortlist(folder,registry,state,limit=10):
     lines+=['',f"Confirmed playing incumbent: `{state['confirmed_playing']}`",'',
         'Skill specialists (practice scores, not certified mastery):','']
     lines.extend(f"- {task}: `{r['path']}` (success rate {r['rate']:.3f})" for task,r in state.get('specialists',{}).items())
+    if state.get('unscripted_learner_report'):
+        lines+=['',f"Learner kickoff script OFF, rivals ON: `{state['unscripted_learner_report']}`"]
     tmp=folder/'SHORTLIST.md.writing';tmp.write_text('\n'.join(lines)+'\n',encoding='utf8');os.replace(tmp,folder/'SHORTLIST.md')
     return native
 
@@ -108,7 +113,7 @@ def child(args,folder,state,stop,*,native_name=None):
     finally:
         write_status(folder,state,active_run=None)
 
-def learn(name,source,bank,focus,pool,folder,state,build,stop,*,bootstrap=False):
+def learn(name,source,bank,focus,pool,folder,state,build,stop,*,bootstrap=False,bc_epochs=None):
     cfg=state['config'];h=helper();run=h.BASE/'runs'/name
     completed=read_json(run/'overnight_completed.json')
     if completed:
@@ -125,14 +130,15 @@ def learn(name,source,bank,focus,pool,folder,state,build,stop,*,bootstrap=False)
             '--run',name,'--build-dir',build,'--device','auto','--games',cfg['games'],
             '--steps',cfg['steps'],'--threads',cfg['threads'],'--width',actor.width,'--depth',actor.depth,
             '--iterations',2 if bootstrap else cfg['iteration_limit'],
-            '--bc-epochs',cfg['bc_epochs'] if bootstrap else 0]
+            '--bc-epochs',(cfg['bc_epochs'] if bc_epochs is None else bc_epochs) if bootstrap else 0,
+            '--kickoff-epochs',cfg['kickoff_epochs'],'--kickoff-demos',cfg['kickoff_demos'],
+            '--campaign','--focus','mixed' if bootstrap else focus,
+            '--old-chance',cfg['old_chance'],'--save-every',cfg['decisions_per_chunk']]
         if not bootstrap:
-            args+=['--decisions',remaining,'--campaign','--focus',focus,
-                '--old-chance',cfg['old_chance'],'--save-every',cfg['decisions_per_chunk']]
+            args+=['--decisions',remaining]
         if not protocol:
             args+=['--initial-checkpoint',source,'--replay-bank',bank]
-            if not bootstrap:
-                for path in pool:args+=['--frozen-checkpoint',path]
+            for path in pool or [source]:args+=['--frozen-checkpoint',path]
         child(args,folder,state,stop,native_name=name)
     saved=checkpoints(run/'checkpoints')
     if not saved:raise RuntimeError('Training produced no complete checkpoint')
@@ -143,6 +149,29 @@ def learn(name,source,bank,focus,pool,folder,state,build,stop,*,bootstrap=False)
     for p in results:checkpoint_identity(p)
     atomic_json(run/'overnight_completed.json',{'checkpoints':[str(p) for p in results]})
     return results
+
+def refresh_replays(name,folder,state,registry,rivals,build,stop):
+    settings={**supply.DEFAULT,**read_json(supply.CONFIG,{'enabled':False})}
+    if not settings['enabled'] or not state['cycle'] or state['cycle']%settings['refresh_cycles']:return
+    cycle=state['cycle']
+    if state.get('replay_refresh_cycle')==cycle:return
+    write_status(folder,state,status='ACQUIRING_FRESH_REPLAYS')
+    try:pack=supply.batch(folder,cycle,cfg=settings,stop_file=stop)
+    except supply.SupplyPaused as exc:raise EvaluationPaused(str(exc)) from None
+    if pack:
+        try:
+            child([sys.executable,'-u',ROOT/'slater_native_campaign.py','prepare',
+                '--inputs',pack['inputs'],'--dataset',pack['dataset'],'--bank',pack['bank'],
+                '--max-replays',settings['batch_size']],folder,state,stop)
+        except RuntimeError as exc:
+            atomic_json(folder/'replay_supply_status.json',{'using_cached_bank':True,'reason':'Fresh batch preparation failed; inspect parser logs'})
+            write_status(folder,state,replay_refresh_cycle=cycle);return
+        previous=shortlist(folder,registry,state)[0]['path']
+        for p in learn(f'{name}_replay_{cycle:05d}',previous,pack['bank'],'mixed',[],
+            folder,state,build,stop,bootstrap=True,bc_epochs=2):
+            screen(p,f'fresh_replay_batch_{cycle}',folder,registry,state,rivals,build,stop)
+        state['active_bank']=pack['bank'];state['active_bank_sha']=sha256(pack['bank'])
+    write_status(folder,state,replay_refresh_cycle=cycle)
 
 def confirm(candidate,folder,state,rivals,build,stop):
     if Path(candidate).resolve()==Path(state['confirmed_playing']).resolve():return
@@ -180,7 +209,7 @@ def run(name,*,bank=QUALITY_BANK,build_dir=None,config=None,candidates=None,prep
         stop.unlink(missing_ok=True)
         state=read_json(folder/'status.json',{})
         write_status(folder,state,status='PREPARING_REPLAYS',active_run=None)
-        if prepare:
+        if prepare and not (folder/'protocol.json').is_file():
             try:
                 child([sys.executable,'-u',ROOT/'slater_native_campaign.py','prepare','--bank',bank],folder,state,stop)
             except EvaluationPaused as exc:
@@ -189,18 +218,22 @@ def run(name,*,bank=QUALITY_BANK,build_dir=None,config=None,candidates=None,prep
                 write_status(folder,state,status='ERROR',reason=str(exc));raise
         h=helper();build=Path(build_dir or h.BASE/'build').resolve()
         old=read_json(folder/'protocol.json')
-        candidates=candidates or ({n:r['path'] for n,r in old['candidates'].items()} if old else discover())
+        if candidates is None:
+            candidates={n:r['path'] for n,r in old['candidates'].items()} if old else discover()
         rivals=frozen_rivals(candidates)
         protocol={'candidates':{n:model_identity(p) for n,p in candidates.items()},'rivals':{n:model_identity(p) for n,p in rivals.items()},
             'config':cfg,'bank':str(Path(bank).resolve()),'bank_sha':sha256(bank),
             'build':str(build),'binary':h.binary_identity(build),'code':{**code_identity(),'overnight':sha256(__file__),
-                'campaign':sha256(ROOT/'slater_native_campaign.py')}}
+                'campaign':sha256(ROOT/'slater_native_campaign.py'),'supply':sha256(supply.__file__)}}
         if old and old!=protocol:raise ValueError('Overnight inputs changed; use a new --run name')
         if not old:atomic_json(folder/'protocol.json',protocol)
         if 'cycle' not in state:
             playing=str(next((p for n,p in candidates.items() if n=='update180'),next(iter(rivals.values()))))
             state.update(cycle=0,bootstrap_done=False,confirmed_playing=playing,confirmation_attempts=0,specialists={},lineages={})
         state['config']=cfg;registry=read_json(folder/'models.json',{})
+        state.setdefault('active_bank',str(Path(bank).resolve()));state.setdefault('active_bank_sha',sha256(bank))
+        if sha256(state['active_bank'])!=state['active_bank_sha']:raise ValueError('Active replay bank changed')
+        supply.initial_seen(folder)
         try:
             write_status(folder,state,status='INITIAL_SCREEN')
             for label,path in candidates.items():screen(path,label,folder,registry,state,rivals,build,stop)
@@ -214,6 +247,7 @@ def run(name,*,bank=QUALITY_BANK,build_dir=None,config=None,candidates=None,prep
                 write_status(folder,state,bootstrap_done=True)
             while not max_cycles or state['cycle']<max_cycles:
                 check_pause(stop);capacity(folder,cfg);index=state['cycle'];round_folder=folder/f'cycle_{index+1:05d}'
+                refresh_replays(name,folder,state,registry,rivals,build,stop)
                 plan=read_json(round_folder/'plan.json')
                 if not plan:
                     native=shortlist(folder,registry,state);source=native[0]['path'];actor=NativeActor(source)
@@ -227,17 +261,23 @@ def run(name,*,bank=QUALITY_BANK,build_dir=None,config=None,candidates=None,prep
                         # Continue close exploration lineages without discarding the archive leader.
                         same_arch=bool(row) and (NativeActor(previous).width,NativeActor(previous).depth)==(actor.width,actor.depth)
                         sources[label]=previous if same_arch and row['score']['mean_goal_diff']>=native[0]['score']['mean_goal_diff']-cfg['exploration_margin'] else source
-                    plan={'source':source,'sources':sources,'focus':focus,'pool':pool};atomic_json(round_folder/'plan.json',plan)
+                    plan={'source':source,'sources':sources,'focus':focus,'pool':pool,
+                        'bank':state['active_bank'],'bank_sha':state['active_bank_sha']};atomic_json(round_folder/'plan.json',plan)
                 for label,focus in (('mixed','mixed'),('focused',plan['focus'])):
                     check_pause(stop);write_status(folder,state,status='TRAINING_'+label.upper(),cycle_focus=plan['focus'])
                     chunk=f'{name}_c{index+1:05d}_{label}'
-                    learned=learn(chunk,plan['sources'][label],bank,focus,plan['pool'],folder,state,build,stop)
+                    if sha256(plan['bank'])!=plan['bank_sha']:raise ValueError('Planned replay bank changed')
+                    learned=learn(chunk,plan['sources'][label],plan['bank'],focus,plan['pool'],folder,state,build,stop)
                     for p in learned:
                         write_status(folder,state,status='SCREENING_CHECKPOINTS')
                         screen(p,f'cycle_{index+1}_{label}',folder,registry,state,rivals,build,stop)
                     state.setdefault('lineages',{})[label]=str(learned[-1].resolve())
                 native=shortlist(folder,registry,state)
                 practice(native[0]['path'],round_folder/'after',state,rivals,build,stop)
+                raw=evaluate({'leader':native[0]['path'],'reference':plan['source']},rivals,
+                    out=round_folder/'unscripted_learner.json',seeds=cfg['screen_seeds'],seconds=cfg['screen_seconds'],
+                    seed_base=5500000000,build_dir=build,stop_file=stop,learner_scripted=False)
+                state['unscripted_learner_report']=str(round_folder/'unscripted_learner.json')
                 if (index+1)%cfg['confirm_every']==0:
                     write_status(folder,state,status='INDEPENDENT_CONFIRMATION')
                     confirm(native[0]['path'],folder,state,rivals,build,stop)
@@ -256,7 +296,7 @@ def run(name,*,bank=QUALITY_BANK,build_dir=None,config=None,candidates=None,prep
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('command',choices=('run','pause','status'))
-    p.add_argument('--run',default='native_overnight02');p.add_argument('--bank',default=str(QUALITY_BANK))
+    p.add_argument('--run',default='native_overnight03');p.add_argument('--bank',default=str(QUALITY_BANK))
     p.add_argument('--build-dir');p.add_argument('--config');p.add_argument('--candidate',action='append')
     p.add_argument('--skip-prepare',action='store_true');p.add_argument('--max-cycles',type=int,default=0)
     a=p.parse_args();folder=paths(a.run)

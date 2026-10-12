@@ -18,6 +18,14 @@ def test_zero_exit_without_completion_is_not_success():
     with pytest.raises(ValueError):m.parse_log('Collection Steps/Second: 100\nOverall Steps/Second: 50\n')
 
 
+def test_pause_before_first_collection_reports_saved_progress_without_fake_throughput(tmp_path):
+    m=load();message='SLATER_GIGA_COMPLETE iterations=10 timesteps=8192'
+    result=m.process_result(message,0,tmp_path/'log',allow_empty_pause=True)
+    assert result['paused_before_collection'] and result['total_timesteps']==8192
+    assert 'Collection Steps/Second' not in result
+    with pytest.raises(RuntimeError):m.process_result(message,0,tmp_path/'log')
+
+
 def test_warm_throughput_parser_counts_agent_decisions():
     m=load();text='Collection Steps/Second: 1,000\nOverall Steps/Second: 500\nCollection Steps/Second: 2,000\nOverall Steps/Second: 800\nSLATER_GIGA_COMPLETE iterations=2 timesteps=4096'
     r=m.parse_log(text)

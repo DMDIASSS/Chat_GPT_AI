@@ -87,3 +87,11 @@ def test_ties_and_duplicate_matches_are_not_confirmation():
 def test_checkpoint_inventory_ignores_incomplete_and_non_numbered_folders(archive):
     path=archive[0];(path.parent/'2000').mkdir();(path.parent/'notes').mkdir()
     assert checkpoints(path.parent)==[path]
+
+def test_unscripted_learner_keeps_rival_kickoff_script_on(archive,monkeypatch):
+    import slater_native_eval as evaluator
+    model=NativeActor(archive[0]);original=evaluator.Controller;flags=[]
+    def spy(actor,scripted=True):flags.append(scripted);return original(actor,scripted=scripted)
+    monkeypatch.setattr(evaluator,'Controller',spy)
+    result=evaluator.match(model,model,side='blue',seed=19,seconds=8,learner_scripted=False)
+    assert flags==[False,True] and result['script_ticks']>0

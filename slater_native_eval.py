@@ -105,8 +105,8 @@ def parity(path,build_dir=None):
         return report
 
 class Controller:
-    def __init__(self,actor):
-        self.actor=actor;self.native=isinstance(actor,NativeActor);self.clock=NextoV4Clock(hardcoded=True,stochastic=False)
+    def __init__(self,actor,scripted=True):
+        self.actor=actor;self.native=isinstance(actor,NativeActor);self.clock=NextoV4Clock(hardcoded=scripted,stochastic=False)
         self.held=np.zeros(8,dtype=np.float32);self.pending=self.held.copy();self.script_ticks=0
     def controls(self,state,aid,previous,engine,tick,kickoff,observer):
         ids=sorted(state.cars);positions=np.array([state.cars[k].physics.position[:2] for k in ids]);teams=np.array([state.cars[k].team_num for k in ids])
@@ -129,7 +129,7 @@ class Controller:
         frame=self.clock.frame(is_kickoff_pause=kickoff,ball_xy=state.ball.position[:2],positions=positions,teams=teams,index=ids.index(aid),infer=predict)
         self.script_ticks+=int(frame.script_applied);return frame.controls
 
-def match(candidate,rival,*,side,seed,seconds,task='match',team_size=1):
+def match(candidate,rival,*,side,seed,seconds,task='match',team_size=1,learner_scripted=True):
     from rlgym.rocket_league.sim import RocketSimEngine
     from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator,KickoffMutator
     from afk_team_research import TeamObserver
@@ -154,7 +154,8 @@ def match(candidate,rival,*,side,seed,seconds,task='match',team_size=1):
                     cp=[rng.uniform(-1200,1200),-sign*4200 if aid==ours and task=='defense' else rng.uniform(-3500,3500),17]
                     if aid==ours and task=='wall':cp=[3550,bp[1]-sign*300,350]
                     set_car(c,cp,bp,boost=10 if task=='low_boost' else 70,on_ground=task!='wall' or aid!=ours)
-            state=engine.set_state(state,{});controllers={aid:Controller(candidate if c.team_num==team else rival) for aid,c in state.cars.items()}
+            state=engine.set_state(state,{});controllers={aid:Controller(candidate if c.team_num==team else rival,
+                scripted=learner_scripted if c.team_num==team else True) for aid,c in state.cars.items()}
             previous={};episode_ticks=0;touched=False;success=False;max_ticks=target-ticks if task=='match' else min(1200,target-ticks)
             from slater_mechanics_core import MechanicTracker
             tracker=MechanicTracker(task,state,ours,enemy) if task in ('air_dribble','air_finish','reset_use') else None
@@ -184,7 +185,7 @@ def code_identity():
         'GigaLearn_Project/Native_Backend/native_setup.py','slater_native_holdout.py')
     return {n:sha256(ROOT/n) for n in names}
 
-def evaluate(candidates,rivals,*,out,seeds=4,seconds=120,seed_base=930000000,build_dir=None,tasks=('match',),team_size=1,stop_file=None):
+def evaluate(candidates,rivals,*,out,seeds=4,seconds=120,seed_base=930000000,build_dir=None,tasks=('match',),team_size=1,stop_file=None,learner_scripted=True):
     check_pause(stop_file)
     if not 1<=seeds<=64 or not 8<=seconds<=300 or len(candidates)>8 or not candidates or not rivals:raise ValueError('Invalid bounded evaluation budget')
     torch.set_num_threads(2)
@@ -196,7 +197,8 @@ def evaluate(candidates,rivals,*,out,seeds=4,seconds=120,seed_base=930000000,bui
             if item['kind']=='native':parity(item['path'],build_dir)
     protocol={**identities,'seeds':seeds,'seconds':seconds,'seed_base':seed_base,'tasks':list(tasks),'team_size':team_size,
         'code':code_identity(),'runtime':{n:version(n) for n in ('torch','numpy','rocketsim','rlgym-rocket-league')},
-        'kickoff_sha':KICKOFF_SHA,'scripted_kickoff_all':True,'cadence':'native8+1; NextoV4Clock per tick',
+        'kickoff_sha':KICKOFF_SHA,'scripted_kickoff_all':bool(learner_scripted),
+        'learner_scripted':bool(learner_scripted),'rivals_scripted':True,'cadence':'native8+1; NextoV4Clock per tick',
         'physics':'Python RocketSim; not claimed equal to bundled CPP RocketSim'}
     with process_lock(out.with_suffix('.lock')):
         state=read_json(out,{'protocol':protocol,'records':[],'done':False})
@@ -215,7 +217,7 @@ def evaluate(candidates,rivals,*,out,seeds=4,seconds=120,seed_base=930000000,bui
                             check_pause(stop_file)
                             key=(name,rival,side,seed,task)
                             if key in done:continue
-                            row=match(actor,opponents[rival],side=side,seed=seed,seconds=seconds,task=task,team_size=team_size)
+                            row=match(actor,opponents[rival],side=side,seed=seed,seconds=seconds,task=task,team_size=team_size,learner_scripted=learner_scripted)
                             row.update(candidate=name,rival=rival);state['records'].append(row);new+=1;atomic_json(out,state)
                             eta=(time.perf_counter()-started)/new*(total-len(state['records']))
                             print('NATIVE_EVAL',len(state['records']),'/',total,name,rival,side,task,

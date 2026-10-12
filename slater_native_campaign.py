@@ -32,6 +32,13 @@ def discover():
             if path not in candidates.values():candidates[name]=path
     if INCUMBENT.is_file():candidates['update180']=str(INCUMBENT)
     candidates['nexto']=str(ROOT/'vendor/nexto/nexto-model.pt')
+    # Include the overnight shortlist in finite selection and new native runs.
+    for archive_name in ('native_overnight03','native_overnight02'):
+        archive=read_json(BASE/'campaigns'/archive_name/'shortlist.json',{})
+        for i,row in enumerate(archive.get('native_shortlist',[])[:2]):
+            if len(candidates)>=8:break
+            if row['path'] not in candidates.values() and model_identity(row['path'])==row['identity']:
+                candidates[f'{archive_name}_leader_{i}']=row['path']
     if not any(Path(p).is_dir() for p in candidates.values()):raise ValueError('No trained native checkpoints found; use --candidate paths')
     return candidates
 
