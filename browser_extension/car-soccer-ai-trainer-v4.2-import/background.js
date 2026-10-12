@@ -18,12 +18,12 @@ async function command(tabId, method, params = {}) {
   return chrome.debugger.sendCommand({ tabId }, method, params);
 }
 
-async function detachPatcher(tabId, message = 'Patch installed. Debugger detached.') {
+async function detachPatcher(tabId, message = 'Patch installed. Debugger detached.', state = 'patched') {
   if (!enabledTabs.has(tabId)) return;
   try { await command(tabId, 'Fetch.disable'); } catch {}
   try { await chrome.debugger.detach({ tabId }); } catch {}
   enabledTabs.delete(tabId);
-  setStatus(tabId, { enabled: true, state: 'patched', message });
+  setStatus(tabId, { enabled: state === 'patched', state, message });
 }
 
 async function enableForTab(tabId) {
@@ -131,7 +131,7 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
     } catch {
       try { await command(tabId, 'Fetch.failRequest', { requestId, errorReason: 'Failed' }); } catch {}
     }
-    await detachPatcher(tabId, `Patch failed: ${message}`);
+    await detachPatcher(tabId, `Patch failed: ${message}`, 'error');
   }
 });
 
