@@ -62,6 +62,21 @@ def test_rejected_epoch_restores_weights_and_adam_moments():
             assert torch.equal(value,ao.state_dict()['state'][index][name])
 
 
+def test_backtracking_accepts_a_smaller_actual_ppo_step():
+    actor,teacher,critic,ao,co,rows=fixture()
+    old=ppo.rollout_log_probs(actor,rows,8,'cpu')
+    ppo.base.update(actor,teacher,critic,ao,co,rows,1,8,.3,6,'cpu')
+    new=ppo.rollout_log_probs(actor,rows,8,'cpu')
+    full_drift=float((old.exp()*(old-new)).sum(-1).mean())
+    actor,teacher,critic,ao,co,rows=fixture()
+    result=ppo.trust_region_update(actor,teacher,critic,ao,co,rows,1,8,.3,6,
+                                   target_kl=full_drift*.4)
+    assert result['accepted_actor_epochs']==1
+    assert result['learning_rate_backtracks']>=1
+    assert result['actor_learning_rate']<.001
+    assert result['rollout_policy_kl']<=full_drift*.4
+
+
 def test_nonfinite_update_restores_actor_before_raising(monkeypatch):
     actor,teacher,critic,ao,co,rows=fixture()
     weights={k:v.clone() for k,v in actor.state_dict().items()}

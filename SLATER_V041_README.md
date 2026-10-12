@@ -2,6 +2,10 @@
 
 **Experimental / isolated. Not a guaranteed improvement or a verified champion.**
 
+For the newer model-selection and focused mechanics curriculum, see
+[SLATER_MECHANICS_README.md](SLATER_MECHANICS_README.md). Its trainer practices
+one stage at a time, with scripted frozen rivals and previous-skill retention.
+
 ## What it does
 
 One PPO student evolves from the local v0.4.0 **u70** checkpoint. The updated generation creates:
@@ -18,7 +22,7 @@ Each trial then gets independent, short PPO fine-tuning, **without a scripted ki
 
 Optional `replay_starts` can replace a configured fraction of resets with prepared, validated 1v1 ReplayFrame states. It defaults to null and needs `requirements-slater-replays.txt` only when used. Dataset contents are SHA-locked. See [SSL training next steps](docs/SSL_TRAINING_NEXT_STEPS.md) for format, setup and the review of the supplied upstream projects, including the successful replay-pretraining/Ripple research direction.
 
-`target_kl: 0.02` bounds the mean exact `KL(old rollout policy || updated policy)` on the collected states. After each epoch, an excessive update is rolled back together with its Adam moments; earlier accepted epochs remain. The critic can retain its supervised updates. The protected V60 teacher KL penalty is separate. Logs report accepted epochs, policy KL and rollback; this limit does not bound behavior in all unseen states or parameter mutations before training.
+`target_kl: 0.02` bounds the mean exact `KL(old rollout policy || updated policy)` on the collected states. An excessive epoch retries from its saved actor/Adam state at a halved learning rate, up to three times. If those retries still exceed the limit, the epoch is rolled back; earlier accepted epochs remain. The critic can retain its supervised updates, including retries. The protected V60 teacher KL penalty is separate. Logs report accepted epochs, policy KL, backtracking and rollback; this limit does not bound behavior in all unseen states or parameter mutations before training.
 
 Training pool: stock Nexto, Cycle 9, Wavedash, OG Champion, V70, V60, plus the current provisional leader. Opponents are rotated after every completed episode with a seeded initial offset; opponent exposure is not exactly equal in wall-clock time because episode lengths vary. Each candidate is **screened independently** against six frozen, SHA-pinned opponents, both sides, matched seeds, and receives a second fresh-seed holdout if promising. The previous leader is kept if nobody passes. Checkpoints failing the screen are excluded from promotion, and disposable branch checkpoints may be deleted after an entire generation. The last ten successful previous leaders remain archived. No user-provided models or original champion files are deleted.
 
