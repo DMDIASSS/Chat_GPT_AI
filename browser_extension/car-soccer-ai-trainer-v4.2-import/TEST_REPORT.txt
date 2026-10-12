@@ -27,3 +27,7 @@ Windows. No unsupported claim of live parity or improved strength is made.
 - Existing test_runtime.mjs also passes for the previous build.
 - These runtime tests use simulated browser/game objects; live rendering,
   Chrome debugger interception and real multiplayer gameplay remain untested.
+
+4.2.2: Chromium panel test with mocked Chrome APIs passes four dropdown options,
+G9 / Original Nexto / custom model switching, persisted selection requests.
+Live extension messaging and gameplay require local verification.

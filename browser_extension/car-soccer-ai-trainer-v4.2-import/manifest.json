@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Car Soccer AI Trainer v4.2 Model Import",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "description": "Import compatible local Nexto actors with scripted kickoffs and manual takeover.",
   "permissions": [
     "debugger",

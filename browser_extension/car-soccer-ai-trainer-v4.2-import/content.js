@@ -9,6 +9,8 @@
   let status = null;
   let button = null;
   let selector = null;
+  let selectedModel = "g9";
+  let changingModel = false;
   let error = null;
   let info = null;
 
@@ -250,10 +252,23 @@
       const stored=await chrome.storage.local.get(['selectedModel','customModel']);
       const id=stored.selectedModel||'g9';
       const name=id==='custom'?stored.customModel?.name:id==='g9'?'G9 u0073':'Original Nexto';
+      await refreshModelOptions();
       bridge('nexto-model-changed',{modelName:name});respond({ok:true});
     })().catch(e=>respond({ok:false,error:e.message}));
     return true;
   });
+
+  async function refreshModelOptions() {
+    const stored = await chrome.storage.local.get(['selectedModel','customModel']);
+    selectedModel = stored.selectedModel || 'g9';
+    if (!selector) return;
+    let custom = selector.querySelector('option[value="custom"]');
+    if (stored.customModel) {
+      if (!custom) { custom=document.createElement('option');custom.value='custom';selector.append(custom); }
+      custom.textContent=stored.customModel.name;
+    } else custom?.remove();
+    render();
+  }
 
   function render() {
     if (!panel || !latest) return;
@@ -264,10 +279,8 @@
     button.disabled = !!s.loading;
     button.textContent = s.active ? 'Take Back Control' : `Give Control to ${botName}`;
     button.classList.toggle('active', !!s.active);
-    selector.disabled = !!s.loading;
-    const modelOption=selector.querySelector('option[value="nexto"]');
-    if(s.selectedBot==='nexto'&&modelOption)modelOption.textContent=botName;
-    if (selector.value !== s.selectedBot) selector.value = s.selectedBot || 'nexto';
+    selector.disabled = !!s.loading || changingModel;
+    if (!changingModel) selector.value = s.selectedBot === 'grandchamp' ? 'grandchamp' : selectedModel;
 
     const c = s.lastControls || {};
     inputs.textContent = [
@@ -325,17 +338,18 @@
     panel.style.top = `${savedPos.y}px`;
 
     panel.innerHTML = `
-      <div class="gct4-head"><span class="gct4-dot"></span><span>Car Soccer AI Trainer v4.1</span></div>
+      <div class="gct4-head"><span class="gct4-dot"></span><span>Car Soccer AI Trainer v4.2.2</span></div>
       <div class="gct4-body">
         <div class="gct4-status"><span>Status</span><b>Connecting…</b></div>
         <label class="gct4-label">AI
           <select class="gct4-select">
-            <option value="nexto">Selected Nexto model</option>
+            <option value="g9">G9 u0073</option>
+            <option value="nexto">Original Nexto</option>
             <option value="grandchamp">Grand Champion (native)</option>
           </select>
         </label>
         <button class="gct4-main" type="button">Give Control to Nexto</button>
-        <div class="gct4-note">Nexto runs in a separate worker · Emergency override: <b>F8</b></div>
+        <div class="gct4-note">Import files using the extension toolbar popup · Scripted kickoffs ON · Emergency override: <b>F8</b></div>
         <details open><summary>AI Inputs</summary><div class="gct4-inputs"></div></details>
         <details><summary>Debug</summary><div class="gct4-debug"></div></details>
         <div class="gct4-info" hidden></div>
@@ -357,10 +371,21 @@
       send(latest?.active ? 'disable' : 'enable');
     });
 
-    selector.addEventListener('change', e => {
-      e.preventDefault();
+    refreshModelOptions().catch(e => { error.hidden=false;error.textContent=e.message; });
+    selector.addEventListener('change', async e => {
       e.stopPropagation();
-      send('select-bot', { botId: selector.value });
+      const id=selector.value;
+      changingModel=true;render();
+      try {
+        send('disable');
+        if (id !== 'grandchamp') {
+          const result=await chrome.runtime.sendMessage({type:'gct-select-model',modelId:id});
+          if (!result?.ok) throw new Error(result?.error || 'Model switch failed.');
+          await refreshModelOptions();
+        }
+        send('select-bot', {botId:id==='grandchamp'?'grandchamp':'nexto'});
+      } catch(e) { error.hidden=false;error.textContent=e.message; }
+      finally { changingModel=false;render(); }
     });
 
     const head = panel.querySelector('.gct4-head');

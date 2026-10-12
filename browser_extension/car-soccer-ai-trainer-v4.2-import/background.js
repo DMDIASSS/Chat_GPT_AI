@@ -1,3 +1,4 @@
+import { notifyModelChange } from './model-store.js';
 import { transformMainSource } from './patcher.js';
 
 const PROTOCOL_VERSION = '1.3';
@@ -153,6 +154,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = message.tabId ?? sender.tab?.id;
     if (!tabId) throw new Error('No tab selected.');
 
+    if (message.type === 'gct-select-model') {
+      if (!['g9','nexto','custom'].includes(message.modelId)) throw new Error('Unknown model.');
+      const stored=await chrome.storage.local.get('customModel');
+      if (message.modelId==='custom' && !stored.customModel) throw new Error('Import a custom model first.');
+      await chrome.storage.local.set({selectedModel:message.modelId});
+      await notifyModelChange();
+      sendResponse({ok:true});return;
+    }
     if (message.type === 'gct-enable') {
       await enableForTab(tabId);
       sendResponse({ ok: true, status: statusByTab.get(tabId) });
