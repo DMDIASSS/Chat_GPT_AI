@@ -1,6 +1,6 @@
 """Pinned GigaLearn build and bounded runs. Never treats Nexto .pt as an MLP."""
 from __future__ import annotations
-import argparse,json,os,re,shutil,subprocess,sys,time
+import argparse,hashlib,json,os,re,shutil,subprocess,sys,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2];HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT))
@@ -28,14 +28,21 @@ def fetch(url,path,commit):
 def patch_source(path):
     path=Path(path)
     if subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'],text=True).strip()!=GIGA:raise ValueError('Unexpected GigaLearn commit')
-    manifest=read_json(HERE/'patch_manifest.json');states=[]
+    manifest=read_json(HERE/'patch_manifest.json');states=[];normalized=[]
     for name,values in manifest.items():
-        h=sha256(path/name)
+        raw=(path/name).read_bytes()
+        canonical=raw.replace(b'\r\n',b'\n')
+        h=hashlib.sha256(canonical).hexdigest()
         if h==values['original']:states.append('original')
         elif h==values['patched']:states.append('patched')
-        else:raise ValueError('Unexpected source contents: '+name+'; no blind overwrite')
+        else:raise ValueError('Unexpected source contents (even after CRLF normalization): '+name+'; no blind overwrite')
+        if raw!=canonical:normalized.append((path/name,canonical))
+    # Validate every file before changing any bytes. Only known source text may
+    # be normalized; a user edit or partial patch must leave the checkout intact.
+    if len(set(states))!=1:raise ValueError('Partial patch; preserve checkout and use a fresh source folder')
+    for file,canonical in normalized:file.write_bytes(canonical)
+    if normalized:print('Normalized Windows CRLF line endings in',len(normalized),'verified source files.',flush=True)
     if set(states)=={'patched'}:print('Known compatibility patch already applied.');return
-    if set(states)!={'original'}:raise ValueError('Partial patch; preserve checkout and use a fresh source folder')
     command(['git','-C',path,'apply','--check',HERE/'compatibility.patch'])
     command(['git','-C',path,'apply',HERE/'compatibility.patch'])
     for name,values in manifest.items():

@@ -33,6 +33,12 @@ The standalone CMake target builds GigaLearn, RLGymCPP and RocketSim, without th
 unnecessary RLBot executable. Compatibility fixes cover broken relative paths,
 case-sensitive headers, monotonic timer types and portable C++20 iterator traits.
 The patch refuses unknown contents instead of overwriting a customized checkout.
+Windows CRLF and LF copies of the exact pinned source are both accepted. All six
+source files must match known original or patched text before any line endings
+are normalized. Actual code edits and partial patches still stop the setup.
+If an older installer reports `Unexpected source contents` on an unedited
+checkout, install the current update and rerun fetch/build; no source deletion
+or hash-check bypass is needed.
 
 CPU was built/tested with GCC 14, Python 3.12 and PyTorch 2.14.1. Windows MSVC and
 CUDA execution remain local checks. For CUDA, use a compatible CUDA-enabled
