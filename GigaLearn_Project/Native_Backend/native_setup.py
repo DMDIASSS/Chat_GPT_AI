@@ -45,8 +45,16 @@ def patch_source(path):
     if set(states)=={'patched'}:print('Known compatibility patch already applied.');return
     command(['git','-C',path,'apply','--check',HERE/'compatibility.patch'])
     command(['git','-C',path,'apply',HERE/'compatibility.patch'])
+    patched_files=[]
     for name,values in manifest.items():
-        if sha256(path/name)!=values['patched']:raise ValueError('Patched source hash mismatch')
+        file=path/name;raw=file.read_bytes();canonical=raw.replace(b'\r\n',b'\n')
+        if hashlib.sha256(canonical).hexdigest()!=values['patched']:
+            raise ValueError('Patched source hash mismatch: '+name)
+        if raw!=canonical:patched_files.append((file,canonical))
+    # Git apply can honor core.autocrlf/eol attributes and write CRLF again.
+    # Verify the actual output first, then canonicalize only known patched text.
+    for file,canonical in patched_files:file.write_bytes(canonical)
+    if patched_files:print('Normalized Git patch output line endings in',len(patched_files),'verified files.',flush=True)
 
 
 def python_paths():

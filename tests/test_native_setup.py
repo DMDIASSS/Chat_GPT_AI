@@ -67,3 +67,15 @@ def test_unknown_or_partial_source_preserves_all_bytes(tmp_path,monkeypatch,part
     before={p:p.read_bytes() for p in source.glob('*.h')}
     with pytest.raises(ValueError):m.patch_source(source)
     assert all(p.read_bytes()==contents for p,contents in before.items())
+
+
+def test_git_apply_crlf_output_is_verified_and_normalized(tmp_path,monkeypatch):
+    m,source,original,patched=source_fixture(tmp_path,monkeypatch)
+    subprocess.run(['git','-C',str(source),'config','core.autocrlf','true'],check=True)
+    subprocess.run(['git','-C',str(source),'config','core.eol','crlf'],check=True)
+    # Reproduce Windows checkout attributes as well as the global Git setting.
+    (source/'.gitattributes').write_bytes(b'*.h text eol=crlf\n')
+    for name in ('a.h','b.h'):(source/name).write_bytes(original.replace(b'\n',b'\r\n'))
+    m.patch_source(source)
+    assert all((source/name).read_bytes()==patched for name in ('a.h','b.h'))
+    m.patch_source(source)
