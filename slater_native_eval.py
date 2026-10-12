@@ -16,6 +16,13 @@ ROOT=Path(__file__).resolve().parent
 BASE=ROOT/'data/isolated/native_quality'
 TASKS=('match','ground','defense','recovery','aerial','wall','air_dribble','air_finish','reset_use','low_boost')
 
+class EvaluationPaused(RuntimeError):
+    """A resumable evaluation stopped between completed matches."""
+
+def check_pause(stop_file):
+    if stop_file is not None and Path(stop_file).exists():
+        raise EvaluationPaused('Pause requested; completed matches are saved')
+
 def helper():
     spec=importlib.util.spec_from_file_location('native_runner',ROOT/'GigaLearn_Project/Native_Backend/native_setup.py')
     m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
@@ -177,7 +184,8 @@ def code_identity():
         'GigaLearn_Project/Native_Backend/native_setup.py','slater_native_holdout.py')
     return {n:sha256(ROOT/n) for n in names}
 
-def evaluate(candidates,rivals,*,out,seeds=4,seconds=120,seed_base=930000000,build_dir=None,tasks=('match',),team_size=1):
+def evaluate(candidates,rivals,*,out,seeds=4,seconds=120,seed_base=930000000,build_dir=None,tasks=('match',),team_size=1,stop_file=None):
+    check_pause(stop_file)
     if not 1<=seeds<=64 or not 8<=seconds<=300 or len(candidates)>8 or not candidates or not rivals:raise ValueError('Invalid bounded evaluation budget')
     torch.set_num_threads(2)
     out=Path(out).resolve()
@@ -204,6 +212,7 @@ def evaluate(candidates,rivals,*,out,seeds=4,seconds=120,seed_base=930000000,bui
                 for rival in rivals:
                     for side in ('blue','orange'):
                         for name,actor in actors.items():
+                            check_pause(stop_file)
                             key=(name,rival,side,seed,task)
                             if key in done:continue
                             row=match(actor,opponents[rival],side=side,seed=seed,seconds=seconds,task=task,team_size=team_size)

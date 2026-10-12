@@ -26,3 +26,14 @@ These tests establish integration and conservative selection behavior, not the
 strength of the user's locally trained models. Generated fixtures are not SSL
 replay evidence. The C++/Python inference parity check does not establish
 simulator physics parity or native RLBot/browser deployment.
+
+## Overnight loop
+
+The combined suites pass 56 tests, including nine overnight-specific checks
+for tied-ranking persistence, interrupted/frozen confirmations, retention
+failures, resumable evaluation, completed chunk reuse and disk preservation.
+A reduced-budget real C++ run completed BC, mixed/focused training, individual
+checkpoint screens, mechanics assessment and fresh confirmation. A second
+cycle was paused during screening and resumed to completion; all previously
+screened native/Nexto file identities remained unchanged. These fixtures use
+short test budgets and do not establish the user's local model strength.

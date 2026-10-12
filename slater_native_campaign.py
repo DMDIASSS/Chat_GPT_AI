@@ -89,9 +89,9 @@ def skills(candidate,rival,folder,cfg,namespace,build_dir):
     atomic_json(folder/'weaknesses.json',{'success_rates':rates,'focus':focus,'note':'Practice screen chooses training focus; not final test mastery.'})
     return focus
 
-def guard(candidate,reference,rivals,folder,cfg,namespace,build_dir):
+def guard(candidate,reference,rivals,folder,cfg,namespace,build_dir,stop_file=None):
     report=evaluate({'candidate':candidate,'reference':reference},rivals,out=folder/'skill_guard.json',
-        seeds=cfg['skill_seeds'],seconds=cfg['skill_seconds'],seed_base=namespace,build_dir=build_dir,tasks=SKILLS)
+        seeds=cfg['skill_seeds'],seconds=cfg['skill_seconds'],seed_base=namespace,build_dir=build_dir,tasks=SKILLS,stop_file=stop_file)
     checks={}
     for task in SKILLS:
         scores={n:[r for r in report['records'] if r['candidate']==n and r['task']==task] for n in ('candidate','reference')}
@@ -101,7 +101,7 @@ def guard(candidate,reference,rivals,folder,cfg,namespace,build_dir):
     team_checks={}
     for size in (2,3):
         team=evaluate({'candidate':candidate,'reference':reference},rivals,out=folder/f'team{size}_guard.json',
-            seeds=cfg['skill_seeds'],seconds=max(8,cfg['skill_seconds']),seed_base=namespace+size*10000,build_dir=build_dir,team_size=size)
+            seeds=cfg['skill_seeds'],seconds=max(8,cfg['skill_seconds']),seed_base=namespace+size*10000,build_dir=build_dir,team_size=size,stop_file=stop_file)
         scores={n:np.mean([r['goal_diff'] for r in team['records'] if r['candidate']==n]) for n in ('candidate','reference')}
         delta=(scores['candidate']-scores['reference'])*60/max(8,cfg['skill_seconds'])
         team_checks[str(size)]={'goal_diff_delta_per_minute':float(delta),'passed':bool(delta>=-.5)}

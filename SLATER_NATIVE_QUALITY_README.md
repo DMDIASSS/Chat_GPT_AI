@@ -1,5 +1,9 @@
 # Native quality campaign
 
+For the continuous overnight loop, use
+[SLATER_NATIVE_OVERNIGHT_README.md](SLATER_NATIVE_OVERNIGHT_README.md) and
+`NATIVE_10_OVERNIGHT_ALL.bat`. The campaign described below is finite.
+
 This update runs a finite replay-pretraining and improvement campaign, then
 compares retained candidates with Nexto and your protected update180. It does
 not replace the original checkpoints or promise SSL strength.
