@@ -547,6 +547,11 @@ class ControlCenter(tk.Tk):
             'Separate GigaLearn_Project/ folder contains C++ build bootstrap and an independent training workspace. '
             'Native Nexto .pt checkpoints are NOT directly loadable by the upstream C++ policy.')
         self._line_buttons(p,[('Open GigaLearn project',lambda:self.open_folder(ROOT/'GigaLearn_Project')),('Read migration plan',lambda:self.open_file(ROOT/'AFK_IMPROVED_GIGALEARN.md'))])
+        self._line_buttons(p,[('Prepare goal/save windows',lambda:self._spawn('Prepare event windows',[str(PYTHON),str(ROOT/'slater_native_focus_curriculum.py'),'prepare'],category='native-prepare')),
+                             ('Start focused native curriculum',lambda:self._spawn('Focused native curriculum',[str(PYTHON),str(ROOT/'slater_native_focus_curriculum.py'),'run'],category='native-focused')),
+                             ('Pause focused curriculum',lambda:self._spawn('Pause focused curriculum',[str(PYTHON),str(ROOT/'slater_native_focus_curriculum.py'),'pause'],category='native-pause')),
+                             ('Open focused reports',lambda:self.open_folder(ROOT/'data'/'isolated'/'event_curriculum'))])
+
 
     def _make_logs(self):
         p=self._section(self.logs,'Process output',

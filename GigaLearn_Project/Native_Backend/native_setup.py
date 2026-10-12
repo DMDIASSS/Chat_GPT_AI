@@ -28,7 +28,7 @@ def fetch(url,path,commit):
 def patch_source(path):
     path=Path(path)
     if subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'],text=True).strip()!=GIGA:raise ValueError('Unexpected GigaLearn commit')
-    manifest=read_json(HERE/'patch_manifest.json');states=[];normalized=[];is_original=True;is_current=True;is_legacy=True;is_metrics_base=True
+    manifest=read_json(HERE/'patch_manifest.json');states=[];normalized=[];is_original=True;is_current=True;is_legacy=True;is_metrics_base=True;is_curriculum_base=True
     for name,values in manifest.items():
         raw=(path/name).read_bytes()
         canonical=raw.replace(b'\r\n',b'\n')
@@ -36,19 +36,21 @@ def patch_source(path):
         is_original &= h==values['original'];is_current &= h==values['patched']
         is_legacy &= 'legacy' in values and h==values['legacy']
         is_metrics_base &= 'metrics_base' in values and h==values['metrics_base']
+        is_curriculum_base &= 'curriculum_base' in values and h==values['curriculum_base']
         if h==values['original']:states.append('original')
         elif h==values['patched']:states.append('patched')
         elif h==values.get('legacy'):states.append('legacy')
         elif h==values.get('metrics_base'):states.append('metrics_base')
+        elif h==values.get('curriculum_base'):states.append('curriculum_base')
         else:raise ValueError('Unexpected source contents (even after CRLF normalization): '+name+'; no blind overwrite')
         if raw!=canonical:normalized.append((path/name,canonical))
     # Validate every file before changing any bytes. Only known source text may
     # be normalized; a user edit or partial patch must leave the checkout intact.
-    if not (is_original or is_current or is_legacy or is_metrics_base):raise ValueError('Partial patch; preserve checkout and use a fresh source folder')
+    if not (is_original or is_current or is_legacy or is_metrics_base or is_curriculum_base):raise ValueError('Partial patch; preserve checkout and use a fresh source folder')
     for file,canonical in normalized:file.write_bytes(canonical)
     if normalized:print('Normalized Windows CRLF line endings in',len(normalized),'verified source files.',flush=True)
     if is_current:print('Known compatibility patch already applied.');return
-    patch=HERE/('metrics.patch' if is_metrics_base else 'campaign.patch' if is_legacy else 'compatibility.patch')
+    patch=HERE/('curriculum.patch' if is_curriculum_base else 'metrics.patch' if is_metrics_base else 'campaign.patch' if is_legacy else 'compatibility.patch')
     command(['git','-C',path,'apply','--check',patch])
     command(['git','-C',path,'apply',patch])
     patched_files=[]
@@ -194,6 +196,8 @@ def run(a,resume=False):
     profile={'games':a.games,'steps':a.steps,'threads':a.threads,'players':a.players,'device':a.device,
              'width':a.width,'depth':a.depth,'bank':str(Path(a.replay_bank).resolve()) if a.replay_bank else None,
              'campaign':bool(a.campaign),'focus':a.focus,'old_chance':a.old_chance,'save_every':a.save_every,
+             'event_windows':str(Path(a.event_windows).resolve()) if getattr(a,'event_windows',None) else None,
+             'learner_team':getattr(a,'learner_team','auto'),'focus_difficulty':getattr(a,'focus_difficulty',0.0),
              'kickoff_epochs':getattr(a,'kickoff_epochs',0),'kickoff_demos':getattr(a,'kickoff_demos',32),
              'frozen':[str(Path(p).resolve()) for p in a.frozen_checkpoint or []]}
     if resume:
@@ -202,6 +206,10 @@ def run(a,resume=False):
         profile=saved['profile']
     identity={'profile':profile,**binary_identity(a.build_dir),'gigalearn_commit':GIGA,
               'bank_sha':sha256(profile['bank']) if profile['bank'] else None}
+    if profile.get('event_windows'):
+        windows=read_json(profile['event_windows'])
+        if not windows or windows['bank_sha']!=identity['bank_sha']:raise ValueError('Event windows/bank identity mismatch')
+        identity['event_windows_sha']=sha256(profile['event_windows'])
     if profile.get('frozen'):
         from slater_native_actor import checkpoint_identity
         identity['frozen']=[checkpoint_identity(p) for p in profile['frozen']]
@@ -232,6 +240,8 @@ def run(a,resume=False):
         pause=run/'pause.flag';pause.unlink(missing_ok=True)
         args=[binary,'--meshes',a.meshes or meshes(),'--checkpoints',run/'checkpoints','--iterations',a.iterations]
         for k in ('games','steps','threads','players','device','width','depth'):args+=['--'+k,str(profile[k])]
+        args+=['--learner-team',profile.get('learner_team','auto'),'--focus-difficulty',str(profile.get('focus_difficulty',0.0))]
+        if profile.get('event_windows'):args+=['--event-windows',profile['event_windows']]
         if a.decisions:args+=['--decisions',str(a.decisions)]
         if profile.get('campaign'):
             args+=['--campaign','1','--focus',profile['focus'],'--old-chance',str(profile['old_chance']),
@@ -276,6 +286,7 @@ def main():
     p.add_argument('--iterations',type=int,default=6);p.add_argument('--threads',type=int,default=2);p.add_argument('--players',type=int,default=1)
     p.add_argument('--device',choices=('cpu','cuda','auto'),default='cpu');p.add_argument('--width',type=int,default=128);p.add_argument('--depth',type=int,default=2)
     p.add_argument('--initial-checkpoint');p.add_argument('--replay-bank');p.add_argument('--bc-epochs',type=int,default=2)
+    p.add_argument('--event-windows');p.add_argument('--learner-team',choices=('auto','blue','orange'),default='auto');p.add_argument('--focus-difficulty',type=float,default=0)
     p.add_argument('--campaign',action='store_true');p.add_argument('--focus',default='mixed')
     p.add_argument('--old-chance',type=float,default=.4);p.add_argument('--save-every',type=int,default=500000)
     p.add_argument('--frozen-checkpoint',action='append')
