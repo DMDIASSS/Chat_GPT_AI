@@ -60,6 +60,9 @@ def kickoff_settings(source, scripted):
 
 def export(checkpoint,name,output=None,*,scripted_kickoff=False):
  import torch
+ if checkpoint is not None and (Path(checkpoint).is_dir() or Path(checkpoint).suffix.lower()==".lt"):
+  from export_native_rlbot_v4 import export_native
+  return export_native(checkpoint,name,output,scripted_kickoff=scripted_kickoff)
  name=validate_name(name);output=Path(OUTPUT if output is None else output).resolve()
  origin=None if checkpoint is None else Path(checkpoint).resolve()
  if origin is not None and not origin.is_file():raise FileNotFoundError(origin)

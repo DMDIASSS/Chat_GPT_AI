@@ -536,6 +536,7 @@ class ControlCenter(tk.Tk):
         ttk.Label(row,text='Checkpoint').pack(side='left',padx=(0,8))
         ttk.Entry(row,textvariable=self.rl_checkpoint,width=83).pack(side='left',padx=(0,8))
         ttk.Button(row,text='Browse…',command=self.pick_rl_checkpoint).pack(side='left')
+        ttk.Button(row,text='Native folder…',command=self.pick_native_rl_checkpoint).pack(side='left')
         self.rl_scripted_kickoff=tk.BooleanVar(value=True)
         ttk.Checkbutton(p,text='Scripted Nexto kickoff (ON by default)',
                         variable=self.rl_scripted_kickoff).pack(anchor='w',pady=4)
@@ -723,9 +724,14 @@ class ControlCenter(tk.Tk):
             initialdir=str(ROOT/'data'),filetypes=[('PyTorch native checkpoints','*.pt'),('All files','*.*')])
         if name:self.rl_checkpoint.set(name)
 
+    def pick_native_rl_checkpoint(self):
+        name=filedialog.askdirectory(parent=self,title='Select numbered native checkpoint folder (contains POLICY.lt)',
+            initialdir=str(ROOT/'data'/'isolated'/'gigalearn_native'/'runs'))
+        if name:self.rl_checkpoint.set(name)
+
     def export_rlbot(self,original=False):
         path=None if original else Path(self.rl_checkpoint.get())
-        if path is not None and not path.is_file():messagebox.showerror('Missing checkpoint',str(path));return
+        if path is not None and not path.exists():messagebox.showerror('Missing checkpoint',str(path));return
         name=simpledialog.askstring('RLBot v4 export name','Unique export folder name (letters/numbers/_/-):',
                     initialvalue=('Original_Nexto' if original else path.stem[:38]),parent=self)
         if not name:return
