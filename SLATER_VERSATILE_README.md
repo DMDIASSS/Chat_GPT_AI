@@ -196,7 +196,8 @@ of verified captures to `prepare --inputs data/replays data/aligned_tas`.
   `8c15e847dc9ecf37ef8ad38d6c615b080772c959`; motivates confidence-filtered human
   imitation followed by RL. Its incompatible network/weights are not imported.
 - [Replicar](https://github.com/Rolv-Arild/replicar): reviewed as a future alternative
-  reconstruction backend; Parquet from it is not accepted by this release.
+  reconstruction backend; the native-backend update adds compatible Parquet
+  import through its official reader. See `GigaLearn_Project/Native_Backend/README.md`.
 
 Cloud validation includes a public parser fixture from
 [Boxcars](https://github.com/nickbabcock/boxcars), `assets/replays/good/b2a19.replay`:

@@ -97,7 +97,7 @@ def choose_tasks(cfg,cycle,dataset):
 
 
 def code_identity():
-    names=('slater_versatile_trainer.py','slater_versatile_data.py','slater_versatile_env.py','slater_versatile_eval.py',
+    names=('slater_replicar.py','slater_versatile_trainer.py','slater_versatile_data.py','slater_versatile_env.py','slater_versatile_eval.py',
         'slater_mechanics_env.py','slater_mechanics_core.py','slater_mechanics_eval.py','slater_cycle9_native_ppo_v025.py',
         'slater_ppo.py','afk_team_research.py','nexto_teacher.py','slater_nexto_scheduler_v038b.py','mechanics_scenarios.py',
         'vendor/nexto/nexto_obs.py','slater_v041_worker.py','slater_v041_overnight.py','slater_v041_core.py','afk_replay_tas_learning.py')

@@ -1,0 +1,113 @@
+diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/CommonValues.h b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/CommonValues.h
+index 7482411..9917ad5 100644
+--- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/CommonValues.h
++++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/CommonValues.h
+@@ -1,5 +1,5 @@
+ #pragma once
+-#include "../Framework.h"
++#include "Framework.h"
+ 
+ namespace RLGC {
+ 	// https://github.com/AechPro/rocket-league-gym-sim/blob/main/rlgym_sim/utils/common_values.py
+diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.h b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.h
+index ea1d96e..bae3a9f 100644
+--- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.h
++++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.h
+@@ -3,7 +3,7 @@
+ #include "../BasicTypes/Action.h"
+ #include "../TerminalConditions/TerminalCondition.h"
+ #include "../Rewards/Reward.h"
+-#include "../OBSBuilders/OBSBuilder.h"
++#include "../ObsBuilders/ObsBuilder.h"
+ #include "../ActionParsers/ActionParser.h"
+ #include "../StateSetters/StateSetter.h"
+ #include "../ThreadPool.h"
+diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/Framework.h b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/Framework.h
+index 6d793e8..c3f29e6 100644
+--- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/Framework.h
++++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/Framework.h
+@@ -1,7 +1,7 @@
+ #pragma once
+ 
+-#include "../RocketSim/src/RocketSim.h"
+-#include "../RocketSim/src/Sim/GameEventTracker/GameEventTracker.h"
++#include "../../RocketSim/src/RocketSim.h"
++#include "../../RocketSim/src/Sim/GameEventTracker/GameEventTracker.h"
+ 
+ // Use RocketSim namespace
+ using namespace RocketSim;
+diff --git a/GigaLearnCPP/src/private/GigaLearnCPP/Util/Models.h b/GigaLearnCPP/src/private/GigaLearnCPP/Util/Models.h
+index 644d2ca..0d88465 100644
+--- a/GigaLearnCPP/src/private/GigaLearnCPP/Util/Models.h
++++ b/GigaLearnCPP/src/private/GigaLearnCPP/Util/Models.h
+@@ -190,8 +190,13 @@ namespace GGL {
+ 				model->Load(folder, allowNotExist, loadOptims);
+ 		}
+ 
+-		class ModelIterator : public std::iterator<std::forward_iterator_tag, typename Model*> {
++		class ModelIterator {
+ 		public:
++            using iterator_category = std::forward_iterator_tag;
++            using value_type = Model*;
++            using difference_type = std::ptrdiff_t;
++            using pointer = Model**;
++            using reference = Model*&;
+ 			using MapItr = std::map<std::string, Model*>::iterator;
+ 			MapItr _mapItr;
+ 
+@@ -202,7 +207,7 @@ namespace GGL {
+ 			bool operator==(const ModelIterator& other) const { return _mapItr == other._mapItr; }
+ 			bool operator!=(const ModelIterator& other) const { return _mapItr != other._mapItr; }
+ 
+-			typename Model*& operator*() const { return _mapItr->second; }
++			Model*& operator*() const { return _mapItr->second; }
+ 		};
+ 
+ 		ModelIterator begin() {
+diff --git a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
+index 3403450..a8f0a30 100644
+--- a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
++++ b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
+@@ -270,6 +270,7 @@ void GGL::Learner::Load() {
+ 
+ void GGL::Learner::StartQuitKeyThread(bool& quitPressed, std::thread& outThread) {
+ 	quitPressed = false;
++	if (std::getenv("SLATER_GL_NO_KEY_THREAD")) return;
+ 
+ 	RG_LOG("Press 'Q' to save and quit!");
+ 	outThread = std::thread(
+@@ -508,6 +509,13 @@ void GGL::Learner::Start() {
+ 		int maxEpisodeLength = (int)(config.ppo.maxEpisodeDuration * (120.f / config.tickSkip));
+ 
+ 		while (true) {
++            if (const char* stop = std::getenv("SLATER_GL_STOP_ITERATION")) {
++                if (totalIterations >= std::stoull(stop) || (std::getenv("SLATER_GL_PAUSE_FILE") && std::filesystem::exists(std::getenv("SLATER_GL_PAUSE_FILE")))) {
++                    Save();
++                    std::cout << "SLATER_GIGA_COMPLETE iterations=" << totalIterations << " timesteps=" << totalTimesteps << std::endl;
++                    exit(0);
++                }
++            }
+ 			Report report = {};
+ 
+ 			bool isFirstIteration = (totalTimesteps == 0);
+diff --git a/GigaLearnCPP/src/public/GigaLearnCPP/Util/Timer.h b/GigaLearnCPP/src/public/GigaLearnCPP/Util/Timer.h
+index 6b0d7c2..e2593cf 100644
+--- a/GigaLearnCPP/src/public/GigaLearnCPP/Util/Timer.h
++++ b/GigaLearnCPP/src/public/GigaLearnCPP/Util/Timer.h
+@@ -11,13 +11,13 @@ namespace GGL {
+ 
+ 		// Returns elapsed time in seconds
+ 		double Elapsed() {
+-			auto endTime = std::chrono::high_resolution_clock::now();
++			auto endTime = std::chrono::steady_clock::now();
+ 			std::chrono::duration<double> elapsed = endTime - startTime;
+ 			return elapsed.count();
+ 		}
+ 
+ 		void Reset() {
+-			startTime = std::chrono::high_resolution_clock::now();
++			startTime = std::chrono::steady_clock::now();
+ 		}
+ 	};
+ }
+\ No newline at end of file

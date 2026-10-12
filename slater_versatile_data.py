@@ -105,9 +105,9 @@ def parse_one(job):
     path,digest,out,cfg=job
     path=Path(path);out=Path(out)
     if out.exists():
-        with np.load(out,allow_pickle=False) as z:group=str(z['group'])
-        return {'path':str(out),'sha256':sha256(out),'source_sha':digest,'group':group,'cached':True}
-    info={'group':digest}
+        with np.load(out,allow_pickle=False) as z:group=str(z['group']);original_sha=str(z['original_replay_sha'])
+        return {'path':str(out),'sha256':sha256(out),'source_sha':digest,'group':group,'original_replay_sha':original_sha,'cached':True}
+    info={'group':digest,'original_replay_sha':digest}
     if path.suffix=='.npz':
         with np.load(path,allow_pickle=False) as z:
             if 'source_group' in z:info['group']=hashlib.sha256(('capture:'+str(z['source_group'])).encode()).hexdigest()
@@ -118,7 +118,10 @@ def parse_one(job):
     # Reservoirs span the entire match rather than only its first 500 frames.
     pools=[[] for _ in BUCKETS];seen=Counter();stats=Counter();past={};last_tick=None;roster=None
     cap=max(8,cfg['per_replay']//len(BUCKETS))
-    frames=capture_frames(path) if path.suffix=='.npz' else replay_frames(path,info)
+    if path.suffix=='.parquet':
+        from slater_replicar import frames as replicar_frames
+        frames=replicar_frames(path,info)
+    else:frames=capture_frames(path) if path.suffix=='.npz' else replay_frames(path,info)
     for index,(state,actions,ages) in enumerate(frames):
         current={k:np.asarray(v,dtype=np.float32).copy() for k,v in actions.items()}
         if last_tick is not None and state.tick_count<last_tick:past={}
@@ -146,27 +149,30 @@ def parse_one(job):
     if not rows:raise ValueError('No usable active gameplay/state-aligned action samples')
     out.parent.mkdir(parents=True,exist_ok=True);tmp=out.with_suffix('.partial')
     with tmp.open('wb') as f:
-        np.savez_compressed(f,group=info['group'],**{k:np.asarray([row[j] for row in rows],dtype=dtype) for j,(k,dtype) in
+        np.savez_compressed(f,group=info['group'],original_replay_sha=info['original_replay_sha'],**{k:np.asarray([row[j] for row in rows],dtype=dtype) for j,(k,dtype) in
             enumerate([('q',np.float32),('kv',np.float32),('mask',np.float32),('target',np.float32),
                        ('weight',np.float32),('bucket',np.uint8),('states',np.float32)])})
     tmp.replace(out)
-    return {'path':str(out),'sha256':sha256(out),'source_sha':digest,'group':info['group'],'samples':len(rows),'cached':False,
+    return {'path':str(out),'sha256':sha256(out),'source_sha':digest,'group':info['group'],'original_replay_sha':info['original_replay_sha'],'samples':len(rows),'cached':False,
             'buckets':dict(Counter(BUCKETS[r[5]] for r in rows)),'filtered':dict(stats),
-            'kind':'verified_simulator_capture' if path.suffix=='.npz' else 'inferred_replay_controls'}
+            'kind':'verified_simulator_capture' if path.suffix=='.npz' else 'replicar_reconstructed_controls' if path.suffix=='.parquet' else 'inferred_replay_controls',
+            'replicar_provenance':info.get('replicar_header'),'control_provenance':dict(info.get('control_provenance',{}))}
 
 def prepare(inputs,out,*,workers=2,per_replay=1024,max_replays=100,max_samples=100000,every=4):
     from afk_replay_tas_learning import expand_files
     out=Path(out).resolve()
     if not out.is_relative_to(ROOT/'data/isolated'):raise ValueError('Dataset output must be under data/isolated')
     if not 1<=workers<=8 or not 48<=per_replay<=10000 or not 1<=every<=30 or not 1<=max_replays<=10000 or not 100<=max_samples<=2000000:raise ValueError('Invalid preparation limits')
-    files=expand_files(inputs,'.replay')+expand_files(inputs,'.npz')
+    files=expand_files(inputs,'.replay')+expand_files(inputs,'.npz')+expand_files(inputs,'.parquet')
+    files=[p for p in files if p.name!='index.parquet']
     if not files:raise ValueError('No .replay or aligned capture .npz files found. Raw TAS .data requires a matched state capture.')
     unique={}
     for f in files:unique.setdefault(sha256(f),f)
     sources=list(unique.items())[:max_replays]
     cfg={'per_replay':per_replay,'max_age':.05,'max_cost':.55,'every':every,
          'parser_version':version('rlgym-tools'),'code_sha':sha256(__file__),
-         'runtime':{n:version(n) for n in ('rlgym-rocket-league','rocketsim','numpy','pandas','pyarrow')}}
+         'runtime':{n:version(n) for n in ('rlgym-rocket-league','rocketsim','numpy','pandas','pyarrow')},
+         'replicar_adapter_sha':sha256(ROOT/'slater_replicar.py')}
     identity=hashlib.sha256(json.dumps(cfg,sort_keys=True).encode()).hexdigest()
     protocol={'config':cfg,'sources':[d for d,_ in sources],'max_samples':max_samples}
     out.mkdir(parents=True,exist_ok=True)
@@ -187,7 +193,13 @@ def prepare(inputs,out,*,workers=2,per_replay=1024,max_replays=100,max_samples=1
                 atomic_json(out/'parse_progress.json',{'completed':n,'total':len(jobs),'records':records,'errors':errors})
                 print('VERSATILE_PARSE',n,'/',len(jobs),'usable',len(records),'errors',len(errors),
                       'seconds',round(time.perf_counter()-started,1),flush=True)
-        records=sorted(records,key=lambda r:r['source_sha']);sizes=[];remaining=max_samples
+        # Raw replay plus its converted Parquet must never enter separate splits.
+        canonical={r['original_replay_sha']:r['group'] for r in records if r['source'].endswith('.replay')}
+        unique_records={}
+        for r in sorted(records,key=lambda r:(not r['source'].endswith('.parquet'),r['source_sha'])):
+            original=r['original_replay_sha'];r['group']=canonical.get(original,r['group']);r['partition']=partition(r['group'])
+            unique_records.setdefault(original,r)
+        records=sorted(unique_records.values(),key=lambda r:r['source_sha']);sizes=[];remaining=max_samples
         for r in records:
             with np.load(r['path'],allow_pickle=False) as z:r['samples']=len(z['weight'])
             take=min(r['samples'],remaining);sizes.append(take);remaining-=take
