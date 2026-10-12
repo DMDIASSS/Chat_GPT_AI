@@ -1,0 +1,20 @@
+Car Soccer AI Trainer v4.2 checks
+================================
+PASS: manifest and shipped JavaScript syntax.
+PASS: G9 RLBot TorchScript export and full native checkpoint convert identically.
+PASS: uploaded RLBot ZIP learned/scripted variants produce one identical actor.
+PASS: model shapes and finite weights enforced; incorrect .bin length rejected.
+PASS: JS G9 logits versus PyTorch on 3/37/41 entities (zero/additive masks):
+      maximum absolute error 0.000003814697265625.
+PASS: compiled/injected runtime tests: scripted kickoff stage boundaries,
+      stale neural reply rejection, return to neural inference after kickoff,
+      aerial-start rejection, closest-teammate priority.
+PASS: original multiplayer input hot-path expression remains unchanged.
+PASS: Chromium popup with mocked Chrome extension APIs: BIN import, actual ZIP
+      conversion via local service, persistence, invalid import preserves model.
+
+NOT VERIFIED: real extension installation in this cloud Chromium build (its
+extension-loading interfaces are unavailable); current live-site main bundle
+(network access returned 403); real Car Soccer gameplay / WebRTC friend rooms.
+The actual Chrome extension storage/messaging and live site must be checked on
+Windows. No unsupported claim of live parity or improved strength is made.
