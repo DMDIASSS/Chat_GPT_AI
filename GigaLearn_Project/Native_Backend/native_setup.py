@@ -28,25 +28,27 @@ def fetch(url,path,commit):
 def patch_source(path):
     path=Path(path)
     if subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'],text=True).strip()!=GIGA:raise ValueError('Unexpected GigaLearn commit')
-    manifest=read_json(HERE/'patch_manifest.json');states=[];normalized=[];is_original=True;is_current=True;is_legacy=True
+    manifest=read_json(HERE/'patch_manifest.json');states=[];normalized=[];is_original=True;is_current=True;is_legacy=True;is_metrics_base=True
     for name,values in manifest.items():
         raw=(path/name).read_bytes()
         canonical=raw.replace(b'\r\n',b'\n')
         h=hashlib.sha256(canonical).hexdigest()
         is_original &= h==values['original'];is_current &= h==values['patched']
         is_legacy &= 'legacy' in values and h==values['legacy']
+        is_metrics_base &= 'metrics_base' in values and h==values['metrics_base']
         if h==values['original']:states.append('original')
         elif h==values['patched']:states.append('patched')
         elif h==values.get('legacy'):states.append('legacy')
+        elif h==values.get('metrics_base'):states.append('metrics_base')
         else:raise ValueError('Unexpected source contents (even after CRLF normalization): '+name+'; no blind overwrite')
         if raw!=canonical:normalized.append((path/name,canonical))
     # Validate every file before changing any bytes. Only known source text may
     # be normalized; a user edit or partial patch must leave the checkout intact.
-    if not (is_original or is_current or is_legacy):raise ValueError('Partial patch; preserve checkout and use a fresh source folder')
+    if not (is_original or is_current or is_legacy or is_metrics_base):raise ValueError('Partial patch; preserve checkout and use a fresh source folder')
     for file,canonical in normalized:file.write_bytes(canonical)
     if normalized:print('Normalized Windows CRLF line endings in',len(normalized),'verified source files.',flush=True)
     if is_current:print('Known compatibility patch already applied.');return
-    patch=HERE/('campaign.patch' if is_legacy else 'compatibility.patch')
+    patch=HERE/('metrics.patch' if is_metrics_base else 'campaign.patch' if is_legacy else 'compatibility.patch')
     command(['git','-C',path,'apply','--check',patch])
     command(['git','-C',path,'apply',patch])
     patched_files=[]
@@ -128,6 +130,18 @@ def parse_log(text):
     done=re.findall(r'SLATER_GIGA_COMPLETE iterations=(\d+) timesteps=(\d+)',text)
     if not done:raise ValueError('No verified completion marker; inspect training.log even if process returned zero')
     result['total_iterations'],result['total_timesteps']=map(int,done[-1]);return result
+
+
+def training_metrics(text):
+    names=('Policy Loss','Critic Loss','Mean KL Divergence','Post-update PPO KL',
+           'Policy Entropy','Learner Speed','Learner Idle Fraction','Learner Touch Fraction')
+    result={}
+    for name in names:
+        values=re.findall(r'^'+re.escape(name)+r': ([\d.,eE+\-]+)',text,re.MULTILINE)
+        if values:
+            value=float(values[-1].replace(',',''))
+            if value==value and abs(value)!=float('inf'):result[name]=value
+    return result
 
 
 def runtime_environment(binary,pause,*,windows=None):
@@ -229,7 +243,12 @@ def run(a,resume=False):
         logfile=run/f'training_{time.time_ns()}.log';started=time.perf_counter()
         with logfile.open('w',encoding='utf8') as f:
             proc=subprocess.Popen([str(x) for x in args],cwd=a.build_dir,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf8',errors='replace')
-            for line in proc.stdout:f.write(line);f.flush();print(line,end='',flush=True)
+            live_lines=[]
+            for line in proc.stdout:
+                f.write(line);f.flush();print(line,end='',flush=True);live_lines.append(line)
+                if line.startswith('Total Iterations:'):
+                    atomic_json(run/'training_metrics.json',training_metrics(''.join(live_lines)))
+                    live_lines.clear()
             code=proc.wait()
         text=logfile.read_text(encoding='utf8')
         try:result=process_result(text,code,logfile,allow_empty_pause=pause.exists())
@@ -243,6 +262,8 @@ def run(a,resume=False):
         result.update(seconds=time.perf_counter()-started,log=str(logfile),checkpoint=str(latest),
             checkpoint_hashes={f:sha256(latest/f) for f in required},architecture='GigaLearn MLP; not native Nexto',
             warning='Throughput, not measured skill. No automatic parent-champion replacement.')
+        result['training_metrics']=training_metrics(text)
+        atomic_json(run/'training_metrics.json',result['training_metrics'])
         atomic_json(run/'last_result.json',result);print('NATIVE_RUN_VERIFIED',json.dumps(result),flush=True)
 
 

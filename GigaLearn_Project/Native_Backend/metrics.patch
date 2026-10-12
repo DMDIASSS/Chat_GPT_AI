@@ -1,0 +1,41 @@
+diff --git a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
+--- a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
++++ b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
+@@ -881,6 +881,14 @@
+ 					{
+ 						"Average Step Reward",
+ 						"Policy Entropy",
++						"Policy Loss",
++						"Critic Loss",
++						"Mean KL Divergence",
++						"Post-update PPO KL",
++						"SB3 Clip Fraction",
++						"Learner Speed",
++						"Learner Idle Fraction",
++						"Learner Touch Fraction",
+ 						"KL Div Loss",
+ 						"First Accuracy",
+ 						"",
+diff --git a/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp b/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp
+--- a/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp
++++ b/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp
+@@ -301,6 +301,19 @@
+ 	float policyUpdateMagnitude = (policyBefore - policyAfter).norm().item<float>();
+ 	float criticUpdateMagnitude = (criticBefore - criticAfter).norm().item<float>();
+ 
++	// Measure after the optimizer step; pre-step KL can be zero with one epoch/batch.
++	if (trainPolicy && experience.data.states.size(0)>0) {
++		torch::NoGradGuard guard;
++		auto n=std::min<int64_t>(1024,experience.data.states.size(0));
++		auto obs=experience.data.states.slice(0,0,n).to(device);
++		auto masks=experience.data.actionMasks.slice(0,0,n).to(device);
++		auto acts=experience.data.actions.slice(0,0,n).to(device);
++		auto old=experience.data.logProbs.slice(0,0,n).to(device).reshape({n});
++		auto probs=InferPolicyProbsFromModels(models,obs,masks,config.policyTemperature,false);
++		auto current=probs.log().gather(-1,acts.unsqueeze(-1)).reshape({n});
++		auto ratio=current-old;
++		report["Post-update PPO KL"]=(ratio.exp()-1-ratio).mean().cpu().item<float>();
++	}
+ 	// Assemble and return report
+ 	report["Policy Entropy"] = avgEntropy.Get();
+ 	report["Mean KL Divergence"] = avgDivergence.Get();

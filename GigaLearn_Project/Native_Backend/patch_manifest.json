@@ -2,41 +2,55 @@
   "GigaLearnCPP/RLGymCPP/src/RLGymCPP/CommonValues.h": {
     "original": "230cf2ddb7455de7f88391a6dc6d92f463e07d30d0c80eb83ee430b76fd8fc0e",
     "patched": "ee2d38d6bdf9cb282bffc68250af306ee4dc1371561f9fee507cbd2aebc32ca1",
-    "legacy": "ee2d38d6bdf9cb282bffc68250af306ee4dc1371561f9fee507cbd2aebc32ca1"
+    "legacy": "ee2d38d6bdf9cb282bffc68250af306ee4dc1371561f9fee507cbd2aebc32ca1",
+    "metrics_base": "ee2d38d6bdf9cb282bffc68250af306ee4dc1371561f9fee507cbd2aebc32ca1"
   },
   "GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.h": {
     "original": "4b06d480191bb5cf811f568ce13d1eae9b1748390dd83192080a21b8d348400a",
     "patched": "3d325bb9bf03f1bcede04f41e667a035bda8b6a30841f73de00d01c9286e00b0",
-    "legacy": "3d325bb9bf03f1bcede04f41e667a035bda8b6a30841f73de00d01c9286e00b0"
+    "legacy": "3d325bb9bf03f1bcede04f41e667a035bda8b6a30841f73de00d01c9286e00b0",
+    "metrics_base": "3d325bb9bf03f1bcede04f41e667a035bda8b6a30841f73de00d01c9286e00b0"
   },
   "GigaLearnCPP/RLGymCPP/src/RLGymCPP/Framework.h": {
     "original": "02f7eb3d61ca127b88dd0710d45e37d7f8d3cca6388b8640234f3bcdfbd23ab4",
     "patched": "11cd082a1a0518803251af8ca7ff894d291c0a943102d19ac3281200833c174f",
-    "legacy": "11cd082a1a0518803251af8ca7ff894d291c0a943102d19ac3281200833c174f"
+    "legacy": "11cd082a1a0518803251af8ca7ff894d291c0a943102d19ac3281200833c174f",
+    "metrics_base": "11cd082a1a0518803251af8ca7ff894d291c0a943102d19ac3281200833c174f"
   },
   "GigaLearnCPP/src/private/GigaLearnCPP/Util/Models.h": {
     "original": "4f076dbe67a62493df92a83af8dd475ba9b414e1925b198046c2cc1963f8d6c2",
     "patched": "5d688d6ba09a52078c0fa210b015c87ff8c73b94e820a63ac6061c3bb6e3fb55",
-    "legacy": "5d688d6ba09a52078c0fa210b015c87ff8c73b94e820a63ac6061c3bb6e3fb55"
+    "legacy": "5d688d6ba09a52078c0fa210b015c87ff8c73b94e820a63ac6061c3bb6e3fb55",
+    "metrics_base": "5d688d6ba09a52078c0fa210b015c87ff8c73b94e820a63ac6061c3bb6e3fb55"
   },
   "GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp": {
     "original": "2fa15e773ae9570108662eb10b166238c3773d012f40aeb151de0f4d63f7f7c4",
-    "patched": "10091d6d4b52fb5d0acbe68faf2560203c278be0efe0e78ddfdc1c3b4eb7eacc",
-    "legacy": "6df612389e43caa634a0b7295232ba0b91fe70552a5835c93b7f3965a6d5a0b9"
+    "patched": "0b5ab783938dc0d6bfe881550bd4611ee8e20d5132050c1247e8cbda89f1f06a",
+    "legacy": "6df612389e43caa634a0b7295232ba0b91fe70552a5835c93b7f3965a6d5a0b9",
+    "metrics_base": "10091d6d4b52fb5d0acbe68faf2560203c278be0efe0e78ddfdc1c3b4eb7eacc"
   },
   "GigaLearnCPP/src/public/GigaLearnCPP/Util/Timer.h": {
     "original": "88f68178ff860ba9b03c107a964061be5fcc69fecfd0cdc5cd5e07d426089316",
     "patched": "6754d911e519048b3f545c9a88a18138e1c6c6c71f3f1e2762505d593cea8d1b",
-    "legacy": "6754d911e519048b3f545c9a88a18138e1c6c6c71f3f1e2762505d593cea8d1b"
+    "legacy": "6754d911e519048b3f545c9a88a18138e1c6c6c71f3f1e2762505d593cea8d1b",
+    "metrics_base": "6754d911e519048b3f545c9a88a18138e1c6c6c71f3f1e2762505d593cea8d1b"
   },
   "GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h": {
     "original": "0006e454a4d5ec73b98c6a06314dbd0a9b6b6ddf13ab63424b507cb421f8afb7",
     "patched": "d322c77bb54b4e0257058bdd0f4a8dd024b62038c4f8da0e46b4705d82c60171",
-    "legacy": "0006e454a4d5ec73b98c6a06314dbd0a9b6b6ddf13ab63424b507cb421f8afb7"
+    "legacy": "0006e454a4d5ec73b98c6a06314dbd0a9b6b6ddf13ab63424b507cb421f8afb7",
+    "metrics_base": "d322c77bb54b4e0257058bdd0f4a8dd024b62038c4f8da0e46b4705d82c60171"
   },
   "GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp": {
     "original": "bc15f31807d55da01ff68c5d0ea3849c1813a73722f2a01d900fb6a712733c65",
     "patched": "cfa3bf07d84101657f4924d1386b17d5657d15d993f4a7db323c68884d95c41b",
-    "legacy": "bc15f31807d55da01ff68c5d0ea3849c1813a73722f2a01d900fb6a712733c65"
+    "legacy": "bc15f31807d55da01ff68c5d0ea3849c1813a73722f2a01d900fb6a712733c65",
+    "metrics_base": "cfa3bf07d84101657f4924d1386b17d5657d15d993f4a7db323c68884d95c41b"
+  },
+  "GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp": {
+    "original": "c7bb34a5a28473ec5e200a669e998fbf173ed6a4b79293fc406c83fce397c1d8",
+    "legacy": "c7bb34a5a28473ec5e200a669e998fbf173ed6a4b79293fc406c83fce397c1d8",
+    "metrics_base": "c7bb34a5a28473ec5e200a669e998fbf173ed6a4b79293fc406c83fce397c1d8",
+    "patched": "e30e60eba2627dab5d30de27c06f8aa9bc5648061cf38dc85f7a2e6a6ff5b599"
   }
 }

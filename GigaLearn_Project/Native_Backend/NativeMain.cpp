@@ -82,7 +82,15 @@ int main(int argc,char** argv){
     cfg.ppo.sharedHead.addLayerNorm=true;cfg.ppo.policy.addLayerNorm=true;cfg.ppo.critic.addLayerNorm=true;
     envSet("SLATER_GL_NO_KEY_THREAD","1");
     if(!bank.empty()){replayBank=std::make_shared<ReplayBank>(bank);if(replayBank->players!=2*players)throw std::runtime_error("Replay bank player count differs");}
-    Learner* learner=new Learner(createEnv,cfg,[](Learner* l,const std::vector<GameState>&,Report&){
+    Learner* learner=new Learner(createEnv,cfg,[](Learner* l,const std::vector<GameState>& states,Report& report){
+        const char* marker=std::getenv("SLATER_GL_FROZEN_TEAM");int frozen=marker?std::atoi(marker):-1;
+        for(const auto& state:states)for(const auto& player:state.players){
+            if(int(player.team)==frozen)continue;
+            bool idle=true;for(int j=0;j<8;j++)idle=idle&&std::abs(player.prevAction[j])<1e-6;
+            report.AddAvg("Learner Speed",player.vel.Length());
+            report.AddAvg("Learner Idle Fraction",idle?1.0:0.0);
+            report.AddAvg("Learner Touch Fraction",player.ballTouchedStep?1.0:0.0);
+        }
         static uint64_t last=uint64_t(-1);
         if(replayBank&&last!=l->totalIterations){std::cout<<"SLATER_REPLAY_RESETS count="<<replayResetCount.load()<<std::endl;last=l->totalIterations;}
         static uint64_t lastCampaign=uint64_t(-1);

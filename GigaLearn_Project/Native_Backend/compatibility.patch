@@ -1,19 +1,4 @@
-diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h
-index 906f531..a309a96 100644
---- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h
-+++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h
-@@ -11,6 +11,9 @@ namespace RLGC {
- 		virtual Action ParseAction(int actionIdx, const Player& player, const GameState& state) = 0;
- 		virtual int GetActionAmount() = 0;
- 
-+        // Optional external controls for frozen rivals; learners remain on-policy.
-+        virtual void ApplyPhysicsControls(Arena* arena) {}
-+
- 		// Returns true or false for each action, depending on if it is available in the current situation
- 		// Not using std::vector<bool> because it has major issues (see https://isocpp.org/blog/2012/11/on-vectorbool)
- 		virtual std::vector<uint8_t> GetActionMask(const Player& player, const GameState& state) {
 diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/CommonValues.h b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/CommonValues.h
-index 7482411..9917ad5 100644
 --- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/CommonValues.h
 +++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/CommonValues.h
 @@ -1,5 +1,5 @@
@@ -23,41 +8,7 @@ index 7482411..9917ad5 100644
  
  namespace RLGC {
  	// https://github.com/AechPro/rocket-league-gym-sim/blob/main/rlgym_sim/utils/common_values.py
-diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp
-index e7d6874..31608e7 100644
---- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp
-+++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp
-@@ -124,7 +124,10 @@ void RLGC::EnvSet::StepFirstHalf(bool async) {
- 		gs.ResetBeforeStep();
- 
- 		// Step arena with old actions
--		arena->Step(config.actionDelay);
-+		for (int tick = 0; tick < config.actionDelay; tick++) {
-+            actionParsers[arenaIdx]->ApplyPhysicsControls(arena);
-+            arena->Step(1);
-+        }
- 	};
- 
- 	g_ThreadPool.StartBatchedJobs(fnStepArena, arenas.size(), async);
-@@ -152,7 +155,15 @@ void RLGC::EnvSet::StepSecondHalf(const IList& actionIndices, bool async) {
- 		// Step arena with new actions we got from observing the last state
- 		// Update the gamestate after
- 		{
--			arena->Step(config.tickSkip - config.actionDelay);
-+			for (int tick = 0; tick < config.tickSkip - config.actionDelay; tick++) {
-+                actionParsers[arenaIdx]->ApplyPhysicsControls(arena);
-+                arena->Step(1);
-+            }
-+            auto appliedCar = arena->_cars.begin();
-+            for (int i = 0; i < actions.size(); i++, appliedCar++) {
-+                auto a = (*appliedCar)->controls;
-+                actions[i] = {a.throttle, a.steer, a.pitch, a.yaw, a.roll, float(a.jump), float(a.boost), float(a.handbrake)};
-+            }
- 
- 			if (eventTrackers[arenaIdx])
- 				eventTrackers[arenaIdx]->Update(arena);
 diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.h b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.h
-index ea1d96e..bae3a9f 100644
 --- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.h
 +++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.h
 @@ -3,7 +3,7 @@
@@ -70,7 +21,6 @@ index ea1d96e..bae3a9f 100644
  #include "../StateSetters/StateSetter.h"
  #include "../ThreadPool.h"
 diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/Framework.h b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/Framework.h
-index 6d793e8..c3f29e6 100644
 --- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/Framework.h
 +++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/Framework.h
 @@ -1,7 +1,7 @@
@@ -84,10 +34,9 @@ index 6d793e8..c3f29e6 100644
  // Use RocketSim namespace
  using namespace RocketSim;
 diff --git a/GigaLearnCPP/src/private/GigaLearnCPP/Util/Models.h b/GigaLearnCPP/src/private/GigaLearnCPP/Util/Models.h
-index 644d2ca..0d88465 100644
 --- a/GigaLearnCPP/src/private/GigaLearnCPP/Util/Models.h
 +++ b/GigaLearnCPP/src/private/GigaLearnCPP/Util/Models.h
-@@ -190,8 +190,13 @@ namespace GGL {
+@@ -190,8 +190,13 @@
  				model->Load(folder, allowNotExist, loadOptims);
  		}
  
@@ -102,7 +51,7 @@ index 644d2ca..0d88465 100644
  			using MapItr = std::map<std::string, Model*>::iterator;
  			MapItr _mapItr;
  
-@@ -202,7 +207,7 @@ namespace GGL {
+@@ -202,7 +207,7 @@
  			bool operator==(const ModelIterator& other) const { return _mapItr == other._mapItr; }
  			bool operator!=(const ModelIterator& other) const { return _mapItr != other._mapItr; }
  
@@ -112,10 +61,9 @@ index 644d2ca..0d88465 100644
  
  		ModelIterator begin() {
 diff --git a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
-index 3403450..b4bda15 100644
 --- a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
 +++ b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
-@@ -270,6 +270,7 @@ void GGL::Learner::Load() {
+@@ -270,6 +270,7 @@
  
  void GGL::Learner::StartQuitKeyThread(bool& quitPressed, std::thread& outThread) {
  	quitPressed = false;
@@ -123,7 +71,7 @@ index 3403450..b4bda15 100644
  
  	RG_LOG("Press 'Q' to save and quit!");
  	outThread = std::thread(
-@@ -508,6 +509,13 @@ void GGL::Learner::Start() {
+@@ -508,6 +509,13 @@
  		int maxEpisodeLength = (int)(config.ppo.maxEpisodeDuration * (120.f / config.tickSkip));
  
  		while (true) {
@@ -137,7 +85,7 @@ index 3403450..b4bda15 100644
  			Report report = {};
  
  			bool isFirstIteration = (totalTimesteps == 0);
-@@ -557,7 +565,17 @@ void GGL::Learner::Start() {
+@@ -557,7 +565,17 @@
  				}
  			}
  
@@ -156,11 +104,25 @@ index 3403450..b4bda15 100644
  
  			int stepsCollected = 0;
  			{ // Generate experience
+@@ -863,6 +881,14 @@
+ 					{
+ 						"Average Step Reward",
+ 						"Policy Entropy",
++						"Policy Loss",
++						"Critic Loss",
++						"Mean KL Divergence",
++						"Post-update PPO KL",
++						"SB3 Clip Fraction",
++						"Learner Speed",
++						"Learner Idle Fraction",
++						"Learner Touch Fraction",
+ 						"KL Div Loss",
+ 						"First Accuracy",
+ 						"",
 diff --git a/GigaLearnCPP/src/public/GigaLearnCPP/Util/Timer.h b/GigaLearnCPP/src/public/GigaLearnCPP/Util/Timer.h
-index 6b0d7c2..e2593cf 100644
 --- a/GigaLearnCPP/src/public/GigaLearnCPP/Util/Timer.h
 +++ b/GigaLearnCPP/src/public/GigaLearnCPP/Util/Timer.h
-@@ -11,13 +11,13 @@ namespace GGL {
+@@ -11,13 +11,13 @@
  
  		// Returns elapsed time in seconds
  		double Elapsed() {
@@ -177,3 +139,71 @@ index 6b0d7c2..e2593cf 100644
  	};
  }
 \ No newline at end of file
+diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h
+--- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h
++++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h
+@@ -11,6 +11,9 @@
+ 		virtual Action ParseAction(int actionIdx, const Player& player, const GameState& state) = 0;
+ 		virtual int GetActionAmount() = 0;
+ 
++        // Optional external controls for frozen rivals; learners remain on-policy.
++        virtual void ApplyPhysicsControls(Arena* arena) {}
++
+ 		// Returns true or false for each action, depending on if it is available in the current situation
+ 		// Not using std::vector<bool> because it has major issues (see https://isocpp.org/blog/2012/11/on-vectorbool)
+ 		virtual std::vector<uint8_t> GetActionMask(const Player& player, const GameState& state) {
+diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp
+--- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp
++++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp
+@@ -124,7 +124,10 @@
+ 		gs.ResetBeforeStep();
+ 
+ 		// Step arena with old actions
+-		arena->Step(config.actionDelay);
++		for (int tick = 0; tick < config.actionDelay; tick++) {
++            actionParsers[arenaIdx]->ApplyPhysicsControls(arena);
++            arena->Step(1);
++        }
+ 	};
+ 
+ 	g_ThreadPool.StartBatchedJobs(fnStepArena, arenas.size(), async);
+@@ -152,7 +155,15 @@
+ 		// Step arena with new actions we got from observing the last state
+ 		// Update the gamestate after
+ 		{
+-			arena->Step(config.tickSkip - config.actionDelay);
++			for (int tick = 0; tick < config.tickSkip - config.actionDelay; tick++) {
++                actionParsers[arenaIdx]->ApplyPhysicsControls(arena);
++                arena->Step(1);
++            }
++            auto appliedCar = arena->_cars.begin();
++            for (int i = 0; i < actions.size(); i++, appliedCar++) {
++                auto a = (*appliedCar)->controls;
++                actions[i] = {a.throttle, a.steer, a.pitch, a.yaw, a.roll, float(a.jump), float(a.boost), float(a.handbrake)};
++            }
+ 
+ 			if (eventTrackers[arenaIdx])
+ 				eventTrackers[arenaIdx]->Update(arena);
+diff --git a/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp b/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp
+--- a/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp
++++ b/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp
+@@ -301,6 +301,19 @@
+ 	float policyUpdateMagnitude = (policyBefore - policyAfter).norm().item<float>();
+ 	float criticUpdateMagnitude = (criticBefore - criticAfter).norm().item<float>();
+ 
++	// Measure after the optimizer step; pre-step KL can be zero with one epoch/batch.
++	if (trainPolicy && experience.data.states.size(0)>0) {
++		torch::NoGradGuard guard;
++		auto n=std::min<int64_t>(1024,experience.data.states.size(0));
++		auto obs=experience.data.states.slice(0,0,n).to(device);
++		auto masks=experience.data.actionMasks.slice(0,0,n).to(device);
++		auto acts=experience.data.actions.slice(0,0,n).to(device);
++		auto old=experience.data.logProbs.slice(0,0,n).to(device).reshape({n});
++		auto probs=InferPolicyProbsFromModels(models,obs,masks,config.policyTemperature,false);
++		auto current=probs.log().gather(-1,acts.unsqueeze(-1)).reshape({n});
++		auto ratio=current-old;
++		report["Post-update PPO KL"]=(ratio.exp()-1-ratio).mean().cpu().item<float>();
++	}
+ 	// Assemble and return report
+ 	report["Policy Entropy"] = avgEntropy.Get();
+ 	report["Mean KL Divergence"] = avgDivergence.Get();
