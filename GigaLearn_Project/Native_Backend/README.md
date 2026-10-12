@@ -24,8 +24,13 @@ Extract the update into `E:\Downloads\Chat_GPT_AI`. Then:
 5. `NATIVE_4_BENCH.bat` benchmarks six iterations with 32 arenas. Read
    `data/isolated/gigalearn_native/runs/native_bench01/last_result.json`.
 
-Each smoke/benchmark uses a new run name; repeating an existing name refuses to
-replace it. Use the CLI with another `--run` for repeated tests.
+The smoke launcher uses `--run auto` to create a fresh named folder each time,
+preserving successful and failed tests. Explicit run names and the benchmark
+refuse to replace existing folders; use another `--run` for repeated benchmarks.
+On Windows the runner adds build/giga, Torch/lib and Python DLL directories to
+the child process PATH automatically. Process failures report the real exit
+code (including Windows status codes), log location and last output lines before
+checking training measurements. `failure.json` preserves diagnostic details.
 
 The build uses LibTorch belonging to the same Python/PyTorch installation.
 Python development headers and import/shared library are checked explicitly.

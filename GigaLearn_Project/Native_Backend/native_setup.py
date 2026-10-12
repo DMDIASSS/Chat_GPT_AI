@@ -126,11 +126,37 @@ def parse_log(text):
     result['total_iterations'],result['total_timesteps']=map(int,done[-1]);return result
 
 
+def runtime_environment(binary,pause,*,windows=None):
+    env=dict(os.environ);env['SLATER_GL_PAUSE_FILE']=str(pause)
+    if windows is None:windows=os.name=='nt'
+    if windows:
+        import torch
+        build=Path(binary).resolve().parent
+        directories=[build,build/'giga',Path(torch.__file__).resolve().parent/'lib',Path(sys.base_prefix)]
+        if env.get('CUDA_PATH'):directories.append(Path(env['CUDA_PATH'])/'bin')
+        paths=[str(p) for p in directories if p.is_dir()]
+        env['PATH']=';'.join([*paths,env.get('PATH','')])
+        print('Native DLL search directories:', ';'.join(paths),flush=True)
+    return env
+
+
+def process_result(text,code,logfile):
+    status=f'0x{code & 0xffffffff:08X}'
+    tail='\n'.join(text.splitlines()[-20:])[-4000:] or '(No output from native executable.)'
+    if code:
+        hint={0xC0000135:'A required DLL was not found.',0xC000007B:'A DLL has an incompatible format.',
+              0xC0000142:'DLL initialization failed.',0xC0000005:'Native access violation.'}.get(code & 0xffffffff,'')
+        raise RuntimeError(f'Native executable exited with code {code} ({status}). {hint}\nLog: {logfile}\n{tail}')
+    try:return parse_log(text)
+    except ValueError as exc:
+        raise RuntimeError(f'Native executable returned zero but did not verify training: {exc}\nLog: {logfile}\n{tail}') from exc
+
+
 def run(a,resume=False):
     if not a.run or not a.run.replace('_','').replace('-','').isalnum():raise ValueError('Use an ASCII run name')
     run=BASE/'runs'/a.run
     if run.exists() and not resume:raise FileExistsError('Run exists: use resume or a new run name')
-    binary=Path(a.build_dir)/('SlaterGigaNative.exe' if os.name=='nt' else 'SlaterGigaNative')
+    binary=Path(a.build_dir).resolve()/('SlaterGigaNative.exe' if os.name=='nt' else 'SlaterGigaNative')
     if not binary.is_file():raise ValueError('Build the native executable first')
     profile={'games':a.games,'steps':a.steps,'threads':a.threads,'players':a.players,'device':a.device,
              'width':a.width,'depth':a.depth,'bank':str(Path(a.replay_bank).resolve()) if a.replay_bank else None}
@@ -157,14 +183,18 @@ def run(a,resume=False):
         args=[binary,'--meshes',a.meshes or meshes(),'--checkpoints',run/'checkpoints','--iterations',a.iterations]
         for k in ('games','steps','threads','players','device','width','depth'):args+=['--'+k,str(profile[k])]
         if profile['bank']:args+=['--replay-bank',profile['bank'],'--bc-epochs',str(0 if resume else a.bc_epochs)]
-        env=dict(os.environ);env['SLATER_GL_PAUSE_FILE']=str(pause)
+        env=runtime_environment(binary,pause)
         logfile=run/f'training_{time.time_ns()}.log';started=time.perf_counter()
         with logfile.open('w',encoding='utf8') as f:
             proc=subprocess.Popen([str(x) for x in args],cwd=a.build_dir,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf8',errors='replace')
             for line in proc.stdout:f.write(line);f.flush();print(line,end='',flush=True)
             code=proc.wait()
-        text=logfile.read_text();result=parse_log(text)
-        if code:raise RuntimeError('Native training process failed; see '+str(logfile))
+        text=logfile.read_text(encoding='utf8')
+        try:result=process_result(text,code,logfile)
+        except RuntimeError as exc:
+            atomic_json(run/'failure.json',{'exit_code':code,'exit_hex':f'0x{code & 0xffffffff:08X}',
+                'log':str(logfile),'error':str(exc)})
+            raise
         latest=run/'checkpoints'/str(result['total_timesteps'])
         required=['POLICY.lt','CRITIC.lt','SHARED_HEAD.lt','RUNNING_STATS.json']
         if not all((latest/f).is_file() for f in required):raise ValueError('Completion did not produce a complete checkpoint')
@@ -208,7 +238,9 @@ def main():
         paused_run=BASE/'runs'/a.run
         if not paused_run.exists():raise ValueError('No native run')
         (paused_run/'pause.flag').touch();print('Native pause requested; finishes current PPO iteration.');return
-    if a.command=='smoke':a.games=8;a.steps=1024;a.iterations=2
+    if a.command=='smoke':
+        a.games=8;a.steps=1024;a.iterations=2
+        if a.run=='auto':a.run='native_smoke_'+str(time.time_ns())
     run(a,resume=a.command=='resume')
 
 if __name__=='__main__':main()

@@ -109,3 +109,29 @@ def test_cuda_missing_gpu_requests_architecture(monkeypatch):
     m=load();monkeypatch.delenv('TORCH_CUDA_ARCH_LIST',raising=False)
     torch=SimpleNamespace(version=SimpleNamespace(cuda='12.6'),cuda=SimpleNamespace(is_available=lambda:False))
     with pytest.raises(ValueError,match='TORCH_CUDA_ARCH_LIST'):m.cuda_configuration(torch)
+
+
+@pytest.mark.parametrize('exit_code',[-1073741515,3221225781])
+def test_missing_dll_exit_is_not_hidden_by_empty_metrics(exit_code):
+    m=load()
+    with pytest.raises(RuntimeError,match='0xC0000135') as caught:m.process_result('',exit_code,Path('failed.log'))
+    assert 'DLL was not found' in str(caught.value) and 'failed.log' in str(caught.value)
+    assert 'No valid Collection' not in str(caught.value)
+
+
+def test_zero_exit_failure_includes_native_output_and_log():
+    m=load()
+    with pytest.raises(RuntimeError) as caught:m.process_result('RG FATAL ERROR: missing meshes',0,Path('failed.log'))
+    assert 'missing meshes' in str(caught.value) and 'failed.log' in str(caught.value)
+
+
+def test_windows_runtime_path_contains_native_torch_and_python_dlls(tmp_path,monkeypatch):
+    import torch
+    m=load();build=tmp_path/'build';(build/'giga').mkdir(parents=True)
+    monkeypatch.setenv('PATH','existing-path')
+    env=m.runtime_environment(build/'SlaterGigaNative.exe',tmp_path/'pause.flag',windows=True)
+    paths=env['PATH'].split(';')
+    assert str(build) in paths and str(build/'giga') in paths
+    assert str(Path(torch.__file__).resolve().parent/'lib') in paths
+    assert str(Path(m.sys.base_prefix)) in paths and paths[-1]=='existing-path'
+    assert env['SLATER_GL_PAUSE_FILE']==str(tmp_path/'pause.flag')
