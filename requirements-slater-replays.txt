@@ -1,0 +1,2 @@
+# Optional: prepared ReplayFrame reset banks; not raw controller imitation.
+rlgym-tools==2.6.5

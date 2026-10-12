@@ -1,5 +1,5 @@
 {
-  "run_name": "overnight01",
+  "run_name": "overnight02",
   "opponents": {
     "nexto": null,
     "cycle9": null,
@@ -13,7 +13,7 @@
   "episode_steps": 450,
   "eval_steps": 600,
   "screen_seeds": 1,
-  "promotion_seeds": 3,
+  "promotion_seeds": 16,
   "small_mutation": 0.012,
   "large_mutation": 0.065,
   "promote_margin": 0.13,
@@ -27,5 +27,11 @@
   "actor_lr_large": 0.000008,
   "epochs": 2,
   "minibatch": 128,
+  "target_kl": 0.02,
+  "promotion_error_budget": 0.05,
+  "training_reset": "mixed_ground",
+  "rlbot_delay": true,
+  "replay_starts": null,
+  "replay_start_probability": 0.2,
   "limit_generations": 0
 }
