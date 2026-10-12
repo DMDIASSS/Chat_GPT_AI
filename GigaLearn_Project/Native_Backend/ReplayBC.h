@@ -45,7 +45,12 @@ inline void replayBC(GGL::Learner* learner,int epochs){
             auto loss=(-(y.index_select(0,ix)*z).sum(-1)*w.index_select(0,ix)).sum()/w.index_select(0,ix).sum();
             if(!torch::isfinite(loss).item<bool>())throw std::runtime_error("Nonfinite replay BC loss");
             models["policy"]->optim->zero_grad();models["shared_head"]->optim->zero_grad();loss.backward();
-            models["policy"]->StepOptim();models["shared_head"]->StepOptim();
+            // Model::StepOptim is not exported from the upstream Windows DLL.
+            // Preserve its full behavior through accessible model fields.
+            for(const char* name:{"policy","shared_head"}){
+                auto model=models[name];model->optim->step();model->optim->zero_grad();
+                model->_seqHalfOutdated=true;
+            }
         }
         float ce=measure();std::cout<<"SLATER_REPLAY_BC epoch="<<epoch+1<<" validation_ce="<<ce<<std::endl;
         if(std::isfinite(ce)&&ce<bestCE){bestCE=ce;models.Save(bestFolder);}else break;

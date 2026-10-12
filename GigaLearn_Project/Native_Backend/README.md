@@ -166,6 +166,9 @@ its own action mask and trains the policy/shared layers with confidence-weighted
 cross-entropy. It selects the best validation-loss snapshot, including optimizer
 state, before PPO. Validation CE is not competitive strength. The untouched test
 partition does not train or supply reset states.
+The bridge steps each optimizer, clears gradients and invalidates the half
+precision cache directly, matching upstream behavior without calling the
+unexported `Model::StepOptim` symbol from the Windows DLL.
 
 Twenty percent of PPO resets sample training-bank states, including ball/car
 poses, velocities, boost timers and core jump/flip/wheel state. This is not a
