@@ -25,8 +25,8 @@ class VersatileCritic(MechanicsCritic):
         return values.gather(1,tasks.reshape(-1,1)).squeeze(1)
 
 class VersatileEnv(MechanicsEnv):
-    def __init__(self,rivals,*,task_name='ground',dataset=None,max_seconds=12,fixed_side=None,fixed_rival=None,scripted_student=False):
-        super().__init__(rivals,retention=True,max_seconds=max_seconds,fixed_side=fixed_side,fixed_rival=fixed_rival,anchor_weight=.03)
+    def __init__(self,rivals,*,task_name='ground',dataset=None,max_seconds=12,fixed_side=None,fixed_rival=None,scripted_student=False,anchor_weight=.03):
+        super().__init__(rivals,retention=True,max_seconds=max_seconds,fixed_side=fixed_side,fixed_rival=fixed_rival,anchor_weight=anchor_weight)
         if task_name not in TASKS:raise ValueError('Unknown versatile task')
         self.task_name=task_name;self.dataset=dataset;self.scripted_student=scripted_student
         self.team_size=2 if task_name=='teamplay' else 1

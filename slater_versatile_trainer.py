@@ -171,7 +171,7 @@ def train(name,source=None,dataset_path=None,*,resume=False,cycles=3,config=None
                 # Include a recent confirmed opponent without changing protected originals.
                 training_rivals=dict(rivals)
                 if state['history']:training_rivals['past_champion']=load_actor(ROOT,Path(state['history'][-1]['previous_champion']))
-                envs=[VersatileEnv(training_rivals,task_name=t,dataset=dataset,max_seconds=cfg['episode_seconds']) for t in tasks]
+                envs=[VersatileEnv(training_rivals,task_name=t,dataset=dataset,max_seconds=cfg['episode_seconds'],anchor_weight=cfg['teacher_anchor']) for t in tasks]
                 try:
                     seeds=[cfg['seed']+state['updates']*100003+j*7919 for j in range(len(envs))]
                     obs=[e.reset(s) for e,s in zip(envs,seeds)]

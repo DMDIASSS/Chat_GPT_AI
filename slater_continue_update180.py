@@ -27,7 +27,7 @@ def verify_actor(source):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('command', choices=('run', 'pause', 'status', 'verify'))
-    p.add_argument('--run', default='update180_continue01')
+    p.add_argument('--run', default='update180_continue02')
     p.add_argument('--source', type=Path, default=SOURCE)
     p.add_argument('--dataset', type=Path)
     p.add_argument('--cycles', type=int, default=3)
