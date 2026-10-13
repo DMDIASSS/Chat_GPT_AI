@@ -662,10 +662,10 @@ class TrainingStudio:
         results.rowconfigure(7, weight=1); results.columnconfigure(1, weight=1)
         ttk.Label(advanced, text='Every supported parameter can be edited below. Click Apply JSON before starting a job.\nConfigurations contain paths and settings; credentials are rejected. Backend validation also applies.').pack(anchor='w')
         self.editor = tk.Text(advanced, wrap='none', font=('Consolas', 10))
-        self.editor.pack(fill='both', expand=True, pady=8)
         row = ttk.Frame(advanced); row.pack(fill='x')
         for text, fn in (('Apply JSON', self.apply_editor), ('Import settings', self.import_settings), ('Export settings', self.export_settings), ('Load selector defaults', self.load_selector_defaults)):
             ttk.Button(row, text=text, command=fn).pack(side='left', padx=3)
+        self.editor.pack(fill='both', expand=True, pady=8)
         controls = ttk.Frame(outer); controls.pack(fill='x')
         self.pause_button = ttk.Button(controls, text='Pause active job safely', command=self.pause_job)
         self.pause_button.pack(side='left')
