@@ -32,7 +32,7 @@ EnvCreateResult createEnv(int index) {
     }
     if(focusDrill){
         r.actionParser=new CampaignAction();r.stateSetter=new FocusSetter();r.obsBuilder=new PaddedObs();
-        r.terminalConditions={new GoalScoreCondition(),new FocusDeadline()};r.rewards={{new FocusReward(),1.f}};return r;
+        r.terminalConditions={new GoalScoreCondition(),new FocusTouchCondition(),new FocusDeadline()};r.rewards={{new FocusReward(),1.f}};return r;
     }
     r.actionParser=campaign?static_cast<ActionParser*>(new CampaignAction()):new DefaultAction();r.obsBuilder=new PaddedObs();
     r.stateSetter=campaign?static_cast<StateSetter*>(new CampaignSetter()):new ReplayMixedSetter();
@@ -52,13 +52,15 @@ void envSet(const char* key,const std::string& value){
 }
 int main(int argc,char** argv){
  try{
-    std::string meshes,checkpoint,device="cpu",bank,probe,probeOut,windowPath,windowAuditOut,learnerTeam="auto";int steps=4096,iterations=2,threads=2,bcEpochs=0,width=128,depth=2;
+    std::string meshes,checkpoint,device="cpu",bank,probe,probeOut,windowPath,windowAuditOut,learnerTeam="auto",teacherBank;int steps=4096,iterations=2,threads=2,bcEpochs=0,width=128,depth=2,teacherEpochs=0;
     float oldChance=.4f;int saveEvery=0,kickoffEpochs=0,kickoffDemos=32;
-    uint64_t decisionBudget=0;
+    uint64_t decisionBudget=0;bool teacherOnly=false;
     for(int i=1;i<argc;i++){
       std::string key=argv[i];if(i+1>=argc)throw std::runtime_error("Missing value for "+key);
       std::string value=argv[++i];
-      if(key=="--event-windows")windowPath=value;else if(key=="--event-audit-out")windowAuditOut=value;else if(key=="--learner-team")learnerTeam=value;else if(key=="--focus-difficulty")focusDifficulty=std::stof(value);
+      if(key=="--teacher-only")teacherOnly=std::stoi(value)!=0;
+      else if(key=="--teacher-bank")teacherBank=value;else if(key=="--teacher-epochs")teacherEpochs=std::stoi(value);
+      else if(key=="--event-windows")windowPath=value;else if(key=="--event-audit-out")windowAuditOut=value;else if(key=="--learner-team")learnerTeam=value;else if(key=="--focus-difficulty")focusDifficulty=std::stof(value);
       else if(key=="--meshes")meshes=value;else if(key=="--checkpoints")checkpoint=value;
       else if(key=="--probe")probe=value;else if(key=="--probe-out")probeOut=value;
       else if(key=="--campaign")campaign=std::stoi(value)!=0;else if(key=="--focus")campaignFocus=value;
@@ -73,6 +75,7 @@ int main(int argc,char** argv){
     if(meshes.empty()||checkpoint.empty()||games<2||games>1024||steps<512||iterations<1||threads<1||threads>32||players<1||players>3||width<64||width>1024||depth<1||depth>6||bcEpochs<0||bcEpochs>10)
        throw std::runtime_error("Invalid/missing meshes, checkpoints or training limits");
     if(kickoffEpochs<0||kickoffEpochs>5||kickoffDemos<10||kickoffDemos>128)throw std::runtime_error("Invalid kickoff imitation budget");
+    if(teacherEpochs<0||teacherEpochs>10||(teacherEpochs>0&&teacherBank.empty())||(teacherOnly&&teacherEpochs==0))throw std::runtime_error("Invalid teacher imitation budget/bank");
     if(learnerTeam!="auto"&&learnerTeam!="blue"&&learnerTeam!="orange")throw std::runtime_error("Invalid learner color");
     fixedLearnerTeam=learnerTeam=="blue"?0:learnerTeam=="orange"?1:-1;
     if(focusDifficulty<0||focusDifficulty>1)throw std::runtime_error("Invalid focus difficulty");
@@ -126,6 +129,9 @@ int main(int argc,char** argv){
     if(!probe.empty()){if(probeOut.empty())throw std::runtime_error("Missing probe output");nativeProbe(learner,probe,probeOut);return 0;}
     replayBC(learner,bcEpochs);
     kickoffBC(learner,kickoffEpochs,kickoffDemos);
+    std::shared_ptr<ReplayBank> guidance;
+    if(teacherEpochs){guidance=std::make_shared<ReplayBank>(teacherBank);if(guidance->players!=2*players)throw std::runtime_error("Teacher bank roster mismatch");replayBC(learner,teacherEpochs,guidance,teacherOnly?"SLATER_TEACHER_BC_POST":"SLATER_TEACHER_BC_PRE");}
+    if(teacherOnly){std::cout<<"SLATER_TEACHER_REFRESH_COMPLETE timesteps="<<learner->totalTimesteps<<std::endl;return 0;}
     envSet("SLATER_GL_STOP_ITERATION",std::to_string(learner->totalIterations+iterations));
     if(decisionBudget)envSet("SLATER_GL_STOP_TIMESTEP",std::to_string(learner->totalTimesteps+decisionBudget));
     std::cout<<"SLATER_GIGA_BEGIN games="<<games<<" steps="<<steps<<" device="<<device<<" architecture=GIGALEARN_MLP"<<std::endl;

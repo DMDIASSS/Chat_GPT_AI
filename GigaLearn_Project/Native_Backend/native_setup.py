@@ -215,6 +215,24 @@ def binary_identity(build):
     return {'binary_sha':sha256(exe),'library_sha':sha256(library)}
 
 
+def refresh_teacher(binary,profile,run,env,logfile,timesteps,mesh_path):
+    # Learner::Start terminates the upstream process with exit(0), so the final
+    # refresh must reload the saved private checkpoint in a separate process.
+    args=[binary,'--meshes',mesh_path,'--checkpoints',run/'checkpoints','--device',profile['device'],
+          '--width',profile['width'],'--depth',profile['depth'],'--games','2','--threads',profile['threads'],
+          '--players',profile['players'],'--teacher-bank',profile['teacher_bank'],
+          '--teacher-epochs',profile['teacher_epochs'],'--teacher-only','1']
+    output=[]
+    with logfile.open('a',encoding='utf8') as f:
+        proc=subprocess.Popen([str(x) for x in args],cwd=Path(binary).parent,env=env,
+                              stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf8',errors='replace')
+        for line in proc.stdout:f.write(line);f.flush();print(line,end='',flush=True);output.append(line)
+        code=proc.wait()
+    text=''.join(output)
+    if code or f'SLATER_TEACHER_REFRESH_COMPLETE timesteps={timesteps}' not in text:
+        raise RuntimeError(f'Teacher refresh failed (exit {code}); preserved checkpoint/log: {logfile}\n'+text[-2500:])
+
+
 def run(a,resume=False):
     if not 0<=a.decisions<=100000000:raise ValueError('Additional decision budget must be 0..100000000')
     if not a.run or not a.run.replace('_','').replace('-','').isalnum():raise ValueError('Use an ASCII run name')
@@ -227,6 +245,8 @@ def run(a,resume=False):
              'campaign':bool(a.campaign),'focus':a.focus,'old_chance':a.old_chance,'save_every':a.save_every,
              'event_windows':str(Path(a.event_windows).resolve()) if getattr(a,'event_windows',None) else None,
              'learner_team':getattr(a,'learner_team','auto'),'focus_difficulty':getattr(a,'focus_difficulty',0.0),
+             'teacher_bank':str(Path(a.teacher_bank).resolve()) if getattr(a,'teacher_bank',None) else None,
+             'teacher_epochs':getattr(a,'teacher_epochs',0),
              'kickoff_epochs':getattr(a,'kickoff_epochs',0),'kickoff_demos':getattr(a,'kickoff_demos',32),
              'frozen':[str(Path(p).resolve()) for p in a.frozen_checkpoint or []]}
     if resume:
@@ -235,6 +255,7 @@ def run(a,resume=False):
         profile=saved['profile']
     identity={'profile':profile,**binary_identity(a.build_dir),'gigalearn_commit':GIGA,
               'bank_sha':sha256(profile['bank']) if profile['bank'] else None}
+    if profile.get('teacher_bank'):identity['teacher_bank_sha']=sha256(profile['teacher_bank'])
     if profile.get('event_windows'):
         windows=read_json(profile['event_windows'])
         if not windows or windows['bank_sha']!=identity['bank_sha']:raise ValueError('Event windows/bank identity mismatch')
@@ -276,6 +297,7 @@ def run(a,resume=False):
             args+=['--campaign','1','--focus',profile['focus'],'--old-chance',str(profile['old_chance']),
                 '--save-every',str(profile['save_every'])]
         if profile['bank']:args+=['--replay-bank',profile['bank'],'--bc-epochs',str(0 if resume else a.bc_epochs)]
+        if profile.get('teacher_bank'):args+=['--teacher-bank',profile['teacher_bank'],'--teacher-epochs',str(0 if resume else profile['teacher_epochs'])]
         args+=['--kickoff-epochs',str(0 if resume else profile.get('kickoff_epochs',0)),
             '--kickoff-demos',str(profile.get('kickoff_demos',32))]
         env=runtime_environment(binary,pause)
@@ -298,6 +320,9 @@ def run(a,resume=False):
         latest=run/'checkpoints'/str(result['total_timesteps'])
         required=['POLICY.lt','CRITIC.lt','SHARED_HEAD.lt','RUNNING_STATS.json']
         if not all((latest/f).is_file() for f in required):raise ValueError('Completion did not produce a complete checkpoint')
+        if profile.get('teacher_bank') and profile.get('teacher_epochs') and not pause.exists():
+            refresh_teacher(binary,profile,run,env,logfile,result['total_timesteps'],a.meshes or meshes())
+            result['teacher_refreshed']=True
         result.update(seconds=time.perf_counter()-started,log=str(logfile),checkpoint=str(latest),
             checkpoint_hashes={f:sha256(latest/f) for f in required},architecture='GigaLearn MLP; not native Nexto',
             warning='Throughput, not measured skill. No automatic parent-champion replacement.')
@@ -316,6 +341,7 @@ def main():
     p.add_argument('--device',choices=('cpu','cuda','auto'),default='cpu');p.add_argument('--width',type=int,default=128);p.add_argument('--depth',type=int,default=2)
     p.add_argument('--initial-checkpoint');p.add_argument('--replay-bank');p.add_argument('--bc-epochs',type=int,default=2)
     p.add_argument('--event-windows');p.add_argument('--learner-team',choices=('auto','blue','orange'),default='auto');p.add_argument('--focus-difficulty',type=float,default=0)
+    p.add_argument('--teacher-bank');p.add_argument('--teacher-epochs',type=int,default=0)
     p.add_argument('--campaign',action='store_true');p.add_argument('--focus',default='mixed')
     p.add_argument('--old-chance',type=float,default=.4);p.add_argument('--save-every',type=int,default=500000)
     p.add_argument('--frozen-checkpoint',action='append')

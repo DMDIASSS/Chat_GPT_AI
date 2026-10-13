@@ -16,12 +16,16 @@ def setup(state,stage,ours,enemy,seed,difficulty=0):
     bp=np.array([rng.uniform(-600,600),rng.uniform(-1200,1200),93.]);cp=bp-[0,sign*(250+rng.uniform(0,500)*difficulty),76]
     if stage in ('wall_roll','wall_pop','wall_to_air_finish'):
         side=rng.choice((-1,1));bp=np.array([side*(3900 if stage=='wall_pop' else 3200),rng.uniform(-1200,1200),500 if stage=='wall_pop' else 93.]);cp=bp-[side*250,0,bp[2]-17]
-    set_ball(state.ball,bp,[0,0,200 if stage=='wall_pop' else 0]);set_car(us,cp,bp,boost=80,on_ground=True)
+    # Ground cars must face along the floor, as they do in FocusSetter (C++).
+    # Looking directly at an elevated ball tilted the chassis into the floor.
+    ground_target=bp.copy();ground_target[2]=cp[2]
+    set_ball(state.ball,bp,[0,0,200 if stage=='wall_pop' else 0]);set_car(us,cp,ground_target,boost=80,on_ground=True)
     if stage=='boost_pickup':
         side=rng.choice((-1,1));set_car(us,[side*2600,-sign*3600,17],[side*3072,-sign*4096,17],boost=5,on_ground=True)
     if stage=='wall_pop':
         side=np.sign(bp[0]);set_car(us,[side*3980,bp[1],bp[2]-170],[side*3980,bp[1],bp[2]+200],up=[-side,0,0],boost=80,on_ground=False);us.physics.linear_velocity=np.array([0,0,350])
-    set_car(op,[-2500,-sign*3500,17],bp,boost=50,on_ground=True)
+    opponent_target=bp.copy();opponent_target[2]=17
+    set_car(op,[-2500,-sign*3500,17],opponent_target,boost=80,on_ground=True)
 
 class Tracker:
     def __init__(self,stage,state,ours,enemy):
@@ -83,6 +87,7 @@ def episode(actor,rival,stage,*,seed,side,seconds=12,difficulty=0,window=None,ba
             b=np.array(window['controls'][min(tick//8,len(window['controls'])-1)][1-team],dtype=np.float32) if window is not None else opponent.controls(state,enemy,previous,engine,tick,kickoff,observer)
             before=state;state=engine.step({ours:a[None],enemy:b[None]},{});tracker.tick(before,state,a);previous={ours:a.copy(),enemy:b.copy()};idle+=int(not np.any(a));touches+=int(state.cars[ours].ball_touches>0);touched|=any(c.ball_touches for c in state.cars.values())
             if state.goal_scored:break
+            if stage=='touch_warmup' and tracker.success(state):break
         return dict(seed=seed,side=side,success=bool(tracker.success(state)),goal_scored=bool(state.goal_scored and tracker.sign*state.ball.position[1]>0),conceded=bool(state.goal_scored and tracker.sign*state.ball.position[1]<0),idle_fraction=idle/(tick+1),touch_ticks=touches,seconds=(tick+1)/120,window=window.get('replay_group',window.get('replay_sha')) if window else None)
     finally:engine.close()
 

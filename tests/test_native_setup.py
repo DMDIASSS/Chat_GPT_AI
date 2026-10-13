@@ -211,3 +211,12 @@ def test_binary_identity_still_rejects_stale_library(tmp_path):
     (tmp_path/('SlaterGigaNative.exe' if m.os.name=='nt' else 'SlaterGigaNative')).write_bytes(b'executable')
     (tmp_path/'giga'/name).write_bytes(b'current');(tmp_path/name).write_bytes(b'stale')
     with pytest.raises(ValueError,match='Stale native library'):m.binary_identity(tmp_path)
+
+
+@pytest.mark.parametrize('code,marker',[(1,'SLATER_TEACHER_REFRESH_COMPLETE timesteps=100'),(0,''),(0,'SLATER_TEACHER_REFRESH_COMPLETE timesteps=99')])
+def test_teacher_refresh_requires_success_and_exact_saved_checkpoint(tmp_path,monkeypatch,code,marker):
+    m=load();monkeypatch.setattr(m.subprocess,'Popen',lambda *args,**kwargs:SimpleNamespace(stdout=[marker+'\n'],wait=lambda:code))
+    profile=dict(device='cpu',width=256,depth=3,threads=1,players=1,teacher_bank='bank.bin',teacher_epochs=3)
+    with pytest.raises(RuntimeError,match='Teacher refresh failed'):
+        m.refresh_teacher(tmp_path/'SlaterGigaNative',profile,tmp_path,{},tmp_path/'training.log',100,tmp_path/'meshes')
+    assert (tmp_path/'training.log').exists()

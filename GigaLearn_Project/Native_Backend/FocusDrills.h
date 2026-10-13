@@ -40,7 +40,8 @@ public:
         if(car.prev){float oldDistance=(s.prev?s.prev->ball.pos-car.prev->pos:delta).Length();r+=.1f*std::clamp((oldDistance-distance)/1000.f,-.1f,.1f);}
         // Dense approach is limited to foundational stages. No reward for consuming boost.
         if(campaignFocus=="touch_warmup"||campaignFocus=="ground_score"||campaignFocus=="kickoff")r+=.3f*std::max(0.f,car.vel.Dot(delta.Normalized())/2300)*dt;
-        if(car.ballTouchedStep){p.contacts++;p.lastContact=p.age;if(campaignFocus=="touch_warmup"&&p.contacts<=3)r+=.4f;
+        if(campaignFocus=="touch_warmup"&&p.age>.3f&&distance<1500&&car.vel.Length()<40)r-=.05f*dt;
+        if(car.ballTouchedStep){p.contacts++;p.lastContact=p.age;if(campaignFocus=="touch_warmup"&&p.contacts==1&&p.active)r+=1.f;
             if(campaignFocus=="kickoff"&&p.contacts==1)r+=sign*s.ball.vel.y>0?1.f:.3f;}
         if(car.prev&&!p.boost&&car.boost-car.prev->boost>5){p.boost=true;if(campaignFocus=="boost_pickup")r+=1;}
         if(car.ballTouchedStep&&std::abs(s.ball.pos.x)>3300){p.wall=true;if(campaignFocus=="wall_roll"&&s.ball.pos.z>180&&!p.pop){p.pop=true;r+=1;}}
@@ -79,4 +80,14 @@ public:
     void Reset(const RLGC::GameState&s)override{origin=s.lastTickCount;}
     bool IsTerminal(const RLGC::GameState&s)override{return s.lastTickCount-origin>=1440;}
     bool IsTruncation()override{return true;}
+};
+class FocusTouchCondition : public RLGC::TerminalCondition {
+public:
+    bool IsTruncation()override{return false;}
+    bool IsTerminal(const RLGC::GameState&s)override{
+        if(campaignFocus!="touch_warmup")return false;
+        for(const auto& p:s.players)if(int(p.team)==fixedLearnerTeam&&p.ballTouchedStep){
+            for(int k=0;k<8;k++)if(std::abs(p.prevAction[k])>1e-6)return true;
+        }return false;
+    }
 };
