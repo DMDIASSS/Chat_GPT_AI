@@ -37,6 +37,18 @@ If your planned training device is CUDA, also run a separate small GPU smoke:
 ATTENTION_NATIVE.bat smoke --device cuda
 ```
 
+To check the native GPU forward pass against the CPU reference explicitly:
+
+```bat
+ATTENTION_NATIVE.bat parity --run attention_cuda_parity01 --device cuda
+```
+
+Default parity runs on CPU. The original traced action head embeds a CPU device
+for its constant action features; the native loader normalizes that device
+to the selected CPU/CUDA device in private actor, teacher and rival instances,
+including checkpoint reload. Actor weights and original files are unchanged.
+GPU kernel execution still requires a successful local CUDA parity/smoke check.
+
 The build initializes the installed Visual Studio x64 toolchain. It uses your
 existing PyTorch, CUDA configuration and RLGym collision meshes. An intact pinned
 GigaLearn source checkout is reused without being edited. If no previous source

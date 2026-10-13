@@ -24,6 +24,39 @@
 namespace slater_attention {
 
 using Tensor = torch::Tensor;
+
+// The original traced Nexto output head contains an explicit CPU device in
+// aten::to for its constant 90-action features. Deserialization moves tensor
+// storage but does not rewrite that device, so loading on CUDA alone fails.
+// Normalize only device-valued constants in this private actor instance.
+inline size_t adapt_device_block(torch::jit::Block* block, torch::Device device) {
+    size_t count = 0;
+    for (auto* node : block->nodes()) {
+        if (node->kind() == torch::jit::prim::Constant && node->outputs().size() == 1 &&
+            node->output()->type()->kind() == c10::TypeKind::DeviceObjType &&
+            node->hasAttribute(torch::jit::attr::value)) {
+            node->s_(torch::jit::attr::value, device.str());
+            ++count;
+        }
+        for (auto* child : node->blocks()) count += adapt_device_block(child, device);
+    }
+    return count;
+}
+
+inline size_t adapt_device_constants(torch::jit::Module& actor, torch::Device device) {
+    size_t count = 0;
+    for (auto module : actor.modules())
+        for (auto method : module.get_methods())
+            count += adapt_device_block(method.graph()->block(), device);
+    return count;
+}
+
+inline torch::jit::Module load_attention(const std::filesystem::path& path, torch::Device device) {
+    auto actor = torch::jit::load(path.string(), device);
+    adapt_device_constants(actor, device);
+    return actor;
+}
+
 struct Config {
     double actor_lr = 1e-5, critic_lr = 1e-4, teacher_weight = .03;
     double target_kl = .015, gamma = .995, lambda = .95;
@@ -250,8 +283,8 @@ class Engine {
 public:
     Engine(const std::filesystem::path& actor_path, const std::filesystem::path& teacher_path,
            Config cfg = {}, torch::Device device = torch::kCPU)
-        : actor_(torch::jit::load(actor_path.string(),device)),
-          teacher_(torch::jit::load(teacher_path.string(),device)), cfg_(cfg), device_(device) {
+        : actor_(load_attention(actor_path,device)),
+          teacher_(load_attention(teacher_path,device)), cfg_(cfg), device_(device) {
         if (!(cfg.actor_lr>0 && std::isfinite(cfg.actor_lr) && cfg.critic_lr>0 && std::isfinite(cfg.critic_lr) &&
               cfg.target_kl>0 && std::isfinite(cfg.target_kl) && cfg.teacher_weight>=0 && std::isfinite(cfg.teacher_weight)) ||
             cfg.epochs<1 || cfg.minibatch<1 || cfg.max_backtracks<0 || cfg.max_backtracks>8)
@@ -360,8 +393,8 @@ public:
     std::string load_checkpoint(const std::filesystem::path& source,const std::string& expected_protocol_json) {
         if (read_text(source/"COMPLETE")!="slater-attention-full-v1\n" || read_text(source/"protocol.json")!=expected_protocol_json)
             throw std::runtime_error("Incomplete checkpoint or incompatible protocol");
-        auto new_actor=torch::jit::load((source/"actor.pt").string(),device_);
-        auto new_teacher=torch::jit::load((source/"teacher.pt").string(),device_);
+        auto new_actor=load_attention(source/"actor.pt",device_);
+        auto new_teacher=load_attention(source/"teacher.pt",device_);
         auto loaded_teacher=cloned_weights(new_teacher);
         if (loaded_teacher.size()!=teacher_initial_.size()) throw std::runtime_error("Checkpoint teacher architecture changed");
         for (size_t i=0;i<loaded_teacher.size();++i)

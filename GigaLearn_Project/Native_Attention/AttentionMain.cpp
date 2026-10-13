@@ -148,7 +148,7 @@ int main(int argc,char** argv){try{
  slater_attention::Config cfg;cfg.actor_lr=o.actor_lr;cfg.critic_lr=o.critic_lr;cfg.teacher_weight=o.teacher_weight;cfg.target_kl=o.target_kl;cfg.epochs=2;cfg.minibatch=std::min(256,o.games*o.steps);
  Engine engine(o.actor,o.teacher,cfg,d);auto protocol=read(o.protocol);json state={{"updates",0},{"decisions",0}};
  if(!o.resume.empty())state=json::parse(engine.load_checkpoint(o.resume,protocol));
- auto rival=torch::jit::load(o.rival,d);rival.eval();for(auto p:rival.parameters())p.set_requires_grad(false);
+ auto rival=slater_attention::load_attention(o.rival,d);rival.eval();for(auto p:rival.parameters())p.set_requires_grad(false);
  if(o.mode=="parity"){
   if(o.fixture.empty())throw std::runtime_error("Tensor fixture required");auto f=torch::jit::load(o.fixture,torch::kCPU);auto q=f.attr("q").toTensor().to(d),kv=f.attr("kv").toTensor().to(d),m=f.attr("mask").toTensor().to(d);torch::NoGradGuard guard;auto expected=f.attr("expected").toTensor();auto got=engine.logits(q,kv,m).to(torch::kCPU);double error=(got-expected).abs().max().item<double>();if(error>(d.is_cuda()?2e-4:2e-5))throw std::runtime_error("Attention tensor forward parity failed");json result={{"forward_max_abs_error",error},{"rows",q.size(0)},{"device",d.str()},{"source_sha",ATTENTION_SOURCE_SHA}};atomic_json(fs::path(o.out)/"parity.json",result);std::cout<<"SLATER_ATTENTION_PARITY "<<result.dump()<<std::endl;return 0;
  }

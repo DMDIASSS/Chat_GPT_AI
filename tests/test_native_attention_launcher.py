@@ -1,9 +1,20 @@
 import json
 from pathlib import Path
+import sys
 
 import pytest
 
 import slater_native_attention as launcher
+
+
+@pytest.mark.parametrize('arguments, expected', [([], 'cpu'), (['--device', 'cpu'], 'cpu'),
+                                                (['--device', 'cuda'], 'cuda')])
+def test_parity_device_is_explicit_and_defaults_to_cpu(monkeypatch, arguments, expected):
+    calls = []
+    monkeypatch.setattr(launcher, 'parity', lambda *args, **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(sys, 'argv', ['slater_native_attention.py', 'parity', *arguments])
+    launcher.main()
+    assert calls[0]['device'] == expected
 
 
 def test_run_names_and_bounded_profiles():

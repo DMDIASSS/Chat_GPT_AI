@@ -387,9 +387,10 @@ def train(name, source=DEFAULT_SOURCE, *, teacher=None, rival=None, profile=None
         return result
 
 
-def parity(name, source=DEFAULT_SOURCE, *, build_dir=None, teacher=None, rival=None):
+def parity(name, source=DEFAULT_SOURCE, *, build_dir=None, teacher=None, rival=None, device='cpu'):
     from slater_attention_native_probe import generate_inputs
-    run, protocol = initialize_run(name, source, teacher, rival, build_dir=build_dir)
+    run, protocol = initialize_run(name, source, teacher, rival, build_dir=build_dir,
+                                   profile={**PROFILE, 'device': device})
     actor = torch.jit.load(str(run / 'initial_actor.pt'), map_location='cpu').eval()
     observations = generate_inputs(actor, run, protocol['profile']['seed'])
     result = checked_process(native_command('parity', run, protocol['profile'], build_dir=build_dir,
@@ -587,7 +588,8 @@ def main():
     elif args.command == 'export':
         export_checkpoint(args.run, checkpoint=args.checkpoint, output=args.output)
     elif args.command == 'parity':
-        parity(args.run, args.source, build_dir=args.build_dir, teacher=args.teacher, rival=args.rival)
+        parity(args.run, args.source, build_dir=args.build_dir, teacher=args.teacher, rival=args.rival,
+               device='cpu' if args.device == 'auto' else args.device)
     elif args.command == 'benchmark':
         cfg = {key: getattr(args, key) for key in PROFILE}
         cfg['device'] = 'cpu'

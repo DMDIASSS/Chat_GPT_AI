@@ -29,6 +29,25 @@ int main(int argc,char** argv) {
         auto f=torch::jit::load((std::filesystem::path(argv[2])/"fixture.pt").string());
         Config cfg; cfg.epochs=1; cfg.minibatch=8; cfg.shuffle=false;
         Engine engine(argv[1],argv[1],cfg); fixture_critic(engine,f); auto b=batch_from(f);
+        // A CPU-only host can test graph portability without pretending CUDA
+        // kernels ran: encode cuda:0, serialize, then normalize on CPU load.
+        // The original action head must have a real embedded device constant.
+        auto portable=torch::jit::load(argv[1],torch::kCPU);
+        auto original_weights=cloned_weights(portable);
+        auto device_constants=adapt_device_constants(portable,torch::Device(torch::kCUDA,0));
+        if(device_constants!=1) throw std::runtime_error("Original actor device constant contract changed");
+        auto out=std::filesystem::path(argv[3]); std::filesystem::create_directories(out);
+        portable.save((out/"cuda_graph_cpu_weights.pt").string());
+        auto encoded=torch::jit::load((out/"cuda_graph_cpu_weights.pt").string(),torch::kCPU);
+        size_t encoded_device_methods=0;
+        for(auto module:encoded.modules()) for(auto method:module.get_methods())
+            encoded_device_methods+=method.graph()->toString().find("value=\"cuda:0\"")!=std::string::npos;
+        if(encoded_device_methods!=1) throw std::runtime_error("Serialized device graph was not retained");
+        auto normalized=load_attention(out/"cuda_graph_cpu_weights.pt",torch::kCPU);
+        auto normalized_weights=cloned_weights(normalized);
+        for(size_t i=0;i<original_weights.size();++i)
+            if(!torch::equal(original_weights[i],normalized_weights[i])) throw std::runtime_error("Device adaptation changed actor weights");
+        check_close(Engine::logits_of(normalized,b.q,b.kv,b.mask),attr(f,"expected_logits"),1e-5,"device_relocation_cpu_logits");
         check_close(engine.logits(b.q,b.kv,b.mask),attr(f,"expected_logits"),1e-5,"logits");
         check_close(engine.values(b.q,b.kv,b.mask,b.task),b.value,1e-6,"critic");
         gae(b); check_close(b.adv,attr(f,"expected_adv"),2e-6,"gae_adv");
@@ -39,7 +58,6 @@ int main(int argc,char** argv) {
         auto after=cloned_weights(engine.actor()); size_t changed=0;
         for(size_t i=0;i<before.size();++i) changed+=!torch::equal(before[i],after[i]);
         if(!changed || !engine.teacher_unchanged()) throw std::runtime_error("No learning or teacher mutated");
-        auto out=std::filesystem::path(argv[3]); std::filesystem::create_directories(out);
         write_text(out/"cpp_metrics.json",metrics.json());
         const std::string protocol="{\"fixture\":1}",state="{\"updates\":1,\"seed\":42}";
         engine.save_checkpoint(out/"checkpoint",protocol,state);
@@ -71,7 +89,7 @@ int main(int argc,char** argv) {
         bool wrong_protocol=false; try{resumed.load_checkpoint(out/"checkpoint","wrong");}catch(...){wrong_protocol=true;}
         if(!wrong_protocol) throw std::runtime_error("Protocol mismatch accepted");
         std::cout << "SLATER_ATTENTION_PPO_PARITY_COMPLETE {\"changed_actor_tensors\":"<<changed
-                  <<",\"frozen_teacher_unchanged\":true,\"optimizer_resume_bitexact\":true,\"rng_resume_bitexact\":true,\"rollback_verified\":true}"<<std::endl;
+                  <<",\"frozen_teacher_unchanged\":true,\"optimizer_resume_bitexact\":true,\"rng_resume_bitexact\":true,\"rollback_verified\":true,\"device_constant_relocation_verified\":true}"<<std::endl;
         return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<std::endl;return 1;}
 }

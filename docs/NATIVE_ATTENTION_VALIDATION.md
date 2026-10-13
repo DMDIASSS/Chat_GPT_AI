@@ -11,7 +11,13 @@ Executed cloud evidence:
 - Integrated native smoke performs real collection and two PPO updates; resume adds updates without rewriting previous checkpoints. A live pause test stopped at a saved update, restored for another update, and preserved all earlier checkpoint bytes and an interrupted partial directory.
 - Matched evaluation runs frozen rivals with kickoff scripts and an unscripted learner. Export reproduces native actor weights in the existing Python attention checkpoint format.
 
-The combined launcher, observation, timing, existing versatile trainer and team-format test suite passed all 67 tests. The packaged update was also extracted into a clean checkout and exercised separately; no model weights, replays, exports or native build products are bundled.
+The combined launcher, observation, timing, existing versatile trainer and team-format test suite passed all 70 tests after the device-loading correction. The packaged update was also extracted into a clean checkout and exercised separately; no model weights, replays, exports or native build products are bundled.
+
+## Windows CUDA loader correction
+
+The user's Windows log confirms a successful MSVC/CUDA-linked build and two real CPU PPO updates from their actual update180, with identical initial actor weights and unchanged source/teacher. CUDA parity and CUDA smoke exposed the original traced action head's explicit `torch.device("cpu")` constant. Loading tensor storage on CUDA did not change that instruction, producing a CPU/CUDA matrix multiplication error.
+
+The native attention loader now normalizes device-valued graph constants on private actor, teacher and rival instances at initial load and checkpoint reload. It preserves all weights and original files. A real-action-head regression encodes `cuda:0`, serializes the private graph, restores it on CPU through the corrected loader, verifies all weights and CPU logits, then exercises PPO, optimizer/RNG resume and rollback. That test proves graph relocation and CPU behavior; it does not execute CUDA kernels. Local explicit CUDA parity and CUDA smoke remain required before claiming GPU support on the user's hardware. Default parity now uses CPU, and `--device cuda` explicitly selects the GPU forward check.
 
 Short cloud matched games produced actual goals. Those development screens are not independent proof of stronger play, SSL rank or learned elite mechanics. Cloud integration used the available original Nexto source explicitly. The user's actual update180 remains local and requires the shipped local build, parity and CPU/GPU smoke commands.
 
