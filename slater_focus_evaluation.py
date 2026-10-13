@@ -14,6 +14,8 @@ def setup(state,stage,ours,enemy,seed,difficulty=0):
     if stage in ('air_carry','air_finish','reset_acquire','reset_use','reset_finish','reset_double_tap'):
         configure_mechanic(state,'air_dribble' if stage=='air_carry' else 'reset_finish' if stage=='reset_double_tap' else stage,ours,enemy,seed,difficulty);return
     bp=np.array([rng.uniform(-600,600),rng.uniform(-1200,1200),93.]);cp=bp-[0,sign*(250+rng.uniform(0,500)*difficulty),76]
+    if stage=='ground_score':
+        bp=np.array([rng.uniform(-120-700*difficulty,120+700*difficulty),sign*(3900-3900*difficulty+rng.uniform(-200,200)),93.]);cp=bp-[0,sign*(250+rng.uniform(0,500)*difficulty),76]
     if stage in ('wall_roll','wall_pop','wall_to_air_finish'):
         side=rng.choice((-1,1));bp=np.array([side*(3900 if stage=='wall_pop' else 3200),rng.uniform(-1200,1200),500 if stage=='wall_pop' else 93.]);cp=bp-[side*250,0,bp[2]-17]
     # Ground cars must face along the floor, as they do in FocusSetter (C++).
@@ -25,7 +27,8 @@ def setup(state,stage,ours,enemy,seed,difficulty=0):
     if stage=='wall_pop':
         side=np.sign(bp[0]);set_car(us,[side*3980,bp[1],bp[2]-170],[side*3980,bp[1],bp[2]+200],up=[-side,0,0],boost=80,on_ground=False);us.physics.linear_velocity=np.array([0,0,350])
     opponent_target=bp.copy();opponent_target[2]=17
-    set_car(op,[-2500,-sign*3500,17],opponent_target,boost=80,on_ground=True)
+    opponent_pos=[rng.choice((-1,1))*3000*(1-difficulty)+rng.uniform(-1200,1200)*difficulty,sign*(3000+1500*difficulty),17] if stage=='ground_score' else [-2500,-sign*3500,17]
+    set_car(op,opponent_pos,opponent_target,boost=80,on_ground=True)
 
 class Tracker:
     def __init__(self,stage,state,ours,enemy):

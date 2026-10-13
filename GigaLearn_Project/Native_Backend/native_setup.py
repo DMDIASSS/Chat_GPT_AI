@@ -172,6 +172,8 @@ def training_metrics(text):
         if values:
             value=float(values[-1].replace(',',''))
             if value==value and abs(value)!=float('inf'):result[name]=value
+    outcomes=re.findall(r'^SLATER_NATIVE_OUTCOMES (\{[^\n]+\})',text,re.MULTILINE)
+    if outcomes:result['outcomes']=json.loads(outcomes[-1])
     return result
 
 
@@ -321,6 +323,10 @@ def run(a,resume=False):
         required=['POLICY.lt','CRITIC.lt','SHARED_HEAD.lt','RUNNING_STATS.json']
         if not all((latest/f).is_file() for f in required):raise ValueError('Completion did not produce a complete checkpoint')
         if profile.get('teacher_bank') and profile.get('teacher_epochs') and not pause.exists():
+            preserved=run/'before_teacher_refresh'/latest.name
+            if preserved.exists():raise FileExistsError('Pre-refresh checkpoint exists; preserve it and use a new run')
+            shutil.copytree(latest,preserved)
+            result['before_teacher_checkpoint']=str(preserved)
             refresh_teacher(binary,profile,run,env,logfile,result['total_timesteps'],a.meshes or meshes())
             result['teacher_refreshed']=True
         result.update(seconds=time.perf_counter()-started,log=str(logfile),checkpoint=str(latest),

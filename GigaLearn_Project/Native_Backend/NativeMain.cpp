@@ -21,6 +21,10 @@
 using namespace GGL;
 using namespace RLGC;
 int games=16,players=1;bool campaign=false;
+struct OutcomeTotals {uint64_t samples=0,touches=0,goalward=0,goalsFor=0,goalsAgainst=0,behind=0;std::vector<bool> scored;
+    void Print()const{if(samples)std::cout<<"SLATER_NATIVE_OUTCOMES "<<nlohmann::json({{"learner_state_samples",samples},{"touch_steps",touches},{"goalward_touch_steps",goalward},{"goals_for",goalsFor},{"goals_against",goalsAgainst},{"behind_ball_fraction",double(behind)/samples}}).dump()<<std::endl;}
+};
+OutcomeTotals outcomeTotals;
 EnvCreateResult createEnv(int index) {
     EnvCreateResult r{};
     r.arena=Arena::Create(GameMode::SOCCAR);
@@ -110,14 +114,22 @@ int main(int argc,char** argv){
         useEventWindows=true;
     }
     focusDrill=campaign&&std::find(focusStages.begin(),focusStages.end(),campaignFocus)!=focusStages.end();
+    std::atexit([](){outcomeTotals.Print();});
     Learner* learner=new Learner(createEnv,cfg,[](Learner* l,const std::vector<GameState>& states,Report& report){
         const char* marker=std::getenv("SLATER_GL_FROZEN_TEAM");int frozen=marker?std::atoi(marker):-1;
-        for(const auto& state:states)for(const auto& player:state.players){
+        if(outcomeTotals.scored.size()!=states.size())outcomeTotals.scored.assign(states.size(),false);
+        for(size_t index=0;index<states.size();index++){const auto& state=states[index];
+          for(const auto& player:state.players){
             if(int(player.team)==frozen)continue;
+            float sign=player.team==Team::BLUE?1.f:-1.f;outcomeTotals.samples++;outcomeTotals.touches+=player.ballTouchedStep;
+            outcomeTotals.goalward+=player.ballTouchedStep&&state.ball.vel.Dot((Vec(0,sign*5120,100)-state.ball.pos).Normalized())>200;
+            outcomeTotals.behind+=sign*(player.pos.y-state.ball.pos.y)<0;
+            if(state.goalScored&&!outcomeTotals.scored[index]){outcomeTotals.goalsFor+=sign*state.ball.pos.y>0;outcomeTotals.goalsAgainst+=sign*state.ball.pos.y<0;}
             bool idle=true;for(int j=0;j<8;j++)idle=idle&&std::abs(player.prevAction[j])<1e-6;
             report.AddAvg("Learner Speed",player.vel.Length());
             report.AddAvg("Learner Idle Fraction",idle?1.0:0.0);
             report.AddAvg("Learner Touch Fraction",player.ballTouchedStep?1.0:0.0);
+          }outcomeTotals.scored[index]=state.goalScored;
         }
         static uint64_t last=uint64_t(-1);
         if(replayBank&&last!=l->totalIterations){std::cout<<"SLATER_REPLAY_RESETS count="<<replayResetCount.load()<<std::endl;last=l->totalIterations;}

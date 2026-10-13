@@ -13,10 +13,15 @@ public:
         if(wall){b.pos={randomRange(0,1)<.5f?-3200.f:3200.f,y,93};if(campaignFocus=="wall_pop"){b.pos.x=b.pos.x>0?3900:-3900;b.pos.z=500;b.vel={0,0,200};}}
         if(air){b.pos={randomRange(-150-800*focusDifficulty,150+800*focusDifficulty),y,randomRange(530,740+400*focusDifficulty)};b.vel={randomRange(-80,80)*focusDifficulty,randomRange(450,700),randomRange(60,140)};}
         int chosen=fixedLearnerTeam>=0?fixedLearnerTeam:std::rand()%2;float sign=chosen==0?1.f:-1.f;if(air){b.vel.y*=sign;b.pos.y=sign*(campaignFocus=="air_finish"||campaignFocus=="reset_finish"||campaignFocus=="reset_double_tap"?1800:800);}
+        if(campaignFocus=="ground_score"){
+            b.pos={randomRange(-120-700*focusDifficulty,120+700*focusDifficulty),sign*(3900-3900*focusDifficulty+randomRange(-200,200)),93};
+            b.vel={0,0,0};
+        }
         arena->ball->SetState(b);bool placed=false;
         for(auto* car:arena->GetCars()){
             RocketSim::CarState c;bool own=int(car->team)==chosen&&!placed;float s=car->team==RocketSim::Team::BLUE?1.f:-1.f;
             c.pos={own?b.pos.x:randomRange(-2500,2500),own?b.pos.y-sign*(250+randomRange(0,500)*focusDifficulty):-s*3500,17};c.boost=80;c.isOnGround=true;
+            if(campaignFocus=="ground_score"&&!own){float side=randomRange(0,1)<.5f?-1.f:1.f;c.pos={side*3000*(1-focusDifficulty)+randomRange(-1200,1200)*focusDifficulty,sign*(3000+1500*focusDifficulty),17};}
             RocketSim::Vec forward=(b.pos-c.pos);forward.z=0;forward=forward.Normalized();c.rotMat=RocketSim::RotMat(forward,{-forward.y,forward.x,0},{0,0,1});
             if(campaignFocus=="boost_pickup"&&own){float side=randomRange(0,1)<.5f?-1.f:1.f;c.pos={side*2600,-s*3600,17};c.boost=5;auto d=(RocketSim::Vec(side*3072,-s*4096,17)-c.pos).Normalized();c.rotMat=RocketSim::RotMat(d,{-d.y,d.x,0},{0,0,1});}
             if(wall&&own){float side=b.pos.x>0?1.f:-1.f;c.pos={b.pos.x-side*250,b.pos.y,17};c.rotMat=RocketSim::RotMat({side,0,0},{0,side,0},{0,0,1});
@@ -29,7 +34,7 @@ public:
     }
 };
 class FocusReward : public RLGC::Reward {
-    struct Progress {bool boost=false,wall=false,pop=false,reset=false,used=false,backboard=false,retouch=false;float carry=0,best=0,travel=0;int contacts=0,noseContacts=0;bool noseEdge=false,carryBeforeReset=false,active=false;float age=0,lastContact=-100,lastNose=-100,lastCarry=-100,resetTime=-100,flipTime=-100;float credit=0;};
+    struct Progress {bool boost=false,wall=false,pop=false,reset=false,used=false,backboard=false,retouch=false;float carry=0,best=0,travel=0;int contacts=0,noseContacts=0;bool noseEdge=false,carryBeforeReset=false,active=false;float age=0,lastContact=-100,lastNose=-100,lastCarry=-100,resetTime=-100,flipTime=-100;float credit=0,groundCredit=0;};
     std::map<uint32_t,Progress> progress;
 public:
     void Reset(const RLGC::GameState&)override{progress.clear();}
@@ -37,12 +42,21 @@ public:
         auto& p=progress[car.carId];float sign=car.team==RocketSim::Team::BLUE?1:-1,dt=s.deltaTime;p.age+=dt;float r=0;
         auto delta=s.ball.pos-car.pos;float distance=delta.Length();auto goal=RocketSim::Vec(0,sign*5120,300);
         for(int j=0;j<8;j++)p.active=p.active||std::abs(car.prevAction[j])>1e-6;
-        if(car.prev){float oldDistance=(s.prev?s.prev->ball.pos-car.prev->pos:delta).Length();r+=.1f*std::clamp((oldDistance-distance)/1000.f,-.1f,.1f);}
+        if(car.prev&&campaignFocus!="ground_score"){float oldDistance=(s.prev?s.prev->ball.pos-car.prev->pos:delta).Length();r+=.1f*std::clamp((oldDistance-distance)/1000.f,-.1f,.1f);}
         // Dense approach is limited to foundational stages. No reward for consuming boost.
-        if(campaignFocus=="touch_warmup"||campaignFocus=="ground_score"||campaignFocus=="kickoff")r+=.3f*std::max(0.f,car.vel.Dot(delta.Normalized())/2300)*dt;
+        if(campaignFocus=="touch_warmup"||campaignFocus=="kickoff")r+=.3f*std::max(0.f,car.vel.Dot(delta.Normalized())/2300)*dt;
         if(campaignFocus=="touch_warmup"&&p.age>.3f&&distance<1500&&car.vel.Length()<40)r-=.05f*dt;
         if(car.ballTouchedStep){p.contacts++;p.lastContact=p.age;if(campaignFocus=="touch_warmup"&&p.contacts==1&&p.active)r+=1.f;
             if(campaignFocus=="kickoff"&&p.contacts==1)r+=sign*s.ball.vel.y>0?1.f:.3f;}
+        // Scoring practice pays for goal progress after learner contact, not car
+        // speed or proximity. Positive shaping is capped below the goal payoff.
+        if(campaignFocus=="ground_score"&&p.contacts>0&&s.prev){
+            float oldPhi=1-std::min(1.f,(goal-s.prev->ball.pos).Length()/12000.f);
+            float newPhi=1-std::min(1.f,(goal-s.ball.pos).Length()/12000.f);
+            float shaping=.995f*newPhi-oldPhi;
+            if(shaping>0){shaping=std::min(shaping,std::max(0.f,1-p.groundCredit));p.groundCredit+=shaping;}
+            r+=shaping;
+        }
         if(car.prev&&!p.boost&&car.boost-car.prev->boost>5){p.boost=true;if(campaignFocus=="boost_pickup")r+=1;}
         if(car.ballTouchedStep&&std::abs(s.ball.pos.x)>3300){p.wall=true;if(campaignFocus=="wall_roll"&&s.ball.pos.z>180&&!p.pop){p.pop=true;r+=1;}}
         if(p.wall&&!p.pop&&car.ballTouchedStep&&s.ball.pos.z>300&&s.prev&&std::abs(s.prev->ball.pos.x)>3700&&s.ball.pos.x*s.ball.vel.x<0&&std::abs(s.ball.vel.x)>150){p.pop=true;if(campaignFocus=="wall_pop"||campaignFocus=="wall_to_air_finish")r+=1;}
