@@ -1,0 +1,73 @@
+{
+  "selector_run": "compare_180_278_197_01",
+  "max_games": 2000,
+  "until": "screen",
+  "selector": {
+    "baseline": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt",
+    "anchors": {
+      "update180": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt",
+      "update278": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000278.pt",
+      "attention197": "data/isolated/native_attention/runs/update180_attention02/checkpoints/checkpoint_000197/actor.pt"
+    },
+    "families": {
+      "known_strong": [
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt",
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000278.pt",
+        "data/isolated/native_attention/runs/update180_attention02/checkpoints/checkpoint_000197/actor.pt"
+      ]
+    },
+    "rivals": {
+      "nexto": "vendor/nexto/nexto-model.pt",
+      "update180": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt",
+      "update278": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000278.pt",
+      "attention197": "data/isolated/native_attention/runs/update180_attention02/checkpoints/checkpoint_000197/actor.pt"
+    },
+    "device": "auto",
+    "worlds": 4,
+    "stages": {
+      "screen": {
+        "seeds": [
+          821000000,
+          821000997
+        ],
+        "seconds": 30.0,
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "rivals": [
+          "nexto",
+          "update180"
+        ],
+        "team_policy": "candidate_squad"
+      },
+      "refine": {
+        "seeds": [
+          822000000,
+          822000997
+        ]
+      },
+      "finalists": {
+        "seeds": [
+          823000000,
+          823000997,
+          823001994,
+          823002991
+        ]
+      },
+      "confirm": {
+        "seeds": [
+          824000000,
+          824000997,
+          824001994,
+          824002991,
+          824003988,
+          824004985,
+          824005982,
+          824006979
+        ]
+      }
+    }
+  }
+}
