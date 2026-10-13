@@ -1,10 +1,17 @@
 # Native attention continuation
 
 This is a separate native C++/LibTorch experiment that starts with the **actual
-original attention actor**. It is a migration of normal-match PPO training before
-adding a new reward curriculum. Your existing attention, MLP, AutoLeague and
+original attention actor**. The original normal-match migration now also supports
+mixed practice routines, variable team rosters and frozen recent self-play. Your existing attention, MLP, AutoLeague and
 replay runs are left intact. The playing model remains update180 until a separate
 evaluation justifies changing it.
+
+For the desktop interface, staged checkpoint selection and automatic champion
+branches, start with [Training Studio](TRAINING_STUDIO.md). Its campaign keeps
+the parent eligible, preserves every complete checkpoint, confirms improvements
+on fresh seeds and rotates away from stalled routines. Manual commands below
+remain available. Whole teams use frozen teammates; only the selected learner
+contributes PPO experience, with its seat rotated between normal episodes.
 
 The default source is:
 

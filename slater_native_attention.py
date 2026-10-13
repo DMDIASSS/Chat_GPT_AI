@@ -34,7 +34,13 @@ CHECKPOINT_FILES = ('actor.pt', 'teacher.pt', 'critic.pt', 'actor_optimizer.pt',
                     'critic_optimizer.pt', 'rng.pt', 'protocol.json', 'state.json')
 PROFILE = {'games': 8, 'steps': 128, 'device': 'auto', 'seed': 20261013,
            'actor_lr': 3e-6, 'critic_lr': 1e-4, 'target_kl': .005,
-           'teacher_weight': .1, 'seconds': 12., 'eval_seeds': 2}
+           'teacher_weight': .1, 'seconds': 12., 'eval_seeds': 2,
+           'curriculum': 'none', 'start_stage': 0, 'practice_fraction': .5,
+           'practice_anchor': .025, 'curriculum_difficulty': .1,
+           'routine': 'match', 'formats': '1v1', 'selfplay_refresh': 0,
+           'opponent_pool': ''}
+ROUTINES = ('match', 'wall-reset', 'air-control', 'defense', 'recovery',
+            'boost', 'bump', 'bump-evasion')
 
 
 def run_path(name):
@@ -44,28 +50,118 @@ def run_path(name):
 
 
 def validate_profile(profile):
+    profile = {**PROFILE, **profile}
     for key, low, high in (('games', 1, 128), ('steps', 16, 4096), ('seed', 1, 2**31-1),
-                           ('eval_seeds', 1, 64)):
+                           ('eval_seeds', 1, 64), ('start_stage', 0, 5),
+                           ('selfplay_refresh', 0, 10000)):
         value = profile[key]
         if type(value) is not int or not low <= value <= high:
             raise ValueError(f'Invalid {key}: expected integer {low}..{high}')
     for key, low, high in (('actor_lr', 1e-8, 5e-5), ('critic_lr', 1e-7, .001),
                            ('target_kl', .0001, .05), ('teacher_weight', 0., 1.),
-                           ('seconds', 3., 300.)):
+                           ('seconds', 3., 300.), ('practice_fraction', .25, .75),
+                           ('practice_anchor', 0., 1.), ('curriculum_difficulty', 0., 1.)):
         value = profile[key]
         if type(value) not in (int, float) or not math.isfinite(value) or not low <= value <= high:
             raise ValueError(f'Invalid {key}')
     if profile['device'] not in ('cpu', 'cuda', 'auto'):
         raise ValueError('Device must be cpu, cuda or auto')
+    if profile['curriculum'] not in ('none', 'wall-reset'):
+        raise ValueError('Curriculum must be none or wall-reset')
+    if profile['routine'] not in ROUTINES:
+        raise ValueError('Unknown training routine')
+    if profile['curriculum'] == 'wall-reset':
+        if profile['routine'] == 'match':
+            profile['routine'] = 'wall-reset'
+        elif profile['routine'] not in ('wall-reset', 'air-control'):
+            raise ValueError('Wall-reset curriculum conflicts with the selected routine')
+    if profile['routine'] in ('wall-reset', 'air-control'):
+        profile['curriculum'] = 'wall-reset'
+    if profile['routine'] == 'air-control':
+        profile['start_stage'] = 2
+    if profile['routine'] != 'match' and profile['games'] < 2:
+        raise ValueError('Mixed routines need at least two worlds to retain match practice')
+    formats = profile['formats']
+    if not isinstance(formats, str):
+        raise ValueError('Formats must be comma-separated team sizes such as 1v1,2v2,3v3')
+    names = [value.strip() for value in formats.split(',')]
+    if not names or len(set(names)) != len(names) or any(not re.fullmatch(r'[1-3]v[1-3]', name) for name in names):
+        raise ValueError('Formats must be unique team sizes with 1..3 cars on each side')
+    profile['formats'] = ','.join(names)
+    if not isinstance(profile['opponent_pool'], (str, Path)):
+        raise ValueError('Opponent pool must be a JSON file path or an empty string')
+    profile['opponent_pool'] = str(profile['opponent_pool'])
     return dict(profile)
 
 
 def validate_source(path):
     path = Path(path).resolve()
+    if path.is_dir():
+        return complete_checkpoint(path) / 'actor.pt'
     if not path.is_file():
         raise FileNotFoundError(f'Original attention checkpoint missing: {path}. '
                                 'Supply --source explicitly; there is no automatic Nexto fallback.')
     return path
+
+
+def snapshot_json(origin, destination, *, expected_sha256=None):
+    """Copy exact input bytes once; future changes to the origin are harmless."""
+    origin, destination = Path(origin).resolve(), Path(destination)
+    before = sha256(origin)
+    data = origin.read_bytes()
+    if hashlib.sha256(data).hexdigest() != before or sha256(origin) != before:
+        raise RuntimeError('Input JSON changed while taking a snapshot: ' + str(origin))
+    if expected_sha256 is not None and before != expected_sha256:
+        raise RuntimeError('Input JSON changed after validation: ' + str(origin))
+    document = json.loads(data.decode('utf-8-sig'))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open('xb') as stream:
+        stream.write(data)
+    if sha256(destination) != before or sha256(origin) != before:
+        raise RuntimeError('Input JSON changed while taking a snapshot: ' + str(origin))
+    return document, {'path': str(destination.resolve()), 'sha256': before,
+                      'origin_path': str(origin), 'origin_sha256': before}
+
+
+def prepare_opponent_pool(run, origin):
+    """Export a fixed pool independently; the user JSON may later be edited."""
+    run = Path(run)
+    snapshot = None
+    if origin:
+        path = Path(origin)
+        path = (path if path.is_absolute() else ROOT / path).resolve()
+        document, snapshot = snapshot_json(path, run / 'opponent_pool_at_start.json')
+        if not isinstance(document, dict) or not isinstance(document.get('actors'), list):
+            raise ValueError('Opponent pool JSON must contain an actors list with id/path entries')
+        actors = document['actors']
+    else:
+        path, actors = None, []
+    names, entries = set(), []
+    for actor in actors:
+        if not isinstance(actor, dict):
+            raise ValueError('Opponent pool actors must be id/path objects')
+        name = actor.get('id')
+        folded = name.casefold() if isinstance(name, str) else ''
+        if (not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', name)
+                or folded in names or folded in ('nexto', 'source') or folded.startswith('snapshot_')):
+            raise ValueError('Opponent IDs must be unique ASCII names; nexto/source/snapshot_ are reserved')
+        names.add(folded)  # Windows filenames are case-insensitive.
+        if not isinstance(actor.get('path'), str) or not actor['path']:
+            raise ValueError('Every opponent actor needs a nonempty checkpoint path')
+        source = Path(actor['path'])
+        source = validate_source(source if source.is_absolute() else path.parent / source)
+        entries.append((name, source))
+    manifest, protected = [], []
+    for name, source in entries:
+        destination = run / 'opponent_pool' / (name + '.pt')
+        exported = export_actor(source, destination)
+        manifest.append({'id': name, 'path': str(destination.resolve()),
+                         'sha256': exported['exported_sha256']})
+        protected.append({'id': name, **exported, 'exported_path': str(destination.resolve())})
+    manifest_path = run / 'opponent_pool.json'
+    atomic_json(manifest_path, {'schema': 1, 'actors': manifest})
+    return {'path': str(manifest_path.resolve()), 'sha256': sha256(manifest_path),
+            'snapshot': snapshot, 'actors': protected}
 
 
 def export_actor(source, destination):
@@ -287,6 +383,52 @@ def verify_protected(protocol):
         entry = protocol[name]
         if sha256(entry['path']) != entry['sha256']:
             raise ValueError(f'Protected {name} changed; use a new run after resolving the source')
+    if 'selection' in protocol:
+        selected = protocol['selection']
+        if sha256(selected['path']) != selected['sha256']:
+            raise ValueError('Selection document changed during training; preserve the run')
+        for entry in selected.get('source_paths', []):
+            if sha256(entry['path']) != entry['sha256']:
+                raise ValueError('Selected original checkpoint changed: ' + entry['path'])
+    pool = protocol.get('opponent_pool')
+    if pool:
+        if sha256(pool['path']) != pool['sha256']:
+            raise ValueError('Private opponent pool manifest changed')
+        if pool.get('snapshot') and sha256(pool['snapshot']['path']) != pool['snapshot']['sha256']:
+            raise ValueError('Opponent pool input snapshot changed')
+        for entry in pool['actors']:
+            if sha256(entry['path']) != entry['sha256']:
+                raise ValueError('Protected opponent model changed: ' + entry['path'])
+            if sha256(entry['exported_path']) != entry['exported_sha256']:
+                raise ValueError('Private opponent actor changed: ' + entry['exported_path'])
+
+
+def source_from_selection(path):
+    """Use a complete screen's private actor for an isolated experiment only."""
+    from slater_team_eval import policy_digest
+    path = Path(path).resolve()
+    before = sha256(path)
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != before:
+        raise RuntimeError('Selection document changed while loading')
+    selected = json.loads(data.decode('utf-8-sig'))
+    if selected.get('schema') != 1 or not selected.get('stage_complete'):
+        raise ValueError('Finish a complete model-selection stage before using --selection')
+    actor_path = validate_source(selected['actor_path'])
+    if sha256(actor_path) != selected['exported_sha256']:
+        raise ValueError('Selected private actor changed')
+    actor = torch.jit.load(str(actor_path), map_location='cpu').eval()
+    if policy_digest(actor) != selected['actor_weights_sha256']:
+        raise ValueError('Selected actor weights do not match the selection report')
+    for entry in selected.get('source_paths', []):
+        if sha256(entry['path']) != entry['sha256']:
+            raise ValueError('Selected original source changed: ' + entry['path'])
+    if sha256(path) != before:
+        raise RuntimeError('Selection document changed while validating its model')
+    metadata = {'path': str(path), 'sha256': before, 'status': selected['status'],
+                'model_id': selected['model_id'], 'source_paths': selected.get('source_paths', []),
+                'playing_model': selected['playing_model'], 'confirmed_best': False}
+    return actor_path, metadata
 
 
 def native_command(mode, run, profile, *, build_dir=None, checkpoint=None, updates=100, fixture=None, kickoffs=None):
@@ -296,8 +438,11 @@ def native_command(mode, run, profile, *, build_dir=None, checkpoint=None, updat
             '--meshes', helper.meshes(), '--out', run, '--protocol', run / 'protocol.json',
             '--pause', run / 'PAUSE', '--updates', updates]
     for key in ('games', 'steps', 'device', 'seed', 'actor_lr', 'critic_lr',
-                'target_kl', 'teacher_weight', 'seconds', 'eval_seeds'):
+                'target_kl', 'teacher_weight', 'seconds', 'eval_seeds', 'curriculum',
+                'start_stage', 'practice_fraction', 'practice_anchor', 'curriculum_difficulty',
+                'routine', 'formats', 'selfplay_refresh'):
         args += ['--' + key.replace('_', '-'), profile[key]]
+    args += ['--opponent-pool', run / 'opponent_pool.json']
     if checkpoint is not None:
         args += ['--resume', complete_checkpoint(checkpoint)]
     if kickoffs is not None:
@@ -325,6 +470,7 @@ def initialize_run(name, source, teacher=None, rival=None, *, profile=None, buil
     export = export_actor(source, run / 'initial_actor.pt')
     teacher_export = export_actor(teacher, run / 'teacher.pt')
     rival_export = export_actor(rival, run / 'rival.pt')
+    opponent_pool = prepare_opponent_pool(run, profile['opponent_pool'])
     protocol = {'version': 1, 'profile': profile, 'source': export,
                 'teacher_source': teacher_export, 'rival_source': rival_export,
                 'initial_actor_sha256': sha256(run / 'initial_actor.pt'),
@@ -333,7 +479,9 @@ def initialize_run(name, source, teacher=None, rival=None, *, profile=None, buil
                     'python': sys.version.split()[0]}, 'gigalearn_commit': helper.GIGA,
                 'learner_scripted_kickoff': False, 'rivals_scripted_kickoff': True,
                 'playing_model': str(source), 'human_replay_gradients': False,
-                'curriculum': 'normal_match_migration', 'auto_promotion': False}
+                'curriculum': 'normal_match_migration' if profile['curriculum']=='none' else 'wall_reset_mixed_v1',
+                'opponent_pool': opponent_pool,
+                'auto_promotion': False}
     atomic_json(run / 'protocol.json', protocol)
     atomic_json(run / 'progress.json', {'status': 'INITIALIZED', 'updates': 0,
                 'decisions': 0, 'playing_model': str(source)})
@@ -359,13 +507,27 @@ def check_run(name, build_dir=None):
 
 
 def train(name, source=DEFAULT_SOURCE, *, teacher=None, rival=None, profile=None,
-          build_dir=None, updates=100, resume=False, kickoffs=None):
+          build_dir=None, updates=100, resume=False, kickoffs=None, selection=None):
     if type(updates) is not int or not 1 <= updates <= 100000:
         raise ValueError('Use a bounded 1..100000 additional update budget')
     if resume:
+        if selection is not None:
+            raise ValueError('Resume uses its protected saved source; omit --selection')
         run, protocol = check_run(name, build_dir)
     else:
+        chosen = None
+        if selection is not None:
+            source, chosen = source_from_selection(selection)
         run, protocol = initialize_run(name, source, teacher, rival, profile=profile, build_dir=build_dir)
+        if chosen:
+            _, snapshot = snapshot_json(chosen['path'], run / 'selection_at_start.json',
+                                        expected_sha256=chosen['sha256'])
+            chosen = {**chosen, **snapshot}
+            protocol['selection'] = chosen
+            protocol['playing_model'] = chosen['playing_model']
+            atomic_json(run / 'protocol.json', protocol)
+            atomic_json(run / 'progress.json', {'status': 'INITIALIZED', 'updates': 0,
+                        'decisions': 0, 'playing_model': chosen['playing_model']})
     with process_lock(run / 'runner.lock'):
         checkpoint = latest_checkpoint(run) if resume else None
         if resume:
@@ -477,8 +639,12 @@ def benchmark(name, source=DEFAULT_SOURCE, *, build_dir=None, profile=None, upda
     end-to-end speedup claim; use the phase measurements for local decisions.
     """
     profile = {**PROFILE, **(profile or {})}
+    profile = validate_profile(profile)
     if profile['device'] != 'cpu':
         raise ValueError('Comparison benchmark requires --device cpu for both implementations')
+    if (profile['routine'] != 'match' or profile['formats'] != '1v1'
+            or profile['selfplay_refresh'] or profile['opponent_pool']):
+        raise ValueError('Reference benchmark requires plain 1v1 match training without opponent-pool/self-play changes')
     import random
     starts = []
     if updates * profile['games'] * profile['steps'] > 2000000:
@@ -559,6 +725,7 @@ def main():
                                           'eval', 'benchmark', 'parity', 'export'))
     parser.add_argument('--run', default='update180_attention01')
     parser.add_argument('--source', type=Path, default=DEFAULT_SOURCE)
+    parser.add_argument('--selection', type=Path, help='Complete selector stage selection.json for an isolated experiment')
     parser.add_argument('--teacher', type=Path)
     parser.add_argument('--rival', type=Path)
     parser.add_argument('--build-dir', type=Path)
@@ -570,6 +737,8 @@ def main():
     for key, default in PROFILE.items():
         parser.add_argument('--' + key.replace('_', '-'), type=type(default), default=default)
     args = parser.parse_args()
+    if args.selection is not None and args.command not in ('train', 'smoke', 'resume'):
+        parser.error('--selection is only available for new train/smoke runs; resume restores its saved source')
     if args.command == 'build':
         build(args.build_dir, args.giga_source, args.jobs)
     elif args.command == 'pause':
@@ -606,7 +775,8 @@ def main():
                 cfg['device'] = 'cpu'
             updates = 2
         train(args.run, args.source, teacher=args.teacher, rival=args.rival, profile=cfg,
-              build_dir=args.build_dir, updates=updates, resume=args.command == 'resume')
+              build_dir=args.build_dir, updates=updates, resume=args.command == 'resume',
+              selection=args.selection)
 
 
 if __name__ == '__main__':

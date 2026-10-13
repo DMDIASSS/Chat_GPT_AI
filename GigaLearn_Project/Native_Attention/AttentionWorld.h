@@ -179,6 +179,12 @@ public:
     const RLGC::GameState& State() const { return state_; }
     uint32_t LearnerId() const { return learnerId_; }
     float LearnerSign() const { return sign_; }
+    size_t LearnerSlot() const {
+        const auto& ids = sign_ > 0 ? blueIds_ : orangeIds_;
+        const auto found = std::find(ids.begin(), ids.end(), learnerId_);
+        if (found == ids.end()) throw std::logic_error("Learner absent from own roster");
+        return size_t(std::distance(ids.begin(), found));
+    }
     size_t LearnerIndex() const {
         for (size_t i = 0; i < state_.players.size(); ++i)
             if (state_.players[i].carId == learnerId_) return i;
@@ -186,6 +192,14 @@ public:
     }
     const std::vector<uint32_t>& BlueIds() const { return blueIds_; }
     const std::vector<uint32_t>& OrangeIds() const { return orangeIds_; }
+    // Rotate the trained seat at an episode boundary. Reset rebuilds frozen
+    // clocks, so the former learner never carries controls into its new role.
+    void SelectLearner(RocketSim::Team team, size_t slot) {
+        if (stepActive_) throw std::logic_error("Change learner only at an action boundary");
+        const auto& ids = team == RocketSim::Team::BLUE ? blueIds_ : orangeIds_;
+        learnerId_ = ids.at(slot);
+        sign_ = team == RocketSim::Team::BLUE ? 1.f : -1.f;
+    }
     const std::map<uint32_t, Action>& PreviousActions() const { return previous_; }
     Action PreviousForInference(uint32_t carId) const { return clocks_.at(carId).action; }
     bool Done() const { return episodeDone_; }
@@ -259,6 +273,24 @@ public:
         for (float value : learnerAction)
             if (!std::isfinite(value)) throw std::invalid_argument("Nonfinite learner control");
         learnerAction_ = learnerAction; info_ = {}; stepActive_ = true;
+    }
+
+    // Evaluation-only per-packet kickoff override. Normal PPO collection does
+    // not call this hook and continues holding its sampled action for 8 ticks.
+    void SetLearnerPacketAction(const Action& action) {
+        if (!stepActive_) throw std::logic_error("BeginAction before packet override");
+        for (float value : action)
+            if (!std::isfinite(value)) throw std::invalid_argument("Nonfinite packet control");
+        learnerAction_ = action;
+    }
+
+    // A drill can fail its physical phase deadline before the ordinary arena
+    // time limit. This is a task terminal, not a goal or an artificial timeout.
+    void EndPracticeEpisode() {
+        if (episodeDone_) return;
+        episodeDone_ = true; stepActive_ = false;
+        info_.terminal = true; info_.timeout = false;
+        info_.episodePhysicsTicks = episodeTicks_;
     }
 
     std::vector<uint32_t> ReadyCars() const {

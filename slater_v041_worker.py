@@ -17,7 +17,7 @@ import slater_cycle9_native_ppo_v025 as base
 import slater_nexto_kickoff_v037a as old
 import slater_v040_multirival as v040
 from afk_team_research import TeamObserver
-from slater_v041_core import RIVAL_NAMES, sha256, read_json, training_mode_index
+from slater_v041_core import RIVAL_NAMES, NEXTO_SHA, sha256, read_json, training_mode_index
 from slater_ppo import trust_region_update
 
 POOL_MODES=tuple('p_'+n for n in RIVAL_NAMES)+('p_leader',)
@@ -27,11 +27,17 @@ def model_from_checkpoint(checkpoint: Path, vendor: Path, *, nexto=False):
     """Load a real RLBot-exported nexto-model.pt OR full PPO .pt checkpoint.
 
     Exact TorchScript forward signature must match legacy Nexto (q,kv,mask)
-    and return 90 logits. Fail closed for incompatible architectures.
+    and return 90 logits. Fail closed for incompatible architectures. A native
+    CUDA export can retain CUDA-valued graph constants despite map_location;
+    read its weights without executing it, then use the verified original CPU
+    graph. Source files and their device constants remain untouched.
     """
-    checkpoint=Path(checkpoint)
+    checkpoint, vendor = Path(checkpoint), Path(vendor)
+    if sha256(vendor) != NEXTO_SHA:
+        raise RuntimeError('Original Nexto changed; cannot construct a trusted CPU actor')
+    checkpoint_sha = sha256(checkpoint)
     try:
-        actor=torch.jit.load(str(checkpoint),map_location='cpu')
+        saved = torch.jit.load(str(checkpoint),map_location='cpu')
     except (RuntimeError, ValueError):
         try:
             doc=torch.load(str(checkpoint),map_location='cpu',weights_only=True)
@@ -40,8 +46,24 @@ def model_from_checkpoint(checkpoint: Path, vendor: Path, *, nexto=False):
         weights=doc.get('actor') if isinstance(doc,dict) else None
         if not isinstance(weights,dict):
             raise ValueError(f'{checkpoint} does not contain a native Nexto actor state_dict')
-        actor=torch.jit.load(str(vendor),map_location='cpu')
-        actor.load_state_dict(weights,strict=True)
+    else:
+        # Deserialization moves tensor storage, but does not rewrite embedded
+        # aten::to device constants. Never forward the supplied script here.
+        weights = saved.state_dict()
+    actor = torch.jit.load(str(vendor), map_location='cpu')
+    expected = actor.state_dict()
+    if (len(expected) != 44 or len(list(actor.parameters())) != 44
+            or sum(parameter.numel() for parameter in actor.parameters()) != 444032
+            or weights.keys() != expected.keys()):
+        raise ValueError(f'{checkpoint} does not contain the original 44-tensor attention architecture')
+    for name, value in weights.items():
+        target = expected[name]
+        if (not torch.is_tensor(value) or value.shape != target.shape or value.dtype != target.dtype
+                or not torch.isfinite(value).all()):
+            raise ValueError(f'{checkpoint} has an incompatible or nonfinite attention tensor: {name}')
+    actor.load_state_dict(weights, strict=True)
+    if not all(torch.equal(value, actor.state_dict()[name]) for name, value in weights.items()):
+        raise RuntimeError('CPU actor reconstruction changed the checkpoint weights')
     actor.eval()
     for param in actor.parameters():param.requires_grad_(False)
     with torch.no_grad():
@@ -52,6 +74,8 @@ def model_from_checkpoint(checkpoint: Path, vendor: Path, *, nexto=False):
                 raise ValueError('Bad Nexto action logits shape or values')
         except Exception as e:
             raise ValueError(f'Policy {checkpoint} incompatible with native Nexto observation/action encoding: {e}') from e
+    if sha256(checkpoint) != checkpoint_sha or sha256(vendor) != NEXTO_SHA:
+        raise RuntimeError('Protected checkpoint or original Nexto changed while loading')
     return actor
 
 def load_pool(root, manifest, *, leader_path=None):
