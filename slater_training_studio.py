@@ -468,6 +468,12 @@ class ProcessManager:
         return completed.stdout.strip()
 
 
+def visual_studio_command(vcvars):
+    # cmd /s /c removes the outer quotes. Pass its command line unchanged:
+    # subprocess's argv-list quoting would turn the inner quotes into \".
+    return f'cmd.exe /d /s /c "call "{vcvars}" >nul && set"'
+
+
 def initialize_visual_studio(environment):
     if os.name != 'nt' or environment.get('VSCMD_ARG_TGT_ARCH') == 'x64':
         return environment
@@ -480,7 +486,7 @@ def initialize_visual_studio(environment):
     if not vcvars.is_file() or any(char in str(vcvars) for char in '"\r\n&|<>^%!'):
         raise ValueError('Visual Studio x64 tools could not be located')
     # The only shell text is this fixed toolchain bootstrap, never user settings.
-    output = subprocess.check_output(['cmd.exe', '/d', '/s', '/c', f'call "{vcvars}" >nul && set'],
+    output = subprocess.check_output(visual_studio_command(vcvars),
                                      text=True, env=environment)
     result = environment.copy()
     for line in output.splitlines():

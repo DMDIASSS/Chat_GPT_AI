@@ -1,6 +1,7 @@
 """Headless checks for Studio configuration, process lifecycle and real exports."""
 from pathlib import Path
 import json
+import os
 import subprocess
 import sys
 import time
@@ -8,6 +9,46 @@ import time
 import pytest
 
 import slater_training_studio as studio
+
+
+def test_visual_studio_bootstrap_passes_cmd_quotes_unchanged(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    programs = tmp_path / 'Program Files (x86)'
+    vswhere = programs / 'Microsoft Visual Studio/Installer/vswhere.exe'
+    vswhere.parent.mkdir(parents=True); vswhere.touch()
+    installation = programs / 'Microsoft Visual Studio/2022/BuildTools'
+    vcvars = installation / 'VC/Auxiliary/Build/vcvars64.bat'
+    vcvars.parent.mkdir(parents=True); vcvars.touch()
+    monkeypatch.setattr(studio, 'os', SimpleNamespace(name='nt', environ={'ProgramFiles(x86)': str(programs)}))
+    environment = {'PATH': 'original'}
+    calls = []
+    def check_output(command, **kwargs):
+        calls.append(command)
+        if isinstance(command, list):
+            assert command[0] == str(vswhere)
+            return str(installation) + '\n'
+        assert command == f'cmd.exe /d /s /c "call "{vcvars}" >nul && set"'
+        assert '\\"' not in command
+        assert kwargs['env'] == environment
+        return 'VSCMD_ARG_TGT_ARCH=x64\nPATH=compiler;original\nVALUE=with=equals\n'
+    monkeypatch.setattr(studio.subprocess, 'check_output', check_output)
+    result = studio.initialize_visual_studio(environment)
+    assert len(calls) == 2 and isinstance(calls[1], str)
+    assert result == {'VSCMD_ARG_TGT_ARCH': 'x64', 'PATH': 'compiler;original', 'VALUE': 'with=equals'}
+    assert environment == {'PATH': 'original'}
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Requires actual Windows cmd.exe')
+def test_actual_windows_cmd_bootstrap_spaces_parentheses_and_failure(tmp_path):
+    vcvars = tmp_path / 'Visual Studio (x86)' / 'vcvars64.bat'
+    vcvars.parent.mkdir()
+    vcvars.write_bytes(b'@echo off\r\nset "SLATER_BOOTSTRAP_TEST=x64-ready"\r\nexit /b 0\r\n')
+    output = subprocess.check_output(studio.visual_studio_command(vcvars), text=True, env=os.environ.copy())
+    assert 'SLATER_BOOTSTRAP_TEST=x64-ready' in output.splitlines()
+    vcvars.write_bytes(b'@echo off\r\nexit /b 9\r\n')
+    with pytest.raises(subprocess.CalledProcessError) as error:
+        subprocess.check_output(studio.visual_studio_command(vcvars), text=True, env=os.environ.copy())
+    assert error.value.returncode == 9
 
 
 def model_settings(tmp_path):
