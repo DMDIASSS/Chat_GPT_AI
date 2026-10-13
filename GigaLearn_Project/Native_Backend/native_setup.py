@@ -1,6 +1,6 @@
 """Pinned GigaLearn build and bounded runs. Never treats Nexto .pt as an MLP."""
 from __future__ import annotations
-import argparse,hashlib,json,os,re,shutil,subprocess,sys,time
+import argparse,hashlib,json,os,re,shutil,subprocess,sys,tempfile,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2];HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT))
@@ -121,6 +121,35 @@ def build(source,folder,jobs):
         f'-DPython_EXECUTABLE={sys.executable}',f'-DPYTHON_EXECUTABLE={sys.executable}',
         f'-DPYTHON_LIBRARY={library}',f'-DPYTHON_INCLUDE_DIR={include}',*cuda_args],env=build_env)
     command([cmake,'--build',folder,'--target','SlaterGigaNative','-j',str(jobs)],env=build_env)
+    # CMake's executable POST_BUILD hook does not run on an up-to-date target.
+    # Always refresh the adjacent Windows DLL after a successful build.
+    sync_library(folder)
+
+
+def sync_library(folder,*,windows=None):
+    windows=os.name=='nt' if windows is None else windows
+    if not windows:return
+    folder=Path(folder).resolve();library=folder/'giga/GigaLearnCPP.dll';shadow=folder/library.name
+    if not (folder/'SlaterGigaNative.exe').is_file() or not library.is_file():
+        raise ValueError('Complete native executable/library build required; run NATIVE_2_BUILD.bat')
+    expected=sha256(library)
+    if shadow.is_file() and sha256(shadow)==expected:
+        print('Native DLL already matches the built library.',flush=True);return
+    # Copy and verify before replacing; a locked DLL must leave the old file intact.
+    temporary=None
+    try:
+        with tempfile.NamedTemporaryFile(dir=folder,prefix='.GigaLearnCPP-',suffix='.tmp',delete=False) as handle:
+            temporary=Path(handle.name)
+        shutil.copyfile(library,temporary)
+        if sha256(temporary)!=expected or sha256(library)!=expected:
+            raise ValueError('Native library changed during repair; wait for the build to finish and retry')
+        try:os.replace(temporary,shadow)
+        except PermissionError as exc:
+            raise RuntimeError('Cannot replace native DLL. Stop native training/evaluation processes, then rerun NATIVE_SYNC_LIBRARY.bat.') from exc
+        if sha256(shadow)!=expected:raise ValueError('Native DLL verification failed after replacement')
+    finally:
+        if temporary is not None:temporary.unlink(missing_ok=True)
+    print('Refreshed native DLL; SHA256',expected,flush=True)
 
 
 def parse_log(text):
@@ -182,7 +211,7 @@ def binary_identity(build):
     library=build/'giga'/('GigaLearnCPP.dll' if os.name=='nt' else 'libGigaLearnCPP.so')
     if not exe.is_file() or not library.is_file():raise ValueError('Complete native executable/library build required')
     shadow=build/library.name
-    if shadow.is_file() and sha256(shadow)!=sha256(library):raise ValueError('Stale native library beside executable; rebuild to refresh the copy')
+    if shadow.is_file() and sha256(shadow)!=sha256(library):raise ValueError('Stale native library beside executable; stop native processes and run NATIVE_SYNC_LIBRARY.bat, or rebuild with NATIVE_2_BUILD.bat')
     return {'binary_sha':sha256(exe),'library_sha':sha256(library)}
 
 
@@ -279,7 +308,7 @@ def run(a,resume=False):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('command',choices=('check','fetch','build','smoke','bench','train','resume','pause','replicar-setup','replicar-convert'))
+    p.add_argument('command',choices=('check','fetch','build','sync-library','smoke','bench','train','resume','pause','replicar-setup','replicar-convert'))
     p.add_argument('--source',default=str(BASE/'source'));p.add_argument('--build-dir',default=str(BASE/'build'))
     p.add_argument('--jobs',type=int,default=2);p.add_argument('--run',default='native_smoke01')
     p.add_argument('--meshes');p.add_argument('--games',type=int,default=32);p.add_argument('--steps',type=int,default=16384)
@@ -303,6 +332,7 @@ def main():
             'nexto_checkpoint_directly_loadable':False},indent=2));return
     if a.command=='fetch':fetch('https://github.com/ZealanL/GigaLearnCPP-Leak.git',a.source,GIGA);patch_source(a.source);return
     if a.command=='build':patch_source(a.source);build(a.source,a.build_dir,a.jobs);return
+    if a.command=='sync-library':sync_library(a.build_dir);print(json.dumps(binary_identity(a.build_dir),indent=2));return
     if a.command=='replicar-setup':
         path=fetch('https://github.com/Rolv-Arild/replicar.git',BASE/'replicar_source',REPLICAR)
         command([sys.executable,'-m','pip','install','--no-deps',str(path/'python/v2')])

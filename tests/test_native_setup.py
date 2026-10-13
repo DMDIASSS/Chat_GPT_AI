@@ -143,3 +143,71 @@ def test_windows_runtime_path_contains_native_torch_and_python_dlls(tmp_path,mon
     assert str(Path(torch.__file__).resolve().parent/'lib') in paths
     assert str(Path(m.sys.base_prefix)) in paths and paths[-1]=='existing-path'
     assert env['SLATER_GL_PAUSE_FILE']==str(tmp_path/'pause.flag')
+
+
+def windows_library_fixture(tmp_path):
+    (tmp_path/'giga').mkdir()
+    (tmp_path/'SlaterGigaNative.exe').write_bytes(b'executable')
+    library=tmp_path/'giga/GigaLearnCPP.dll';library.write_bytes(b'current library')
+    shadow=tmp_path/'GigaLearnCPP.dll';shadow.write_bytes(b'stale library')
+    return library,shadow
+
+
+def test_library_repair_verifies_source_and_repeats_without_replacing(tmp_path,monkeypatch):
+    m=load();library,shadow=windows_library_fixture(tmp_path)
+    original_exe=(tmp_path/'SlaterGigaNative.exe').read_bytes()
+    m.sync_library(tmp_path,windows=True)
+    assert shadow.read_bytes()==library.read_bytes()==b'current library'
+    assert (tmp_path/'SlaterGigaNative.exe').read_bytes()==original_exe
+    assert not list(tmp_path.glob('.GigaLearnCPP-*.tmp'))
+    def cannot_copy(*args):raise AssertionError('matching library must not be replaced')
+    monkeypatch.setattr(m.shutil,'copyfile',cannot_copy)
+    m.sync_library(tmp_path,windows=True)
+
+
+def test_library_repair_locked_destination_preserves_old_copy(tmp_path,monkeypatch):
+    m=load();library,shadow=windows_library_fixture(tmp_path)
+    def locked(*args):raise PermissionError('DLL in use')
+    monkeypatch.setattr(m.os,'replace',locked)
+    with pytest.raises(RuntimeError,match='Stop native training/evaluation'):m.sync_library(tmp_path,windows=True)
+    assert shadow.read_bytes()==b'stale library' and library.read_bytes()==b'current library'
+    assert not list(tmp_path.glob('.GigaLearnCPP-*.tmp'))
+
+
+def test_library_repair_source_change_is_not_installed(tmp_path,monkeypatch):
+    m=load();library,shadow=windows_library_fixture(tmp_path);copyfile=m.shutil.copyfile
+    def changing_copy(src,dst):
+        copyfile(src,dst);Path(src).write_bytes(b'concurrent build')
+    monkeypatch.setattr(m.shutil,'copyfile',changing_copy)
+    with pytest.raises(ValueError,match='changed during repair'):m.sync_library(tmp_path,windows=True)
+    assert shadow.read_bytes()==b'stale library'
+    assert not list(tmp_path.glob('.GigaLearnCPP-*.tmp'))
+
+
+def test_library_repair_missing_build_preserves_old_copy(tmp_path):
+    m=load();library,shadow=windows_library_fixture(tmp_path);library.unlink()
+    with pytest.raises(ValueError,match='Complete native'):m.sync_library(tmp_path,windows=True)
+    assert shadow.read_bytes()==b'stale library'
+
+
+def test_build_refreshes_library_even_when_cmake_has_no_work(tmp_path,monkeypatch):
+    m=load();library,shadow=windows_library_fixture(tmp_path)
+    monkeypatch.setattr(m,'tool',lambda name:name)
+    monkeypatch.setattr(m,'cuda_configuration',lambda torch:([],{}))
+    monkeypatch.setattr(m,'python_paths',lambda:('python.lib','include'))
+    calls=[]
+    # A successful no-op build never executes the executable's POST_BUILD hook.
+    monkeypatch.setattr(m,'command',lambda args,**kwargs:calls.append(args))
+    original_sync=m.sync_library
+    monkeypatch.setattr(m,'sync_library',lambda folder:original_sync(folder,windows=True))
+    m.build(tmp_path/'source',tmp_path,2)
+    assert len(calls)==2 and '--build' in calls[-1]
+    assert shadow.read_bytes()==library.read_bytes()==b'current library'
+
+
+def test_binary_identity_still_rejects_stale_library(tmp_path):
+    m=load();(tmp_path/'giga').mkdir()
+    name='GigaLearnCPP.dll' if m.os.name=='nt' else 'libGigaLearnCPP.so'
+    (tmp_path/('SlaterGigaNative.exe' if m.os.name=='nt' else 'SlaterGigaNative')).write_bytes(b'executable')
+    (tmp_path/'giga'/name).write_bytes(b'current');(tmp_path/name).write_bytes(b'stale')
+    with pytest.raises(ValueError,match='Stale native library'):m.binary_identity(tmp_path)

@@ -13,6 +13,8 @@ This implements the proposed goal-window practice and staged mechanics in the ex
 
 Do not start multiple training campaigns together. Existing window corpora/experiment protocols are immutable; use a new `--prepared` directory and run name after changing code, binary, source weights or settings.
 
+If startup reports `Stale native library beside executable`, stop native training/evaluation and run `NATIVE_SYNC_LIBRARY.bat`, then restart the curriculum launcher. This verifies and atomically copies the existing `build\giga\GigaLearnCPP.dll` beside the executable; it does not compile, parse replays, change checkpoints or bypass binary identity checks. Builds now refresh this copy even when CMake reports no compilation work. A missing executable/library still requires `NATIVE_2_BUILD.bat`; a DLL held open by another process must be released before repair.
+
 ## Goal and save windows
 
 The preparer selects 5-, 8- and 12-second sequences before goals. It labels the last ball-touching player on the scoring team as the inferred attacker, skipping apparent own goals. This is not always the official credited scorer. Actual save-tagged events provide defender imitation targets when the parser has those tags. Unmarked hits are not invented saves.
