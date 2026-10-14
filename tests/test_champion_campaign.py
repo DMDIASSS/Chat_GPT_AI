@@ -133,6 +133,38 @@ def test_configuration_rejects_unbounded_runs_bad_weights_and_unknown_routines()
     assert campaign.validate_config({'cycles': 0, 'max_minutes': 10})['cycles'] == 0
 
 
+def test_format_specific_opponents_and_scripted_eval_keep_paired_reference():
+    cfg = campaign.validate_config({'rivals': {'u271': '271.pt', 'u14': '14.pt', 'nexto': 'nexto.pt'},
+        'rivals_by_format': {'1v1': ['u271'], '2v2': ['u271'], '3v3': ['u14', 'nexto']},
+        'learner_scripted_kickoff': True, 'require_target_advantage': True})
+    protocol = {'settings': cfg, 'protocol_sha': 'fixture', 'identity': {'native': {}}}
+    inventory = {'roles': {'rival:u271': 'parent', 'rival:u14': 'team14', 'rival:nexto': 'nexto'}}
+    jobs = campaign.evaluation_jobs(protocol, inventory, cfg, ['child'], 'parent', 1, 'screen')
+    assert len(jobs) == 40
+    for job in jobs:
+        allowed = {'team14', 'nexto', 'parent'} if job['format'] == [3, 3] else {'parent'}
+        assert job['rival_id'] in allowed
+        assert job['learner_scripted_kickoff'] and job['frozen_scripted_kickoff']
+        assert any(r['candidate_id'] == 'parent' and campaign.selector.cell_key(r) ==
+                   campaign.selector.cell_key(job) for r in jobs)
+    with pytest.raises(ValueError, match='cover every'):
+        campaign.validate_config({'rivals_by_format': {'1v1': ['nexto']}})
+
+
+def test_promotion_requires_beating_every_target_when_enabled():
+    cfg = campaign.validate_config({'rivals_by_format': {'1v1': ['nexto'], '2v2': ['nexto'],
+                                                        '3v3': ['nexto']},
+                                    'require_target_advantage': True})
+    strong = {'mean': 1., 'lower': .4, 'upper': 1.5, 'independent_seeds': 8}
+    candidate = {'id': 'child', 'weighted_goal_difference_per_minute': strong,
+                 'per_mode': {mode: strong for mode in cfg['mode_weights']},
+                 'target_scores': {f'{mode}:nexto': strong for mode in cfg['mode_weights']}}
+    assert campaign.promotion_decision([candidate], 'parent', cfg, 1)['promote']
+    candidate['target_scores']['3v3:nexto'] = {**strong, 'lower': -.1}
+    decision = campaign.promotion_decision([candidate], 'parent', cfg, 1)
+    assert not decision['promote'] and decision['reason'] == 'TARGET_ADVANTAGE_NOT_CONFIRMED'
+
+
 def test_fresh_confirmation_namespaces_never_overlap_and_spending_is_bounded():
     cfg = campaign.validate_config(configuration())
     seen = set()

@@ -38,7 +38,7 @@ PROFILE = {'games': 8, 'steps': 128, 'device': 'auto', 'seed': 20261013,
            'curriculum': 'none', 'start_stage': 0, 'practice_fraction': .5,
            'practice_anchor': .025, 'curriculum_difficulty': .1,
            'routine': 'match', 'formats': '1v1', 'selfplay_refresh': 0,
-           'opponent_pool': ''}
+           'opponent_pool': '', 'learner_scripted_kickoff': False}
 ROUTINES = ('match', 'wall-reset', 'air-control', 'defense', 'recovery',
             'boost', 'bump', 'bump-evasion')
 
@@ -51,6 +51,8 @@ def run_path(name):
 
 def validate_profile(profile):
     profile = {**PROFILE, **profile}
+    if type(profile['learner_scripted_kickoff']) is not bool:
+        raise ValueError('learner_scripted_kickoff must be a boolean')
     for key, low, high in (('games', 1, 128), ('steps', 16, 4096), ('seed', 1, 2**31-1),
                            ('eval_seeds', 1, 64), ('start_stage', 0, 5),
                            ('selfplay_refresh', 0, 10000)):
@@ -135,7 +137,7 @@ def prepare_opponent_pool(run, origin):
             raise ValueError('Opponent pool JSON must contain an actors list with id/path entries')
         actors = document['actors']
     else:
-        path, actors = None, []
+        path, actors, document = None, [], {}
     names, entries = set(), []
     for actor in actors:
         if not isinstance(actor, dict):
@@ -151,6 +153,15 @@ def prepare_opponent_pool(run, origin):
         source = Path(actor['path'])
         source = validate_source(source if source.is_absolute() else path.parent / source)
         entries.append((name, source))
+    mapping = document.get('rivals_by_format', {})
+    if not isinstance(mapping, dict):
+        raise ValueError('Opponent rivals_by_format must be an object')
+    exact_names = {name for name, source in entries} | {'source', 'nexto'}
+    for mode, ids in mapping.items():
+        if (not re.fullmatch(r'[1-3]v[1-3]', mode) or not isinstance(ids, list) or not ids
+                or any(not isinstance(id, str) or id not in exact_names for id in ids)
+                or len(set(ids)) != len(ids)):
+            raise ValueError('Opponent format groups require valid formats and known unique actor IDs')
     manifest, protected = [], []
     for name, source in entries:
         destination = run / 'opponent_pool' / (name + '.pt')
@@ -159,7 +170,7 @@ def prepare_opponent_pool(run, origin):
                          'sha256': exported['exported_sha256']})
         protected.append({'id': name, **exported, 'exported_path': str(destination.resolve())})
     manifest_path = run / 'opponent_pool.json'
-    atomic_json(manifest_path, {'schema': 1, 'actors': manifest})
+    atomic_json(manifest_path, {'schema': 1, 'actors': manifest, 'rivals_by_format': mapping})
     return {'path': str(manifest_path.resolve()), 'sha256': sha256(manifest_path),
             'snapshot': snapshot, 'actors': protected}
 
@@ -443,6 +454,7 @@ def native_command(mode, run, profile, *, build_dir=None, checkpoint=None, updat
                 'routine', 'formats', 'selfplay_refresh'):
         args += ['--' + key.replace('_', '-'), profile[key]]
     args += ['--opponent-pool', run / 'opponent_pool.json']
+    args += ['--learner-scripted-kickoff', int(profile['learner_scripted_kickoff'])]
     if checkpoint is not None:
         args += ['--resume', complete_checkpoint(checkpoint)]
     if kickoffs is not None:
@@ -477,7 +489,7 @@ def initialize_run(name, source, teacher=None, rival=None, *, profile=None, buil
                 'teacher_sha256': sha256(run / 'teacher.pt'), 'rival_sha256': sha256(run / 'rival.pt'),
                 'native': identity, 'code': code_identity(), 'runtime': {'torch': torch.__version__,
                     'python': sys.version.split()[0]}, 'gigalearn_commit': helper.GIGA,
-                'learner_scripted_kickoff': False, 'rivals_scripted_kickoff': True,
+                'learner_scripted_kickoff': profile['learner_scripted_kickoff'], 'rivals_scripted_kickoff': True,
                 'playing_model': str(source), 'human_replay_gradients': False,
                 'curriculum': 'normal_match_migration' if profile['curriculum']=='none' else 'wall_reset_mixed_v1',
                 'opponent_pool': opponent_pool,
@@ -600,13 +612,65 @@ def evaluate(name, *, build_dir=None, checkpoint=None, seeds=8, seconds=60.):
     profile = validate_profile({**protocol['profile'], 'eval_seeds': seeds, 'seconds': seconds})
     folder = run / 'evaluations' / f'{checkpoint.name}_{time.time_ns()}'
     folder.mkdir(parents=True)
-    command = native_command('eval', run, profile, build_dir=build_dir, checkpoint=checkpoint, updates=1)
-    result = checked_process(command, folder / 'eval.log', marker='SLATER_ATTENTION_EVAL_COMPLETE')
+    pool = read_json(run / 'opponent_pool.json')
+    if pool.get('rivals_by_format'):
+        result = evaluate_format_targets(run, folder, checkpoint, profile, pool, build_dir)
+    else:
+        command = native_command('eval', run, profile, build_dir=build_dir, checkpoint=checkpoint, updates=1)
+        result = checked_process(command, folder / 'eval.log', marker='SLATER_ATTENTION_EVAL_COMPLETE')
     verify_protected(protocol)
     result.update(checkpoint=str(checkpoint), checkpoint_actor_sha256=sha256(checkpoint / 'actor.pt'),
                   playing_model=protocol['playing_model'], auto_promotion=False)
     atomic_json(folder / 'comparison.json', result)
     print('ATTENTION_EVALUATION_REPORT', folder / 'comparison.json', flush=True)
+    return result
+
+
+def evaluate_format_targets(run, folder, checkpoint, profile, pool, build_dir=None):
+    """Use the same native selector contract for a standalone targeted run."""
+    import slater_model_selection as selector
+    template = torch.jit.load(str(DEFAULT_RIVAL), map_location='cpu')
+    inventory = {'models': {}, 'roles': {}}
+
+    def add(path):
+        model, source = selector.canonical_actor(template, {'path': str(path), 'families': [], 'roles': []},
+                                                 folder / 'actors', inventory['models'])
+        inventory['models'].setdefault(model['id'], {**model, 'source_paths': [source]})
+        return model['id']
+
+    parent = add(run / 'teacher.pt')
+    candidate = add(checkpoint / 'actor.pt')
+    inventory['roles']['baseline'] = parent
+    ids = {'source': parent, 'nexto': add(run / 'rival.pt')}
+    ids.update({entry['id']: add(entry['path']) for entry in pool['actors']})
+    settings = {'device': profile['device'], 'worlds': min(profile['games'], 32),
+                'learner_scripted_kickoff': profile['learner_scripted_kickoff'],
+                'frozen_scripted_kickoff': True}
+    protocol = {'settings': settings, 'identity': selector.selector_identity(build_dir)}
+    protocol['protocol_sha'] = selector.canonical_hash({'native_protocol': sha256(run / 'protocol.json'),
+        'checkpoint': sha256(checkpoint / 'actor.pt'), 'settings': settings})
+    jobs = []
+    seed_base = time.time_ns() % 1_500_000_000
+    for fmt in selector.stage_formats(profile['formats']):
+        mode = f'{fmt[0]}v{fmt[1]}'
+        targets = list(dict.fromkeys(ids[id] for id in pool['rivals_by_format'][mode]))
+        for actor in sorted({candidate, parent}):
+            for rival in targets:
+                for index in range(profile['eval_seeds']):
+                    for side in ('blue', 'orange'):
+                        jobs.append(selector.game_descriptor(protocol, actor, rival, actor, fmt,
+                            seed_base + 31 * index, side, profile['seconds'], 'candidate_squad'))
+    atomic_json(folder / 'protocol.json', protocol)
+    atomic_json(folder / 'inventory.json', inventory)
+    for start in range(0, len(jobs), 128):
+        selector.execute_group(folder, protocol, inventory, 'eval', jobs[start:start+128], build_dir)
+    records, _ = selector.cached_records(folder, jobs, require_complete=True)
+    result = {'status': 'FINITE_EVALUATION_COMPLETE', 'completed_games': len(records),
+              'ranking': selector.summarize(records, {candidate, parent}, parent),
+              'pairwise': selector.pairwise_summary(records, inventory),
+              'rivals_by_format': pool['rivals_by_format'], 'seeds': profile['eval_seeds'],
+              'seconds': profile['seconds'], **settings, 'auto_promotion': False}
+    atomic_json(folder / 'evaluation.json', result)
     return result
 
 
@@ -735,7 +799,14 @@ def main():
     parser.add_argument('--jobs', type=int, default=1)
     parser.add_argument('--updates', type=int, default=100)
     for key, default in PROFILE.items():
-        parser.add_argument('--' + key.replace('_', '-'), type=type(default), default=default)
+        if type(default) is bool:
+            def boolean(value):
+                if value.lower() not in ('true', 'false', '1', '0'):
+                    raise argparse.ArgumentTypeError('Choose true or false')
+                return value.lower() in ('true', '1')
+            parser.add_argument('--' + key.replace('_', '-'), type=boolean, default=default)
+        else:
+            parser.add_argument('--' + key.replace('_', '-'), type=type(default), default=default)
     args = parser.parse_args()
     if args.selection is not None and args.command not in ('train', 'smoke', 'resume'):
         parser.error('--selection is only available for new train/smoke runs; resume restores its saved source')

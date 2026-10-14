@@ -261,3 +261,20 @@ def test_resume_rejects_changed_runtime_before_evaluation(tmp_path, monkeypatch)
     monkeypatch.setattr(selector, 'selector_identity', lambda build=None: {'native': 'new'})
     with pytest.raises(ValueError, match='runtime or code changed'):
         selector.run_campaign('fixture', resume=True)
+
+
+def test_comparison_targets_are_filtered_by_format():
+    cfg = selector.merge_config(selector.DEFAULT, {
+        'rivals': {'u271': '271.pt', 'u14': '14.pt', 'nexto': 'nexto.pt'},
+        'rivals_by_format': {'1v1': ['u271'], '2v2': ['u271'], '3v3': ['u14', 'nexto']},
+        'learner_scripted_kickoff': True,
+        'stages': {'screen': {'rivals': ['u271', 'u14', 'nexto'],
+                              'formats': [[1, 1], [2, 2], [3, 3]], 'seeds': [42]}}})
+    protocol = {'settings': cfg, 'identity': {'native': {}}, 'protocol_sha': 'fixture'}
+    inventory = {'roles': {'baseline': 'parent', 'rival:u271': 'parent',
+                           'rival:u14': 'team', 'rival:nexto': 'nexto'}}
+    jobs = selector.expected_jobs(protocol, inventory, ['child'], 'screen')
+    assert len(jobs) == 16
+    assert all(job['learner_scripted_kickoff'] for job in jobs)
+    for job in jobs:
+        assert job['rival_id'] in ({'team', 'nexto'} if job['format'] == [3, 3] else {'parent'})

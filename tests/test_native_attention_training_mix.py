@@ -173,3 +173,37 @@ def test_real_wall_reset_mixed_allocation_and_nonzero_task_head(native_mix_runti
     assert state_changed(actor_state(initial / "actor.pt"), actor_state(latest / "actor.pt"))
     assert not state_changed(actor_state(initial / "teacher.pt"), actor_state(latest / "teacher.pt"))
     launcher.verify_protected(read_json(run / "protocol.json"))
+
+
+def test_real_format_pool_loaded_and_scripted_rows_excluded(native_mix_runtime):
+    import json
+    build, source, folder = native_mix_runtime
+    pool = folder / 'targets.json'
+    pool.write_text(json.dumps({'actors': [{'id': 'duel', 'path': str(source)},
+                                          {'id': 'team', 'path': str(source)}],
+                               'rivals_by_format': {'1v1': ['duel'], '2v2': ['duel'], '3v3': ['team']}}))
+    profile = {**launcher.PROFILE, 'device': 'cpu', 'games': 8, 'steps': 32,
+               'seconds': 3., 'formats': '1v1,2v2,3v3', 'opponent_pool': str(pool),
+               'learner_scripted_kickoff': True, 'selfplay_refresh': 1}
+    result = launcher.train('scripted_targets', source, profile=profile, build_dir=build, updates=1)
+    run = folder / 'scripted_targets'
+    row = read_json(run / 'update_1.json')
+    assert row['learner_scripted_kickoff'] is True
+    assert 0 < row['decisions'] < 8 * 32
+    assert row['selfplay']['learner_script_ticks'] > 0
+    assert row['selfplay']['excluded_script_rows'] == 8 * 32 - row['decisions']
+    assert set(row['selfplay']['external']) == {'duel', 'team'}
+    assigned = row['selfplay']['assigned_opponents']
+    assert {entry['format'] for entry in assigned} == {'1v1', '2v2', '3v3'}
+    for entry in assigned:
+        assert entry['rival'] == ('team' if entry['format'] == '3v3' else 'duel')
+    assert result['source_unchanged']
+    launcher.train('scripted_targets', build_dir=build, updates=1, resume=True)
+    resumed = read_json(run / 'update_2.json')
+    assert resumed['learner_scripted_kickoff'] is True
+    assert set(resumed['selfplay']['external']) == {'duel', 'team'}
+    evaluated = launcher.evaluate('scripted_targets', build_dir=build, seeds=1, seconds=3.)
+    assert evaluated['learner_scripted_kickoff'] is True
+    assert evaluated['completed_games'] > 0
+    assert evaluated['rivals_by_format'] == {'1v1': ['duel'], '2v2': ['duel'], '3v3': ['team']}
+    assert set(evaluated['ranking'][0]['per_mode']) == {'1v1', '2v2', '3v3'}

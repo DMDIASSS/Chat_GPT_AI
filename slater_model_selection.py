@@ -47,7 +47,7 @@ DEFAULT = {
                'update278': str(DEFAULT_278)},
     'device': 'auto', 'worlds': 8, 'job_group': 128, 'top_per_family': 4,
     'refine_per_family': 8, 'uncertain_extra_per_family': 4, 'confirm_leaders': 4,
-    'learner_scripted_kickoff': False, 'frozen_scripted_kickoff': True,
+    'learner_scripted_kickoff': False, 'frozen_scripted_kickoff': True, 'rivals_by_format': {},
     'stages': {
         'screen': {'seeds': [730000000], 'seconds': 20., 'formats': ['1v1'],
                    'rivals': ['nexto', 'update180'], 'team_policy': 'fixed_reference'},
@@ -132,6 +132,14 @@ def validate_config(config):
         raise ValueError('This PyTorch runtime cannot use CUDA')
     if type(cfg['learner_scripted_kickoff']) is not bool or cfg['frozen_scripted_kickoff'] is not True:
         raise ValueError('Learner kickoff must be explicit; frozen policies require scripted kickoff')
+    mapping = cfg['rivals_by_format']
+    if not isinstance(mapping, dict):
+        raise ValueError('rivals_by_format must be an object')
+    for mode, names in mapping.items():
+        if (not re.fullmatch(r'[1-3]v[1-3]', mode) or not isinstance(names, list) or not names
+                or any(not isinstance(name, str) or name not in cfg['rivals'] for name in names)
+                or len(names) != len(set(names))):
+            raise ValueError('Per-format rivals require valid format keys and configured unique rival names')
     if set(cfg['stages']) != set(STAGES):
         raise ValueError('All four selector stages must be configured')
     used_seeds = set()
@@ -389,13 +397,20 @@ def expected_jobs(protocol, inventory, candidate_ids, stage_name, extra_rivals=(
     cfg = protocol['settings']; stage = cfg['stages'][stage_name]
     roles = inventory['roles']; reference = roles['baseline']
     names = stage.get('rivals', list(cfg['rivals']))
-    rivals = list(dict.fromkeys([roles['rival:' + name] for name in names] + list(extra_rivals)))
+    def format_rivals(fmt):
+        mode = f'{fmt[0]}v{fmt[1]}'
+        allowed = cfg.get('rivals_by_format', {}).get(mode, names)
+        targets = [roles['rival:' + name] for name in names if name in allowed]
+        result = list(dict.fromkeys(targets + list(extra_rivals)))
+        if not result:
+            raise ValueError('No stage rivals configured for ' + mode)
+        return result
     candidates = sorted(set(candidate_ids) | {reference})
     team_policy = stage.get('team_policy', 'fixed_reference')
     return [game_descriptor(protocol, candidate, rival,
                             candidate if team_policy == 'candidate_squad' else reference,
                             fmt, seed, side, stage['seconds'], team_policy)
-            for candidate in candidates for fmt in stage['formats'] for rival in rivals
+            for candidate in candidates for fmt in stage['formats'] for rival in format_rivals(fmt)
             # A policy playing itself adds no useful head-to-head evidence.
             # Keep the protected baseline's self-game because it is the paired
             # reference record used to score every other candidate in that cell.
@@ -753,8 +768,10 @@ def write_selection(run, protocol, inventory, document):
         lines.append(f"| {index} | {sources} | {score['mean']:.3f} | {score['independent_seeds']} |")
     scope = ('Team games evaluate one candidate-controlled car with fixed reference teammates.'
              if document.get('team_policy', 'fixed_reference') == 'fixed_reference' else
-             'Team games use the candidate policy for its whole squad; the selected car learns its kickoff '
-             'and its frozen-policy teammates retain scripted kickoff.')
+             'Team games use the candidate policy for its whole squad.')
+    scope += (' The selected car uses scripted kickoff; frozen teammates and rivals do too.'
+              if protocol['settings']['learner_scripted_kickoff'] else
+              ' The selected car uses its policy for kickoff; frozen teammates and rivals use scripts.')
     lines += ['', scope + ' A team goal is not proof that one particular car performed the mechanic.', '',
               'Full paths, aliases, per-mode leaders and confidence intervals are in shortlist.json and stage ranking.json.', '']
     (run / 'SHORTLIST.md').write_text('\n'.join(lines), encoding='utf-8')

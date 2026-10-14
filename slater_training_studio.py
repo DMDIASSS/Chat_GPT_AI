@@ -26,7 +26,7 @@ ROUTINES = ('match', 'defense', 'wall-reset', 'air-control', 'recovery', 'boost'
 NATIVE_FLAGS = {'games', 'steps', 'device', 'seed', 'actor_lr', 'critic_lr', 'target_kl',
                 'teacher_weight', 'seconds', 'eval_seeds', 'curriculum', 'start_stage',
                 'practice_fraction', 'practice_anchor', 'curriculum_difficulty',
-                'routine', 'formats', 'selfplay_refresh', 'opponent_pool'}
+                'routine', 'formats', 'selfplay_refresh', 'opponent_pool', 'learner_scripted_kickoff'}
 RUN_NAME = re.compile(r'[A-Za-z0-9_-]{1,64}\Z')
 SECRET_KEY = re.compile(r'(?:^|_)(?:token|password|secret|api_key|authorization)(?:$|_)', re.I)
 CAMPAIGN_COMMON = {'cycles': 8, 'chunk_updates': 20, 'branch_updates': 100,
@@ -46,7 +46,7 @@ def default_settings():
                            'actor_lr': 3e-6, 'critic_lr': 1e-4, 'target_kl': .005,
                            'teacher_weight': .1, 'seconds': 12., 'eval_seeds': 2,
                            'routine': 'match', 'formats': '1v1,2v2,3v3',
-                           'selfplay_refresh': 10},
+                           'selfplay_refresh': 10, 'learner_scripted_kickoff': False},
         'selector': {},
         'campaign': deepcopy(CAMPAIGN_COMMON),
         'replays': {'inputs': 'data/replays/ranked-duels',
@@ -119,6 +119,9 @@ def validate_settings(settings):
     if unknown:
         raise ValueError('Unknown native profile fields: ' + ', '.join(sorted(unknown)))
     profile = result['native_profile']
+    profile.setdefault('learner_scripted_kickoff', False)
+    if type(profile['learner_scripted_kickoff']) is not bool:
+        raise ValueError('Learner scripted kickoff must be True or False')
     if profile.get('device', 'auto') not in ('auto', 'cpu', 'cuda'):
         raise ValueError('Choose auto, cpu or cuda')
     if profile.get('routine', 'match') not in ROUTINES:
@@ -389,6 +392,7 @@ def job_config(engine, settings):
     if engine == 'selector':
         options.setdefault('device', settings['native_profile']['device'])
     elif engine == 'campaign':
+        options.setdefault('learner_scripted_kickoff', settings['native_profile']['learner_scripted_kickoff'])
         profile = options.setdefault('native_profile', {})
         for key, value in settings['native_profile'].items():
             profile.setdefault(key, value)
@@ -607,10 +611,11 @@ class TrainingStudio:
         self._entry(train, 'profile.target_kl', 'PPO KL limit', 9)
         self._entry(train, 'profile.teacher_weight', 'Teacher anchor', 10)
         self._entry(train, 'profile.selfplay_refresh', 'Self-play refresh interval', 11)
-        row = ttk.Frame(train); row.grid(row=12, column=0, columnspan=3, sticky='w', pady=8)
+        self._entry(train, 'profile.learner_scripted_kickoff', 'Learner scripted kickoff', 12, choices=('False', 'True'))
+        row = ttk.Frame(train); row.grid(row=13, column=0, columnspan=3, sticky='w', pady=8)
         for label, action in (('Build engine', 'build'), ('Parity check', 'parity'), ('Smoke test', 'smoke'), ('Start new run', 'train'), ('Resume', 'resume')):
             self._job_button(row, label, 'native', action)
-        ttk.Label(train, text='A new run preserves its source. Resume restores the saved profile and adds the requested updates.').grid(row=13, column=0, columnspan=3, sticky='w')
+        ttk.Label(train, text='A new run preserves its source. Resume restores the saved profile and adds the requested updates.').grid(row=14, column=0, columnspan=3, sticky='w')
         self._entry(selection, 'selector_run', 'Selection run', 0)
         self._entry(selection, 'max_games', 'Game budget this launch', 1)
         self._entry(selection, 'until', 'Stop after stage', 2, choices=('screen', 'refine', 'finalists', 'confirm'))

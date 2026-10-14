@@ -39,7 +39,8 @@ def default_config():
         'max_minutes': 0., 'unlimited_until_paused': False,
         'routines': list(ROUTINES), 'native_profile': profile,
         'routine_profiles': {}, 'rivals': {'nexto': str(native.DEFAULT_RIVAL)},
-        'formats': ['1v1', '2v2', '3v3'],
+        'formats': ['1v1', '2v2', '3v3'], 'rivals_by_format': {},
+        'learner_scripted_kickoff': False, 'require_target_advantage': False,
         'mode_weights': {'1v1': .4, '2v2': .3, '3v3': .3},
         'screen_seeds': 2, 'screen_seconds': 20.,
         'confirm_seeds': 8, 'confirm_seconds': 60.,
@@ -105,6 +106,17 @@ def validate_config(changes=None):
     if any(not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', name) for name in cfg['rivals']):
         raise ValueError('Rival names must be simple ASCII names')
     cfg['rivals'] = {name: str(selector.path_of(path)) for name, path in cfg['rivals'].items()}
+    if type(cfg['learner_scripted_kickoff']) is not bool:
+        raise ValueError('learner_scripted_kickoff must be a boolean')
+    mapping = cfg['rivals_by_format']
+    if not isinstance(mapping, dict) or (mapping and set(mapping) != modes):
+        raise ValueError('rivals_by_format must cover every configured format')
+    for names in mapping.values():
+        if (not isinstance(names, list) or not names or len(names) != len(set(names))
+                or any(name not in cfg['rivals'] for name in names)):
+            raise ValueError('Per-format rivals must be nonempty lists of configured rival names')
+    if type(cfg['require_target_advantage']) is not bool or (cfg['require_target_advantage'] and not mapping):
+        raise ValueError('require_target_advantage needs explicit per-format rivals')
     if set(cfg['native_profile']) != set(native.PROFILE):
         raise ValueError('native_profile contains missing or unknown trainer settings')
     cfg['native_profile'] = native.validate_profile(cfg['native_profile'])
@@ -182,7 +194,7 @@ def initialize(name, *, source=None, selection=None, config=None, build_dir=None
     protocol = {'schema': SCHEMA, 'settings': cfg, 'identity': identity,
                 'protected_inputs': protected, 'playing_model': playing_model,
                 'initial_champion_id': champion_id,
-                'learner_scripted_kickoff': False, 'frozen_scripted_kickoff': True,
+                'learner_scripted_kickoff': cfg['learner_scripted_kickoff'], 'frozen_scripted_kickoff': True,
                 'confirmation_is_independent_per_branch': True,
                 'source_selection': selection_metadata,
                 'playing_model_auto_export': False}
@@ -254,7 +266,7 @@ def evaluation_protocol(protocol, cfg):
     return {'protocol_sha': protocol['protocol_sha'], 'identity': protocol['identity'],
             'settings': {'device': cfg['native_profile']['device'] if cfg['native_profile']['device'] != 'auto'
                          else 'cuda' if torch.cuda.is_available() else 'cpu',
-                         'worlds': cfg['worlds'], 'learner_scripted_kickoff': False,
+                         'worlds': cfg['worlds'], 'learner_scripted_kickoff': cfg['learner_scripted_kickoff'],
                          'frozen_scripted_kickoff': True}}
 
 
@@ -268,13 +280,16 @@ def seed_namespace(cfg, cycle, stage):
 def evaluation_jobs(protocol, inventory, cfg, candidate_ids, parent_id, cycle, stage):
     evaluation = evaluation_protocol(protocol, cfg)
     seconds = cfg['screen_seconds' if stage == 'screen' else 'confirm_seconds']
-    rivals = list(dict.fromkeys([inventory['roles']['rival:' + name] for name in cfg['rivals']]
-                                + [parent_id]))
-    return [selector.game_descriptor(evaluation, candidate, rival, candidate, fmt, seed, side,
-                                     seconds, 'candidate_squad')
-            for candidate in sorted(set(candidate_ids) | {parent_id}) for rival in rivals
-            for fmt in cfg['formats'] for seed in seed_namespace(cfg, cycle, stage)
-            for side in ('blue', 'orange')]
+    jobs = []
+    for fmt in cfg['formats']:
+        mode = f'{fmt[0]}v{fmt[1]}'
+        names = cfg['rivals_by_format'].get(mode, list(cfg['rivals']))
+        rivals = list(dict.fromkeys([inventory['roles']['rival:' + name] for name in names] + [parent_id]))
+        jobs.extend(selector.game_descriptor(evaluation, candidate, rival, candidate, fmt, seed, side,
+                                            seconds, 'candidate_squad')
+                    for candidate in sorted(set(candidate_ids) | {parent_id}) for rival in rivals
+                    for seed in seed_namespace(cfg, cycle, stage) for side in ('blue', 'orange'))
+    return jobs
 
 
 def weighted_ranking(records, candidate_ids, parent_id, cfg, *, alpha=.05):
@@ -323,6 +338,14 @@ def promotion_decision(ranking, parent_id, cfg, cycle):
     if regressed:
         return {'promote': False, 'reason': 'MODE_REGRESSION_OR_UNCERTAINTY',
                 'candidate_id': candidate['id'], 'modes': regressed}
+    if cfg['require_target_advantage']:
+        expected = {f'{mode}:{name}' for mode, names in cfg['rivals_by_format'].items() for name in names}
+        scores = candidate.get('target_scores', {})
+        failed = sorted(key for key in expected if key not in scores or scores[key]['lower'] is None
+                        or scores[key]['lower'] <= 0)
+        if failed:
+            return {'promote': False, 'reason': 'TARGET_ADVANTAGE_NOT_CONFIRMED',
+                    'candidate_id': candidate['id'], 'targets': failed}
     return {'promote': True, 'reason': 'FRESH_SEED_IMPROVEMENT', 'candidate_id': candidate['id'],
             'cycle': cycle, 'scope': 'configured simulator rivals and formats; competitive rank unverified'}
 
@@ -356,13 +379,27 @@ def evaluate_branch(run, protocol, inventory, state, cfg, stage, candidate_ids, 
             raise RuntimeError('Native evaluation completed without a new cached match')
     # Alpha spending controls repeated branch confirmations; each mode and overall
     # comparison receives its own share. Bootstrap coverage remains approximate.
+    target_count = sum(map(len, cfg['rivals_by_format'].values())) if cfg['require_target_advantage'] else 0
     alpha = (cfg['promotion_alpha'] / (state['cycle'] * (state['cycle'] + 1))
-             / (1 + len(cfg['formats']))) if stage == 'confirm' else .05
+             / (1 + len(cfg['formats']) + target_count)) if stage == 'confirm' else .05
     ranking = weighted_ranking(records, candidate_ids, parent, cfg, alpha=alpha)
+    for candidate in ranking:
+        candidate['target_scores'] = {}
+        for mode, names in cfg['rivals_by_format'].items():
+            for name in names:
+                rival = inventory['roles']['rival:' + name]
+                groups = {}
+                for record in records:
+                    if (record['candidate_id'] == candidate['id'] and record['rival_id'] == rival
+                            and f"{record['format'][0]}v{record['format'][1]}" == mode):
+                        score = (record['goals_for'] - record['goals_against']) * 60 / record['seconds']
+                        groups.setdefault(record['seed'], []).append(score)
+                candidate['target_scores'][f'{mode}:{name}'] = selector.clustered_interval(
+                    [float(np.mean(scores)) for scores in groups.values()], alpha=alpha)
     report = {'schema': SCHEMA, 'stage': stage, 'complete': True, 'cycle': state['cycle'],
               'parent_id': parent, 'ranking': ranking, 'seeds': seed_namespace(cfg, state['cycle'], stage),
               'alpha': alpha, 'completed_games': len(records), 'team_policy': 'candidate_squad',
-              'learner_scripted_kickoff': False, 'frozen_scripted_kickoff': True,
+              'learner_scripted_kickoff': cfg['learner_scripted_kickoff'], 'frozen_scripted_kickoff': True,
               'all_checkpoints_preserved': True, 'competitive_rank_verified': False}
     atomic_json(folder / ('screen.json' if stage == 'screen' else 'confirmation.json'), report)
     return report
@@ -370,6 +407,7 @@ def evaluate_branch(run, protocol, inventory, state, cfg, stage, candidate_ids, 
 
 def branch_profile(cfg, routine, cycle):
     profile = {**cfg['native_profile'], **cfg['routine_profiles'].get(routine, {})}
+    profile['learner_scripted_kickoff'] = cfg['learner_scripted_kickoff']
     profile['seed'] = (cfg['native_profile']['seed'] - 1 + cycle * 997) % (2**31 - 1) + 1
     if 'routine' in native.PROFILE:
         profile['routine'] = routine
@@ -397,7 +435,12 @@ def start_branch(name, run, protocol, state, inventory, cfg, build_dir=None):
                                          + [state['champion_id']] + history))
         pool = run / 'branches' / f'cycle_{cycle:06d}' / 'opponent_pool.json'
         atomic_json(pool, {'actors': [{'id': 'p_' + id[2:26], 'path': inventory['models'][id]['actor_path']}
-                                      for id in opponent_ids]})
+                                      for id in opponent_ids],
+                          'rivals_by_format': {
+                              mode: list(dict.fromkeys('p_' + id[2:26] for id in
+                                  [inventory['roles']['rival:' + name] for name in names]
+                                  + [state['champion_id']] + history))
+                              for mode, names in cfg['rivals_by_format'].items()}})
         profile['opponent_pool'] = str(pool)
     state.update(cycle=cycle, phase='training', status='BRANCH_INITIALIZING', active={
         'cycle': cycle, 'routine': routine, 'run_name': branch_name,
