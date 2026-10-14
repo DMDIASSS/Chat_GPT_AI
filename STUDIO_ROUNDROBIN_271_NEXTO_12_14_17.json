@@ -46,9 +46,9 @@
     "rivals": {
       "update271": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
       "nexto": "vendor/nexto/nexto-model.pt",
-      "update12": "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000012",
-      "update14": "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000014",
-      "update17": "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000017"
+      "update12": "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000012/actor.pt",
+      "update14": "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000014/actor.pt",
+      "update17": "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000017/actor.pt"
     },
     "device": "auto",
     "worlds": 16,
