@@ -314,6 +314,62 @@ def flatten_metrics(event):
     visit('', event)
     result['train/update'] = int(event.get('update', event.get('updates', event.get('total_updates', 0))))
     result['train/timesteps'] = int(event.get('timesteps', event.get('total_timesteps', 0)))
+    # Keep raw diagnostics, but expose the actual learning signals separately
+    # from fixed reward coefficients and bookkeeping counters. A coefficient
+    # such as weights/wall_pop is not a learned neural-network parameter.
+    metrics = event.get('metrics', {})
+    if not isinstance(metrics, dict):
+        return result
+    aliases = {
+        'Policy Loss': 'learning/actor_loss',
+        'Critic Loss': 'learning/critic_loss',
+        'Policy Entropy': 'learning/policy_entropy_normalized',
+        'Post-update PPO KL': 'learning/policy_kl_after_update',
+        'Policy Update Magnitude': 'learning/actor_parameter_change_l2',
+        'Critic Update Magnitude': 'learning/critic_parameter_change_l2',
+        'Average Step Reward': 'learning/mean_step_reward',
+        'GAE/Avg Return': 'learning/mean_absolute_return',
+        'SB3 Clip Fraction': 'learning/clip_fraction',
+        'learning_rate/actor': 'learning/actor_lr',
+        'learning_rate/critic': 'learning/critic_lr',
+        'Overall Steps/Second': 'performance/overall_steps_per_second',
+        'Collection Steps/Second': 'performance/collection_steps_per_second',
+    }
+    for original, name in aliases.items():
+        value = metrics.get(original)
+        if type(value) in (float, int) and math.isfinite(value):
+            result[name] = value
+    outcomes = metrics.get('outcomes', {})
+    if isinstance(outcomes, dict):
+        episodes = sum(value for key, value in outcomes.items() if key.startswith('episodes/')
+                       and type(value) in (float, int) and math.isfinite(value))
+        successes = sum(value for key, value in outcomes.items() if key.startswith('successes/')
+                        and type(value) in (float, int) and math.isfinite(value))
+        if episodes > 0:
+            result['practice/success_rate'] = successes / episodes
+            result['practice/episodes'] = episodes
+    components = metrics.get('reward_components', {})
+    if isinstance(components, dict):
+        for key, value in components.items():
+            if key.startswith('weighted_sum/') and type(value) in (float, int) and math.isfinite(value):
+                result['reward_contributions/' + key.removeprefix('weighted_sum/')] = value
+    evaluation = event.get('evaluation')
+    if isinstance(evaluation, dict) and evaluation.get('complete'):
+        for key in ('success_rate', 'successes', 'episodes', 'difficulty'):
+            value = evaluation.get(key)
+            if type(value) in (float, int) and math.isfinite(value):
+                result['validation/' + key] = value
+        episodes = evaluation.get('episodes', 0)
+        telemetry = evaluation.get('telemetry', {})
+        if type(episodes) in (float, int) and episodes > 0 and isinstance(telemetry, dict):
+            for key, name in (('events/learner_goal', 'goals_per_episode'),
+                              ('events/air_touch', 'air_touches_per_episode'),
+                              ('events/verified_four_wheel_reset', 'resets_per_episode'),
+                              ('measurements/best_carry_seconds_sum', 'mean_best_carry_seconds')):
+                value = telemetry.get(key, 0)
+                if type(value) in (float, int) and math.isfinite(value):
+                    result['validation/' + name] = value / episodes
+    # Missing evaluations/losses stay missing: they must not become fake zeros.
     return result
 
 
@@ -364,6 +420,11 @@ class WandbMonitor:
             return
         for prefix in ('metrics/*', 'reward_components/*', 'weights/*', 'outcomes/*', 'evaluation/*', 'curriculum/*'):
             self.handle.define_metric(prefix, step_metric='train/update')
+        for prefix in ('learning/*', 'performance/*', 'practice/*', 'reward_contributions/*', 'validation/*'):
+            self.handle.define_metric(prefix, step_metric='train/update')
+        for prefix in ('schema', 'update', 'timesteps', 'train/*', 'metrics/weights/*',
+                       'metrics/training/*', 'evaluation/seed_base', 'evaluation/evaluation'):
+            self.handle.define_metric(prefix, hidden=True)
         self.last_logged = max(self.last_logged, int(getattr(self.handle, 'step', 0) or 0) - 1)
         self.state.update(run_id=run_id, mode=self.mode, project=settings['project'],
                           entity=settings['entity'], url=self.handle.url if self.mode == 'online' else None)

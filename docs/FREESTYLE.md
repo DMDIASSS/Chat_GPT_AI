@@ -100,6 +100,33 @@ difficulty and independent evaluation success. Inspect reward components
 alongside actual event counts and evaluation scores: a rising training reward
 alone is insufficient evidence of better ball control.
 
+In W&B, enter `learning/` in **Search panels by regex** to see actor loss,
+critic loss, normalized policy entropy, post-update PPO KL and actor parameter
+change. These values are logged after every PPO update, not every physics tick;
+one update collects roughly 32,768 learner transitions with the default settings.
+Use `reward_contributions/` for the rewards actually earned during collection,
+`practice/` for training drill successes and `validation/` for independent
+evaluation successes, goals, aerial touches, resets and carry duration.
+Evaluation runs every ten updates by default, so its graphs have fewer points.
+Reward contributions are sums over collection; they are not success rates.
+
+`update` and `timesteps` are counters, so steadily rising lines are expected.
+`metrics/weights/*` contains configured reward coefficients, not neural-network
+weights; those lines normally stay flat within a curriculum stage. These
+bookkeeping fields remain in the data but are hidden from new automatic plots.
+Existing workspace panels may remain; filtering by `learning/` avoids them.
+Before installing the monitoring update, filter by
+`Policy Loss|Critic Loss|Policy Entropy|Post-update PPO KL|Policy Update Magnitude`
+to see the same underlying learning signals under their original names.
+
+A positive `learning/actor_parameter_change_l2` confirms the actor parameters
+changed during that update. Improvement needs sustained independent evaluation
+success, not fluctuating loss or GPU usage alone. Missing evaluations are not
+logged as zero successes. To install the Python-only monitoring hotfix on an
+existing run: use **Safe pause**, wait for `PAUSED`, close the app, extract the
+hotfix into the project folder, reopen `FREESTYLE_APP.bat` and **Resume** the same
+run. No native rebuild or new training run is required.
+
 The run folder contains:
 
 - `protocol.json` and `config.json`: initialization, source/binary identity and
