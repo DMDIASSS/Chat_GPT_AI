@@ -141,3 +141,16 @@ two-car ordering, 94 action masks and 240 randomized stage/color starts were
 also checked. These small runs establish operation, not learned mastery.
 Windows/CUDA execution and authenticated online W&B must be checked on the
 PC; cloud validation used CPU and the real offline W&B SDK.
+
+## Windows duplicate Learner linker error
+
+If setup ends with `LNK2005` mentioning both `Learner.cpp.obj` and
+`FreestyleLearner.cpp.obj`, install the current Freestyle source update and
+rerun `FREESTYLE_SETUP.bat`. The fix normalizes Windows source paths and
+requires exactly one upstream learner to be replaced before compiling. It
+does not suppress linker errors or edit the pinned upstream checkout. Keep
+the existing build directory so Ninja can reuse completed objects; reinstalling
+Torch/CUDA or deleting checkpoints is unnecessary for this error.
+
+The fix adds five CMake regression cases for backslashes, case differences,
+relative paths and invalid source counts. All 43 focused tests pass in cloud.

@@ -10,11 +10,12 @@ def package(output=None):
     files = [ROOT / 'slater_freestyle.py', ROOT / 'package_freestyle.py',
              ROOT / 'docs/FREESTYLE.md', ROOT / 'docs/FREESTYLE_RESEARCH.md',
              ROOT / 'tests/freestyle_native_checks.cpp',
-             ROOT / 'tests/test_freestyle_native_checks.py', ROOT / 'tests/test_freestyle_runner.py']
+             ROOT / 'tests/test_freestyle_native_checks.py', ROOT / 'tests/test_freestyle_runner.py',
+             ROOT / 'tests/test_freestyle_build.py']
     files += sorted(ROOT.glob('FREESTYLE_*.bat')) + sorted(ROOT.glob('FREESTYLE_*.vbs'))
     files += [ROOT / 'FREESTYLE_SETTINGS.json', ROOT / 'FREESTYLE_MECHANICS.json']
     files += sorted(path for path in (ROOT / 'GigaLearn_Project/Freestyle').iterdir()
-                    if path.is_file() and path.suffix in ('.cpp', '.h', '.txt'))
+                    if path.is_file() and path.suffix in ('.cpp', '.h', '.txt', '.cmake'))
     with zipfile.ZipFile(destination, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
         for path in files:
             archive.write(path, path.relative_to(ROOT).as_posix())

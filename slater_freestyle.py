@@ -232,7 +232,7 @@ def build(folder=None, source=None, jobs=1):
     library, include = helper.python_paths()
     configure = [helper.tool('cmake'), '-S', HERE, '-B', folder, '-G', 'Ninja',
                  '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_MAKE_PROGRAM=' + helper.tool('ninja'),
-                 '-DGIGALEARN_SOURCE=' + str(source), '-DCMAKE_PREFIX_PATH=' + torch.utils.cmake_prefix_path,
+                 '-DGIGALEARN_SOURCE=' + source.as_posix(), '-DCMAKE_PREFIX_PATH=' + torch.utils.cmake_prefix_path,
                  '-DPython_EXECUTABLE=' + sys.executable, '-DPYTHON_EXECUTABLE=' + sys.executable,
                  '-DPYTHON_LIBRARY=' + str(library), '-DPYTHON_INCLUDE_DIR=' + str(include), *cuda_args]
     for args in (configure, [helper.tool('cmake'), '--build', folder, '--target', 'SlaterFreestyleNative', '-j', str(jobs)]):
