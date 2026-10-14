@@ -13,7 +13,7 @@ the existing attention checkpoints supplies its initialization. Runs live in
    give this experiment the laptop's CPU, RAM and GPU budget.
 3. Run `FREESTYLE_SETUP.bat`. It installs the pinned build/monitoring helpers,
    reuses the existing Torch installation, builds a separate executable,
-   runs a finite offline smoke test, then opens the Freestyle app.
+   runs a finite local smoke test without starting W&B, then opens the Freestyle app.
 4. In the app, leave run `freestyle01`, W&B `online`, and the supplied settings
    for the first experiment. Click **Start new**. If no local W&B login exists,
    a password dialog appears; paste your key with Ctrl+V. The key is handled by

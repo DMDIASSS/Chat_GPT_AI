@@ -719,7 +719,7 @@ def desktop(settings_file=None):
             if command in ('train', 'resume'):
                 args += ['--run', value['run_name'], '--wandb-mode', mode.get()]
             elif command == 'smoke':
-                args += ['--wandb-mode', 'offline']
+                args += ['--wandb-mode', 'disabled']
             logdir = BASE / 'app_logs'; logdir.mkdir(parents=True, exist_ok=True)
             logfile = logdir / (str(time.time_ns()) + '_' + command + '.log')
             options = {'cwd': str(ROOT)}
@@ -855,7 +855,7 @@ def main():
                                       epochs=1, max_updates=2, device='cpu', eval_every_updates=1,
                                       eval_episodes=4)
         train(name, settings, args.build_dir, args.meshes, resume=args.command == 'resume',
-              updates=args.updates, mode=args.wandb_mode or ('offline' if args.command == 'smoke' else None))
+              updates=args.updates, mode=args.wandb_mode or ('disabled' if args.command == 'smoke' else None))
 
 
 if __name__ == '__main__':
