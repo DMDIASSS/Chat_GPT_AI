@@ -63,8 +63,7 @@ freestyle_replace_learner(GigaLearnCPP "${ORIGINAL_LEARNER}"
 target_include_directories(GigaLearnCPP PRIVATE "${GIGALEARN_SOURCE}/GigaLearnCPP/src/public/GigaLearnCPP")
 # Link the full-report hook inside the shared library itself, avoiding Windows
 # executable-symbol resolution. It calls back through a registered function.
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/FreestyleHook.cpp" "#include <GigaLearnCPP/Learner.h>\nnamespace { void (*callback)(GGL::Learner*, const GGL::Report&) = nullptr; void (*saveCallback)(GGL::Learner*)=nullptr; }\nextern \"C\" RG_IMEXPORT void SlaterFreestyleSetReportHook(void (*fn)(GGL::Learner*, const GGL::Report&)) { callback=fn; }\nextern \"C\" RG_IMEXPORT void SlaterFreestyleSetCheckpointHook(void (*fn)(GGL::Learner*)) { saveCallback=fn; }\nextern \"C\" void SlaterFreestyleReportHook(GGL::Learner* learner, const GGL::Report& report) { if(callback) callback(learner, report); }\nextern \"C\" void SlaterFreestyleCheckpointHook(GGL::Learner* learner) { if(saveCallback) saveCallback(learner); }\n")
-target_sources(GigaLearnCPP PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/FreestyleHook.cpp")
+target_sources(GigaLearnCPP PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/FreestyleBridge.cpp")
 add_executable(SlaterFreestyleNative FreestyleMain.cpp)
 file(GLOB FREESTYLE_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/*.cmake" "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt")
 list(SORT FREESTYLE_FILES)

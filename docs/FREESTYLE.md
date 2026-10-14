@@ -154,3 +154,11 @@ Torch/CUDA or deleting checkpoints is unnecessary for this error.
 
 The fix adds five CMake regression cases for backslashes, case differences,
 relative paths and invalid source counts. All 43 focused tests pass in cloud.
+
+If the DLL links but the executable reports `LNK2019` for
+`PPOLearner::InferActionsFromModels` or `PPOLearner::SetLearningRates`, install
+the Windows build hotfix v2. Freestyle now calls explicit exported bridge
+functions; those internal PPO methods are called only inside the GigaLearn
+DLL. The pinned upstream classes are unchanged. The additional shared-library
+test hides the internal methods and verifies inference, optimizer-rate changes
+and callbacks through the exported bridge. All 44 focused tests pass in cloud.

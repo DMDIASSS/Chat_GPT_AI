@@ -13,6 +13,7 @@
 #include "FreestyleObs.h"
 #include "FreestyleRewards.h"
 #include "FreestyleActions.h"
+#include "FreestyleBridge.h"
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
@@ -29,8 +30,6 @@ using namespace RLGC;
 using namespace SlaterFreestyle;
 using Json=nlohmann::json;
 namespace fs=std::filesystem;
-extern "C" RG_IMEXPORT void SlaterFreestyleSetReportHook(void (*fn)(GGL::Learner*, const GGL::Report&));
-extern "C" RG_IMEXPORT void SlaterFreestyleSetCheckpointHook(void (*fn)(GGL::Learner*));
 
 namespace {
 constexpr int STATE_SCHEMA=1;
@@ -230,8 +229,7 @@ Json Evaluate(Learner* learner) {
         auto states=torch::tensor(observations).reshape({int64_t(worlds.size()),learner->obsSize}).to(learner->ppo->device);
         auto actionMasks=torch::tensor(masks).reshape({int64_t(worlds.size()),learner->numActions}).to(learner->ppo->device);
         torch::Tensor actions;
-        PPOLearner::InferActionsFromModels(learner->ppo->models,states,actionMasks,true,
-            learner->ppo->config.policyTemperature,false,&actions,nullptr);
+        SlaterFreestyleInfer(learner,states,actionMasks,&actions);
         auto chosen=actions.cpu().contiguous();
         for(size_t i=0;i<worlds.size();i++) {
             auto& world=*worlds[i];if(world.done) continue;
@@ -280,7 +278,7 @@ void ReportHook(Learner* learner,const Report& report) {
         const double kl=report["Post-update PPO KL"];
         if(std::isfinite(kl)&&kl>settings->targetKL*1.5) currentActorLR=std::max(settings->minLR,currentActorLR*.7f);
         else if(std::isfinite(kl)&&kl<settings->targetKL*.35) currentActorLR=std::min(settings->actorLR,currentActorLR*1.02f);
-        learner->ppo->SetLearningRates(currentActorLR,settings->criticLR);
+        SlaterFreestyleSetLearningRates(learner,currentActorLR,settings->criticLR);
     }
     Json evaluation=nullptr;
     if(settings->evalEvery&&learner->totalIterations%settings->evalEvery==0) {
@@ -346,7 +344,7 @@ void RestoreState(Learner* learner,const fs::path& folder) {
     if(learner->ppo->device.is_cuda()) {torch::Tensor cudaRng;torch::load(cudaRng,(folder/"CUDA_RNG.lt").string());
         auto cudaGenerator=at::cuda::detail::getDefaultCUDAGenerator(learner->ppo->device.index());cudaGenerator.set_state(cudaRng);}
 #endif
-    learner->ppo->SetLearningRates(currentActorLR,settings->criticLR);
+    SlaterFreestyleSetLearningRates(learner,currentActorLR,settings->criticLR);
     // Already-running physical episodes aren't serialized. Restart them using
     // saved generator streams instead of pretending to continue their history.
     for(size_t i=0;i<learner->envSet->arenas.size();i++) learner->envSet->ResetArena(i);

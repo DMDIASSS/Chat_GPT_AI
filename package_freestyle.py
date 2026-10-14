@@ -11,7 +11,7 @@ def package(output=None):
              ROOT / 'docs/FREESTYLE.md', ROOT / 'docs/FREESTYLE_RESEARCH.md',
              ROOT / 'tests/freestyle_native_checks.cpp',
              ROOT / 'tests/test_freestyle_native_checks.py', ROOT / 'tests/test_freestyle_runner.py',
-             ROOT / 'tests/test_freestyle_build.py']
+             ROOT / 'tests/test_freestyle_build.py', ROOT / 'tests/test_freestyle_dll_bridge.py']
     files += sorted(ROOT.glob('FREESTYLE_*.bat')) + sorted(ROOT.glob('FREESTYLE_*.vbs'))
     files += [ROOT / 'FREESTYLE_SETTINGS.json', ROOT / 'FREESTYLE_MECHANICS.json']
     files += sorted(path for path in (ROOT / 'GigaLearn_Project/Freestyle').iterdir()
