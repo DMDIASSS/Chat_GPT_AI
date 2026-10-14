@@ -191,3 +191,46 @@ def test_active_pause_finishes_bounded_games_then_resumes(native_selection_binar
     assert resumed["cached"] == paused["completed"]
     assert len(resumed["records"]) == len(data["jobs"])
     assert all(path.read_bytes() == content for path, content in frozen.items())
+
+
+def test_real_first_goal_or_timeout_rounds_and_cache(native_selection_binary, selection_files):
+    """Use a deliberately zero-weight attention fixture, never a user checkpoint."""
+    import torch
+    from slater_model_selection import validate_record
+    folder, meshes, actors = selection_files
+    idle_path = folder/'zero_weight_fixture.pt'
+    fixture = torch.jit.load(actors[0]['path'], map_location='cpu')
+    with torch.no_grad():
+        for p in fixture.parameters(): p.zero_()
+    torch.jit.save(fixture, str(idle_path))
+    actors[1] = {'id':'candidate', 'path':str(idle_path),
+                 'sha256':hashlib.sha256(idle_path.read_bytes()).hexdigest()}
+    manifest, jobs = make_manifest(folder, actors, scripted=True, seconds=90,
+                                   formats=((1,1),(2,2),(3,3)))
+    for job in jobs:
+        job['stop_after_first_goal'] = True
+        job['team_policy'] = 'candidate_squad'
+        job['reference_id'] = job['candidate_id']
+        if job['candidate_id'] == 'baseline':
+            job['seconds'] = .1  # Deterministic real-physics no-goal timeout fixture.
+    doc=json.loads(manifest.read_text()); doc['jobs']=jobs
+    manifest.write_text(json.dumps(doc))
+    output=folder/'first_goal'
+    invoke(native_selection_binary, manifest, meshes, output, folder/'PAUSE')
+    result=json.loads((output/'evaluation.json').read_text())
+    by_id={j['id']:j for j in jobs}
+    candidate=[]
+    for record in result['records']:
+        validate_record(by_id[record['id']],record)
+        assert record['episodes']==1
+        assert record['descriptor']['round_end']=='first-goal-or-timeout-v1'
+        if record['candidate_id']=='baseline':
+            assert record['round_end']=='NO_GOAL_TIMEOUT' and record['seconds']==.1
+        else:
+            candidate.append(record)
+    # The functioning rival must actually score against this deliberately bad fixture.
+    assert any(r['goals_against']==1 and r['seconds']<90 for r in candidate)
+    assert all(r['goals_for']+r['goals_against']<=1 for r in candidate)
+    invoke(native_selection_binary, manifest, meshes, output, folder/'PAUSE')
+    cached=json.loads((output/'evaluation.json').read_text())
+    assert cached['cached']==len(jobs) and cached['physics_ticks']==0

@@ -7,6 +7,9 @@ ROOT = Path(__file__).resolve().parent
 FILES = tuple(sorted(set(ATTENTION_FILES) | {
     'TRAINING_STUDIO.bat', 'TRAINING_STUDIO.vbs', 'slater_training_studio.py',
     'slater_champion_campaign.py', 'slater_model_selection.py', 'slater_v041_worker.py',
+    'slater_nexto_goal_benchmark.py', 'docs/NEXTO_ROUND_BENCHMARK.md',
+    'STUDIO_NEXTO_ROUNDS_1_TO_400.json',
+    'tests/test_nexto_goal_benchmark.py',
     'GigaLearn_Project/Native_Attention/AttentionCurriculum.h',
     'GigaLearn_Project/Native_Attention/AttentionEval.h',
     'GigaLearn_Project/Native_Attention/AttentionTasks.h',
@@ -29,7 +32,7 @@ def build():
         path = Path(name)
         if path.is_absolute() or '..' in path.parts or path.parts[0] in ('data', 'attachments', 'vendor'):
             raise ValueError('Private or unsafe archive member: ' + name)
-        if path.suffix.lower() not in ('.py', '.cpp', '.h', '.md', '.bat', '.vbs', '.txt'):
+        if path.suffix.lower() not in ('.py', '.cpp', '.h', '.md', '.bat', '.vbs', '.txt', '.json'):
             raise ValueError('Unsupported archive member: ' + name)
         if not (ROOT / path).is_file():
             raise FileNotFoundError(name)

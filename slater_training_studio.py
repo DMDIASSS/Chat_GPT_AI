@@ -300,7 +300,7 @@ def discover_checkpoints(root=ROOT):
 def progress_from_line(line):
     """Extract structured progress without inventing strength from losses."""
     left, separator, right = line.strip().partition(' ')
-    if not separator or not left.startswith(('SLATER_', 'ATTENTION_', 'MODEL_SELECTION_', 'CHAMPION_')):
+    if not separator or not left.startswith(('SLATER_', 'ATTENTION_', 'MODEL_SELECTION_', 'CHAMPION_', 'GOAL_BENCHMARK_')):
         return None
     try:
         payload = json.loads(right)
@@ -395,6 +395,14 @@ def job_config(engine, settings):
     else:
         raise ValueError('This operation does not use a configuration JSON')
     return options
+
+
+def nexto_round_preset(settings, root=ROOT):
+    """Only change comparison settings; keep the user's training configuration."""
+    preset = read_json(Path(root) / 'STUDIO_NEXTO_ROUNDS_1_TO_400.json')
+    if not preset:
+        raise FileNotFoundError('Install STUDIO_NEXTO_ROUNDS_1_TO_400.json from the benchmark update')
+    return validate_settings({**deepcopy(settings), **preset})
 
 
 def format_preset(settings, all_nine=False):
@@ -611,7 +619,8 @@ class TrainingStudio:
         for label, action in (('Inventory models', 'inventory'), ('Start comparison', 'run'), ('Resume comparison', 'resume'), ('Rebuild ranking', 'rank')):
             self._job_button(row, label, 'selector', action)
         ttk.Button(selection, text='Use this selection for training', command=self.use_selection).grid(row=5, column=0, columnspan=3, sticky='w', pady=12)
-        ttk.Label(selection, text='Change checkpoint families, rivals, seeds, duration and shortlist limits in All settings → selector.').grid(row=6, column=0, columnspan=3, sticky='w')
+        ttk.Label(selection, text='Change checkpoint families, rivals, seeds, duration and shortlist limits in All settings → selector.\nNexto round benchmark preset: Start/Resume comparison uses its round budget and streak rules; Stop after stage is ignored.').grid(row=6, column=0, columnspan=3, sticky='w')
+        ttk.Button(selection, text='Nexto rounds preset (40)', command=self.load_nexto_round_preset).grid(row=7, column=0, columnspan=3, sticky='w', pady=8)
         self._entry(campaign, 'campaign_run', 'Campaign name', 0)
         self._entry(campaign, 'campaign.cycles', 'Cycles (0 = time/unlimited budget)', 1)
         self._entry(campaign, 'campaign.branch_updates', 'Maximum updates per branch', 2)
@@ -774,6 +783,17 @@ class TrainingStudio:
                 atomic_json(BASE / 'settings.json', self.settings); self._load_forms()
             except Exception as exc:
                 self.show_error(exc)
+
+    def load_nexto_round_preset(self):
+        try:
+            if self.manager.active:
+                raise ValueError('Pause or finish the current job before loading a new benchmark')
+            self.settings = nexto_round_preset(self.gather())
+            atomic_json(BASE / 'settings.json', self.settings)
+            self._load_forms()
+            self.status_var.set('Native Nexto benchmark loaded: 40 rounds per format, 90s draw, 10-result streak. Click Start comparison.')
+        except Exception as exc:
+            self.show_error(exc)
 
     def export_settings(self):
         try:
@@ -959,7 +979,7 @@ class TrainingStudio:
                         progress = progress_from_line(line)
                         if progress:
                             keep = {key: value for key, value in progress.items() if key in
-                                    ('update', 'updates', 'decisions', 'status', 'phase', 'routine', 'champion', 'promotions', 'actor_loss', 'teacher_kl')}
+                                    ('update', 'updates', 'decisions', 'status', 'phase', 'routine', 'champion', 'promotions', 'actor_loss', 'teacher_kl', 'rounds', 'new_rounds')}
                             ppo = progress.get('ppo', {})
                             if isinstance(ppo, dict):
                                 keep.update({key: ppo[key] for key in ('actor_loss', 'teacher_kl', 'rollout_policy_kl') if key in ppo})
@@ -986,7 +1006,7 @@ class TrainingStudio:
                     payload = read_json(folder / filename)
                     if payload:
                         concise = {key: value for key, value in payload.items() if key in
-                                   ('status', 'phase', 'stage', 'stage_complete', 'updates', 'decisions', 'champion', 'checkpoint', 'promotions', 'routine', 'branch_run', 'playing_model', 'confirmed_best', 'completed_games', 'total_games')}
+                                   ('status', 'phase', 'stage', 'stage_complete', 'updates', 'decisions', 'champion', 'checkpoint', 'promotions', 'routine', 'branch_run', 'playing_model', 'confirmed_best', 'completed_games', 'total_games', 'completed_model_formats', 'total_model_formats')}
                         output.append(json.dumps(concise or payload, indent=2, ensure_ascii=False)[:6000])
                 shortlist = folder / 'SHORTLIST.md'
                 if shortlist.is_file():

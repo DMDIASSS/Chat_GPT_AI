@@ -63,7 +63,7 @@ struct Job {
     std::string id, candidate, rival, teammate, team_policy = "fixed_reference";
     int learner_count = 1, rival_count = 1;
     uint64_t seed = 0, ticks = 0;
-    bool blue = true, scripted = false;
+    bool blue = true, scripted = false, first_goal = false;
 };
 struct Plan {
     std::map<std::string, ActorSpec> actors;
@@ -121,6 +121,7 @@ inline Plan parse_plan(const fs::path& manifest_path, const fs::path& out,
             throw std::runtime_error("Invalid or duplicate selection job");
         job.ticks = uint64_t(std::llround(duration * 120));
         job.scripted = row.value("learner_scripted_kickoff", false);
+        job.first_goal = row.value("stop_after_first_goal", false);
         job.team_policy = row.value("team_policy", "fixed_reference");
         if (job.team_policy != "fixed_reference" && job.team_policy != "candidate_squad")
             throw std::runtime_error("Unknown selection team_policy");
@@ -142,6 +143,7 @@ inline Plan parse_plan(const fs::path& manifest_path, const fs::path& out,
             {"ticks", job.ticks}, {"learner_scripted_kickoff", job.scripted},
             {"frozen_scripted_kickoff", true}, {"device", device.str()}, {"batch_worlds", batch_worlds},
             {"policy", "greedy-unmasked-90"}, {"clock", "one-old-seven-new-frozen-v4"}};
+        if (job.first_goal) job.descriptor["round_end"] = "first-goal-or-timeout-v1";
         plan.jobs.push_back(std::move(job));
     }
     if (!contains_reference && !plan.jobs.empty())
@@ -257,6 +259,8 @@ inline json record_for(const Plan& plan, const Job& job, const ActiveGame& game)
             ? "one learner plus frozen scripted candidate teammates"
             : "one learner plus fixed scripted reference teammates"},
         {"finish", "COMPLETE"}, {"game_complete", true}, {"descriptor", job.descriptor}});
+    if (job.first_goal) record["round_end"] = game.goals_for + game.goals_against
+        ? "FIRST_GOAL" : "NO_GOAL_TIMEOUT";
     return record;
 }
 
@@ -412,9 +416,10 @@ inline json run_batched_evaluation(const fs::path& manifest_path, const fs::path
                     slot->early_goals_for += slot->world->StepInfo().outcome == 1;
                     slot->early_goal_concessions += slot->world->StepInfo().outcome == -1;
                 }
-                if (slot->total_ticks < job.ticks) slot->reset(job);
+                if (slot->total_ticks < job.ticks && !job.first_goal) slot->reset(job);
             }
-            if (slot->total_ticks < job.ticks) continue;
+            if (slot->total_ticks < job.ticks &&
+                !(job.first_goal && slot->goals_for + slot->goals_against > 0)) continue;
             auto record = record_for(plan, job, *slot);
             const auto path = plan.cache_dir / (job.id + ".json");
             if (fs::exists(path)) throw std::runtime_error("Evaluation cache appeared during run; concurrent writer refused");

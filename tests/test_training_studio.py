@@ -247,3 +247,19 @@ def test_export_reuses_checked_rlbot_exporter_and_keeps_source(monkeypatch, tmp_
     assert source.read_bytes() == before
     with pytest.raises(FileExistsError):
         studio.export_worker(str(source), 'FixtureChampion', 'both')
+
+
+def test_nexto_round_preset_preserves_training_and_uses_native_comparison():
+    settings = studio.default_settings()
+    settings['native_run'] = 'keep_my_training'
+    settings['source'] = 'my_private_source.pt'
+    preset = studio.nexto_round_preset(settings)
+    assert preset['native_run'] == 'keep_my_training'
+    assert preset['source'] == 'my_private_source.pt'
+    assert preset['selector']['goal_race']['rounds_per_format'] == 40
+    assert preset['selector']['goal_race']['early_stop_streak'] == 10
+    assert preset['selector']['learner_scripted_kickoff'] is True
+    assert set(preset['selector']['rivals']) == {'nexto'}
+    command = studio.command_for('selector', 'run', preset, config_file=Path('/tmp/config.json'))
+    assert any('slater_model_selection.py' in part for part in command)
+    assert '--max-games' in command

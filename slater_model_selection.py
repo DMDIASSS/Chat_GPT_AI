@@ -34,6 +34,7 @@ SCHEMA = 1
 DEFAULT_278 = ROOT / 'data/isolated/mechanics_curriculum/selected7_mechanics01/update_000278.pt'
 STAGES = ('screen', 'refine', 'finalists', 'confirm')
 DEFAULT = {
+    'goal_race': None,
     'baseline': str(native.DEFAULT_SOURCE),
     'anchors': {'update180': str(native.DEFAULT_SOURCE), 'update278': str(DEFAULT_278)},
     'families': {
@@ -97,6 +98,11 @@ def validate_config(config):
     cfg = deepcopy(config)
     if set(cfg) != set(DEFAULT):
         raise ValueError('Selector configuration has missing or unknown top-level settings')
+    if cfg['goal_race'] is not None:
+        from slater_nexto_goal_benchmark import validate_goal_config
+        cfg['goal_race'] = validate_goal_config(cfg['goal_race'])
+        if set(cfg['rivals']) != {'nexto'}:
+            raise ValueError('Goal benchmark requires Nexto as the only rival')
     for key in ('anchors', 'families', 'rivals'):
         if not isinstance(cfg[key], dict) or (key != 'anchors' and not cfg[key]):
             raise ValueError('Expected a named nonempty ' + key + ' map')
@@ -202,6 +208,7 @@ def selector_identity(build_dir=None):
     return {'schema': SCHEMA, 'native': native.binary_identity(build_dir),
             'code': {**native.code_identity(), 'slater_model_selection.py': sha256(__file__),
                      'slater_team_eval.py': sha256(ROOT / 'slater_team_eval.py'),
+                     'slater_nexto_goal_benchmark.py': sha256(ROOT / 'slater_nexto_goal_benchmark.py'),
                      'slater_v041_worker.py': sha256(ROOT / 'slater_v041_worker.py')},
             'runtime': runtime_identity(), 'gigalearn_commit': native.helper.GIGA}
 
@@ -393,7 +400,9 @@ def expected_jobs(protocol, inventory, candidate_ids, stage_name, extra_rivals=(
 
 
 def validate_record(job, record):
-    if not isinstance(record, dict) or any(record.get(key) != value for key, value in job.items()):
+    first_goal = job.get('stop_after_first_goal', False)
+    if not isinstance(record, dict) or any(record.get(key) != value for key, value in job.items()
+                                          if not (first_goal and key == 'seconds')):
         raise ValueError('Cached native game descriptor does not match the frozen protocol')
     if record.get('finish') != 'COMPLETE':
         raise ValueError('Native game did not finish')
@@ -402,6 +411,13 @@ def validate_record(job, record):
             raise ValueError('Invalid cached goal count')
     if type(record.get('seconds')) not in (float, int) or not math.isfinite(record['seconds']):
         raise ValueError('Invalid cached match duration')
+    if first_goal:
+        total = record['goals_for'] + record['goals_against']
+        if not 0 < record['seconds'] <= job['seconds'] or total not in (0, 1):
+            raise ValueError('Invalid first-goal round')
+        if (record.get('round_end') != ('FIRST_GOAL' if total else 'NO_GOAL_TIMEOUT')
+                or (not total and abs(record['seconds'] - job['seconds']) > 1 / 120)):
+            raise ValueError('First-goal round ended prematurely or has an invalid outcome')
     return record
 
 
@@ -782,6 +798,22 @@ def main():
     parser.add_argument('--until', choices=STAGES, default='confirm')
     args = parser.parse_args()
     run = run_path(args.run)
+    saved_settings = read_json(run / 'config.json', {}).get('settings', {})
+    requested = read_json(args.config) if args.config else {}
+    goal_settings = requested.get('goal_race', saved_settings.get('goal_race'))
+    if goal_settings is not None and args.command in ('run', 'resume', 'rank'):
+        from slater_nexto_goal_benchmark import run_benchmark, rebuild_report
+        if args.command == 'rank':
+            result = rebuild_report(run, args.build_dir)
+        else:
+            result = run_benchmark(args.run,
+                config=merge_config(DEFAULT, requested) if args.command == 'run' else None,
+                build_dir=args.build_dir, resume=args.command == 'resume', max_games=args.max_games)
+        summary = {key: result[key] for key in ('status', 'phase', 'complete', 'completed_games',
+                   'completed_model_formats', 'total_model_formats') if key in result}
+        summary['report'] = str(run / 'goal_benchmark.json')
+        print('MODEL_SELECTION_COMPLETE', json.dumps(summary), flush=True)
+        return
     if args.command == 'pause':
         if not (run / 'config.json').is_file():
             raise ValueError('No selector run is available to pause')
