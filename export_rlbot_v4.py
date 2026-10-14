@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+import zipfile
 
 ROOT=Path(__file__).resolve().parent
 SOURCE=ROOT/'vendor'/'nexto'/'nexto-model.pt'
@@ -43,9 +44,22 @@ def model_from_checkpoint(path):
  if not SOURCE.is_file():raise FileNotFoundError(f'Bundled Nexto base model missing: {SOURCE}')
  model=torch.jit.load(str(SOURCE),map_location='cpu')
  if path is not None:
-  data=torch.load(str(path),map_location='cpu',weights_only=True)
-  if not isinstance(data,dict) or 'actor' not in data: raise ValueError('Not a native Nexto actor checkpoint')
-  model.load_state_dict(data['actor'],strict=True)
+  path=Path(path)
+  # Native attention exports are already TorchScript modules. Loading them with
+  # torch.load(weights_only=True) fails on current PyTorch; read their tensor
+  # state into the checked upstream wrapper instead of executing checkpoint code.
+  is_torchscript=False
+  if zipfile.is_zipfile(path):
+   with zipfile.ZipFile(path) as archive:
+    is_torchscript=any(re.search(r'(?:^|/)code/[^/]+\.py$',name) for name in archive.namelist())
+  if is_torchscript:
+   trained=torch.jit.load(str(path),map_location='cpu')
+   weights=trained.state_dict()
+  else:
+   data=torch.load(str(path),map_location='cpu',weights_only=True)
+   if not isinstance(data,dict) or 'actor' not in data: raise ValueError('Not a native Nexto actor checkpoint')
+   weights=data['actor']
+  model.load_state_dict(weights,strict=True)
  model.eval()
  return model
 
