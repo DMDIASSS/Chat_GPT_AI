@@ -79,6 +79,14 @@ def wave_paths(folder):
     return sorted(p for p in folder.glob('wave_*.json') if not p.name.endswith('.hashes.json'))
 
 
+def source_label(source):
+    """Show native checkpoint IDs instead of the shared actor.pt basename."""
+    path = Path(source['path'])
+    if path.name == 'actor.pt' and path.parent.name.startswith('checkpoint_'):
+        return path.parent.name
+    return path.name
+
+
 def load_ledger(run):
     import slater_model_selection as s
     jobs, records = {}, {}
@@ -110,7 +118,7 @@ def summarize(run, protocol, inventory, records, status=None):
     rows = []
     for candidate in inventory['candidate_ids']:
         model = inventory['models'][candidate]
-        aliases = sorted({Path(src['path']).name for src in model['source_paths'] if src['families']})
+        aliases = sorted({source_label(src) for src in model['source_paths'] if src['families']})
         modes = {}
         for mode in cfg['formats']:
             rounds = grouped.get((candidate, mode), [])

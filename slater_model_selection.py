@@ -396,7 +396,19 @@ def expected_jobs(protocol, inventory, candidate_ids, stage_name, extra_rivals=(
                             candidate if team_policy == 'candidate_squad' else reference,
                             fmt, seed, side, stage['seconds'], team_policy)
             for candidate in candidates for fmt in stage['formats'] for rival in rivals
+            # A policy playing itself adds no useful head-to-head evidence.
+            # Keep the protected baseline's self-game because it is the paired
+            # reference record used to score every other candidate in that cell.
+            if candidate != rival or candidate == reference
             for seed in stage['seeds'] for side in ('blue', 'orange')]
+
+
+def source_label(source):
+    """Prefer the checkpoint directory name over repeated actor.pt basenames."""
+    path = Path(source['path'])
+    if path.name == 'actor.pt' and re.fullmatch(r'checkpoint_\d{6,}', path.parent.name):
+        return path.parent.name
+    return path.name
 
 
 def validate_record(job, record):
@@ -580,6 +592,40 @@ def build_stage(run, protocol, inventory, name):
             'jobs': expected_jobs(protocol, inventory, candidates, name, extra_rivals)}
 
 
+def pairwise_summary(records, inventory):
+    """Summarize actual candidate-v-rival results by mode and color."""
+    groups = {}
+    for row in records:
+        candidate, rival = row['candidate_id'], row['rival_id']
+        if candidate == rival:
+            continue
+        mode = f"{row['format'][0]}v{row['format'][1]}"
+        groups.setdefault((candidate, rival, mode), []).append(row)
+
+    def metrics(rows):
+        wins = sum(row['goals_for'] > row['goals_against'] for row in rows)
+        draws = sum(row['goals_for'] == row['goals_against'] for row in rows)
+        losses = sum(row['goals_for'] < row['goals_against'] for row in rows)
+        count = len(rows)
+        return {'matches': count, 'wins': wins, 'draws': draws, 'losses': losses,
+                'points_rate': (wins + .5 * draws) / count if count else None,
+                'win_rate': wins / count if count else None,
+                'goal_difference_per_game': sum(row['goals_for'] - row['goals_against']
+                                                for row in rows) / count if count else None}
+
+    result = []
+    for (candidate, rival, mode), rows in sorted(groups.items()):
+        candidate_model = inventory['models'][candidate]
+        rival_model = inventory['models'][rival]
+        result.append({'candidate_id': candidate, 'rival_id': rival,
+                       'candidate_sources': [source_label(source) for source in candidate_model['source_paths']],
+                       'rival_sources': [source_label(source) for source in rival_model['source_paths']],
+                       'format': mode, **metrics(rows),
+                       'by_color': {color: metrics([row for row in rows if row['learner_team'] == color])
+                                    for color in ('blue', 'orange')}})
+    return result
+
+
 def stage_ranking(run, protocol, inventory, plan):
     records, missing = cached_records(run, plan['jobs'])
     # Partial groups can lack their baseline game: rank only complete candidates.
@@ -592,13 +638,15 @@ def stage_ranking(run, protocol, inventory, plan):
         actual.setdefault(row['candidate_id'], set()).add(row['id'])
     complete_ids = [id for id in expected if actual.get(id, set()) == expected[id]]
     if reference not in complete_ids:
-        ranking = []
+        ranking = []; pairwise = []
     else:
         available = [row for row in records if row['candidate_id'] in complete_ids]
         comparisons = len(plan['candidate_ids']) * len(protocol['settings']['stages'][plan['stage']]['formats'])
         ranking = summarize(available, complete_ids, reference, comparison_count=comparisons)
+        pairwise = pairwise_summary(available, inventory)
     short = shortlist(ranking, inventory, protocol['settings']['top_per_family'], include_specialists=True)
     document = {'stage': plan['stage'], 'complete': not missing, 'ranking': ranking,
+                'pairwise': pairwise,
                 'team_policy': protocol['settings']['stages'][plan['stage']].get('team_policy', 'fixed_reference'),
                 'shortlist': short, 'completed_games': len(records), 'total_games': len(plan['jobs']),
                 'tied_leader_ids': [row['id'] for row in leaders_with_ties(ranking, 1)],
@@ -607,6 +655,16 @@ def stage_ranking(run, protocol, inventory, plan):
                         'Small seed samples and team scores with scripted frozen-policy teammates are exploratory; '
                         'no report guarantees the best policy or a competitive rank.'}
     atomic_json(run / 'stages' / plan['stage'] / 'ranking.json', document)
+    pairwise_path = run / 'stages' / plan['stage'] / 'head_to_head.csv'
+    with pairwise_path.open('w', newline='', encoding='utf-8-sig') as stream:
+        import csv
+        fields = ['candidate_sources', 'rival_sources', 'format', 'matches', 'wins', 'draws',
+                  'losses', 'win_rate', 'points_rate', 'goal_difference_per_game']
+        writer = csv.DictWriter(stream, fieldnames=fields, extrasaction='ignore')
+        writer.writeheader()
+        for row in pairwise:
+            writer.writerow({**row, 'candidate_sources': '; '.join(row['candidate_sources']),
+                             'rival_sources': '; '.join(row['rival_sources'])})
     return document
 
 
@@ -689,7 +747,7 @@ def write_selection(run, protocol, inventory, document):
              '', '| Rank | Sources | Paired goal difference/minute vs reference | Independent seeds |',
              '| --- | --- | ---: | ---: |']
     for index, row in enumerate(document['ranking'][:20], 1):
-        sources = '; '.join(Path(source['path']).name for source in inventory['models'][row['id']]['source_paths']
+        sources = '; '.join(source_label(source) for source in inventory['models'][row['id']]['source_paths']
                             if source['families']) or Path(inventory['models'][row['id']]['source_paths'][0]['path']).name
         score = row['paired_goal_difference_per_minute']
         lines.append(f"| {index} | {sources} | {score['mean']:.3f} | {score['independent_seeds']} |")
