@@ -51,7 +51,7 @@ def model_from_checkpoint(path):
   is_torchscript=False
   if zipfile.is_zipfile(path):
    with zipfile.ZipFile(path) as archive:
-    is_torchscript=any(re.search(r'(?:^|/)code/[^/]+\.py$',name) for name in archive.namelist())
+    is_torchscript=any(re.search(r'(?:^|/)code/.+\.py$',name) for name in archive.namelist())
   if is_torchscript:
    trained=torch.jit.load(str(path),map_location='cpu')
    weights=trained.state_dict()
