@@ -239,6 +239,7 @@ struct ActiveGame {
 struct PendingBatch {
     SlaterAttention::FlatBatch rows;
     std::vector<std::pair<size_t, uint32_t>> positions;
+    std::vector<bool> learners;
 };
 inline json record_for(const Plan& plan, const Job& job, const ActiveGame& game) {
     auto record = job.original;
@@ -329,26 +330,26 @@ inline json run_batched_evaluation(const fs::path& manifest_path, const fs::path
         }
         if (!any_active) break;
         actors.retain(wanted);
-        // Begin all learner actions that ended the previous eight physics packets.
-        std::map<std::string, PendingBatch> learner_batches;
+        // A policy may control both the learner and frozen teammates. Collect
+        // both kinds of rows before inference so each actor needs one GPU
+        // forward and one device-to-host transfer per physics packet.
+        std::map<std::string, PendingBatch> batches;
         for (size_t i = 0; i < active.size(); ++i) if (active[i]) {
             auto& slot = *active[i]; auto& world = *slot.world;
             if (!world.StepComplete()) continue;
             const auto& job = plan.jobs[slot.job_index];
-            if (job.scripted) { world.BeginAction(SlaterAttention::ZeroAction()); continue; }
-            auto views = observations(world); auto& batch = learner_batches[job.candidate];
-            batch.rows.Append(view_for(views, world.LearnerId()));
-            batch.positions.emplace_back(i, world.LearnerId());
-        }
-        for (auto& [id, batch] : learner_batches) {
-            auto indices = choices(actors.get(id), batch.rows, device); auto values = indices.data_ptr<int64_t>();
-            for (size_t j = 0; j < batch.positions.size(); ++j)
-                active[batch.positions[j].first]->world->BeginAction(table.actions.at(values[j]));
-            inference_rows += batch.rows.Size();
+            if (!job.scripted) {
+                auto views = observations(world); auto& batch = batches[job.candidate];
+                batch.rows.Append(view_for(views, world.LearnerId()));
+                batch.positions.emplace_back(i, world.LearnerId());
+                batch.learners.push_back(true);
+            }
+            // BeginAction only changes the pending learner control; observations
+            // and frozen clocks still see the same pre-physics game state.
+            world.BeginAction(SlaterAttention::ZeroAction());
         }
         // Ready frozen cars (and optional script-enabled learner) are pooled by
         // immutable policy across all arenas, regardless of candidate family.
-        std::map<std::string, PendingBatch> frozen_batches;
         for (size_t i = 0; i < active.size(); ++i) if (active[i]) {
             auto& slot = *active[i]; auto& world = *slot.world;
             const auto& job = plan.jobs[slot.job_index];
@@ -359,20 +360,24 @@ inline json run_batched_evaluation(const fs::path& manifest_path, const fs::path
             const auto& allies = job.blue ? world.BlueIds() : world.OrangeIds();
             for (auto id : ready) {
                 bool own_team = std::find(allies.begin(), allies.end(), id) != allies.end();
-                auto& batch = frozen_batches[own_team ? job.teammate : job.rival];
+                auto& batch = batches[own_team ? job.teammate : job.rival];
                 batch.rows.Append(view_for(views, id)); batch.positions.emplace_back(i, id);
+                batch.learners.push_back(false);
             }
             if (learner_ready) {
-                auto& batch = frozen_batches[job.candidate];
+                auto& batch = batches[job.candidate];
                 batch.rows.Append(view_for(views, world.LearnerId()));
                 batch.positions.emplace_back(i, world.LearnerId());
+                batch.learners.push_back(false);
             }
         }
         std::vector<std::map<uint32_t, Action>> predictions(active.size());
-        for (auto& [id, batch] : frozen_batches) {
+        for (auto& [id, batch] : batches) {
             auto indices = choices(actors.get(id), batch.rows, device); auto values = indices.data_ptr<int64_t>();
             for (size_t j = 0; j < batch.positions.size(); ++j) {
-                auto [i, car_id] = batch.positions[j]; predictions[i][car_id] = table.actions.at(values[j]);
+                auto [i, car_id] = batch.positions[j];
+                if (batch.learners[j]) active[i]->world->SetLearnerPacketAction(table.actions.at(values[j]));
+                else predictions[i][car_id] = table.actions.at(values[j]);
             }
             inference_rows += batch.rows.Size();
         }
