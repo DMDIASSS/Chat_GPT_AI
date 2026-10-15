@@ -10,6 +10,7 @@ namespace SlaterFreestyle {
 // Smooth stage gates keep later discoveries useful without letting ground
 // touching, free flight or static proximity dominate a developed policy.
 struct RewardConfig {
+    static constexpr int VERSION = 2;
     std::map<std::string,float> weights = {
         {"approach",.15f}, {"jump_explore",.025f}, {"ball_touch",.6f},
         {"wall_roll",.7f}, {"wall_pop",1.1f}, {"air_touch",1.3f},
@@ -18,6 +19,7 @@ struct RewardConfig {
         {"double_tap_proxy",4.f}, {"psycho_proxy",5.f}, {"wall_recovery",1.5f},
         {"walldash_proxy",2.5f}, {"shot_progress",.5f}, {"goal",2.f},
         {"qualified_finish",6.f}, {"concede",.15f}, {"idle",.02f}
+        ,{"lift_progress",1.5f}, {"pop_retouch",2.f}
     };
     float maxEpisodePositive = 36.f;
     float touchSpacing = .12f;
@@ -51,9 +53,12 @@ class FreestyleReward : public RLGC::Reward {
         if(component=="reset_acquire") return stage>=2?1.f:.15f;
         if(component=="reset_use") return stage>=3?1.f:.15f;
         if(component=="multi_reset") return stage>=4?1.f:.1f;
-        if(component=="pinch_proxy") return context_->stage==Stage::Pinch?1.f:.15f;
-        if(component=="double_tap_proxy") return context_->stage==Stage::DoubleTap?1.f:.15f;
-        if(component=="psycho_proxy") return context_->stage==Stage::PsychoProxy?1.f:.1f;
+        if(component=="pinch_proxy") return context_->stage==Stage::Pinch?1.f:0.f;
+        if(component=="double_tap_proxy") return context_->stage==Stage::DoubleTap?1.f:0.f;
+        if(component=="psycho_proxy") return context_->stage==Stage::PsychoProxy?1.f:0.f;
+        if(component=="goal")return context_->stage==Stage::ContactPop?.25f:1.f;
+        if(component=="lift_progress")return context_->stage==Stage::ContactPop?1.f:.15f;
+        if(component=="pop_retouch")return context_->stage==Stage::ContactPop?1.f:.3f;
         if(component=="wall_recovery") return context_->stage==Stage::WallRecovery?1.f:.15f;
         if(component=="walldash_proxy") return context_->stage==Stage::WallDashProxy?1.f:.15f;
         return 1.f;
@@ -64,8 +69,9 @@ class FreestyleReward : public RLGC::Reward {
         if(weight==config_.weights.end()||weight->second<=0||raw<=0) return;
         auto& chain=context_->chains.at(id);
         const float remaining=std::max(0.f,budget-chain.rawCredit[name]);
-        float accepted=std::min(Clip(raw),remaining);
         float scale=weight->second*Gate(name);
+        if(scale<=0)return;
+        float accepted=std::min(Clip(raw),remaining);
         float weighted=accepted*scale;
         if(!penalty&&scale>0) {
             weighted=std::min(weighted,std::max(0.f,config_.maxEpisodePositive-positivePaid_[id]));
@@ -85,9 +91,9 @@ class FreestyleReward : public RLGC::Reward {
         const float d=context_->difficulty;
         switch(context_->stage) {
         case Stage::ContactPop:
-            if(d<.3f)return c.touches>0&&c.active;
-            if(d<.7f)return c.active&&(c.pop||c.lastAirTouch>=0);
-            return c.active&&c.pop&&c.lastAirTouch>c.popAt+.08f&&c.lastAirTouch-c.popAt<2.5f;
+            if(context_->contactObjective==0)return c.touches>0&&c.active;
+            if(context_->contactObjective==1)return c.active&&c.pop;
+            return c.active&&c.popRetouch;
         case Stage::AirCarry:return c.bestCarry>=.6f+.9f*d&&c.noseTouches>=2&&c.carryDistance>=180+320*d;
         case Stage::ResetAcquire:return c.resets>=1&&c.active;
         case Stage::ResetUse:return c.resetUses>=1&&(d<.7f||c.ownScored);
@@ -99,6 +105,20 @@ class FreestyleReward : public RLGC::Reward {
         case Stage::WallDashProxy:return c.wallDashes>=2;
         }
         return false;
+    }
+    bool QualifiedFinish(const ChainState& c) const {
+        // Only the currently trained mechanic can earn the large bonus.
+        // A pinch proxy must never unlock an unrelated pop/carry finish.
+        switch(context_->stage) {
+        case Stage::ContactPop:return c.popRetouch&&c.elapsed-c.lastAirTouch<config_.finishDeadline;
+        case Stage::AirCarry:return c.bestCarry>=.6f&&c.noseTouches>=2&&c.elapsed-c.lastAirTouch<config_.finishDeadline;
+        case Stage::ResetAcquire:case Stage::ResetUse:case Stage::MultiReset:
+            return StageSuccess(c)&&c.resetUses>0&&c.elapsed-c.resetAt<config_.finishDeadline;
+        case Stage::Pinch:return c.pinch&&c.elapsed-c.pinchAt<config_.finishDeadline;
+        case Stage::DoubleTap:return c.retouch&&!c.ownBoard&&c.elapsed-c.retouchAt<config_.finishDeadline;
+        case Stage::PsychoProxy:return c.retouch&&c.ownBoard&&c.elapsed-c.retouchAt<config_.finishDeadline;
+        default:return false;
+        }
     }
 public:
     explicit FreestyleReward(std::shared_ptr<FreestyleContext> context, RewardConfig config={})
@@ -159,31 +179,35 @@ public:
                 Pay(p.carId,"idle",dt,2.f,metrics,true);
             if(touch&&c.active) {
                 const bool wallBeforeTouch=c.wall;
+                const float previousWallAt=c.wallAt;
                 ++c.touches;c.lastTouch=c.elapsed;Event(metrics,"learner_touch");
                 if(c.elapsed-c.lastRewardedTouch>=config_.touchSpacing) {
                     Pay(p.carId,"ball_touch",.2f+.8f*Clip(impulse/1500.f),2.f,metrics);
                     c.lastRewardedTouch=c.elapsed;
                 }
-                const bool nearBallWall=std::abs(state.ball.pos.x)>3600&&state.ball.pos.z>140;
-                if(nearBallWall) {
+                const bool nearBallWall=std::abs(state.ball.pos.x)>3850&&state.ball.pos.z>140;
+                if(nearBallWall&&onWall&&state.ball.vel.z>60) {
                     c.wall=true;c.wallAt=c.elapsed;
                     Pay(p.carId,"wall_roll",Clip((state.ball.pos.z-140)/600),1.f,metrics);
                 }
-                if(wallBeforeTouch&&!c.pop&&c.elapsed-c.wallAt<2.5f&&state.ball.pos.z>300&&
+                if(wallBeforeTouch&&!c.pop&&c.elapsed-previousWallAt<2.5f&&state.ball.pos.z>250&&
                    state.ball.pos.x*state.ball.vel.x<0&&std::abs(state.ball.vel.x)>180) {
                     c.pop=true;c.popAt=c.elapsed;Pay(p.carId,"wall_pop",1,1,metrics);Event(metrics,"wall_pop");
                 }
                 // Ground setup can earn a pop too, followed by a separate
                 // airborne retouch. A ball spawned high cannot count as a pop.
-                if(!c.pop&&state.prev&&state.prev->ball.pos.z<160&&state.ball.vel.z>250&&
-                   state.ball.pos.z>110&&p.pos.z<180) {
-                    c.pop=true;c.popAt=c.elapsed;
-                    Pay(p.carId,"wall_pop",.6f,1,metrics);Event(metrics,"learner_ground_pop");
+                if(!c.pop&&state.prev&&state.prev->ball.pos.z<180&&p.pos.z<200&&
+                   state.ball.vel.z>80&&state.ball.vel.z-oldBallVel.z>60) {
+                    c.pendingLift=true;c.liftAt=c.elapsed;c.liftStartHeight=state.prev->ball.pos.z;
+                    Pay(p.carId,"lift_progress",Clip((state.ball.vel.z-oldBallVel.z)/600),1,metrics);
                 }
                 if(freeAir&&state.ball.pos.z>300) {
                     c.lastAirTouch=c.elapsed;
                     Pay(p.carId,"air_touch",Clip(p.airTime/.8f)*Clip(state.ball.pos.z/1100),3.f,metrics);
                     Event(metrics,"air_touch");
+                    if(c.pop&&!c.popRetouch&&c.elapsed-c.popAt>.08f&&c.elapsed-c.popAt<2.5f) {
+                        c.popRetouch=true;Pay(p.carId,"pop_retouch",1,1,metrics);Event(metrics,"pop_air_retouch");
+                    }
                     const bool nose=p.rotMat.forward.Dot(direction)>.45f&&
                         std::abs(p.rotMat.right.Dot(delta))<110&&p.rotMat.up.Dot(delta)>-40;
                     if(nose&&c.elapsed-c.lastNoseTouch>=config_.touchSpacing) {
@@ -192,6 +216,11 @@ public:
                         Event(metrics,"nose_contact");
                     }
                 }
+            }
+            if(c.pendingLift&&!c.pop&&c.elapsed-c.liftAt<=.8f&&state.lastTouchCarID==int(p.carId)&&
+               state.ball.pos.z>110&&state.ball.pos.z-c.liftStartHeight>=30+70*context_->difficulty) {
+                c.pop=true;c.popAt=c.elapsed;c.pendingLift=false;
+                Pay(p.carId,"wall_pop",.6f,1,metrics);Event(metrics,"learner_ground_pop");
             }
             const bool carry=c.active&&freeAir&&state.ball.pos.z>300&&distance<240&&
                 (state.ball.vel-p.vel).Length()<650&&c.elapsed-c.lastNoseTouch<config_.carryTouchDeadline&&
@@ -235,8 +264,14 @@ public:
 
             // These named events are geometry/kinematics proxies, not verified
             // recognizers of stylistic pinches, double taps or psychos.
-            if(c.active&&touch&&!c.pinch&&
-               (std::abs(state.ball.pos.x)>3750||state.ball.pos.z<130)&&
+            const bool groundCompression=state.ball.pos.z<120&&p.pos.z>state.ball.pos.z+25&&
+                std::hypot(delta.x,delta.y)<140&&p.vel.z-oldBallVel.z< -150;
+            const bool wallCompression=std::abs(state.ball.pos.x)>3960&&
+                std::abs(p.pos.x)<std::abs(state.ball.pos.x)-25&&state.ball.pos.x*state.ball.vel.x<0;
+            const bool ceilingCompression=state.ball.pos.z>1930&&p.pos.z<state.ball.pos.z-25&&
+                std::hypot(delta.x,delta.y)<140&&state.ball.vel.z< -300;
+            if(c.active&&touch&&!c.pinch&&(groundCompression||wallCompression||ceilingCompression)&&
+               (p.vel-oldBallVel).Dot(direction)>200&&
                distance<220&&impulse>1000&&state.ball.vel.Length()>2000&&goalward) {
                 c.pinch=true;c.pinchAt=c.elapsed;
                 Pay(p.carId,"pinch_proxy",1,1,metrics);Event(metrics,"pinch_proxy");
@@ -285,10 +320,7 @@ public:
                 if(own&&attributed) {
                     c.ownScored=true;
                     Pay(p.carId,"goal",1,1,metrics);Event(metrics,"learner_goal");
-                    const bool complex=(c.bestCarry>.6f&&c.noseTouches>=2)||c.resetUses>0||
-                        (c.pinch&&c.elapsed-c.pinchAt<config_.finishDeadline)||
-                        (c.retouch&&c.elapsed-c.retouchAt<config_.finishDeadline);
-                    if(complex) {Pay(p.carId,"qualified_finish",1,1,metrics);Event(metrics,"qualified_mechanic_goal");}
+                    if(QualifiedFinish(c)) {Pay(p.carId,"qualified_finish",1,1,metrics);Event(metrics,"qualified_mechanic_goal");}
                     if(c.ownBoard&&c.retouch&&c.elapsed-c.retouchAt<config_.finishDeadline) {
                         Pay(p.carId,"psycho_proxy",1,1,metrics);Event(metrics,"psycho_finish_proxy");
                     }
@@ -322,6 +354,11 @@ public:
             auto& c=pair.second;c.finished=true;
             const std::string stage=StageName(context_->stage);
             metrics["episodes/"+stage]+=1;metrics["successes/"+stage]+=c.successful?1:0;
+            if(context_->stage==Stage::ContactPop) {
+                const std::string objective=context_->contactObjective==0?"touch":context_->contactObjective==1?"pop":"retouch";
+                metrics["objectives/"+objective+"/episodes"]+=1;
+                metrics["objectives/"+objective+"/successes"]+=c.successful?1:0;
+            }
             metrics["measurements/best_carry_seconds_sum"]+=c.bestCarry;
             metrics["measurements/reset_count_sum"]+=c.resets;
             metrics["measurements/reset_uses_sum"]+=c.resetUses;

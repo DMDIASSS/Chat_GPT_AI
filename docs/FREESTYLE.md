@@ -5,6 +5,86 @@ policy and critic start with random weights; none of update180, update271 or
 the existing attention checkpoints supplies its initialization. Runs live in
 `data/isolated/freestyle/runs/`. The current playing bots remain separate.
 
+## Revised rewards: continue an existing Freestyle actor
+
+The overnight report exposed two issues in reward version 1: ordinary fast
+ground shots could trigger the pinch proxy and earn a large mechanic-finish
+bonus, and a ground lift could be missed because the ball had not yet risen at
+the exact contact tick. Reward version 2 fixes those conditions and changes the
+training objective. It requires a native rebuild and a new run, not an ordinary
+resume of the old build's checkpoint state.
+
+For the reported `freestyle01` run:
+
+1. **Safe pause** and wait for its saved checkpoint, then close the app.
+2. Extract the reward update into the project folder. Run
+   `FREESTYLE_REWARDS_V2.bat`. It builds once if necessary, finds the latest
+   completed parent checkpoint, copies its actor into `freestyle_rewards02`,
+   and starts a **200 additional update** trial with online W&B. Later launches
+   of this batch resume that child for another 200 updates. Build outputs are
+   reused and all parent checkpoints remain in place.
+3. The first **10 updates train only the new critic**. Actor changes and actor
+   learning rate are intentionally zero then. The actor subsequently trains
+   with a default maximum rate of `0.00005`, one quarter of the original rate.
+4. Send the child's `events.jsonl` after the trial. Compare evaluation
+   `validation/objectives/pop_success_rate`, `pop_retouches_per_episode` and
+   `mean_best_carry_seconds`, alongside the earned reward contributions.
+
+The app equivalent is **Build**, then put `freestyle01` in the Run field and
+click **Continue with revised rewards**. Accept or edit the new run name.
+That button prepares the copy and starts the same 200-update first trial.
+Normal **Resume** in the app uses the child's saved unlimited setting; safely
+pause when needed. The batch launcher applies its own finite additional budget.
+
+For another parent or destination name, use:
+
+```bat
+FREESTYLE_NATIVE.bat fork --from-run freestyle01 --run freestyle_rewards02
+FREESTYLE_NATIVE.bat resume --run freestyle_rewards02 --updates 200 --wandb-mode online
+```
+
+`fork --checkpoint "...\checkpoints\91229712"` can explicitly select a completed
+checkpoint inside the chosen parent's checkpoint folder. The default discovers
+the latest completed one, including updates made since the uploaded report.
+Parent and child must retain the same observation/action schemas, width, depth
+and action timing. The actor is copied exactly; the critic, optimizers, return
+normalization and curriculum start fresh because the old critic predicts the
+old rewards. `parent_policy/lineage.json` records the source and its SHA256.
+An interrupted copy cannot silently start a random policy. The child gets a
+separate W&B run; the parent history remains intact.
+
+Version 2 keeps 512 observations and 94 actions. Its reward changes are:
+
+- Ground-shot speed alone cannot trigger pinch credit. The proxy now requires
+  plausible ball/car compression against floor, sidewall or ceiling, closing
+  motion and an attributed high-speed contact. It remains an approximate
+  detector, not certification of a named pinch.
+- Pinch/double-tap/psycho bonuses are gated to their matching stages. The large
+  finish bonus requires the current stage's mechanic; contact/pop practice
+  requires a learner-caused pop followed by a distinct aerial retouch.
+- Goals during initial pop practice earn `0.5` instead of `2`. A bounded
+  `lift_progress` reward pays for a learner-caused upward impulse and a separate
+  `pop_retouch` reward pays once for the subsequent aerial contact.
+- A ground hit can establish a pending lift. The ball must actually rise by a
+  difficulty-dependent amount within 0.8 seconds, with the learner retaining
+  last-touch attribution. A high spawn, another car's hit or a later unrelated
+  rise cannot count. Wall rolling requires the car to be following on the wall.
+- Touch, pop and pop-plus-retouch episode objectives blend with difficulty
+  instead of abruptly switching at 0.3. Easier low, moving setups provide no
+  free upward launch. Objective-specific evaluation rates are logged separately
+  so an easy-touch success cannot be confused with an aerial success.
+
+The continuation starts contact/pop practice at difficulty 0.25. These changes
+close verified loopholes; learning speed and advanced mastery still require
+new evaluation evidence. The old and new reward totals are not comparable.
+
+Validation passed 67 focused checks, including native reward regressions,
+schema/copy safeguards and a real CPU continuation that preserved the actor
+through critic warmup, then updated it after resume without changing the parent
+checkpoint. A larger 768-unit cloud actor also transferred exactly and trained
+after warmup with real offline W&B logging. Windows/CUDA uses the same sources
+but needs the rebuild on the PC.
+
 ## Windows: start here
 
 1. Extract the source update directly into `E:\Downloads\Chat_GPT_AI`, alongside

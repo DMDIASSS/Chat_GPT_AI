@@ -27,8 +27,10 @@ struct Learner { PPOLearner* ppo; };
     (include / 'PPO/PPOLearner.h').write_text('''
 #pragma once
 #include <GigaLearnCPP/Learner.h>
+#include <filesystem>
 namespace GGL {
-struct ModelSet {};
+struct Model {bool loaded=false;void Load(std::filesystem::path folder,bool allow,bool optim) {loaded=folder=="parent"&&!allow&&!optim;}};
+struct ModelSet {Model policy;Model* operator[](const char*) {return &policy;}};
 class PPOLearner {
 public:
  ModelSet models;
@@ -60,6 +62,7 @@ int main() {
  SlaterFreestyleSetLearningRates(&learner,.003f,.004f);
  SlaterFreestyleInfer(&learner,obs,mask,&actions);
  if(p.actor!=.003f||p.critic!=.004f||actions.value!=29)return 1;
+ SlaterFreestyleLoadPolicy(&learner,"parent");if(!p.models.policy.loaded)return 3;
  SlaterFreestyleSetReportHook(report);SlaterFreestyleSetCheckpointHook(save);
  SlaterFreestyleReportHook(&learner,GGL::Report{3});SlaterFreestyleCheckpointHook(&learner);
  SlaterFreestyleSetReportHook(nullptr);SlaterFreestyleSetCheckpointHook(nullptr);

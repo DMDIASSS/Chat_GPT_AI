@@ -84,12 +84,14 @@ struct ChainState {
     float resetAt = -100, flipAt = -100, noFlipAt = -100, wallLaunchAt = -100;
     float boardAt = -100, pinchAt = -100, retouchAt = -100, lastRewardedTouch = -100;
     float recoveryStart = -100, wallSpeedBefore = 0, carryCredit = 0;
+    float liftAt = -100, liftStartHeight = 0;
     int touches = 0, noseTouches = 0, resets = 0, resetUses = 0, resetChain = 0, chainUses = 0, bestUsedResetChain = 0;
     int wallDashes = 0;
     bool wall = false, pop = false, pendingReset = false, airborneSinceReset = false;
     bool pinch = false, board = false, retouch = false, ownBoard = false;
     bool recovered = false, recoveryNeeded = false, successful = false, finished = false, ownScored = false;
     bool lastFourWheels = false, wasAirborne = false, lastJump = false, goalPaid = false, active = false;
+    bool pendingLift = false, popRetouch = false;
     uint64_t lastHitTick = ~uint64_t(0);
     RocketSim::Vec initialBall{}, lastBall{}, lastCar{};
     std::map<std::string, float> rawCredit;
@@ -109,6 +111,7 @@ struct FreestyleContext {
     Stage stage = Stage::ContactPop;
     float difficulty = 0, episodeSeconds = 12;
     bool evaluation = false, privilegedVisible = false;
+    int contactObjective = 0; // touch, learner-caused pop, pop then aerial retouch
     uint32_t learnerId = 0;
     uint64_t startTick = 0, rewardTick = ~uint64_t(0), resetCount = 0;
     std::unordered_map<uint32_t, ChainState> chains;
@@ -133,6 +136,11 @@ struct FreestyleContext {
         if (!std::isfinite(dropout)||dropout<0||dropout>1)
             throw std::invalid_argument("Invalid freestyle privileged state dropout");
         privilegedVisible=Rand(0,1)>=dropout;
+        contactObjective=0;
+        if(stage==Stage::ContactPop&&Rand(0,1)<Clip((difficulty-.05f)/.25f)) {
+            contactObjective=1;
+            if(Rand(0,1)<Clip((difficulty-.45f)/.45f))contactObjective=2;
+        }
     }
 };
 
@@ -235,6 +243,14 @@ public:
                 ball.vel = {side*80, sign*180, 100};
                 own.pos = {ball.pos.x-side*230, ball.pos.y-sign*180, 17};
                 own.rotMat = Facing(ball.pos-own.pos);
+            }
+            // Low, moving setups make learner-caused lift discoverable. They
+            // provide no initial upward impulse and cannot grant a pop event.
+            if(c.contactObjective>0&&c.Rand(0,1)<.6f*(1-d)) {
+                ball.pos={c.Rand(-650,650),sign*c.Rand(-1000,600),c.Rand(100,140)};
+                ball.vel={0,sign*120,0};
+                own.pos={ball.pos.x,ball.pos.y-sign*(160+140*d),17};
+                own.vel={0,sign*120,0};own.rotMat=Facing({0,sign,0});
             }
         } else if (setup == Stage::AirCarry || setup == Stage::ResetAcquire ||
                    setup == Stage::ResetUse || setup == Stage::MultiReset) {

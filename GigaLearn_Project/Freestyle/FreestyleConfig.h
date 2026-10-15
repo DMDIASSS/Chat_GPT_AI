@@ -16,6 +16,7 @@ struct NativeSettings {
     uint64_t seed=20261014, maxUpdates=0, saveEvery=10, evalEvery=10;
     uint64_t evalSeed=910000000, minStageUpdates=20;
     int evalEpisodes=16, masteryPasses=3;
+    uint64_t criticWarmup=0;
     float difficulty=0, difficultyStep=.1f, masteryRate=.7f;
     bool curriculum=true, halfPrecision=false, adaptiveLR=true;
     float targetKL=.02f, minLR=.00002f, privilegedDropout=.5f, defenderStrength=.7f;
@@ -43,13 +44,14 @@ struct NativeSettings {
         masteryRate=j.value("mastery_success_rate",masteryRate); curriculum=j.value("curriculum_enabled",curriculum);
         halfPrecision=j.value("half_precision",halfPrecision); targetKL=j.value("target_kl",targetKL);
         adaptiveLR=j.value("adaptive_lr",adaptiveLR); minLR=j.value("min_actor_lr",minLR);
+        criticWarmup=j.value("critic_warmup_updates",criticWarmup);
         rewardSettings=j.value("rewards",rewardSettings);
         if(games<1||games>256||threads<1||threads>32||simThreads<1||simThreads>32||
            width<64||width>2048||depth<1||depth>6||epochs<1||epochs>8||
            steps<512||steps>1000000||minibatch<128||minibatch>steps||
            std::find(std::begin(validTicks),std::end(validTicks),tickSkip)==std::end(validTicks)||
            actionDelay<0||actionDelay>=tickSkip||saveEvery<1||evalEpisodes<2||evalEpisodes>256||
-           masteryPasses<1||masteryPasses>20||minStageUpdates<1||
+           masteryPasses<1||masteryPasses>20||minStageUpdates<1||criticWarmup>1000||
            (device!="auto"&&device!="cuda"&&device!="cpu"))
             throw std::invalid_argument("Invalid freestyle architecture/budget/device/timing setting (tick1 requires delay0)");
         for(float x:{actorLR,criticLR,gamma,lambda,entropy,clip,rewardClip,episodeSeconds,difficulty,difficultyStep,masteryRate,targetKL,minLR,privilegedDropout,defenderStrength})

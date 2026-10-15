@@ -26,3 +26,8 @@ extern "C" void SlaterFreestyleInfer(GGL::Learner* learner, const at::Tensor& ob
     GGL::PPOLearner::InferActionsFromModels(learner->ppo->models,observations,masks,true,
         learner->ppo->config.policyTemperature,false,actions,nullptr);
 }
+extern "C" void SlaterFreestyleLoadPolicy(GGL::Learner* learner, const char* folder) {
+    // Keep architecture validation inside the upstream loader and the DLL.
+    // A new reward objective needs a fresh critic/optimizer/return normalizer.
+    learner->ppo->models["policy"]->Load(std::filesystem::u8path(folder),false,false);
+}

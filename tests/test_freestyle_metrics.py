@@ -50,3 +50,17 @@ def test_invalid_metrics_cannot_become_plot_values():
              'Critic Loss': float('inf'), 'Post-update PPO KL': True}}
     result = freestyle.flatten_metrics(event)
     assert not any(key.startswith('learning/') for key in result)
+
+
+def test_contact_objectives_are_reported_separately_and_absent_groups_stay_missing():
+    event = {'update': 10, 'metrics': {'training/critic_warmup': True,
+        'outcomes': {'objectives/touch/episodes': 2, 'objectives/touch/successes': 2,
+                     'objectives/pop/episodes': 8, 'objectives/pop/successes': 2}},
+        'evaluation': {'complete': True, 'episodes': 16, 'telemetry': {
+            'objectives/pop/episodes': 12, 'objectives/pop/successes': 3}}}
+    values = freestyle.flatten_metrics(event)
+    assert values['learning/critic_warmup'] == 1
+    assert values['practice/objectives/touch_success_rate'] == 1
+    assert values['practice/objectives/pop_success_rate'] == .25
+    assert values['validation/objectives/pop_success_rate'] == .25
+    assert 'validation/objectives/retouch_success_rate' not in values

@@ -39,12 +39,14 @@ std::shared_ptr<FreestyleTelemetry> telemetry=std::make_shared<FreestyleTelemetr
 std::vector<std::shared_ptr<FreestyleContext>> contexts;
 fs::path output,pauseMarker;
 Json inputConfig;
+Json parentPolicy=Json::object();
 RewardConfig rewardConfig;
 uint64_t stageStartedUpdate=0,evaluations=0;
 int masteryPassCount=0;
 float currentActorLR=0;
 std::map<std::string,double> lastTelemetry;
 volatile std::sig_atomic_t signalPause=0;
+const char* Initialization() {return parentPolicy.empty()?"RANDOM_FROM_SCRATCH":"POLICY_CONTINUATION";}
 
 void SignalPause(int) { signalPause=1; }
 void SetEnv(const char* name,const std::string& value) {
@@ -85,7 +87,8 @@ Json State(Learner* learner) {
             {"stage",StageName(Stage(curriculum->stage.load()))},{"difficulty",curriculum->difficulty.load()},
             {"stage_started_update",stageStartedUpdate},{"mastery_passes",masteryPassCount},
             {"evaluations",evaluations},{"actor_lr",currentActorLR},{"environment_rng",rng},
-            {"source_sha",FREESTYLE_SOURCE_SHA},{"initialization","RANDOM_FROM_SCRATCH"},
+            {"source_sha",FREESTYLE_SOURCE_SHA},{"initialization",Initialization()},
+            {"reward_version",RewardConfig::VERSION},{"parent_policy",parentPolicy},
             {"episode_resume","new episodes; model, optimizers, normalization, curriculum and RNG retained"}};
 }
 void CheckpointHook(Learner* learner) {
@@ -265,6 +268,8 @@ Json NumericReport(const Report& report) {
 }
 void ReportHook(Learner* learner,const Report& report) {
     const Stage trainedStage=Stage(curriculum->stage.load());
+    const bool warmedCritic=settings->criticWarmup>0&&learner->totalIterations<=settings->criticWarmup;
+    const float actorRateUsed=warmedCritic?0:currentActorLR;
     Json metrics=NumericReport(report);
     auto values=telemetry->Snapshot();Json components=Json::object(),events=Json::object();
     for(const auto& item:values) {
@@ -274,12 +279,12 @@ void ReportHook(Learner* learner,const Report& report) {
     }
     lastTelemetry=values;
     // LR adapts only to actual sampled policy drift, not teacher agreement.
-    if(settings->adaptiveLR&&report.Has("Post-update PPO KL")) {
+    if(settings->adaptiveLR&&learner->totalIterations>=settings->criticWarmup&&report.Has("Post-update PPO KL")) {
         const double kl=report["Post-update PPO KL"];
         if(std::isfinite(kl)&&kl>settings->targetKL*1.5) currentActorLR=std::max(settings->minLR,currentActorLR*.7f);
         else if(std::isfinite(kl)&&kl<settings->targetKL*.35) currentActorLR=std::min(settings->actorLR,currentActorLR*1.02f);
-        SlaterFreestyleSetLearningRates(learner,currentActorLR,settings->criticLR);
     }
+    SlaterFreestyleSetLearningRates(learner,learner->totalIterations<settings->criticWarmup?0:currentActorLR,settings->criticLR);
     Json evaluation=nullptr;
     if(settings->evalEvery&&learner->totalIterations%settings->evalEvery==0) {
         evaluation=Evaluate(learner);
@@ -303,12 +308,14 @@ void ReportHook(Learner* learner,const Report& report) {
     metrics["reward_components"]=components;metrics["outcomes"]=events;
     metrics["training/learner_rows_per_step"]=settings->games;
     metrics["training/scripted_defender_rows_excluded"]=settings->defender=="none"?0:settings->games;
-    metrics["learning_rate/actor"]=currentActorLR;metrics["learning_rate/critic"]=settings->criticLR;
+    metrics["learning_rate/actor"]=actorRateUsed;
+    metrics["training/critic_warmup"]=warmedCritic;
+    metrics["learning_rate/critic"]=settings->criticLR;
     metrics["curriculum/difficulty"]=curriculum->difficulty.load();metrics["curriculum/mastery_passes"]=masteryPassCount;
     Json event={{"type","update"},{"schema",STATE_SCHEMA},{"update",learner->totalIterations},
                 {"timesteps",learner->totalTimesteps},{"stage",StageName(trainedStage)},
                 {"next_stage",StageName(Stage(curriculum->stage.load()))},{"metrics",metrics},
-                {"evaluation",evaluation},{"initialization","RANDOM_FROM_SCRATCH"}};
+                {"evaluation",evaluation},{"initialization",Initialization()},{"reward_version",RewardConfig::VERSION}};
     AppendEvent(event,"FREESTYLE_UPDATE");
     if(learner->totalIterations%settings->saveEvery==0) learner->Save();
 }
@@ -327,10 +334,14 @@ fs::path LatestComplete() {
 }
 void RestoreState(Learner* learner,const fs::path& folder) {
     Json saved=ReadJson(folder/"FREESTYLE_STATE.json");
-    if(saved.value("schema",-1)!=STATE_SCHEMA||saved.value("source_sha","")!=FREESTYLE_SOURCE_SHA||saved.value("initialization","")!="RANDOM_FROM_SCRATCH"||
+    const auto origin=saved.value("initialization","");
+    if(saved.value("schema",-1)!=STATE_SCHEMA||saved.value("source_sha","")!=FREESTYLE_SOURCE_SHA||
+       (origin!="RANDOM_FROM_SCRATCH"&&origin!="POLICY_CONTINUATION")||
        saved.value("update",uint64_t(-1))!=learner->totalIterations||
        saved.value("timesteps",uint64_t(-1))!=learner->totalTimesteps)
         throw std::runtime_error("Freestyle checkpoint/curriculum state mismatch; original Slater actors cannot be resumed here");
+    parentPolicy=saved.value("parent_policy",Json::object());
+    if((origin=="POLICY_CONTINUATION")==parentPolicy.empty())throw std::runtime_error("Invalid continuation provenance");
     curriculum->stage=int(ParseStage(saved.at("stage")));curriculum->difficulty=saved.at("difficulty");
     stageStartedUpdate=saved.at("stage_started_update");masteryPassCount=saved.at("mastery_passes");
     evaluations=saved.at("evaluations");currentActorLR=saved.at("actor_lr");
@@ -344,7 +355,7 @@ void RestoreState(Learner* learner,const fs::path& folder) {
     if(learner->ppo->device.is_cuda()) {torch::Tensor cudaRng;torch::load(cudaRng,(folder/"CUDA_RNG.lt").string());
         auto cudaGenerator=at::cuda::detail::getDefaultCUDAGenerator(learner->ppo->device.index());cudaGenerator.set_state(cudaRng);}
 #endif
-    SlaterFreestyleSetLearningRates(learner,currentActorLR,settings->criticLR);
+    SlaterFreestyleSetLearningRates(learner,learner->totalIterations<settings->criticWarmup?0:currentActorLR,settings->criticLR);
     // Already-running physical episodes aren't serialized. Restart them using
     // saved generator streams instead of pretending to continue their history.
     for(size_t i=0;i<learner->envSet->arenas.size();i++) learner->envSet->ResetArena(i);
@@ -354,7 +365,7 @@ void RestoreState(Learner* learner,const fs::path& folder) {
 
 int main(int argc,char** argv) {
     try {
-        fs::path configFile,meshes;bool resume=false;std::string mode="train";
+        fs::path configFile,meshes,warmStart;bool resume=false;std::string mode="train";
         for(int i=1;i<argc;i++) {
             std::string argument=argv[i];
             if(argument=="--resume") {resume=true;continue;}
@@ -362,10 +373,12 @@ int main(int argc,char** argv) {
             std::string value=argv[++i];
             if(argument=="--config") configFile=value;else if(argument=="--out") output=value;
             else if(argument=="--meshes") meshes=value;else if(argument=="--pause") pauseMarker=value;
+            else if(argument=="--warm-start")warmStart=fs::u8path(value);
             else if(argument=="--mode") mode=value;else throw std::invalid_argument("Unknown argument "+argument);
         }
         if(configFile.empty()||output.empty()||meshes.empty()||(mode!="train"&&mode!="evaluate"))
             throw std::invalid_argument("Provide --config --out --meshes [--pause] [--resume] [--mode train|evaluate]");
+        if(!warmStart.empty()&&(resume||mode!="train"))throw std::invalid_argument("Policy continuation requires a fresh training run");
         inputConfig=ReadJson(configFile);settings=std::make_unique<NativeSettings>(inputConfig);
         if(!settings->rewardSettings.is_object()) throw std::invalid_argument("rewards must be an object");
         if(settings->rewardSettings.contains("weights")) {
@@ -424,9 +437,22 @@ int main(int argc,char** argv) {
                 if(signalPause&&!pauseMarker.empty()&&!fs::exists(pauseMarker)) {std::ofstream marker(pauseMarker);marker<<"signal\n";}
             }));
         if(resume) RestoreState(learner.get(),previous);
-        else {stageStartedUpdate=0;learner->Save();}
+        else {
+            if(!warmStart.empty()) {
+                if(!previous.empty())throw std::invalid_argument("Continuation cannot overwrite existing checkpoints");
+                parentPolicy=ReadJson(warmStart/"lineage.json");
+                if(parentPolicy.value("observation_schema","")!=FreestyleObs::SCHEMA||
+                   parentPolicy.value("action_schema","")!=FreestyleControls::SCHEMA)
+                    throw std::invalid_argument("Continuation observation/action schema mismatch");
+                const auto utf8=warmStart.u8string();
+                SlaterFreestyleLoadPolicy(learner.get(),reinterpret_cast<const char*>(utf8.c_str()));
+            }
+            SlaterFreestyleSetLearningRates(learner.get(),settings->criticWarmup?0:currentActorLR,settings->criticLR);
+            stageStartedUpdate=0;learner->Save();
+        }
         std::signal(SIGINT,SignalPause);std::signal(SIGTERM,SignalPause);
-        Json begin={{"initialization","RANDOM_FROM_SCRATCH"},{"teacher",nullptr},{"device",learner->ppo->device.str()},
+        Json begin={{"initialization",Initialization()},{"parent_policy",parentPolicy},
+                    {"reward_version",RewardConfig::VERSION},{"teacher",nullptr},{"device",learner->ppo->device.str()},
                     {"observation_size",learner->obsSize},{"observation_schema",FreestyleObs::SCHEMA},{"actions",learner->numActions},{"action_schema",FreestyleControls::SCHEMA},{"width",settings->width},
                     {"depth",settings->depth},{"tick_skip",settings->tickSkip},{"update",learner->totalIterations},
                     {"source_sha",FREESTYLE_SOURCE_SHA},{"mode",mode},{"defender",settings->defender},

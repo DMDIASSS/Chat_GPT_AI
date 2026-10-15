@@ -72,14 +72,96 @@ static void GoalAttributionAndRepeatedTick() {
             const auto metrics = ctx->telemetry->Snapshot();
             reward.PreStep(state);
             assert(ctx->telemetry->Snapshot() == metrics);
-            assert(attributed ? paid >= 2 : paid < 2); // Approach shaping remains independently valid.
+            assert(attributed ? paid >= .5f : paid < .5f); // Modest solo-pop goal reward.
             Next(state); reward.GetReward(state.players[0], state, false);
             const auto final = ctx->telemetry->Snapshot();
             auto goals = final.find("events/learner_goal");
             assert(attributed ? goals != final.end() && goals->second == 1 : goals == final.end());
             auto goalReward = final.find("weighted_sum/goal");
-            assert(attributed ? goalReward != final.end() && goalReward->second == 2 : goalReward == final.end());
+            assert(attributed ? goalReward != final.end() && goalReward->second == .5 : goalReward == final.end());
         }
+    }
+}
+
+static double Metric(const std::shared_ptr<FreestyleContext>& ctx,const std::string& name) {
+    auto values=ctx->telemetry->Snapshot();auto found=values.find(name);
+    return found==values.end()?0:found->second;
+}
+
+static void OrdinaryShotsCannotBecomeFreestyleFinishes() {
+    for(auto team:{RocketSim::Team::BLUE,RocketSim::Team::ORANGE}) {
+        const float sign=team==RocketSim::Team::BLUE?1.f:-1.f;
+        auto ctx=std::make_shared<FreestyleContext>();ctx->learnerId=1;
+        FreestyleReward reward(ctx);auto state=Fixture(team);
+        state.players[0].pos={0,0,17};state.players[0].vel={0,sign*2200,0};
+        state.players[0].isOnGround=true;state.ball.pos={0,sign*130,93};state.ball.vel={0,0,0};
+        reward.Reset(state);auto before=state;state.prev=&before;
+        Next(state,true);state.ball.vel={0,sign*2500,0};state.lastTouchCarID=1;
+        reward.PreStep(state);
+        assert(!ctx->chains.at(1).pinch);
+        Next(state);state.goalScored=true;state.ball.pos={0,sign*5300,93};reward.PreStep(state);
+        assert(Metric(ctx,"events/learner_goal")==1);
+        assert(Metric(ctx,"weighted_sum/goal")==.5);
+        assert(Metric(ctx,"weighted_sum/qualified_finish")==0);
+        assert(Metric(ctx,"events/qualified_mechanic_goal")==0);
+    }
+    // A genuine compression proxy is rewarded only by the pinch curriculum.
+    for(auto stage:{Stage::ContactPop,Stage::Pinch}) {
+        auto ctx=std::make_shared<FreestyleContext>();ctx->learnerId=1;ctx->stage=stage;
+        FreestyleReward reward(ctx);auto state=Fixture();
+        state.players[0].pos={0,0,160};state.players[0].vel={0,1000,-800};
+        state.ball.pos={0,50,93};state.ball.vel={0,0,0};reward.Reset(state);
+        auto before=state;state.prev=&before;Next(state,true);state.ball.vel={0,2500,0};
+        state.lastTouchCarID=1;reward.PreStep(state);assert(ctx->chains.at(1).pinch);
+        Next(state);state.goalScored=true;state.ball.pos={0,5300,93};reward.PreStep(state);
+        assert((Metric(ctx,"weighted_sum/pinch_proxy")>0)==(stage==Stage::Pinch));
+        assert((Metric(ctx,"weighted_sum/qualified_finish")>0)==(stage==Stage::Pinch));
+    }
+}
+
+static void LearnerLiftMustRiseThenReceiveASeparateAirTouch() {
+    for(bool learnerLastTouch:{false,true}) {
+        auto ctx=std::make_shared<FreestyleContext>();ctx->learnerId=1;
+        ctx->difficulty=.3f;ctx->contactObjective=2;
+        FreestyleReward reward(ctx);auto state=Fixture();
+        state.players[0].pos={0,0,17};state.players[0].isOnGround=true;
+        state.ball.pos={0,130,93};state.ball.vel={0,200,0};reward.Reset(state);
+        auto before=state;state.prev=&before;Next(state,true);
+        state.ball.pos.z=95;state.ball.vel.z=400;state.lastTouchCarID=1;
+        reward.PreStep(state);
+        assert(!ctx->chains.at(1).pop&&ctx->chains.at(1).pendingLift);
+        assert(Metric(ctx,"weighted_sum/lift_progress")>0);
+        for(int i=0;i<12;++i)Next(state);
+        state.ball.pos.z=155;state.lastTouchCarID=learnerLastTouch?1:2;reward.PreStep(state);
+        assert(ctx->chains.at(1).pop==learnerLastTouch);
+        assert(!reward.IsSuccess(1));
+        if(!learnerLastTouch)continue;
+        for(int i=0;i<12;++i)Next(state);
+        state.players[0].pos.z=400;state.players[0].isOnGround=false;state.players[0].airTime=1;
+        state.ball.pos.z=450;Next(state,true);reward.PreStep(state);
+        assert(ctx->chains.at(1).popRetouch&&reward.IsSuccess(1));
+        assert(Metric(ctx,"events/pop_air_retouch")==1);
+        for(int i=0;i<24;++i){Next(state,true);reward.PreStep(state);}
+        assert(Metric(ctx,"events/pop_air_retouch")==1); // Cannot farm the chain step.
+        Next(state);state.goalScored=true;state.ball.pos={0,5300,93};reward.PreStep(state);
+        assert(Metric(ctx,"weighted_sum/qualified_finish")==6);
+    }
+    auto ctx=std::make_shared<FreestyleContext>();ctx->learnerId=1;ctx->contactObjective=2;
+    FreestyleReward reward(ctx);auto state=Fixture();reward.Reset(state);
+    Next(state,true);reward.PreStep(state);
+    assert(!ctx->chains.at(1).pop&&!reward.IsSuccess(1)); // High spawn + touch is not a pop.
+}
+
+static void GradualContactObjectives() {
+    auto ctx=std::make_shared<FreestyleContext>();
+    for(float difficulty:{0.f,.175f,.3f,.675f,1.f}) {
+        ctx->control->difficulty=difficulty;int pops=0,retouches=0;
+        for(int n=0;n<1000;++n){ctx->SampleSettings();pops+=ctx->contactObjective>0;retouches+=ctx->contactObjective==2;}
+        if(difficulty==0)assert(pops==0);
+        if(difficulty==.175f)assert(pops>400&&pops<600);
+        if(difficulty==.3f)assert(pops==1000&&retouches==0);
+        if(difficulty==.675f)assert(pops==1000&&retouches>400&&retouches<600);
+        if(difficulty==1)assert(retouches==1000);
     }
 }
 
@@ -357,7 +439,9 @@ int main(int argc, char** argv) {
     RealResetAndFalseResourceEdges(); StateSettersAndObservations(); TeamSymmetryAndMasking();
     TwoCarLearnerSelectionAndRewards();
     FreestyleControlsAndMasks();
+    OrdinaryShotsCannotBecomeFreestyleFinishes();LearnerLiftMustRiseThenReceiveASeparateAirTouch();GradualContactObjectives();
     std::cout << "FREESTYLE_NATIVE_PASS real_wheel_reset=1 proximity_farming=0 positive_cap=12 "
                  "goal_attribution=both_colors spawn_reset_rejected=1 randomized_starts=240 "
-                 "two_car_learner=blue offpolicy_defender_reward=0 controls=94 masks_valid=1\n";
+                 "two_car_learner=blue offpolicy_defender_reward=0 controls=94 masks_valid=1 "
+                 "ground_shot_bonus=0 delayed_pop=1 gradual_objectives=1\n";
 }

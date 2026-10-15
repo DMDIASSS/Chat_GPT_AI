@@ -12,7 +12,8 @@ def package(output=None):
              ROOT / 'tests/freestyle_native_checks.cpp',
              ROOT / 'tests/test_freestyle_native_checks.py', ROOT / 'tests/test_freestyle_runner.py',
              ROOT / 'tests/test_freestyle_build.py', ROOT / 'tests/test_freestyle_dll_bridge.py',
-             ROOT / 'tests/test_freestyle_metrics.py', ROOT / 'tests/test_atomic_json_windows.py']
+             ROOT / 'tests/test_freestyle_metrics.py', ROOT / 'tests/test_atomic_json_windows.py',
+             ROOT / 'tests/test_freestyle_continuation.py', ROOT / 'tests/test_freestyle_native_continuation.py']
     files += sorted(ROOT.glob('FREESTYLE_*.bat')) + sorted(ROOT.glob('FREESTYLE_*.vbs'))
     files += [ROOT / 'FREESTYLE_SETTINGS.json', ROOT / 'FREESTYLE_MECHANICS.json']
     files += sorted(path for path in (ROOT / 'GigaLearn_Project/Freestyle').iterdir()
@@ -33,6 +34,36 @@ def package(output=None):
                for name in archive.namelist()):
             raise RuntimeError('Source package unexpectedly contains runtime/model files')
     print(destination, destination.stat().st_size, 'bytes;', len(files), 'source files')
+    return destination
+
+
+def package_reward_revision(output=None):
+    """Small overlay: leave the user's settings and stable obs/action files alone."""
+    destination = Path(output or ROOT / 'Slater_Freestyle_Rewards_V2.zip')
+    names = ['slater_freestyle.py', 'slater_v041_core.py', 'FREESTYLE_REWARDS_V2.bat',
+             'docs/FREESTYLE.md']
+    names += ['GigaLearn_Project/Freestyle/' + name for name in (
+        'FreestyleBridge.cpp', 'FreestyleBridge.h', 'FreestyleConfig.h',
+        'FreestyleCurriculum.h', 'FreestyleMain.cpp', 'FreestyleRewards.h')]
+    with zipfile.ZipFile(destination, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        for name in names:
+            archive.write(ROOT / name, name)
+        archive.writestr('FREESTYLE_REWARDS_V2_INSTALL.txt',
+            '1. Safe pause Freestyle and close the app after its checkpoint saves.\n'
+            '2. Extract into E:\\Downloads\\Chat_GPT_AI, replacing the included source files.\n'
+            '3. Run FREESTYLE_REWARDS_V2.bat. It rebuilds if needed, copies the latest\n'
+            '   completed freestyle01 actor into freestyle_rewards02, and trains 200 updates.\n'
+            '4. Future launches resume freestyle_rewards02 for another 200 updates.\n'
+            'The parent run, all checkpoints and your settings are preserved.\n'
+            'First 10 child updates train the fresh critic while the actor stays fixed.\n'
+            'W&B uses your existing local login and creates a new child run.\n'
+            'For the GUI: Build, Run=freestyle01, Continue with revised rewards.\n'
+            'See docs/FREESTYLE.md for other parent names and custom budgets.\n')
+    with zipfile.ZipFile(destination) as archive:
+        if archive.testzip() is not None:
+            raise RuntimeError('Reward update failed ZIP integrity verification')
+        assert not any(name.startswith(('data/', '.venv/')) for name in archive.namelist())
+    print(destination, destination.stat().st_size, 'bytes;', len(names), 'source files')
     return destination
 
 

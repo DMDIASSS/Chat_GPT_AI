@@ -42,7 +42,8 @@ def reward_defaults():
         'air_carry': 2., 'reset_acquire': 3., 'reset_use': 4., 'multi_reset': 5.,
         'pinch_proxy': 3., 'double_tap_proxy': 4., 'psycho_proxy': 5.,
         'wall_recovery': 1.5, 'walldash_proxy': 2.5, 'shot_progress': .5,
-        'goal': 2., 'qualified_finish': 6., 'concede': .15, 'idle': .02},
+        'goal': 2., 'qualified_finish': 6., 'concede': .15, 'idle': .02,
+        'lift_progress': 1.5, 'pop_retouch': 2.},
         'max_episode_positive': 36., 'touch_spacing': .12, 'carry_touch_deadline': .35,
         'reset_use_deadline': 2.5, 'flip_touch_deadline': .55, 'finish_deadline': 5.}
 
@@ -61,6 +62,7 @@ def defaults():
             'eval_episodes': 16, 'mastery_success_rate': .7, 'mastery_passes': 3,
             'min_stage_updates': 20, 'difficulty_step': .1, 'max_episode_seconds': 12.,
             'target_kl': .02, 'adaptive_lr': True, 'min_actor_lr': .00002,
+            'critic_warmup_updates': 0,
             'half_precision': False, 'reward_clip': 10., 'eval_seed_base': 910000000,
             'privileged_dropout': .5, 'defender': 'scripted_goalie',
             'defender_after_stage': 'reset_use', 'defender_strength': .7,
@@ -111,6 +113,7 @@ def validate_settings(value):
         'save_every_updates': (1, 1000), 'eval_every_updates': (1, 10000),
         'eval_episodes': (2, 256), 'mastery_passes': (1, 20),
         'min_stage_updates': (1, 1000000), 'eval_seed_base': (0, 2147483647),
+        'critic_warmup_updates': (0, 1000),
     }
     for key, (lower, upper) in ranges.items():
         if type(native[key]) is not int or not lower <= native[key] <= upper:
@@ -339,6 +342,8 @@ def flatten_metrics(event):
         value = metrics.get(original)
         if type(value) in (float, int) and math.isfinite(value):
             result[name] = value
+    if type(metrics.get('training/critic_warmup')) is bool:
+        result['learning/critic_warmup'] = int(metrics['training/critic_warmup'])
     outcomes = metrics.get('outcomes', {})
     if isinstance(outcomes, dict):
         episodes = sum(value for key, value in outcomes.items() if key.startswith('episodes/')
@@ -348,6 +353,12 @@ def flatten_metrics(event):
         if episodes > 0:
             result['practice/success_rate'] = successes / episodes
             result['practice/episodes'] = episodes
+        for objective in ('touch', 'pop', 'retouch'):
+            count = outcomes.get('objectives/' + objective + '/episodes', 0)
+            success = outcomes.get('objectives/' + objective + '/successes', 0)
+            if type(count) in (float, int) and math.isfinite(count) and count > 0 and \
+                    type(success) in (float, int) and math.isfinite(success):
+                result['practice/objectives/' + objective + '_success_rate'] = success / count
     components = metrics.get('reward_components', {})
     if isinstance(components, dict):
         for key, value in components.items():
@@ -365,10 +376,17 @@ def flatten_metrics(event):
             for key, name in (('events/learner_goal', 'goals_per_episode'),
                               ('events/air_touch', 'air_touches_per_episode'),
                               ('events/verified_four_wheel_reset', 'resets_per_episode'),
+                              ('events/pop_air_retouch', 'pop_retouches_per_episode'),
                               ('measurements/best_carry_seconds_sum', 'mean_best_carry_seconds')):
                 value = telemetry.get(key, 0)
                 if type(value) in (float, int) and math.isfinite(value):
                     result['validation/' + name] = value / episodes
+            for objective in ('touch', 'pop', 'retouch'):
+                count = telemetry.get('objectives/' + objective + '/episodes', 0)
+                success = telemetry.get('objectives/' + objective + '/successes', 0)
+                if type(count) in (float, int) and math.isfinite(count) and count > 0 and \
+                        type(success) in (float, int) and math.isfinite(success):
+                    result['validation/objectives/' + objective + '_success_rate'] = success / count
     # Missing evaluations/losses stay missing: they must not become fake zeros.
     return result
 
@@ -423,7 +441,7 @@ class WandbMonitor:
             self.handle.define_metric(prefix, step_metric='train/update')
         for prefix in ('learning/*', 'performance/*', 'practice/*', 'reward_contributions/*', 'validation/*'):
             self.handle.define_metric(prefix, step_metric='train/update')
-        for prefix in ('schema', 'update', 'timesteps', 'train/*', 'metrics/weights/*',
+        for prefix in ('schema', 'reward_version', 'update', 'timesteps', 'train/*', 'metrics/weights/*',
                        'metrics/training/*', 'evaluation/seed_base', 'evaluation/evaluation'):
             self.handle.define_metric(prefix, hidden=True)
         self.last_logged = max(self.last_logged, int(getattr(self.handle, 'step', 0) or 0) - 1)
@@ -532,7 +550,7 @@ class EventReader:
         return result
 
 
-def initialize(name, settings, build_dir=None, *, resume=False):
+def initialize(name, settings, build_dir=None, *, resume=False, continuation=None):
     folder = run_path(name)
     identity = binary_identity(build_dir)
     if resume:
@@ -554,6 +572,8 @@ def initialize(name, settings, build_dir=None, *, resume=False):
                 'created_at': datetime.now(timezone.utc).isoformat(), 'identity': identity,
                 'config_sha256': sha256(folder / 'config.json'),
                 'runner_sha256': sha256(Path(__file__))}
+    if continuation:
+        protocol.update(initialization='policy_continuation_pending', parent_policy=continuation)
     atomic_json(folder / 'protocol.json', protocol)
     atomic_json(folder / 'progress.json', {'status': 'INITIALIZED', 'updates': 0, 'timesteps': 0})
     return folder, protocol
@@ -570,6 +590,65 @@ def completed_update(folder, fallback=0):
     if type(latest.get('update')) is int and latest['update'] >= 0:
         updates.append(latest['update'])
     return max(updates) if updates else int(fallback)
+
+
+def fork_policy(name, parent, settings, build_dir=None, checkpoint=None):
+    """Copy a completed compatible actor into a new reward experiment, read-only parent."""
+    source = run_path(parent)
+    if name == parent:
+        raise ValueError('Continuation needs a different run name; the parent remains preserved')
+    with process_lock(source.parent / (parent + '.lock')), process_lock(source.parent / (name + '.lock')):
+        old = read_json(source / 'protocol.json', {})
+        if old.get('schema') != SCHEMA:
+            raise ValueError('Parent must be an existing Freestyle run')
+        original = old['settings']['native']
+        settings = validate_settings(settings)
+        for key in ('width', 'depth', 'tick_skip', 'action_delay'):
+            if original[key] != settings['native'][key]:
+                raise ValueError('Continuation must preserve ' + key)
+        backend = old['identity'].get('backend_sha', {})
+        for filename in ('FreestyleObs.h', 'FreestyleActions.h'):
+            if backend.get(filename) != sha256(HERE / filename):
+                raise ValueError('Parent observation/action schema differs; refusing an incompatible actor')
+        checkpoints = source / 'checkpoints'
+        choices = [path for path in checkpoints.iterdir() if path.is_dir() and path.name.isdigit()
+                   and (path / 'FREESTYLE_COMPLETE.json').is_file()]
+        chosen = Path(checkpoint).resolve() if checkpoint else max(choices, key=lambda p: int(p.name), default=None)
+        if chosen is None or not chosen.resolve().is_relative_to(checkpoints.resolve()):
+            raise ValueError('No completed parent checkpoint found inside its checkpoint folder')
+        marker = read_json(chosen / 'FREESTYLE_COMPLETE.json', {})
+        saved = read_json(chosen / 'FREESTYLE_STATE.json', {})
+        if marker.get('schema') != 1 or saved.get('schema') != 1 or \
+                any(type(marker.get(k)) is not int or marker[k] < 0 for k in ('update', 'timesteps')) or \
+                not isinstance(marker.get('source_sha'), str) or not marker['source_sha'] or \
+                any(marker.get(k) != saved.get(k) for k in ('update', 'timesteps', 'source_sha')):
+            raise ValueError('Parent checkpoint is incomplete or its state disagrees with the completion marker')
+        policy = chosen / 'POLICY.lt'
+        digest = sha256(policy)
+        lineage = {'parent_run': parent, 'checkpoint': str(chosen.resolve()), 'policy_sha256': digest,
+                   'parent_update': marker['update'], 'parent_timesteps': marker['timesteps'],
+                   'observation_schema': 'slater_freestyle_flat512_v1',
+                   'action_schema': 'slater_freestyle_94_stall_v1',
+                   'critic': 'new for revised rewards', 'optimizers': 'new', 'reward_version': 2}
+        folder, protocol = initialize(name, settings, build_dir, continuation=lineage)
+        copy_folder = folder / 'parent_policy'
+        copy_folder.mkdir()
+        shutil.copyfile(policy, copy_folder / 'POLICY.lt')
+        if sha256(policy) != digest or sha256(copy_folder / 'POLICY.lt') != digest:
+            raise RuntimeError('Parent policy changed during copy; no continuation was launched')
+        atomic_json(copy_folder / 'lineage.json', lineage)
+        protocol.update(initialization='policy_continuation', parent_policy=lineage)
+        atomic_json(folder / 'protocol.json', protocol)
+        print('FREESTYLE_POLICY_FORK', json.dumps({'run': name, **lineage}), flush=True)
+        return folder
+
+
+def revised_reward_settings(parent):
+    settings = validate_settings(read_json(run_path(parent) / 'protocol.json')['settings'])
+    settings['native'].update(stage='contact_pop', difficulty=.25, rewards=reward_defaults(),
+                              actor_lr=min(settings['native']['actor_lr'], .00005),
+                              min_actor_lr=.00001, critic_warmup_updates=10)
+    return validate_settings(settings)
 
 
 def write_progress(folder, progress):
@@ -592,6 +671,8 @@ def train(name, settings, build_dir=None, meshes=None, *, resume=False, updates=
     # Lock lives beside the run, so acquiring it cannot make a new run look existing.
     with process_lock(folder.parent / (name + '.lock')), process_lock(folder.parent / (name + '.telemetry.lock')):
         folder, protocol = initialize(name, settings, build_dir, resume=resume)
+        if protocol.get('initialization') == 'policy_continuation_pending':
+            raise RuntimeError('Actor copy was interrupted. Keep the parent and create a continuation with a new run name; refusing random initialization.')
         monitor_settings = deepcopy(protocol['settings']['wandb'])
         if mode is not None:
             monitor_settings['mode'] = mode
@@ -610,7 +691,14 @@ def train(name, settings, build_dir=None, meshes=None, *, resume=False, updates=
         mesh_path = Path(meshes).resolve() if meshes else helper.meshes()
         args = [str(binary), '--config', str(folder / 'launch_config.json'), '--out', str(folder),
                 '--meshes', str(mesh_path), '--pause', str(pause)]
-        if resume:
+        parent = protocol.get('parent_policy')
+        has_checkpoint = any((folder / 'checkpoints').glob('*/FREESTYLE_COMPLETE.json'))
+        if parent and not has_checkpoint:
+            copied = folder / 'parent_policy'
+            if sha256(copied / 'POLICY.lt') != parent['policy_sha256']:
+                raise ValueError('Copied continuation actor changed; restore the preserved copy')
+            args += ['--warm-start', str(copied)]
+        elif resume:
             args.append('--resume')
         environment = helper.runtime_environment(binary, pause)
         for key in REDACT_ENV:
@@ -619,7 +707,8 @@ def train(name, settings, build_dir=None, meshes=None, *, resume=False, updates=
         # Resolve/validate the native prerequisites before opening an online run.
         monitor = WandbMonitor(folder, monitor_settings, protocol)
         logfile = folder / ('native_' + str(time.time_ns()) + '.log')
-        print('FREESTYLE_RUN', name, 'random initialization' if not resume else 'resuming saved weights/optimizer/curriculum', flush=True)
+        print('FREESTYLE_RUN', name, 'continuing preserved actor with revised rewards' if parent else
+              ('random initialization' if not resume else 'resuming saved weights/optimizer/curriculum'), flush=True)
         print('Checkpoint/reward files:', folder, flush=True)
         process = None
         try:
@@ -766,7 +855,7 @@ def monitor_saved(name, mode=None):
 
 def desktop(settings_file=None):
     import tkinter as tk
-    from tkinter import filedialog, messagebox, ttk
+    from tkinter import filedialog, messagebox, simpledialog, ttk
     import webbrowser
     settings = validate_settings(read_json(settings_file) if settings_file else defaults())
     root = tk.Tk()
@@ -797,7 +886,7 @@ def desktop(settings_file=None):
     def show_error(exc):
         messagebox.showerror('Freestyle', str(exc), parent=root)
 
-    def start(command):
+    def start(command, updates=None):
         try:
             if job['process'] and job['process'].poll() is None:
                 raise RuntimeError('The current job is running; safely pause it first')
@@ -807,6 +896,8 @@ def desktop(settings_file=None):
             args = [sys.executable, '-u', str(Path(__file__)), command, '--settings', str(ui_settings)]
             if command in ('train', 'resume'):
                 args += ['--run', value['run_name'], '--wandb-mode', mode.get()]
+                if updates is not None:
+                    args += ['--updates', str(updates)]
             elif command == 'smoke':
                 args += ['--wandb-mode', 'disabled']
             logdir = BASE / 'app_logs'; logdir.mkdir(parents=True, exist_ok=True)
@@ -825,6 +916,24 @@ def desktop(settings_file=None):
         try:
             pause_run(name.get())
             headline.set('Safe pause requested; native PPO finishes its current update and saves.')
+        except Exception as exc:
+            show_error(exc)
+
+    def continue_revised():
+        try:
+            if job['process'] and job['process'].poll() is None:
+                raise RuntimeError('Safely pause the current training job first')
+            parent = name.get()
+            child = simpledialog.askstring('Continue with revised rewards',
+                'New run name (the current run is preserved):', initialvalue='freestyle_rewards02', parent=root)
+            if not child:
+                return
+            value = revised_reward_settings(parent)
+            value['run_name'] = child
+            fork_policy(child, parent, value)
+            name.set(child)
+            editor.delete('1.0', 'end'); editor.insert('1.0', json.dumps(value, indent=2))
+            start('resume', updates=200)
         except Exception as exc:
             show_error(exc)
 
@@ -888,6 +997,7 @@ def desktop(settings_file=None):
                             ('Import settings', import_settings), ('Export settings', export_settings)):
         ttk.Button(controls, text=label, command=callback).pack(side='left', padx=3)
     ttk.Button(root, text='Mechanics catalogue', command=open_mechanics).pack(anchor='w', padx=12, pady=(0, 8))
+    ttk.Button(root, text='Continue with revised rewards', command=continue_revised).pack(anchor='w', padx=12, pady=(0, 8))
 
     def poll():
         try:
@@ -911,9 +1021,11 @@ def desktop(settings_file=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('build', 'smoke', 'train', 'resume', 'pause', 'status', 'monitor', 'gui', 'settings', 'mechanics'))
+    parser.add_argument('command', choices=('build', 'check-build', 'smoke', 'train', 'resume', 'fork', 'pause', 'status', 'monitor', 'gui', 'settings', 'mechanics'))
     parser.add_argument('--settings', type=Path)
     parser.add_argument('--run')
+    parser.add_argument('--from-run')
+    parser.add_argument('--checkpoint', type=Path)
     parser.add_argument('--build-dir', type=Path)
     parser.add_argument('--giga-source', type=Path)
     parser.add_argument('--meshes', type=Path)
@@ -925,6 +1037,8 @@ def main():
     name = args.run or settings['run_name']
     if args.command == 'build':
         build(args.build_dir, args.giga_source, args.jobs)
+    elif args.command == 'check-build':
+        print(json.dumps(binary_identity(args.build_dir)))
     elif args.command == 'gui':
         desktop(args.settings)
     elif args.command == 'settings':
@@ -937,6 +1051,11 @@ def main():
         print(json.dumps(status(name), indent=2))
     elif args.command == 'monitor':
         monitor_saved(name, args.wandb_mode)
+    elif args.command == 'fork':
+        if not args.from_run or not args.run:
+            parser.error('fork requires --from-run PARENT --run NEW_NAME')
+        value = settings if args.settings else revised_reward_settings(args.from_run)
+        fork_policy(name, args.from_run, value, args.build_dir, args.checkpoint)
     else:
         if args.command == 'smoke':
             name = args.run or ('smoke_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S'))

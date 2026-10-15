@@ -20,5 +20,6 @@ FREESTYLE_DLL_API void SlaterFreestyleCheckpointHook(GGL::Learner*);
 FREESTYLE_DLL_API void SlaterFreestyleSetLearningRates(GGL::Learner*, float actor, float critic);
 FREESTYLE_DLL_API void SlaterFreestyleInfer(GGL::Learner*, const at::Tensor& observations,
                                           const at::Tensor& masks, at::Tensor* actions);
+FREESTYLE_DLL_API void SlaterFreestyleLoadPolicy(GGL::Learner*, const char* folder);
 }
 #undef FREESTYLE_DLL_API
