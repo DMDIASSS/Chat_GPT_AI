@@ -4,3 +4,6 @@ __pycache__/
 *.pt
 *.pth
 *.ckpt
+file_connection.json
+botrblx_exchange/
+botrblx_client.lua

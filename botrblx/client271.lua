@@ -1,5 +1,4 @@
 -- Update271 live bridge. Reads rendered state; Python sends normal OS input.
-local URL="http://127.0.0.1:28771"
 local TEAM=0 -- 0=blue, 1=orange. Freeplay spawns blue.
 local HZ=15
 local player=game:GetService("Players").LocalPlayer
@@ -24,6 +23,8 @@ teamButton.Text="Team: BLUE"
 local close=Instance.new("TextButton",panel)
 close.Position=UDim2.fromOffset(300,120);close.Size=UDim2.fromOffset(110,30);close.Text="Close"
 gui.Parent=pg
+-- BRIDGE_TRANSPORT_BEGIN
+local URL="http://127.0.0.1:28771"
 -- HTTP_COMPAT_BEGIN: inline copy shared by the launcher and standalone client.
 local http_preferred
 local function http_response_detail(value)
@@ -83,6 +84,12 @@ local function http_request_checked(options)
     error("No usable HTTP response. "..table.concat(errors," | "),0)
 end
 -- HTTP_COMPAT_END
+local function bridge_call(path,packet,token)
+    return http_request_checked({Url=URL..path,Method=packet and "POST"or "GET",
+        Headers={ ["Content-Type"]="application/json",["X-Bridge-Token"]=token or ""},
+        Body=packet and game:GetService("HttpService"):JSONEncode(packet)or nil,Timeout=2})
+end
+-- BRIDGE_TRANSPORT_END
 
 if player.Name~="Deadline_coolgun"or game.PlaceId~=101880234193261 then
     label.Text="This adapter is configured for Deadline_coolgun / place 101880234193261.";return
@@ -92,10 +99,8 @@ local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
 local alive,enabled,token,seq,armAt=true,false,nil,0,0
 local function call(path,packet)
-    local body,status=http_request_checked({Url=URL..path,Method=packet and "POST"or "GET",
-        Headers={ ["Content-Type"]="application/json",["X-Bridge-Token"]=token or ""},
-        Body=packet and http:JSONEncode(packet)or nil,Timeout=2})
-    assert(not status or status==200,"HTTP "..tostring(status)..": "..body:sub(1,200))
+    local body,status=bridge_call(path,packet,token)
+    assert(not status or status==200,"Bridge "..tostring(status)..": "..body:sub(1,200))
     local data=http:JSONDecode(body)
     assert(type(data)=="table","Invalid JSON response")
     return data

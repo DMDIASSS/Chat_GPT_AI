@@ -24,7 +24,7 @@ if not exist "%~dp0bridge271.py" goto missing_bridge
 if not exist "%~dp0client271.lua" goto missing_client
 echo Python: %BOTRBLX_PYTHON%
 echo Project: %BOTRBLX_PROJECT_ROOT%
-echo Keep this window open. Wait for READY, then execute JJSploit_Launch.lua.
+echo Keep this window open. Wait for READY and follow the connection instructions.
 "%BOTRBLX_PYTHON%" -u "%~dp0bridge271.py" --project-root "%BOTRBLX_PROJECT_ROOT%" %*
 set "BOTRBLX_EXIT=%errorlevel%"
 >> "%BOTRBLX_LAUNCH_LOG%" echo Bridge exit code: %BOTRBLX_EXIT%

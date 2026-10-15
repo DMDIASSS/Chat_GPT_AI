@@ -220,6 +220,15 @@ class Bridge:
     def reply(self, **extra):
         return dict(status=self.status,disarmed=self.blocked,keys=sorted(self.output.held),**extra)
 
+    def hello(self):
+        with self.lock:
+            self.enabled, self.blocked, self.seq = False, False, -1
+            self.epoch += 1
+            self.token = secrets.token_hex(24)
+            self.release("Connected - click Start bot")
+            logging.info("CLIENT_HELLO: Lua client connected; waiting for telemetry/start")
+            return {"token":self.token,"protocol":1}
+
     def watchdog(self):
         with self.lock:
             if self.output.stopped():
@@ -314,13 +323,7 @@ def make_handler(bridge, client_source):
                 logging.info("CLIENT_DOWNLOAD: launcher requested /client")
                 return self.send(200,client_source,"text/plain; charset=utf-8")
             if self.path == "/hello":
-                with bridge.lock:
-                    bridge.enabled, bridge.blocked, bridge.seq = False, False, -1
-                    bridge.epoch += 1
-                    bridge.token = secrets.token_hex(24)
-                    bridge.release("Connected - click Start bot")
-                    logging.info("CLIENT_HELLO: Lua client connected; waiting for telemetry/start")
-                    return self.send(200,{"token":bridge.token,"protocol":1})
+                return self.send(200,bridge.hello())
             return self.send(404,{"error":"Unknown route"})
 
         def do_POST(self):
@@ -374,6 +377,10 @@ def main():
     parser.add_argument("--model", type=Path)
     parser.add_argument("--base", type=Path)
     parser.add_argument("--dry-run",action="store_true")
+    parser.add_argument("--transport", choices=("http","files"), default="http")
+    parser.add_argument("--workspace", type=Path, help="Executor workspace root for file mode")
+    parser.add_argument("--choose-workspace", action="store_true", help="Open a folder picker if no file workspace is saved")
+    parser.add_argument("--reset-workspace", action="store_true", help="Ignore the saved workspace and choose again")
     parser.add_argument("--self-check", action="store_true", help="Verify files and model inference without starting input or HTTP")
     args = parser.parse_args()
     root, model_path, base_path = resolve_paths(args)
@@ -391,7 +398,15 @@ def main():
         return
     output = Output(args.dry_run)
     bridge = Bridge(model,output)
-    server = ThreadingHTTPServer(("127.0.0.1",PORT),make_handler(bridge,client_source))
+    server = None
+    exchange = None
+    if args.transport == "files":
+        from file_transport import FileExchange, install_client, select_workspace
+        workspace = select_workspace(args, APP_DIR / "file_connection.json")
+        install_client(workspace,APP_DIR)
+        exchange = FileExchange(bridge,workspace)
+    else:
+        server = ThreadingHTTPServer(("127.0.0.1",PORT),make_handler(bridge,client_source))
     done = threading.Event()
     def monitor():
         while not done.wait(.02):
@@ -401,16 +416,24 @@ def main():
                 logging.exception("Input watchdog")
     worker = threading.Thread(target=monitor,daemon=True)
     worker.start()
-    logging.info("READY http://127.0.0.1:%s | model %s",PORT,model_path)
+    if exchange:
+        logging.info("READY FILE MODE | workspace %s | no HTTP server",workspace)
+        logging.info("Execute JJSploit_File_Launch.lua. Requires executor readfile/writefile support.")
+    else:
+        logging.info("READY http://127.0.0.1:%s | model %s",PORT,model_path)
     logging.info("Model SHA256 %s",hashlib.sha256(model_path.read_bytes()).hexdigest())
     logging.info("F8 releases bot inputs. Focus loss/stale telemetry pauses. Ctrl+C exits.")
     logging.info("Freeplay adapter: ground/flip estimated; unavailable pads masked; other cars omitted.")
-    try: server.serve_forever(poll_interval=.1)
+    try:
+        if exchange:
+            while not done.wait(.005): exchange.poll()
+        else:
+            server.serve_forever(poll_interval=.1)
     except KeyboardInterrupt: pass
     finally:
         done.set()
         with bridge.lock: bridge.release("Stopped")
-        server.server_close()
+        if server: server.server_close()
         worker.join(timeout=1)
 
 

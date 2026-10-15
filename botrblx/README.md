@@ -4,7 +4,51 @@ Local freeplay inference: rendered Roblox state → update271 in Python → norm
 Windows keyboard and mouse events. The model stays in your existing training
 project; model weights, logs and recordings are not included in this folder.
 
-## Start on Windows
+## JJSploit / WRD: file mode
+
+The reported WRD HTTP request returned **403, Wrd Server Error: Connection
+Failed**, without reaching Python. Loading Lua locally alone does not fix that:
+telemetry also needs a working transport. File mode replaces HTTP entirely.
+It requires working executor `readfile` and `writefile` functions.
+
+1. Replace the complete `botrblx` folder in `E:\Downloads\Chat_GPT_AI` with this
+   version. Stop the old bridge with Ctrl+C and close its Roblox panels.
+2. Run **`START_FILE_BOT.bat`**. The first launch opens a folder picker.
+   Select **JJSploit's workspace root**: the folder its `readfile` and `writefile`
+   functions use. This is not automatically your training project folder.
+3. Wait for **`READY FILE MODE`**. Python installs `botrblx_client.lua` in that
+   workspace and creates its own `botrblx_exchange` subfolder. Keep Python open.
+4. In freeplay, execute the complete **`JJSploit_File_Launch.lua`** file.
+   It loads the installed Lua client from that workspace without a download.
+5. The panel should show **Connected / PAUSED**, and Python should log
+   **`CLIENT_HELLO`**. Then press **F6** to drive; **F8** stops inputs.
+
+The folder choice is saved in local, ignored `file_connection.json`. To choose
+again, run `START_FILE_BOT.bat --reset-workspace`. If the picker is unavailable,
+use `START_FILE_BOT.bat --workspace "C:\path\to\executor\workspace"`.
+
+If you do not know the workspace location, execute this file-function test:
+
+```lua
+writefile("botrblx_workspace_probe.txt", "botrblx workspace test")
+```
+
+Locate that file in your JJSploit installation/workspace and select its containing
+folder. The script creates only that text file; it does not send controls.
+`function function` from `print(type(readfile), type(writefile))` confirms the
+functions exist, but the handshake above verifies the actual shared folder.
+
+**File not found** in the launcher means the selected workspace differs from
+the executor's workspace. **No file reply** means Python has not processed a
+request in that folder. Look for `request.json` under `botrblx_exchange` while
+the client is running; do not edit these runtime files manually.
+
+File mode exchanges bounded JSON requests and replies, with per-client sessions,
+fresh tokens, sequence checks and a stale-frame limit. It does not execute code
+received from a request file. Python still performs inference and Windows input.
+The Lua model is not embedded in the loader. No HTTP server is opened in this mode.
+
+## HTTP mode (requires working localhost requests)
 
 1. Update/download the complete `botrblx` folder into
    `E:\Downloads\Chat_GPT_AI\botrblx`.
@@ -101,8 +145,9 @@ their verified state is unavailable. WASD couples controller axes. These limits
 can affect policy performance compared with Rocket League or the browser
 extension; this is not a claim of equivalent match strength.
 
-The client reads rendered poses and HUD values and posts JSON only to
-`127.0.0.1:28771`. It does not require game modules or change game remotes,
+The client reads rendered poses and HUD values. HTTP mode posts JSON only to
+`127.0.0.1:28771`; file mode uses the chosen local workspace instead.
+Neither mode requires game modules or changes game remotes,
 execution identity, or server code. The HTTP server binds only to loopback and
 rejects browser origins; there is no external model service or API key.
 
@@ -117,3 +162,8 @@ case exercises the bundled Nexto actor when that local asset exists. Set
 `LUAU_BIN` to a Luau interpreter to run the mocked Roblox client cases; those
 cases are explicitly skipped if Luau is unavailable. Windows/JJSploit execution
 still requires validation on the user's PC.
+
+`JJSploit_File_Client.lua` is a generated standalone copy of `client271.lua` with
+`templates/file_transport.lua` substituted for the HTTP block. The installer
+generates the same source when copying it to the executor workspace. The tests
+check that both copies share the same telemetry and control code.

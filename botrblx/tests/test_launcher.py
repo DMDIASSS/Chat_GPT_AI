@@ -36,9 +36,9 @@ class TransportCopiesTests(unittest.TestCase):
 
 @unittest.skipUnless(LUAU, "Set LUAU_BIN to exercise launcher UI")
 class LauncherTests(unittest.TestCase):
-    def run_lua(self, setup, checks):
+    def run_lua(self, setup, checks, filename="JJSploit_Launch.lua"):
         prefix = (HERE / "fixtures/roblox_mock.luau").read_text(encoding="utf-8")
-        source = (HERE.parent / "JJSploit_Launch.lua").read_text(encoding="utf-8")
+        source = (HERE.parent / filename).read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "launcher.luau"
             path.write_text(prefix + BASE + setup + "\nlocal function launch()\n" + source + "\nend\nlaunch()\n" + checks, encoding="utf-8")
@@ -56,6 +56,26 @@ end
 assert(loaded)
 assert(playerGui.children.Update271Loader.destroyed)
 ''')
+
+    def test_file_launcher_reads_installed_client_without_network(self):
+        self.run_lua(r'''
+request=function()error('Unexpected HTTP')end
+http_request=request
+local writefile=function()end
+local readfile=function(path)
+ panel_exists()
+ assert(path=='botrblx_client.lua')
+ return 'CLIENT_SOURCE'
+end
+''',"\nassert(loaded)\nassert(playerGui.children.Update271Loader.destroyed)\n",filename="JJSploit_File_Launch.lua")
+
+    def test_file_launcher_reports_missing_api_or_wrong_workspace(self):
+        for setup,message in (
+            ("local readfile=nil;local writefile=nil", "needs both readfile and writefile"),
+            ("local writefile=function()end;local readfile=function()error('missing file')end", "botrblx_client.lua was not found"),
+        ):
+            with self.subTest(message=message):
+                self.run_lua("\n"+setup+"\n", "\nassert(not loaded)\nassert(string.find(report_text(),"+repr(message)+",1,true),report_text())\n",filename="JJSploit_File_Launch.lua")
 
     def test_supported_response_formats(self):
         for result in (
