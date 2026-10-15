@@ -24,6 +24,25 @@ copyable text box. On successful startup, this panel closes and the main
 **Update271** control panel remains. Execute the launcher file, not the Python
 file or a browser's rendered text.
 
+If the launcher reports **no response body**, the HTTP function did not return
+usable source code. The adapter tries distinct `request` and `http_request`
+functions and remembers the working one. It accepts raw body strings, common
+response fields and APIs returning `(success, response)`. Failure messages show
+the response type, field names/types, status and error message; header values
+and session tokens are not printed. The same adapter handles live telemetry.
+
+You can skip the code download completely: close the launcher panel, then open
+`client271.lua` from this folder and execute its full contents directly in
+JJSploit. That file is the standalone client and creates the main control panel.
+It still needs an HTTP connection to Python for game state and model decisions;
+an empty `/hello` or `/frame` reply is reported in that panel with the API details.
+
+If the executor supports `readfile`, the launcher also tries the local workspace
+paths `botrblx/client271.lua` and `client271.lua` after an HTTP download failure.
+These paths refer to the executor's workspace, not the Python project directory.
+Place the client there explicitly to use this optional local loading fallback.
+`templates/http_compat.lua` is an internal source template, not an entry point.
+
 Use the default bindings: WASD, Q/E air roll, Shift powerslide/free roll,
 left mouse boost, right mouse jump. Disable mouse steering, pitch inversion
 and aerial safety. Buttons hide during driving so injected boost clicks cannot

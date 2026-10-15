@@ -26,6 +26,14 @@ end
 '''
 
 
+class TransportCopiesTests(unittest.TestCase):
+    def test_launcher_and_client_share_the_checked_transport_source(self):
+        template = (HERE.parent / "templates/http_compat.lua").read_text(encoding="utf-8").strip()
+        for filename in ("JJSploit_Launch.lua", "client271.lua"):
+            source = (HERE.parent / filename).read_text(encoding="utf-8")
+            self.assertIn(template,source,filename+" HTTP adapter is out of sync")
+
+
 @unittest.skipUnless(LUAU, "Set LUAU_BIN to exercise launcher UI")
 class LauncherTests(unittest.TestCase):
     def run_lua(self, setup, checks):
@@ -53,6 +61,11 @@ assert(playerGui.children.Update271Loader.destroyed)
         for result in (
             "{StatusCode='200',Body='CLIENT_SOURCE'}",
             "{status_code='200',body='CLIENT_SOURCE'}",
+            "{StatusCode=200,Body='',body='CLIENT_SOURCE'}",
+            "{StatusCode=200,ResponseBody='CLIENT_SOURCE'}",
+            "true,{StatusCode=200,Body='CLIENT_SOURCE'}",
+            "nil,'CLIENT_SOURCE'",
+            "{StatusCode=200},'CLIENT_SOURCE'",
             "'CLIENT_SOURCE'",
         ):
             with self.subTest(result=result):
@@ -65,11 +78,40 @@ assert(playerGui.children.Update271Loader.destroyed)
         for response, message in (
             ("error('loopback request denied')", "loopback request denied"),
             ("return {StatusCode=404,Body='not found'}", "HTTP 404"),
-            ("return {StatusCode=200}", "HTTP response has no Lua body"),
+            ("return {StatusCode=200}", "no response body"),
             ("return {StatusCode='unknown',Body='CLIENT_SOURCE'}", "Unrecognized HTTP status"),
         ):
             with self.subTest(message=message):
                 self.run_lua("\nrequest=function()panel_exists();" + response + " end\n", "\nassert(not loaded)\nassert(string.find(report_text()," + repr(message) + ",1,true),report_text())\nassert(not playerGui.children.Update271Loader.destroyed)\n")
+
+    def test_empty_request_tries_distinct_http_request(self):
+        self.run_lua(r'''
+local first_calls,second_calls=0,0
+request=function()first_calls=first_calls+1;return {StatusCode=0,Body='',StatusMessage='unavailable'}end
+http_request=function()second_calls=second_calls+1;return {StatusCode=200,Body='CLIENT_SOURCE'}end
+''',"\nassert(loaded)\nassert(first_calls==1 and second_calls==1)\n")
+
+    def test_aliased_http_functions_are_not_retried_twice(self):
+        self.run_lua("\nlocal calls=0\nrequest=function()calls=calls+1;return nil end\nhttp_request=request\n", "\nassert(not loaded)\nassert(calls==1)\nassert(string.find(report_text(),'returned nil',1,true))\n")
+
+    def test_empty_response_reports_contract_without_dumping_headers(self):
+        self.run_lua(r'''
+request=function()
+ return {StatusCode=0,Body='',Success=false,StatusMessage='connection failed',Headers={Authorization='DO_NOT_ECHO_HEADER_VALUE'}}
+end
+''',r'''
+assert(not loaded)
+assert(string.find(report_text(),'Body:string(0)',1,true),report_text())
+assert(string.find(report_text(),'status=0',1,true),report_text())
+assert(string.find(report_text(),'connection failed',1,true),report_text())
+assert(not string.find(report_text(),'DO_NOT_ECHO_HEADER_VALUE',1,true),report_text())
+''')
+
+    def test_local_client_is_loaded_when_download_has_no_body(self):
+        self.run_lua("\nrequest=function()return nil end\nreadfile=function(path)assert(path=='botrblx/client271.lua');return 'CLIENT_SOURCE'end\n", "\nassert(loaded)\nassert(playerGui.children.Update271Loader.destroyed)\n")
+
+    def test_failed_local_read_retains_original_http_details(self):
+        self.run_lua("\nrequest=function()return {StatusCode=0,Body='',StatusMessage='no connection'}end\nreadfile=function()error('file not found')end\n", "\nassert(not loaded)\nassert(string.find(report_text(),'no connection',1,true))\nassert(string.find(report_text(),'Local client unavailable',1,true))\n")
 
     def test_missing_http_and_compiler_errors_are_visible(self):
         self.run_lua("\nrequest=nil;http_request=nil\n", "\nassert(not loaded)\nassert(string.find(report_text(),'HTTP request function unavailable',1,true))\n")

@@ -14,14 +14,14 @@ LUAU = os.environ.get("LUAU_BIN") or shutil.which("luau")
 
 @unittest.skipUnless(LUAU, "Set LUAU_BIN to exercise the mocked Roblox client")
 class ClientTests(unittest.TestCase):
-    def run_case(self, name, extra=""):
+    def run_case(self, name, extra="", extra_checks=""):
         _, behaviour, checks = next(case for case in CASES if case[0] == name)
         prefix = (HERE / "fixtures/roblox_mock.luau").read_text(encoding="utf-8")
         source = (HERE.parent / "client271.lua").read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / (name + ".luau")
             wrapped = "\nlocal function start_client()\n" + source + "\nend\nlocal client_state=start_client()\n"
-            path.write_text(prefix + extra + behaviour + wrapped + checks, encoding="utf-8")
+            path.write_text(prefix + extra + behaviour + wrapped + checks + extra_checks, encoding="utf-8")
             result = subprocess.run([LUAU,str(path)],capture_output=True,text=True,timeout=10)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
@@ -34,12 +34,23 @@ class ClientTests(unittest.TestCase):
         formats = {
             "string_status": "return {StatusCode='200',Body=response.Body}",
             "lowercase_fields": "return {status_code='200',body=response.Body}",
+            "empty_uppercase": "return {StatusCode=200,Body='',body=response.Body}",
+            "second_return": "return true,response",
             "raw_body": "return response.Body",
         }
         for name, result in formats.items():
             with self.subTest(format=name):
                 extra = "\nlocal original_request=request\nrequest=function(options)\nlocal response=original_request(options)\n" + result + "\nend\n"
                 self.run_case("live_frames_and_close", extra)
+
+    def test_live_client_falls_back_and_caches_working_http_api(self):
+        extra = r'''
+local original_request=request
+local failed_calls=0
+request=function()failed_calls=failed_calls+1;return nil end
+http_request=original_request
+'''
+        self.run_case("live_frames_and_close",extra, "\nassert(failed_calls==1,'Repeated the failed API on every frame')\n")
 
 
 if __name__ == "__main__": unittest.main(verbosity=2)

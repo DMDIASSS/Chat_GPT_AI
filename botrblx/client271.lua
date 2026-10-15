@@ -24,8 +24,66 @@ teamButton.Text="Team: BLUE"
 local close=Instance.new("TextButton",panel)
 close.Position=UDim2.fromOffset(300,120);close.Size=UDim2.fromOffset(110,30);close.Text="Close"
 gui.Parent=pg
-local requestFn=type(request)=="function"and request or http_request
-if type(requestFn)~="function" then label.Text="HTTP request function unavailable.";return end
+-- HTTP_COMPAT_BEGIN: inline copy shared by the launcher and standalone client.
+local http_preferred
+local function http_response_detail(value)
+    if type(value)~="table"then return "returned "..type(value)end
+    local fields={}
+    for key,item in pairs(value)do
+        fields[#fields+1]=tostring(key)..":"..type(item)..(type(item)=="string"and "("..#item..")"or "")
+        if #fields>=10 then break end
+    end
+    table.sort(fields)
+    local code=value.StatusCode or value.Status or value.status_code or value.status
+    local message=value.StatusMessage or value.status_message or value.Error or value.error or value.Message
+    return "fields={"..table.concat(fields,",").."}; status="..tostring(code)
+        ..(type(message)=="string"and "; message="..message:sub(1,160)or "")
+end
+local function http_response_parts(first,second)
+    if first==false then return nil,nil,"returned false: "..tostring(second):sub(1,160)end
+    local value=first
+    if (value==nil or value==true)and second~=nil then value=second;second=nil end
+    local body,code
+    if type(value)=="string"then body=value
+    elseif type(value)=="table"then
+        code=value.StatusCode or value.Status or value.status_code or value.status
+        for _,key in ipairs({"Body","body","ResponseBody","responseBody"})do
+            if type(value[key])=="string"and #value[key]>0 then body=value[key];break end
+        end
+    end
+    if (not body or #body==0)and type(second)=="string"and #second>0 then body=second end
+    if type(body)~="string"or #body==0 then
+        return nil,nil,"no response body; "..http_response_detail(value)
+    end
+    local status=code~=nil and tonumber(code)or nil
+    if code~=nil and not status then return nil,nil,"Unrecognized HTTP status: "..tostring(code)end
+    return body,status
+end
+local function http_request_checked(options)
+    local candidates={}
+    local function add(name,fn)
+        if type(fn)~="function"then return end
+        for _,entry in ipairs(candidates)do if entry.fn==fn then return end end
+        candidates[#candidates+1]={name=name,fn=fn}
+    end
+    if http_preferred then add(http_preferred.name,http_preferred.fn)end
+    add("request",request);add("http_request",http_request)
+    assert(#candidates>0,"HTTP request function unavailable")
+    local errors={}
+    for _,entry in ipairs(candidates)do
+        local ok,first,second=pcall(entry.fn,options)
+        if ok then
+            local body,status,detail=http_response_parts(first,second)
+            if body then http_preferred=entry;return body,status end
+            errors[#errors+1]=entry.name..": "..detail
+        else
+            errors[#errors+1]=entry.name..": "..tostring(first):sub(1,240)
+        end
+    end
+    error("No usable HTTP response. "..table.concat(errors," | "),0)
+end
+-- HTTP_COMPAT_END
+
 if player.Name~="Deadline_coolgun"or game.PlaceId~=101880234193261 then
     label.Text="This adapter is configured for Deadline_coolgun / place 101880234193261.";return
 end
@@ -34,23 +92,12 @@ local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
 local alive,enabled,token,seq,armAt=true,false,nil,0,0
 local function call(path,packet)
-    local response=requestFn({Url=URL..path,Method=packet and "POST"or "GET",
+    local body,status=http_request_checked({Url=URL..path,Method=packet and "POST"or "GET",
         Headers={ ["Content-Type"]="application/json",["X-Bridge-Token"]=token or ""},
         Body=packet and http:JSONEncode(packet)or nil,Timeout=2})
-    local body,status
-    if type(response)=="string"then body=response
-    elseif type(response)=="table"then
-        body=response.Body or response.body
-        local code=response.StatusCode or response.Status or response.status_code or response.status
-        if code~=nil then
-            status=tonumber(code)
-            assert(status,"Unrecognized HTTP status: "..tostring(code))
-        end
-    end
-    assert(type(body)=="string","No HTTP response body")
+    assert(not status or status==200,"HTTP "..tostring(status)..": "..body:sub(1,200))
     local data=http:JSONDecode(body)
     assert(type(data)=="table","Invalid JSON response")
-    assert(not status or status==200,data.error or "HTTP request failed")
     return data
 end
 local function send(packet)
