@@ -31,6 +31,29 @@ Re-extracting a ZIP does not include its installed `.venv`; run INSTALL.bat afte
 extracting the exported bot ZIP. Installation is local to this PC and reuses the
 project Python/Torch path recorded during export. It is not a standalone EXE.
 
+## Investigating apparently random controls
+
+New exports record at most 45 wall-clock seconds or 3,600 callbacks into a
+local `diagnostics/live_*.jsonl.gz` file. Start a match, watch for 45 seconds,
+end the match, then run **AUDIT_LIVE.bat** in the exported folder. Send the
+resulting `diagnostics/live_*_report.json` and the `.jsonl.gz` recording for
+analysis. Captures contain game packets (including player names), settings and
+controller outputs; no API key or account token is read. To disable recording,
+set `diagnostic_capture` to `false` in the exported `runtime.json`.
+
+The report checks deterministic adapter replay, callback/frame gaps, the game's
+reported last inputs against sent controls over several frame delays, and
+frequent policy actions with their eight named controls. Correct echo does not
+prove the policy learned a useful skill; replay consistency does not establish
+exact live simulator parity. Repeated controls can inflate echo agreement, and
+game filtering/packet loss can lower it. Callback latency excludes capture I/O.
+
+To compare the earlier ground-pop model, export `--update 700` with a new name.
+Update 730 changed to airborne air-carry starts. Changes in reward contributions
+at that boundary do not establish catastrophic forgetting or a control bug.
+Compare 700 and later checkpoints in the same game conditions, preferably
+including an airborne setup; normal match play was not the training objective.
+
 For direct commands:
 
 ```bat

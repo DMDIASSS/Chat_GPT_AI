@@ -13,6 +13,8 @@ def main():
     pads=[flat.BoostPad(location=flat.Vector3(*map(float,p)),is_full_boost=p[2]>72)for p in PAD_LOCATIONS]
     bot=Freestyle.__new__(Freestyle)
     bot.index=0;bot.field_info=flat.FieldInfo(boost_pads=pads);bot.initialize()
+    # Synthetic installation checks must not masquerade as real live recordings.
+    if bot.recorder is not None:bot.recorder.close();bot.recorder.path.unlink();bot.recorder=None
     previous=flat.ControllerState();nonzero=0;latencies=[]
     for tick in range(48):
         frame=1200+tick;now=frame/120;air=tick>=24

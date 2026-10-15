@@ -81,10 +81,11 @@ def export(run='freestyle_rewards02', *, update=None, checkpoint=None, name=None
         'update':number,'stage':STAGES.index(state['stage']),'difficulty':state['difficulty'],
         'episode_seconds':config['max_episode_seconds'],'tick_skip':config['tick_skip'],
         'action_delay':config['action_delay'],'scripted_kickoff':bool(scripted),
+        'diagnostic_capture':True,
         'reward_timings':config['rewards'],'observation_schema':OBS_SCHEMA,'action_schema':ACTION_SCHEMA}
     with tempfile.TemporaryDirectory(prefix='.freestyle-v5-',dir=destination.parent)as temp:
         staging=Path(temp)
-        for filename in ('runtime.py','live.py','bot.py','install_runtime.py','diagnose.py'):
+        for filename in ('runtime.py','live.py','bot.py','install_runtime.py','diagnose.py','live_audit.py'):
             shutil.copyfile(TEMPLATE/filename,staging/filename)
         traced=torch.jit.trace(actor,torch.zeros(1,512))
         traced.save(str(staging/'policy.pt'))
@@ -115,6 +116,8 @@ def export(run='freestyle_rewards02', *, update=None, checkpoint=None, name=None
             executable+' -u install_runtime.py\nset "BOT_EXIT=%ERRORLEVEL%"\npause\nendlocal & exit /b %BOT_EXIT%\n',encoding='utf-8')
         (staging/'DIAGNOSE.bat').write_text('@echo off\ncd /d "%~dp0"\n.venv\\Scripts\\python.exe -u diagnose.py\n'+
             'set "BOT_EXIT=%ERRORLEVEL%"\npause\nexit /b %BOT_EXIT%\n',encoding='utf-8')
+        (staging/'AUDIT_LIVE.bat').write_text('@echo off\ncd /d "%~dp0"\n.venv\\Scripts\\python.exe -u live_audit.py\n'+
+            'set "BOT_EXIT=%ERRORLEVEL%"\npause\nexit /b %BOT_EXIT%\n',encoding='utf-8')
         (staging/'README_IMPORT.txt').write_text(
             'Run INSTALL.bat once, then import this folder bot.toml in RLBot v5.\n'+
             'The exported model is policy.pt. Training checkpoints are unchanged.\n'+
@@ -125,14 +128,17 @@ def export(run='freestyle_rewards02', *, update=None, checkpoint=None, name=None
             'Wheel-contact/reset evidence is masked, as in training dropout episodes.\n'+
             'Live jump timers and reward-chain history are reconstructed from packets.\n'+
             'These reconstructed histories and timing are not exact simulator state.\n'+
-            'Use 120 physics packets/second where possible. Review RLBot logs if startup fails.\n',encoding='utf-8')
+            'Use 120 physics packets/second where possible. Review RLBot logs if startup fails.\n'+
+            'Local diagnostics record at most 45 seconds/3600 callbacks. Play then end\n'+
+            'the match and run AUDIT_LIVE.bat. Reports/capture are in diagnostics/.\n'+
+            'Set diagnostic_capture=false in runtime.json to disable packet recording.\n',encoding='utf-8')
         manifest={'source_checkpoint':str(folder),'source_policy_sha256':before,'update':number,
             'portable_policy_sha256':sha256(staging/'policy.pt'),'observation_schema':OBS_SCHEMA,'action_schema':ACTION_SCHEMA,
             'scripted_kickoff':scripted,'parameter_tensors_identical':True,'portable_test_states':96,
             'portable_max_logit_error':error,'portable_actions_identical':identical,
             'live_state':'privileged mask zero; observable timers/history reconstructed',
             'rlbot_sdk':'2.0.0b56','flatbuffers':'0.19.0'}
-        manifest['runtime_files_sha256']={filename:sha256(staging/filename)for filename in ('runtime.py','live.py','bot.py')}
+        manifest['runtime_files_sha256']={filename:sha256(staging/filename)for filename in ('runtime.py','live.py','bot.py','live_audit.py')}
         (staging/'EXPORT_INFO.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
         if sha256(folder/'POLICY.lt')!=before or sha256(folder/'FREESTYLE_COMPLETE.json')!=marker_before:
             raise RuntimeError('Input checkpoint changed during export; retry after its save completes')

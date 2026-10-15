@@ -11,6 +11,7 @@ def package(output=None):
              ROOT / 'docs/FREESTYLE.md', ROOT / 'docs/FREESTYLE_RESEARCH.md',
              ROOT / 'export_freestyle_rlbot_v5.py', ROOT / 'docs/FREESTYLE_RLBOT_V5.md',
              ROOT / 'tests/test_freestyle_v5_export.py',
+             ROOT / 'tests/test_freestyle_live_audit.py',
              ROOT / 'tests/freestyle_export_native/CMakeLists.txt',
              ROOT / 'tests/freestyle_export_native/reference.cpp',
              ROOT / 'tests/freestyle_native_checks.cpp',
