@@ -2,8 +2,10 @@
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -96,6 +98,39 @@ class FileTests(unittest.TestCase):
         self.assertEqual(reply["status"],408)
         self.assertFalse(self.output.held)
         self.assertEqual(self.bridge.frames,0)
+
+    def test_measured_wrd_delay_is_accepted_with_bounded_expiry_and_immediate_stop(self):
+        self.bridge.telemetry_timeout = 3.0
+        self.hello()
+        self.request_id += 1
+        self.exchange.request.write_text(json.dumps(dict(session="client-A",id=self.request_id,
+            file_protocol=3,route="/frame",token=self.token,packet=packet())))
+        written = time.time()-1.3
+        os.utime(self.exchange.request,(written,written))
+        self.exchange.poll()
+        reply = json.loads(self.exchange.response.read_text())
+        self.assertEqual(reply["status"],200)
+        self.assertIn("W",self.output.held)
+        self.now += 1.4
+        self.bridge.watchdog()
+        self.assertIn("W",self.output.held)
+        self.output.f8 = True
+        self.bridge.watchdog()
+        self.assertFalse(self.output.held)
+        self.assertTrue(self.bridge.blocked)
+        self.output.f8 = False
+        self.bridge.frame(dict(packet(1),enabled=False))
+        self.bridge.frame(packet(2))
+        self.assertTrue(self.output.held)
+        self.output.focus = False
+        self.bridge.watchdog()
+        self.assertFalse(self.output.held)
+        self.output.focus = True
+        self.bridge.frame(dict(packet(3),enabled=False))
+        self.bridge.frame(packet(4))
+        self.now += 3.1
+        self.bridge.watchdog()
+        self.assertFalse(self.output.held)
 
     def test_locked_response_retries_without_repeating_inference(self):
         self.hello()

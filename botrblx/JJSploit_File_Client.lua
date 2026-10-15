@@ -24,7 +24,7 @@ local close=Instance.new("TextButton",panel)
 close.Position=UDim2.fromOffset(300,120);close.Size=UDim2.fromOffset(110,30);close.Text="Close"
 gui.Parent=pg
 -- File transport: generated into the standalone client instead of HTTP.
-label.Text="Update271 file client v3.1: connecting to Python..."
+label.Text="Update271 file client v3.2 (WRD): connecting to Python..."
 local fileHttp=game:GetService("HttpService") -- JSON/UUID only; no network calls.
 local fileSession=fileHttp:GenerateGUID(false)
 local fileId=0
@@ -39,7 +39,8 @@ local function bridge_call(path,packet,token)
     assert(wrote,"Cannot write file telemetry. Select the executor workspace in START_FILE_BOT.bat: "..tostring(writeError))
     -- Some executor file calls yield for appreciable time. Handshakes carry no
     -- inputs and can wait longer; live telemetry still has the Python watchdog.
-    local deadline=os.clock()+(path=="/hello"and 4 or 1)
+    -- Diagnostic: this WRD build takes 1.2–1.3s even on working paths.
+    local deadline=os.clock()+4
     local detail="readfile was not called"
     while os.clock()<deadline do
         assert(id==fileId,"File request superseded")
@@ -82,11 +83,14 @@ local http=game:GetService("HttpService")
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
 local alive,enabled,token,seq,armAt=true,false,nil,0,0
+local sampler
 local function call(path,packet)
+    local began=os.clock()
     local body,status=bridge_call(path,packet,token)
     assert(not status or status==200,"Bridge "..tostring(status)..": "..body:sub(1,200))
     local data=http:JSONDecode(body)
     assert(type(data)=="table","Invalid JSON response")
+    data.link_ms=math.floor((os.clock()-began)*1000+.5)
     return data
 end
 local function send(packet)
@@ -115,6 +119,7 @@ local hotkey=input.InputBegan:Connect(function(key,processed)
 end)
 close.Activated:Connect(function()
     alive=false;enabled=false;hotkey:Disconnect();gui:Destroy()
+    if sampler then sampler:Disconnect()end
     if token then task.spawn(function()pcall(send,{enabled=false,valid=false})end)end
 end)
 local scene,car,ball,carRoot,ballRoot,lastCar,lastBall,lastTime
@@ -186,6 +191,16 @@ local function read()
         or(math.abs(p[2])>5082 and math.abs(p[1])>1000 and u[2]*p[2]<-3200)
     return {car=cp,ball=bp,boost=b,team=TEAM,ground_estimate=grounded,valid=true}
 end
+-- Sample poses independently of file round trips. A 1.3s RPC must not turn
+-- every physics sample into a >0.3s discontinuity and invalidate the policy.
+local latestPacket,latestReason,lastSample=nil,"warming up poses",-math.huge
+sampler=game:GetService("RunService").Heartbeat:Connect(function()
+    if not alive or os.clock()-lastSample<1/HZ then return end
+    lastSample=os.clock()
+    local ok,packet,reason=pcall(read)
+    latestPacket=ok and packet or nil
+    latestReason=ok and reason or "pose reader failed"
+end)
 task.spawn(function()
     while alive do
         local began=os.clock()
@@ -196,15 +211,20 @@ task.spawn(function()
                 token=hello.token;seq=0;enabled=false
             end
             if input:GetFocusedTextBox()then enabled=false end
-            local packet,reason=read()
-            packet=packet or {valid=false,reason=reason}
+            local packet={}
+            if latestPacket and os.clock()-lastSample<=.3 then
+                for key,value in pairs(latestPacket)do packet[key]=value end
+            else
+                packet={valid=false,reason=latestReason or "pose sampler stalled"}
+            end
+            if packet.valid and boost()==nil then packet={valid=false,reason="numeric boost HUD missing"}end
             packet.enabled=enabled and os.clock()>=armAt
             local reply=send(packet)
             if not alive then return end
             if reply.disarmed then enabled=false end
             controls()
-            label.Text=("Update271 | %s\nKeys: %s | inference: %s ms\nF6 start/pause; F8 stop. Freeplay adapter.\nGround/flip estimated; pads/other cars unavailable.")
-                :format(reply.status or "connected",table.concat(reply.keys or {}," "),tostring(reply.ms or "-"))
+            label.Text=("Update271 | %s\nKeys: %s | inference: %s ms\nLink: %s ms | F6 pause; F8 stop\nFreeplay; ground/flip estimated.")
+                :format(reply.status or "connected",table.concat(reply.keys or {}," "),tostring(reply.ms or "-"),tostring(reply.link_ms or "-"))
         end)
         if not ok and alive then
             enabled=false;token=nil;controls()

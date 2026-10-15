@@ -99,6 +99,7 @@ local function move(dt)
  carAnchor.Position=carRoot.Position;ballAnchor.Position=ballRoot.Position
  boostLabel.Text=tostring(math.max(0,math.floor(100-now*2)))
  label.Text='0.72 km/h'
+ beat:Fire()
 end
 
 Enum.KeyCode.F6='F6';Enum.KeyCode.F8='F8'

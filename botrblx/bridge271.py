@@ -200,8 +200,9 @@ class Output:
 
 
 class Bridge:
-    def __init__(self, model, output, clock=time.monotonic):
+    def __init__(self, model, output, clock=time.monotonic, telemetry_timeout=.4):
         self.model, self.output, self.clock = model, output, clock
+        self.telemetry_timeout = telemetry_timeout
         self.lock, self.infer_lock = threading.RLock(), threading.Lock()
         self.token = secrets.token_hex(24)
         self.seq, self.last_seen, self.blocked, self.enabled = -1, 0, False, False
@@ -235,7 +236,7 @@ class Bridge:
                 self.release("STOPPED by F8 - click Start bot again",True)
             elif self.enabled and not self.output.focused():
                 self.release("PAUSED: Roblox lost focus - click Start bot",True)
-            elif self.enabled and self.clock()-self.last_seen > .4:
+            elif self.enabled and self.clock()-self.last_seen > self.telemetry_timeout:
                 self.release("PAUSED: telemetry timeout - click Start bot",True)
 
     def frame(self, packet):
@@ -399,7 +400,9 @@ def main():
         logging.info("SELF_CHECK_OK: model returns 90 finite logits; client271.lua found. No inputs sent.")
         return
     output = Output(args.dry_run)
-    bridge = Bridge(model,output)
+    # The user's WRD diagnostic measured 1.2–1.3s file round trips. The
+    # low-latency HTTP profile remains separate from file-link expiry.
+    bridge = Bridge(model,output,telemetry_timeout=3.0 if args.transport=="files" else .4)
     server = None
     exchange = None
     if args.transport == "files":
@@ -419,8 +422,9 @@ def main():
     worker = threading.Thread(target=monitor,daemon=True)
     worker.start()
     if exchange:
-        logging.info("READY FILE MODE v3 | workspace %s | request-specific reply files | no HTTP server",workspace)
+        logging.info("READY FILE MODE v3.2 WRD | workspace %s | request-specific reply files | no HTTP server",workspace)
         logging.info("Execute JJSploit_File_Launch.lua. Requires executor readfile/writefile support.")
+        logging.info("WRD compatibility: 4s client wait, 3s telemetry expiry; F8/focus checks remain immediate.")
     else:
         logging.info("READY http://127.0.0.1:%s | model %s",PORT,model_path)
     logging.info("Model SHA256 %s",hashlib.sha256(model_path.read_bytes()).hexdigest())

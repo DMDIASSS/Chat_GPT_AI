@@ -50,6 +50,26 @@ workspace override: `DIAGNOSE.bat --workspace "C:\path\to\workspace"`.
 
 ## JJSploit / WRD: file mode
 
+### Normal start (WRD compatibility profile)
+
+1. Stop old bridge/diagnostic CMD windows and close old bot panels. Extract the
+   folder-only ZIP into `E:\Downloads\Chat_GPT_AI`, replacing the application files.
+2. Double-click **`START_FILE_BOT.bat`**. It reuses the saved workspace or finds
+   `%APPDATA%\jjsploit\workspace` automatically. Wait for **`READY FILE MODE v3.2 WRD`**.
+3. In freeplay, execute `loadstring(readfile("botrblx_client.lua"))()` in JJSploit.
+4. Press **F6** to start/pause; **F8** stops Windows inputs immediately.
+
+The supplied diagnostic measured working paths with **1.2–1.3 second file round
+trips**. Client v3.2 waits four seconds for a response, and file-mode input expiry
+is three seconds. Focus loss, F8 and Ctrl+C still release inputs immediately;
+duplicate requests do not refresh expiry. Pose sampling runs independently on
+Heartbeat, so a slow reply does not invalidate every car/ball velocity sample.
+The panel displays link latency separately from model inference time.
+
+This profile fixes the measured timeouts; it cannot remove WRD's underlying
+transfer delay. Reaction speed is limited by that delay. HTTP mode keeps its
+0.4-second telemetry expiry and still requires a working localhost API.
+
 The reported WRD HTTP request returned **403, Wrd Server Error: Connection
 Failed**, without reaching Python. Loading Lua locally alone does not fix that:
 telemetry also needs a working transport. File mode replaces HTTP entirely.
@@ -60,7 +80,7 @@ It requires working executor `readfile` and `writefile` functions.
 2. Run **`START_FILE_BOT.bat`**. The first launch opens a folder picker.
    Select **JJSploit's workspace root**: the folder its `readfile` and `writefile`
    functions use. This is not automatically your training project folder.
-3. Wait for **`READY FILE MODE v3`**. Python installs `botrblx_client.lua` in that
+3. Wait for **`READY FILE MODE v3.2 WRD`**. Python installs `botrblx_client.lua` in that
    workspace and creates its own `botrblx_exchange` subfolder. Keep Python open.
 4. In freeplay, execute the complete **`JJSploit_File_Launch.lua`** file.
    It loads the installed Lua client from that workspace without a download.
@@ -97,7 +117,7 @@ still obtain each new response from its new filename. Lua polls `readfile`
 directly and retries missing/incomplete replies; existence metadata never gates
 the read. Python retains the newest 16
 replies and removes older ones; files held open by Windows are retried for cleanup.
-The handshake can wait four seconds; the live-input timeout stays at 0.4 seconds.
+Reply waits are four seconds; file-mode telemetry expires after three seconds.
 
 **Upgrade both Python and Lua together for v3.** Stop the old bridge and close
 its Roblox panel, replace the complete `botrblx` folder, restart the BAT, then
@@ -105,10 +125,11 @@ execute `JJSploit_File_Launch.lua` again. Older clients use one shared reply fil
 and cannot communicate with v3. Session and request-ID checks remain required;
 an older reply never substitutes for the current response.
 
-Client revision **v3.1** removes the `isfile` gate that could stop every read.
-It is compatible with the running v3 Python bridge. Close the old bot panel and
-execute the updated `JJSploit_File_Client.lua` directly to update only Lua; the
-file launcher instead loads the client last installed by Python at startup.
+Client revision **v3.2** includes the measured-delay profile and independent sampling;
+it also removes the `isfile` gate that could stop every read.
+Update Python and Lua together for the WRD compatibility profile. Restarting
+`START_FILE_BOT.bat` installs the matching client in the executor workspace;
+the file launcher loads that installed copy.
 
 File mode exchanges bounded JSON requests and replies, with per-client sessions,
 fresh tokens, sequence checks and a stale-frame limit. It does not execute code

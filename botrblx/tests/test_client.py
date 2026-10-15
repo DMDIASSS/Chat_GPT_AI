@@ -14,8 +14,9 @@ LUAU = os.environ.get("LUAU_BIN") or shutil.which("luau")
 
 @unittest.skipUnless(LUAU, "Set LUAU_BIN to exercise the mocked Roblox client")
 class ClientTests(unittest.TestCase):
-    def run_case(self, name, extra="", extra_checks="", filename="client271.lua", checks_override=None):
+    def run_case(self, name, extra="", extra_checks="", filename="client271.lua", checks_override=None, behaviour_override=None):
         _, behaviour, checks = next(case for case in CASES if case[0] == name)
+        if behaviour_override is not None: behaviour = behaviour_override
         if checks_override is not None: checks = checks_override
         prefix = (HERE / "fixtures/roblox_mock.luau").read_text(encoding="utf-8")
         source = (HERE.parent / filename).read_text(encoding="utf-8")
@@ -86,6 +87,48 @@ end
         with self.subTest(case="readable_reply_with_false_isfile"):
             self.run_case("live_frames_and_close",extra+"\nlocal isfile=function()return false end\n",
                           filename="JJSploit_File_Client.lua")
+
+    def test_measured_1300ms_roundtrip_keeps_sampling_valid_poses(self):
+        extra = r'''
+local mock_server=request
+services.HttpService.GenerateGUID=function()return 'slow-wrd-session'end
+local files={}
+local writefile=function(path,body)
+ local r=services.HttpService:JSONDecode(body)
+ local reply=mock_server({Url=r.route,Method=r.packet and 'POST'or 'GET',
+  Headers={['X-Bridge-Token']=r.token},Body=r.packet and services.HttpService:JSONEncode(r.packet)})
+ files['botrblx_exchange/replies/reply_'..r.session..'_'..r.id..'.json']={readyAt=now+1.3,
+  body=services.HttpService:JSONEncode({session=r.session,id=r.id,file_protocol=3,status=200,
+   data=services.HttpService:JSONDecode(reply.Body)})}
+end
+local readfile=function(path)
+ local item=assert(files[path]);assert(now>=item.readyAt,'Expected File But Got Directory')
+ return item.body
+end
+'''
+        behaviour = r'''
+local closed=false
+task.wait=function(dt)
+ move(dt)
+ if now>1.5 and not startedBot then startedBot=true;click('Start bot / F6')end
+ if now>=12 and not closed then closed=true;click('Close')end
+end
+'''
+        checks = r'''
+assert(#packets>=6,'Slow replies caused repeated reconnects')
+local valid=0
+for _,p in ipairs(packets)do
+ if p.enabled and p.valid then
+  valid=valid+1
+  assert(math.abs(p.car.velocity[1]-20)<.01,'Network interval corrupted pose velocity')
+ end
+end
+assert(valid>=3,'No valid policy frames under measured WRD delay')
+assert(packets[#packets].enabled==false)
+assert(not beat.listeners[1].connection.enabled,'Pose sampler leaked after close')
+'''
+        self.run_case("live_frames_and_close",extra,filename="JJSploit_File_Client.lua",
+                      checks_override=checks,behaviour_override=behaviour)
 
     def test_file_client_missing_functions_stays_visible(self):
         extra = "\nservices.HttpService.GenerateGUID=function()return 'test-session'end\nlocal readfile=nil\nlocal writefile=nil\n"

@@ -1,5 +1,5 @@
 -- File transport: generated into the standalone client instead of HTTP.
-label.Text="Update271 file client v3.1: connecting to Python..."
+label.Text="Update271 file client v3.2 (WRD): connecting to Python..."
 local fileHttp=game:GetService("HttpService") -- JSON/UUID only; no network calls.
 local fileSession=fileHttp:GenerateGUID(false)
 local fileId=0
@@ -14,7 +14,8 @@ local function bridge_call(path,packet,token)
     assert(wrote,"Cannot write file telemetry. Select the executor workspace in START_FILE_BOT.bat: "..tostring(writeError))
     -- Some executor file calls yield for appreciable time. Handshakes carry no
     -- inputs and can wait longer; live telemetry still has the Python watchdog.
-    local deadline=os.clock()+(path=="/hello"and 4 or 1)
+    -- Diagnostic: this WRD build takes 1.2–1.3s even on working paths.
+    local deadline=os.clock()+4
     local detail="readfile was not called"
     while os.clock()<deadline do
         assert(id==fileId,"File request superseded")

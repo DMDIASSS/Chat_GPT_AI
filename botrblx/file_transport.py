@@ -2,6 +2,7 @@
 import json
 import logging
 from collections import deque
+import os
 from pathlib import Path
 import re
 import secrets
@@ -22,6 +23,9 @@ def select_workspace(args, config_path):
     workspace = args.workspace
     if workspace is None and not args.reset_workspace and config_path.is_file():
         workspace = Path(json.loads(config_path.read_text(encoding="utf-8"))["workspace"])
+    if workspace is None and not args.reset_workspace and os.environ.get("APPDATA"):
+        candidate = Path(os.environ["APPDATA"]) / "jjsploit" / "workspace"
+        if candidate.is_dir(): workspace = candidate
     if workspace is None and args.choose_workspace:
         import tkinter
         from tkinter import filedialog
@@ -94,7 +98,7 @@ class FileExchange:
             return dict(session=session,id=request_id,server=self.server,file_protocol=3,status=status_code,data=data)
         if request.get("file_protocol") != 3:
             return reply(400,error="Update both Python and Lua to file transport v3")
-        if self.wall_clock()-mtime > .35 or mtime-self.wall_clock() > 1:
+        if self.wall_clock()-mtime > self.bridge.telemetry_timeout or mtime-self.wall_clock() > 1:
             with self.bridge.lock: self.bridge.release("PAUSED: stale file telemetry",True)
             return reply(408,error="Stale file telemetry; reconnect",disarmed=True)
         route = request.get("route")
