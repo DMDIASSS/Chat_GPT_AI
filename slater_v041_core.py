@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import random
 import shutil
+import time
 import uuid
 
 V60_SHA = '5f9bf7cb6a0bcfb3bcf801ade021b11499181d80fb36b0cfad827e2648936c74'
@@ -35,10 +36,26 @@ def atomic_json(path, obj):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + '.writing.' + uuid.uuid4().hex)
-    with tmp.open('x', encoding='utf-8') as f:
-        json.dump(obj, f, indent=2, sort_keys=True)
-        f.flush(); os.fsync(f.fileno())
-    os.replace(tmp, path)
+    try:
+        with tmp.open('x', encoding='utf-8') as f:
+            json.dump(obj, f, indent=2, sort_keys=True)
+            f.flush(); os.fsync(f.fileno())
+        # Windows readers may briefly hold a handle without FILE_SHARE_DELETE.
+        # Keep the old complete file until replacement succeeds; never truncate
+        # or remove it to work around a sharing/access violation.
+        for attempt in range(9):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError as exc:
+                if getattr(exc, 'winerror', None) not in (5, 32, 33) or attempt == 8:
+                    raise
+                time.sleep(min(.02 * 2**attempt, .25))
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass  # A scanner may still hold the temporary file on Windows.
 
 def read_json(path, default=None):
     try:

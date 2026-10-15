@@ -374,3 +374,70 @@ def test_online_resume_skips_events_already_uploaded(fake_wandb):
         assert fake_wandb.calls[0]['id'] == fake_wandb.calls[1]['id']
     finally:
         resumed.close()
+
+
+def test_windows_progress_lock_cannot_stop_native_training(isolated_runtime, monkeypatch, capsys):
+    write = freestyle.atomic_json
+
+    def blocked_status(path, data):
+        if Path(path).name == 'progress.json' and data.get('updates') == 1:
+            error = PermissionError('progress.json is held by a Windows reader')
+            error.winerror = 5
+            raise error
+        write(path, data)
+
+    class Reader:
+        def __init__(self, folder):
+            self.done = False
+
+        def read(self):
+            if self.done:
+                return []
+            self.done = True
+            return [{'update': 1, 'timesteps': 1024}, {'update': 2, 'timesteps': 2048}]
+
+    monkeypatch.setattr(freestyle, 'atomic_json', blocked_status)
+    monkeypatch.setattr(freestyle, 'EventReader', Reader)
+    result = freestyle.train('locked_status', freestyle.defaults(), updates=3)
+    assert result['status'] == 'COMPLETE' and result['updates'] == 3
+    assert freestyle.read_json(freestyle.run_path('locked_status') / 'progress.json')['updates'] == 3
+    assert not (freestyle.run_path('locked_status') / 'PAUSE').exists()
+    assert [event['update'] for event in isolated_runtime['monitors'][0].events] == [1, 2]
+    assert 'FREESTYLE_STATUS_WARNING' in capsys.readouterr().out
+
+
+def test_status_writer_does_not_hide_unrelated_permissions(tmp_path, monkeypatch):
+    def fail(*args):
+        raise PermissionError('unrelated permission failure')
+
+    monkeypatch.setattr(freestyle, 'atomic_json', fail)
+    with pytest.raises(PermissionError, match='unrelated'):
+        freestyle.write_progress(tmp_path, {'updates': 1})
+
+
+def test_wandb_registers_copies_and_never_live_status_files(fake_wandb):
+    folder = fake_wandb.folder
+    (folder / 'config.json').write_text('{"width":768}')
+    monitor = freestyle.WandbMonitor(folder, freestyle.defaults()['wandb'], {})
+    (folder / 'progress.json').write_text('{"updates":2612}')
+    monitor.close()
+    handle = fake_wandb.handles[0]
+    snapshots = [Path(args[0]) for args, kwargs in handle.saved]
+    assert {path.name for path in snapshots} == {'config.json', 'progress.json'}
+    assert all(path.parent.parent == folder / 'wandb_uploads' for path in snapshots)
+    (folder / 'progress.json').write_text('{"updates":2613}')
+    copied_progress = next(path for path in snapshots if path.name == 'progress.json')
+    assert json.loads(copied_progress.read_text()) == {'updates': 2612}
+    assert handle.finished
+
+
+def test_snapshot_upload_failure_still_finishes_wandb(fake_wandb, monkeypatch):
+    monitor = freestyle.WandbMonitor(fake_wandb.folder, freestyle.defaults()['wandb'], {})
+    (fake_wandb.folder / 'progress.json').write_text('{"updates":1}')
+
+    def upload_failure(*args, **kwargs):
+        raise PermissionError('file upload temporarily unavailable')
+
+    monkeypatch.setattr(fake_wandb.handles[0], 'save', upload_failure)
+    monitor.close()
+    assert fake_wandb.handles[0].finished

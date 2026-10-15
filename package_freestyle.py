@@ -7,12 +7,12 @@ ROOT = Path(__file__).resolve().parent
 
 def package(output=None):
     destination = Path(output or ROOT / 'Slater_Freestyle_Update.zip')
-    files = [ROOT / 'slater_freestyle.py', ROOT / 'package_freestyle.py',
+    files = [ROOT / 'slater_freestyle.py', ROOT / 'slater_v041_core.py', ROOT / 'package_freestyle.py',
              ROOT / 'docs/FREESTYLE.md', ROOT / 'docs/FREESTYLE_RESEARCH.md',
              ROOT / 'tests/freestyle_native_checks.cpp',
              ROOT / 'tests/test_freestyle_native_checks.py', ROOT / 'tests/test_freestyle_runner.py',
              ROOT / 'tests/test_freestyle_build.py', ROOT / 'tests/test_freestyle_dll_bridge.py',
-             ROOT / 'tests/test_freestyle_metrics.py']
+             ROOT / 'tests/test_freestyle_metrics.py', ROOT / 'tests/test_atomic_json_windows.py']
     files += sorted(ROOT.glob('FREESTYLE_*.bat')) + sorted(ROOT.glob('FREESTYLE_*.vbs'))
     files += [ROOT / 'FREESTYLE_SETTINGS.json', ROOT / 'FREESTYLE_MECHANICS.json']
     files += sorted(path for path in (ROOT / 'GigaLearn_Project/Freestyle').iterdir()

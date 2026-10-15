@@ -127,6 +127,30 @@ existing run: use **Safe pause**, wait for `PAUSED`, close the app, extract the
 hotfix into the project folder, reopen `FREESTYLE_APP.bat` and **Resume** the same
 run. No native rebuild or new training run is required.
 
+### Windows access denied while updating progress
+
+`PermissionError: [WinError 5] ... progress.json.writing.* -> progress.json`
+means Windows refused replacement of the status file. The Python supervisor
+used to treat this as fatal and request a safe native pause. The native log may
+therefore correctly end with `PAUSED` and a complete checkpoint even though the
+Python progress file says `ERROR`. Read the app's `*_train.log` or `*_resume.log`
+in `data/isolated/freestyle/app_logs/` to find the original traceback.
+
+JSON replacement now retries Windows access/sharing violations for a bounded
+period while retaining the previous complete file. A longer lock on Freestyle's
+display-only `progress.json` emits `FREESTYLE_STATUS_WARNING` and retries at the
+next update without stopping the learner. During a lock, that displayed status
+can be stale; `events.jsonl` and completed native checkpoints remain authoritative.
+Other errors still propagate. W&B receives uniquely named copies in
+`wandb_uploads/<session>/` instead of registering live status files for upload.
+This does not identify which Windows reader held the original file open.
+
+Install `Slater_Freestyle_Status_Lock_Fix.zip` into the project with the app
+closed and the trainer paused. It includes the shared Python JSON writer and
+Freestyle supervisor; it contains no settings, checkpoints or native sources.
+Then reopen the app and **Resume** the existing run. No administrator launch,
+native rebuild or new run is needed. This fixes supervision, not reward design.
+
 The run folder contains:
 
 - `protocol.json` and `config.json`: initialization, source/binary identity and

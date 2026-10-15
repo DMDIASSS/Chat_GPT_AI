@@ -382,6 +382,7 @@ class WandbMonitor:
         self.queue = queue.Queue(maxsize=128)
         self.handle = None
         self.thread = None
+        self.snapshot_folder = self.folder / 'wandb_uploads' / uuid.uuid4().hex
         self.mode = settings['mode']
         self.failed = False
         previous_mode = self.state.get('mode')
@@ -431,9 +432,23 @@ class WandbMonitor:
         atomic_json(self.statefile, self.state)
         if self.state.get('url'):
             print('W&B dashboard:', self.state['url'], flush=True)
-        self.handle.save(str(self.folder / 'config.json'), base_path=str(self.folder), policy='now')
+        self._save_snapshot('config.json')
         self.thread = threading.Thread(target=self._worker, daemon=True, name='FreestyleWandb')
         self.thread.start()
+
+    def _save_snapshot(self, filename):
+        # The SDK may link/watch its source on Windows. Register a unique copy,
+        # never a live file that the supervisor/native process replaces.
+        source = self.folder / filename
+        if not source.is_file():
+            return
+        try:
+            self.snapshot_folder.mkdir(parents=True, exist_ok=True)
+            snapshot = self.snapshot_folder / filename
+            snapshot.write_bytes(source.read_bytes())
+            self.handle.save(str(snapshot), base_path=str(self.folder), policy='now')
+        except Exception:
+            print('W&B file snapshot could not upload; the original remains in the run folder.', flush=True)
 
     def submit(self, event):
         if not self.handle or self.failed:
@@ -482,8 +497,7 @@ class WandbMonitor:
         def finish():
             try:
                 for filename in ('latest.json', 'curriculum.json', 'progress.json'):
-                    if (self.folder / filename).is_file():
-                        self.handle.save(str(self.folder / filename), base_path=str(self.folder), policy='now')
+                    self._save_snapshot(filename)
                 self.handle.finish()
             except Exception:
                 pass
@@ -558,6 +572,19 @@ def completed_update(folder, fallback=0):
     return max(updates) if updates else int(fallback)
 
 
+def write_progress(folder, progress):
+    """A locked dashboard status file must not stop the native learner."""
+    try:
+        atomic_json(Path(folder) / 'progress.json', progress)
+        return True
+    except PermissionError as exc:
+        if getattr(exc, 'winerror', None) not in (5, 32, 33):
+            raise
+        print('FREESTYLE_STATUS_WARNING progress.json is locked; native training continues. '
+              'The latest metrics remain in events.jsonl; status will retry at the next update.', flush=True)
+        return False
+
+
 def train(name, settings, build_dir=None, meshes=None, *, resume=False, updates=None, mode=None):
     from GigaLearn_Project.Native_Backend import native_setup as helper
     folder = run_path(name)
@@ -599,8 +626,8 @@ def train(name, settings, build_dir=None, meshes=None, *, resume=False, updates=
             with logfile.open('wb') as output:
                 options = {'start_new_session': True} if os.name != 'nt' else {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP}
                 process = subprocess.Popen(args, cwd=binary.parent, env=environment, stdout=output, stderr=subprocess.STDOUT, **options)
-                atomic_json(folder / 'progress.json', {**previous, 'status': 'TRAINING', 'pid': process.pid,
-                                                       'runner_pid': os.getpid(), 'native_log': str(logfile)})
+                write_progress(folder, {**previous, 'status': 'TRAINING', 'pid': process.pid,
+                                       'runner_pid': os.getpid(), 'native_log': str(logfile)})
                 while True:
                     events = reader.read()
                     for event in events:
@@ -611,14 +638,14 @@ def train(name, settings, build_dir=None, meshes=None, *, resume=False, updates=
                             'timesteps': int(event.get('timesteps', event.get('total_timesteps', 0))),
                             'stage': stage, 'event': event, 'pid': process.pid, 'runner_pid': os.getpid(),
                             'native_log': str(logfile), 'wandb_url': monitor.state.get('url')}
-                        atomic_json(folder / 'progress.json', progress)
+                        write_progress(folder, progress)
                         print('FREESTYLE_UPDATE', json.dumps(event, separators=(',', ':')), flush=True)
                     code = process.poll()
                     if code is not None:
                         # One final pass after the writer closes handles the final report.
                         for event in reader.read():
                             monitor.submit(event)
-                            atomic_json(folder / 'progress.json', {'status': 'TRAINING',
+                            write_progress(folder, {'status': 'TRAINING',
                                 'updates': int(event.get('update', event.get('updates', 0))),
                                 'timesteps': int(event.get('timesteps', 0)), 'event': event,
                                 'stage': event.get('stage', '?'), 'native_log': str(logfile)})
@@ -643,7 +670,7 @@ def train(name, settings, build_dir=None, meshes=None, *, resume=False, updates=
                             wandb_url=monitor.state.get('url'),
                             updates=int(completion.get('total_updates', completion.get('updates', progress.get('updates', 0)))),
                             timesteps=int(completion.get('timesteps', completion.get('total_timesteps', progress.get('timesteps', 0)))))
-            atomic_json(folder / 'progress.json', progress)
+            write_progress(folder, progress)
             print('FREESTYLE_JOB_COMPLETE', json.dumps(completion), flush=True)
             return progress
         except KeyboardInterrupt:
@@ -655,14 +682,15 @@ def train(name, settings, build_dir=None, meshes=None, *, resume=False, updates=
                             latest=read_json(folder / 'latest.json', {}), native_log=str(logfile),
                             updates=int(completion.get('total_updates', progress.get('updates', 0))),
                             timesteps=int(completion.get('timesteps', progress.get('timesteps', 0))))
-            atomic_json(folder / 'progress.json', progress)
+            write_progress(folder, progress)
             print('FREESTYLE_JOB_COMPLETE', json.dumps(completion or {'status': progress['status']}), flush=True)
             return progress
-        except BaseException:
+        except BaseException as exc:
             if process is not None and process.poll() is None:
                 stop_native_safely(process, pause)
             progress = read_json(folder / 'progress.json', {})
-            atomic_json(folder / 'progress.json', {**progress, 'status': 'ERROR', 'native_log': str(logfile)})
+            write_progress(folder, {**progress, 'status': 'ERROR', 'native_log': str(logfile),
+                                    'error_type': type(exc).__name__})
             raise
         finally:
             monitor.close()
