@@ -20,7 +20,9 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL ready | self-test passed`**, then press **F6** to drive.
+5. Wait for **`LOCAL v2 ready | model self-test passed`**, then press **F6**.
+   The first start briefly tests W/A/S/D/Q/E/Shift and chooses a keyboard method
+   only when Roblox observes both keydown and keyup for every key. Then it drives.
    **F6** pauses and **F8** stops and releases the inputs. Keep default controls:
    WASD, Q/E air roll, LMB boost, RMB jump, Shift powerslide. Disable mouse
    steering, pitch inversion, and aerial safety.
@@ -32,7 +34,9 @@ The download contains the exporter and runtime source, not anyone's weights.
 Re-export only when changing the model or updating this runtime.
 
 The panel reports inference time, executor input-call time, actual decisions per
-second, current keys, and action ID. It targets 15 decisions/second and samples
+second, the keyboard method, requested keys, and keyboard keys Roblox actually
+sees. Requested keys alone are not proof that an executor delivered them.
+It targets 15 decisions/second and samples
 poses at up to 30 Hz. Startup runs four saved PyTorch reference cases and refuses
 to drive if local logits/actions differ or inference exceeds 200 ms. F8, focus
 loss, chat, invalid poses, missing boost HUD, and errors release owned inputs.
@@ -52,9 +56,19 @@ Neither change retrains the model. Car/ball physics differ from Rocket League;
 wheel/flip state is still estimated, and other cars and pad availability remain
 unverified. Start with freeplay when judging the improvement.
 
-Local mode requires `keypress`, `keyrelease`, `mouse1press`, `mouse1release`,
-`mouse2press`, `mouse2release`, and Roblox's buffer API. Missing functions are
-named in the panel. Startup does not press keys. It reads rendered poses and HUD
+Local mode requires `mouse1press`, `mouse1release`, `mouse2press`, `mouse2release`,
+and Roblox's buffer API. Keyboard v2 first tests normal Roblox enum key events;
+if those are disallowed or ineffective it tests executor `keypress`/`keyrelease`
+with virtual-key and scan-code mappings. Shift uses generic VK_SHIFT (0x10)
+in the virtual-key mapping. No thread identity or game-module access is changed.
+If no method changes observable key state, it stays paused with the failure
+reason. A later silent keyboard failure stops the bot and requires a retest.
+Keep Roblox focused, chat closed, and release physical movement keys during the
+brief test. F8 cancels and releases test inputs. A passed test verifies Roblox's
+input state; it does not prove that custom game controls use those inputs.
+
+Missing functions are named in the panel. Loading the script does not press keys;
+the keyboard test starts only with F6/the Start button. It reads rendered poses and HUD
 values; it does not require game modules or change execution identity/remotes.
 
 Optional exporter overrides:

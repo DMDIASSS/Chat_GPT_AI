@@ -111,8 +111,11 @@ local windowActive=true
 local isrbxactive=function()return windowActive end
 local emissions={}
 local function emit(kind,key)emissions[#emissions+1]={kind,key}end
-local keypress=function(key)emit('down',key)end
-local keyrelease=function(key)emit('up',key)end
+local physicalDown={}
+local virtualCodes={[0x57]='W',[0x41]='A',[0x53]='S',[0x44]='D',[0x51]='Q',[0x45]='E',[0x10]='LeftShift'}
+services.UserInputService.IsKeyDown=function(self,key)return physicalDown[key]==true end
+local keypress=function(key)physicalDown[virtualCodes[key] or key]=true;emit('down',key)end
+local keyrelease=function(key)physicalDown[virtualCodes[key] or key]=nil;emit('up',key)end
 local mouse1press=function()emit('down','LMB')end
 local mouse1release=function()emit('up','LMB')end
 local mouse2press=function()emit('down','RMB')end
@@ -125,13 +128,14 @@ end
 request=function()error('Standalone must not use HTTP')end
 local readfile=function()error('Standalone must not read files during operation')end
 local writefile=readfile
+task.wait=function(dt)move(dt)end
 '''+extra
         wrapped="\nlocal function boot()\n"+self.source+"\nend\nlocal result=boot()\n"
         return self.run_lua(prefix+extra+wrapped+behaviour+checks)
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-1')
+assert(result.version=='local-2')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -171,7 +175,15 @@ click('Close')
 
     def test_f8_during_executor_press_cannot_leave_a_late_key_down(self):
         self.client_case('''
-move(.05);inputKey('F6');for i=1,40 do move(1/30)end
+move(.05);inputKey('F6');for i=1,10 do move(1/30)end
+local oldPress=keypress
+inputKey('F8')
+keypress=function(key)
+ if not interrupted then interrupted=true;inputKey('F8')end
+ oldPress(key) -- simulate a yielding press completing after F8
+end
+inputKey('F6')
+for i=1,40 do move(1/30)end
 ''','''
 assert(interrupted,'Did not exercise an interrupted key press')
 local held={}
@@ -180,10 +192,6 @@ assert(next(held)==nil,'A press completed after F8 and remained down')
 click('Close')
 ''',extra='''
 local interrupted=false
-keypress=function(key)
- if not interrupted then interrupted=true;inputKey('F8')end
- emit('down',key) -- simulate a yielding press completing after F8
-end
 ''')
 
     def test_missing_boost_releases_instead_of_running_with_fake_state(self):

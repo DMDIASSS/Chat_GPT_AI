@@ -1,5 +1,6 @@
 -- Generated LOCAL model + telemetry + controls. Weights stay on this PC.
 -- LOCAL_POLICY_HERE
+-- LOCAL_KEYBOARD_HERE
 local TEAM=0
 local HZ=30 -- pose sampling; policy decisions target 15 Hz (tick skip 8 at 120 Hz)
 local player=game:GetService("Players").LocalPlayer
@@ -27,17 +28,19 @@ gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
 local alive,enabled,ready,armAt=true,false,false,0
+local testingKeyboard=false
 local epoch=0
 local held,connections={},{}
-local pressKey,releaseKey,pressLeft,releaseLeft,pressRight,releaseRight
+local pressLeft,releaseLeft,pressRight,releaseRight
 local activeWindow=isrbxactive or isgameactive
-local keysVK={W=0x57,S=0x53,A=0x41,D=0x44,Q=0x51,E=0x45,SHIFT=0xA0}
+local keyboard=Keyboard.new(input)
+local keyboardKey={W=true,S=true,A=true,D=true,Q=true,E=true,SHIFT=true}
 local order={"W","S","A","D","Q","E","SHIFT","LMB","RMB"}
 local previous=table.create(8,0)
 local jumpAt,usedFlip,lastGround=nil,false,true
 local focus=true
 local function event(key,down)
-    if keysVK[key]then (down and pressKey or releaseKey)(keysVK[key])
+    if keyboardKey[key]then keyboard:event(key,down)
     elseif key=="LMB"then (down and pressLeft or releaseLeft)()
     else (down and pressRight or releaseRight)()end
 end
@@ -49,18 +52,43 @@ local function release()
         end
     end
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
+    keyboard:release()
 end
 local function controls()
-    start.Visible=not enabled;teamButton.Visible=not enabled;close.Visible=not enabled
+    start.Visible=not enabled and not testingKeyboard
+    teamButton.Visible=not enabled and not testingKeyboard
+    close.Visible=not enabled and not testingKeyboard
 end
 local function stop(reason)
-    epoch=epoch+1;enabled=false;release();controls()
+    epoch=epoch+1;enabled=false;testingKeyboard=false;release();controls()
     if reason then label.Text=reason end
 end
 local function toggle()
     if not ready then return end
-    if enabled then stop("LOCAL paused. F6 starts; F8 stops.")
-    else epoch=epoch+1;enabled=true;armAt=os.clock()+.5;controls()end
+    if enabled or testingKeyboard then stop("LOCAL paused. F6 starts; F8 stops.");return end
+    epoch=epoch+1
+    if keyboard.selected then enabled=true;armAt=os.clock()+.5;controls();return end
+    testingKeyboard=true;controls()
+    local testEpoch=epoch
+    task.spawn(function()
+        local function cancelled()
+            return epoch~=testEpoch or not alive or not focus or input:GetFocusedTextBox()
+                or input:IsKeyDown(Enum.KeyCode.F8)or(activeWindow and not activeWindow())
+        end
+        local ok,passed,reason=pcall(function()
+            -- Let the launch hotkey/button settle before testing physical inputs.
+            task.wait(.3)
+            if cancelled()then return false,"Keyboard test cancelled"end
+            return keyboard:probe(cancelled,function(message)label.Text="LOCAL keyboard test\n"..message end)
+        end)
+        if epoch~=testEpoch or not alive then keyboard:release();return end
+        testingKeyboard=false
+        if not ok or not passed then
+            stop("LOCAL keyboard stopped: "..tostring(ok and reason or passed));return
+        end
+        label.Text="LOCAL keyboard verified: "..keyboard.name.."\nStarting model. F8 stops."
+        enabled=true;armAt=os.clock()+.3;controls()
+    end)
 end
 local function connect(signal,callback)
     local connection=signal:Connect(callback);connections[#connections+1]=connection
@@ -90,11 +118,9 @@ task.spawn(function()
             "This adapter targets Deadline_coolgun / place 101880234193261")
         assert(not pg:FindFirstChild("Update271Bridge"),
             "Close the old bridge panel and stop START_FILE_BOT.bat before using LOCAL mode")
-        pressKey,releaseKey=keypress,keyrelease
         pressLeft,releaseLeft=mouse1press,mouse1release
         pressRight,releaseRight=mouse2press,mouse2release
-        for name,fn in pairs({keypress=pressKey or false,keyrelease=releaseKey or false,
-            mouse1press=pressLeft or false,mouse1release=releaseLeft or false,
+        for name,fn in pairs({mouse1press=pressLeft or false,mouse1release=releaseLeft or false,
             mouse2press=pressRight or false,mouse2release=releaseRight or false})do
             assert(type(fn)=="function","Missing executor input function: "..name)
         end
@@ -119,7 +145,7 @@ task.spawn(function()
         local period=math.max(1/15,peak*1.3)
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=("Update271 LOCAL ready | self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nNo file/HTTP round trips. F6 start; F8 stop.")
+        label.Text=("Update271 LOCAL v2 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nF6 tests keyboard, then starts. F8 stops.")
             :format(peak*1000,1/period)
         local lastTick,lastDecision,lastUi=os.clock(),-math.huge,-math.huge
         local busy=false
@@ -137,6 +163,8 @@ task.spawn(function()
                 end
                 local packet,reason=read()
                 if not enabled or now<armAt then return end
+                local keyboardOk,keyboardReason=keyboard:verify()
+                assert(keyboardOk,keyboardReason)
                 if not packet then
                     release();label.Text="LOCAL waiting: "..tostring(reason);return
                 end
@@ -182,8 +210,8 @@ task.spawn(function()
                 if now-lastUi>=.2 then
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=("Update271 LOCAL running | %.1f decisions/s\nInference %.1f ms | inputs %.1f ms\nKeys %s | action %d\nF6 pause; F8 stop | freeplay estimates")
-                        :format(rate,inferenceMs,inputMs,table.concat(names," "),index-1)
+                    label.Text=("LOCAL v2 | %.1f decisions/s | %s\nInference %.1f ms | inputs %.1f ms\nRequested %s | action %d\nKeyboard seen: %s | F6 pause; F8 stop")
+                        :format(rate,keyboard.name,inferenceMs,inputMs,table.concat(names," "),index-1,keyboard:observed())
                 end
             end)
             busy=false
@@ -192,4 +220,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-1"}
+return {started=true,version="local-2"}

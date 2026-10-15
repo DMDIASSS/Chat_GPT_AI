@@ -113,10 +113,12 @@ return tensors'''
 def standalone_source(model,model_sha,app_dir=APP_DIR):
     tensors,cases=prepare_model(model)
     policy=(app_dir/"templates/local_policy.lua").read_text(encoding="utf-8")
+    keyboard=(app_dir/"templates/local_keyboard.lua").read_text(encoding="utf-8")
     client=(app_dir/"client271.lua").read_text(encoding="utf-8")
     pose=client.split("-- POSE_READER_BEGIN",1)[1].partition("\n")[2].split("-- POSE_READER_END",1)[0]
     template=(app_dir/"templates/standalone.lua").read_text(encoding="utf-8")
     return (template.replace("-- LOCAL_POLICY_HERE", "local Policy=(function()\n"+policy+"\nend)()")
+            .replace("-- LOCAL_KEYBOARD_HERE", "local Keyboard=(function()\n"+keyboard+"\nend)()")
             .replace("-- MODEL_TENSORS_HERE",tensor_source(tensors))
             .replace("-- MODEL_CASES_HERE",literal(cases))
             .replace("-- POSE_READER_HERE",pose)
