@@ -7,3 +7,8 @@ __pycache__/
 file_connection.json
 botrblx_exchange/
 botrblx_client.lua
+DIAGNOSTIC_REPORT.txt
+DIAGNOSTIC_REPORT.json
+diagnostics.lock
+botrblx_diagnose.lua
+botrblx_diag_*

@@ -13,6 +13,41 @@ the existing folder's application files after stopping the bridge. Your existing
 training environment and model stay in the project. This ZIP is stored separately
 from full-repository archives and can be downloaded for bridge updates.
 
+## One-shot connection diagnostic
+
+For file errors, run this before changing the transport again:
+
+1. Close the bot panel and stop the bridge CMD with Ctrl+C.
+2. Double-click **`DIAGNOSE.bat`** in the updated `botrblx` folder. It uses the
+   saved workspace or `%APPDATA%\jjsploit\workspace`. Wait for **`READY DIAGNOSTIC`**.
+3. Execute this in JJSploit:
+
+   ```lua
+   loadstring(readfile("botrblx_diagnose.lua"))()
+   ```
+
+4. Wait for **`DIAGNOSTIC COMPLETE`** in CMD. Send the single file
+   **`botrblx\DIAGNOSTIC_REPORT.txt`**. The Lua tests normally take about 10–30
+   seconds; CMD allows five minutes for launching the script and transferring it.
+
+If loading the installed script fails, open
+`C:\Users\almas\AppData\Roaming\jjsploit\workspace\botrblx_diagnose.lua` in
+Notepad and execute its complete contents. That is the configured script;
+`JJSploit_Diagnose.lua` in this folder is its source template.
+
+The tool tests flat and nested paths, `/` and `\`, short and long filenames,
+file/directory metadata, Python-created versus Lua-created files, overwrite
+visibility, immutable replies, two fresh generations and timing. It records API
+errors individually and compares them with Python's actual filesystem view.
+It does not import Torch, run the model, load game modules or send game inputs.
+Only dedicated diagnostic files are written and cleaned up; the report remains
+on your PC. It contains source fingerprints and test outcomes, with credentials
+redacted and live mailbox contents excluded.
+
+If report export fails, the Roblox panel keeps a copyable report: click its text,
+Ctrl+A, Ctrl+C. CMD also saves a partial report on timeout or Ctrl+C. Optional
+workspace override: `DIAGNOSE.bat --workspace "C:\path\to\workspace"`.
+
 ## JJSploit / WRD: file mode
 
 The reported WRD HTTP request returned **403, Wrd Server Error: Connection
