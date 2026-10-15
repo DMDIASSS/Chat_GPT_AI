@@ -1,4 +1,70 @@
-# Update271 Roblox bridge
+# Update271 Roblox adapter
+
+## Local Lua mode: remove the file round trip
+
+**Use this mode for JJSploit/WRD.** The supplied diagnostic measured 1.2–1.3
+seconds per file exchange. Local mode runs the actual two-block attention policy
+inside Lua and sends inputs with the executor's keyboard/mouse functions. There
+is no file exchange, HTTP request, or Python process during driving.
+
+1. Close the old Roblox bot panel and stop `START_FILE_BOT.bat` with Ctrl+C.
+2. Extract the [folder-only ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/native-quality-campaign/downloads/botrblx.zip)
+   into `E:\Downloads\Chat_GPT_AI`, replacing `botrblx` application files.
+3. Double-click **`EXPORT_LOCAL_BOT.bat`** once. It reads the existing update271
+   with the project's existing Python, exports all policy weights at float32
+   precision, and installs **`botrblx_standalone.lua`** in the saved JJSploit
+   workspace. Wait for **`READY STANDALONE`**. You can then close CMD.
+4. In freeplay, execute:
+
+   ```lua
+   loadstring(readfile("botrblx_standalone.lua"))()
+   ```
+
+5. Wait for **`LOCAL ready | self-test passed`**, then press **F6** to drive.
+   **F6** pauses and **F8** stops and releases the inputs. Keep default controls:
+   WASD, Q/E air roll, LMB boost, RMB jump, Shift powerslide. Disable mouse
+   steering, pitch inversion, and aerial safety.
+
+The generated file is the complete standalone bot, including your model. It is
+also saved as `botrblx\botrblx_standalone.lua`. **Keep it private:** it contains
+your model weights. It is ignored by Git and excluded from the public download.
+The download contains the exporter and runtime source, not anyone's weights.
+Re-export only when changing the model or updating this runtime.
+
+The panel reports inference time, executor input-call time, actual decisions per
+second, current keys, and action ID. It targets 15 decisions/second and samples
+poses at up to 30 Hz. Startup runs four saved PyTorch reference cases and refuses
+to drive if local logits/actions differ or inference exceeds 200 ms. F8, focus
+loss, chat, invalid poses, missing boost HUD, and errors release owned inputs.
+Goal/reset waits resume after valid car/ball poses return.
+
+This removes the measured file-transfer delay; inference and frame/input timing
+still take time. The cloud Luau interpreter averaged about 10 ms/inference with
+the supplied actor, matching all four reference actions within 0.000016 maximum
+absolute logit error. This is **not** a Windows/JJSploit speed measurement. The
+runtime checks and panel report the result on your PC. No executor input was
+sent during cloud validation.
+
+This version also fixes the float attention mask: unavailable boost pads now
+receive **-10000**, rather than **+1**, in the Python bridge. Local mode omits
+those masked rows, which is checked against the complete PyTorch observation.
+Neither change retrains the model. Car/ball physics differ from Rocket League;
+wheel/flip state is still estimated, and other cars and pad availability remain
+unverified. Start with freeplay when judging the improvement.
+
+Local mode requires `keypress`, `keyrelease`, `mouse1press`, `mouse1release`,
+`mouse2press`, `mouse2release`, and Roblox's buffer API. Missing functions are
+named in the panel. Startup does not press keys. It reads rendered poses and HUD
+values; it does not require game modules or change execution identity/remotes.
+
+Optional exporter overrides:
+
+```bat
+EXPORT_LOCAL_BOT.bat --workspace "C:\Users\almas\AppData\Roaming\jjsploit\workspace"
+EXPORT_LOCAL_BOT.bat --model "D:\Models\update.pt"
+```
+
+## External bridge modes (fallback)
 
 Local freeplay inference: rendered Roblox state → update271 in Python → normal
 Windows keyboard and mouse events. The model stays in your existing training

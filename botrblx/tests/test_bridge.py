@@ -96,7 +96,7 @@ class BridgeTests(unittest.TestCase):
             np.testing.assert_array_equal(q[0,0,24:], previous)
             np.testing.assert_array_equal(q[0,0,:3], [1,1,0])
             np.testing.assert_array_equal(mask[0,:2], [0,0])
-            np.testing.assert_array_equal(mask[0,2:], np.ones(34))
+            np.testing.assert_array_equal(mask[0,2:], np.full(34,-10000))
             self.assertAlmostEqual(float(q[0,0,20]), .33, places=6)
 
     def test_rejects_missing_boost_and_nonfinite_pose(self):
@@ -187,6 +187,16 @@ class BridgeTests(unittest.TestCase):
             with torch.inference_mode(): logits = actor(b.observations(p,b.ZERO,True))[0]
             self.assertEqual(tuple(logits.shape),(1,90))
             self.assertTrue(torch.isfinite(logits).all())
+
+    @unittest.skipUnless((ROOT / "vendor/nexto/nexto-model.pt").is_file(), "Local Nexto asset unavailable")
+    def test_unknown_pads_are_actually_excluded_by_torchscript_attention(self):
+        base = ROOT / "vendor/nexto/nexto-model.pt"
+        actor = b.load_model(base,base)
+        q,kv,mask = b.observations(packet(),b.ZERO,True)
+        with torch.inference_mode():
+            full = actor((q,kv,mask))[0]
+            trimmed = actor((q,kv[:,:2],mask[:,:2]))[0]
+        torch.testing.assert_close(full,trimmed,atol=2e-5,rtol=2e-5)
 
     def test_cli_selfcheck_and_missing_model_log_before_client(self):
         with tempfile.TemporaryDirectory() as directory:

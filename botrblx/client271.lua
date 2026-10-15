@@ -137,6 +137,7 @@ close.Activated:Connect(function()
     if sampler then sampler:Disconnect()end
     if token then task.spawn(function()pcall(send,{enabled=false,valid=false})end)end
 end)
+-- POSE_READER_BEGIN (also embedded by the standalone exporter)
 local scene,car,ball,carRoot,ballRoot,lastCar,lastBall,lastTime
 local function nearest(anchor,excluded)
     if not anchor then return nil end
@@ -206,6 +207,7 @@ local function read()
         or(math.abs(p[2])>5082 and math.abs(p[1])>1000 and u[2]*p[2]<-3200)
     return {car=cp,ball=bp,boost=b,team=TEAM,ground_estimate=grounded,valid=true}
 end
+-- POSE_READER_END
 -- Sample poses independently of file round trips. A 1.3s RPC must not turn
 -- every physics sample into a >0.3s discontinuity and invalidate the policy.
 local latestPacket,latestReason,lastSample=nil,"warming up poses",-math.huge

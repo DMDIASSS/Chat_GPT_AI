@@ -12,3 +12,5 @@ DIAGNOSTIC_REPORT.json
 diagnostics.lock
 botrblx_diagnose.lua
 botrblx_diag_*
+botrblx_standalone.lua
+standalone_export.log

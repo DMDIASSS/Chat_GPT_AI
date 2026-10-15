@@ -101,7 +101,9 @@ def observations(packet, previous, has_flip):
     kv[2:, 20] = np.where(PADS[:, 2] > 72, 1, .12)
     # Pad availability is NOT observable from the supplied recordings.
     # Mask these entities instead of inventing 34 active-pad states.
-    mask[2:] = 1
+    # This TorchScript attention adds the float mask to attention logits.
+    # +1 would INCREASE attention to unknown pads; a large negative hides them.
+    mask[2:] = -10000
     if packet["team"] == 1:
         kv[:, 5:20] *= np.tile([-1, -1, 1], 5)
         kv[:, [1, 2]] = kv[:, [2, 1]]
