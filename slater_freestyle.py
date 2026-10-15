@@ -962,6 +962,16 @@ def desktop(settings_file=None):
         else:
             messagebox.showinfo('W&B', 'The dashboard link appears after an online run starts. Offline rewards remain in events.jsonl.', parent=root)
 
+    def open_v5_exporter():
+        try:
+            options = {'cwd': str(ROOT)}
+            if os.name == 'nt':
+                options['creationflags'] = subprocess.CREATE_NEW_CONSOLE
+            subprocess.Popen([sys.executable, '-u', str(ROOT / 'export_freestyle_rlbot_v5.py'),
+                              '--gui', '--run', name.get()], **options)
+        except Exception as exc:
+            show_error(exc)
+
     def open_mechanics():
         try:
             catalogue = mechanics_catalogue()
@@ -998,6 +1008,7 @@ def desktop(settings_file=None):
         ttk.Button(controls, text=label, command=callback).pack(side='left', padx=3)
     ttk.Button(root, text='Mechanics catalogue', command=open_mechanics).pack(anchor='w', padx=12, pady=(0, 8))
     ttk.Button(root, text='Continue with revised rewards', command=continue_revised).pack(anchor='w', padx=12, pady=(0, 8))
+    ttk.Button(root, text='Export RLBot v5', command=open_v5_exporter).pack(anchor='w', padx=12, pady=(0, 8))
 
     def poll():
         try:

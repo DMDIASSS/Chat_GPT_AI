@@ -123,8 +123,10 @@ The separate 512-float observation includes normalized ball/car physics,
 car-local geometry, prior controls, boost pads, resources, wall/goal distances,
 curriculum context, short ballistic forecasts and slots for other cars. Optional
 simulator contact evidence has a visibility mask and is hidden in a fraction
-of episodes. A matching live observation adapter is still needed before an
-RLBot export: the old Nexto attention exporter cannot load this architecture.
+of episodes. Use [the Freestyle RLBot v5 exporter](FREESTYLE_RLBOT_V5.md)
+to play a reward-version-2 checkpoint. Its live adapter masks privileged
+features and reconstructs observable timers/history from packets. The old
+Nexto attention exporter cannot load this architecture.
 
 The default actor and critic each have three 768-unit hidden layers. Freestyle
 has its own 94-action table, adding opposing yaw/roll plus jump controls for
