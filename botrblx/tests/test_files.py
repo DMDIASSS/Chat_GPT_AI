@@ -28,7 +28,7 @@ class FileTests(unittest.TestCase):
 
     def send(self, route, p=None, session="client-A", token=None):
         self.request_id += 1
-        envelope = dict(session=session,id=self.request_id,route=route,
+        envelope = dict(session=session,id=self.request_id,route=route,file_protocol=3,
                         token=self.token if token is None else token,packet=p)
         self.exchange.request.write_text(json.dumps(envelope),encoding="utf-8")
         self.exchange.poll()
@@ -54,18 +54,19 @@ class FileTests(unittest.TestCase):
         self.assertTrue(self.bridge.blocked)
         self.assertEqual([event for event in self.output.events if event[0]=="W"],[("W",True),("W",False)])
 
-    def test_persistent_reader_sees_each_reply_in_same_file(self):
+    def test_cached_reply_bytes_do_not_hide_the_next_response(self):
         self.hello()
-        # Executors may retain a handle to a named file. Replacing that file can
-        # leave the handle reading the old object despite a new path entry.
-        with self.exchange.response.open(encoding="utf-8") as reader:
-            first = json.load(reader)
-            for seq in range(3):
-                reply = self.send("/frame",packet(seq))
-                reader.seek(0)
-                visible = json.load(reader)
-                self.assertEqual(visible["id"],reply["id"],"Open reader retained the preceding reply")
-                self.assertGreater(visible["id"],first["id"])
+        cache = {}
+        def cached_read(path):
+            if path not in cache: cache[path] = path.read_bytes()
+            return cache[path]
+        original_path = self.exchange.response
+        original = cached_read(original_path)
+        for seq in range(3):
+            reply = self.send("/frame",packet(seq))
+            visible = json.loads(cached_read(self.exchange.response))
+            self.assertEqual(visible["id"],reply["id"])
+            self.assertEqual(original_path.read_bytes(),original,"Published reply was overwritten")
 
     def test_session_tokens_and_new_server_disarm_old_request(self):
         self.assertEqual(self.send("/frame",packet())["status"],401)
@@ -100,12 +101,12 @@ class FileTests(unittest.TestCase):
         self.hello()
         write_text = Path.write_text
         def locked_write(path,*args,**kwargs):
-            if path == self.exchange.response: raise PermissionError("read handle denies writes")
+            if path.parent == self.exchange.replies: raise PermissionError("reply write denied")
             return write_text(path,*args,**kwargs)
         with patch.object(Path,"write_text",locked_write), self.assertLogs(level="WARNING"):
             self.request_id += 1
             self.exchange.request.write_text(json.dumps(dict(session="client-A",id=self.request_id,
-                route="/frame",token=self.token,packet=packet())),encoding="utf-8")
+                route="/frame",file_protocol=3,token=self.token,packet=packet())),encoding="utf-8")
             self.exchange.poll()
             self.assertIsNotNone(self.exchange.pending)
             self.assertEqual(self.bridge.frames,1)
@@ -119,18 +120,37 @@ class FileTests(unittest.TestCase):
             self.hello()
         messages = " ".join(logs.output)
         self.assertIn("FILE_REPLY: hello",messages)
-        self.assertIn("reply_v2.json",messages)
+        self.assertIn("reply_client-A_1.json",messages)
         self.assertNotIn(self.token,messages)
 
-    def test_restart_resets_content_without_detaching_persistent_reader(self):
+    def test_restart_cleans_owned_replies_and_preserves_other_files(self):
         self.hello()
-        with self.exchange.response.open(encoding="utf-8") as reader:
-            self.exchange = f.FileExchange(self.bridge,self.workspace)
-            reader.seek(0)
-            self.assertEqual(json.load(reader),{})
-            self.hello()
-            reader.seek(0)
-            self.assertEqual(json.load(reader)["id"],self.request_id)
+        old_path = self.exchange.response
+        other = self.exchange.replies / "notes.txt"
+        other.write_text("keep this")
+        self.exchange = f.FileExchange(self.bridge,self.workspace)
+        self.assertFalse(old_path.exists())
+        self.assertEqual(other.read_text(),"keep this")
+        self.hello()
+        self.assertNotEqual(self.exchange.response,old_path)
+
+    def test_replies_are_bounded_and_replaying_does_not_repeat_inference(self):
+        self.hello()
+        for seq in range(40): self.send("/frame",packet(seq))
+        self.assertEqual(len(list(self.exchange.replies.glob("*.json"))),16)
+        self.assertEqual(list(self.exchange.replies.glob("*.tmp")),[])
+        frames = self.bridge.frames
+        replay = dict(session="client-A",id=self.request_id-1,route="/frame",file_protocol=3,
+                      token=self.token,packet=packet(38))
+        self.exchange.request.write_text(json.dumps(replay))
+        self.exchange.poll()
+        self.assertEqual(self.bridge.frames,frames)
+
+    def test_reply_paths_cannot_escape_the_exchange_folder(self):
+        self.exchange.request.write_text(json.dumps(dict(session="../../escaped",id=1,route="/hello",file_protocol=3)))
+        self.exchange.poll()
+        self.assertEqual(list(self.exchange.replies.iterdir()),[])
+        self.assertEqual(self.bridge.frames,0)
 
     def test_true_torchscript_mailbox_and_invalid_packet_release(self):
         base,_ = save_actor(self.workspace)

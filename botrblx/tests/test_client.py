@@ -64,11 +64,11 @@ local read_attempt=0
 local writefile=function(path,body)
  assert(path=='botrblx_exchange/request.json')
  local r=services.HttpService:JSONDecode(body)
- assert(r.session=='fresh-file-session')
+ assert(r.session=='fresh-file-session'and r.file_protocol==3)
  local reply=mock_server({Url=r.route,Method=r.packet and 'POST'or 'GET',
   Headers={['X-Bridge-Token']=r.token},Body=r.packet and services.HttpService:JSONEncode(r.packet)})
- files['botrblx_exchange/reply_v2.json']=services.HttpService:JSONEncode({
-  session=r.session,id=tostring(r.id),server='file-server',status='200',data=services.HttpService:JSONDecode(reply.Body)})
+ files['botrblx_exchange/replies/reply_'..r.session..'_'..r.id..'.json']=services.HttpService:JSONEncode({
+  session=r.session,id=tostring(r.id),file_protocol=3,server='file-server',status='200',data=services.HttpService:JSONDecode(reply.Body)})
  read_attempt=0
 end
 local readfile=function(path)
@@ -94,6 +94,36 @@ end
 assert(visible,'Missing APIs did not produce a visible explanation')
 '''
         self.run_case("live_frames_and_close",extra=extra,filename="JJSploit_File_Client.lua",checks_override=checks)
+
+    def test_cached_reads_and_delayed_publication_keep_live_frames_current(self):
+        extra = r'''
+local mock_server=request
+request=function()error('File client attempted HTTP')end
+http_request=request
+services.HttpService.GenerateGUID=function()return 'cached-reader-session'end
+local files,cache={},{}
+local writes=0
+local writefile=function(path,body)
+ assert(path=='botrblx_exchange/request.json')
+ local r=services.HttpService:JSONDecode(body)
+ local target='botrblx_exchange/replies/reply_'..r.session..'_'..r.id..'.json'
+ assert(not files[target],'A reply filename was reused')
+ local reply=mock_server({Url=r.route,Method=r.packet and 'POST'or 'GET',
+  Headers={['X-Bridge-Token']=r.token},Body=r.packet and services.HttpService:JSONEncode(r.packet)})
+ files[target]={readyAt=now+.025,body=services.HttpService:JSONEncode({
+  session=r.session,id=r.id,file_protocol=3,status=200,data=services.HttpService:JSONDecode(reply.Body)})}
+ writes=writes+1
+end
+local isfile=function(path)return files[path]and now>=files[path].readyAt or false end
+local readfile=function(path)
+ if cache[path]then return cache[path]end -- Reproduce a reader caching bytes by pathname.
+ assert(isfile(path),'Reply read before publication')
+ cache[path]=files[path].body
+ return cache[path]
+end
+'''
+        self.run_case("live_frames_and_close",extra=extra,filename="JJSploit_File_Client.lua",
+                      extra_checks="\nassert(writes>150)\n")
 
     def test_file_client_wrong_workspace_times_out_visibly(self):
         extra = r'''

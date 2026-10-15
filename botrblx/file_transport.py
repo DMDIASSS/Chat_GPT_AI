@@ -1,7 +1,9 @@
 """Local JSON mailbox. No HTTP, executor internals, or model files are exposed."""
 import json
 import logging
+from collections import deque
 from pathlib import Path
+import re
 import secrets
 import time
 
@@ -55,24 +57,43 @@ class FileExchange:
         self.folder = Path(workspace) / "botrblx_exchange"
         self.folder.mkdir(exist_ok=True)
         self.request = self.folder / "request.json"
-        # A fresh name avoids handles cached by the old atomic-replace writer.
-        self.response = self.folder / "reply_v2.json"
-        self.temporary = self.folder / "response.tmp"
+        self.replies = self.folder / "replies"
+        self.replies.mkdir(exist_ok=True)
+        self.response = None
+        self.retained = deque()
+        self.retired = set()
         self.server = secrets.token_hex(16)
         self.session, self.last_id = None, -1
         self.last_request, self.pending = None, None
         self.pending_route = None
         self.last_write_warning = -float("inf")
-        # Preserve the file objects: executor APIs can retain handles between
-        # reads or executions. Reset content without unlinking either mailbox.
+        # Requests already reach Python reliably. Replies use a fresh pathname
+        # for each session/id so a cached read cannot expose the preceding reply.
         self.request.write_text("{}",encoding="utf-8")
-        self.response.write_text("{}",encoding="utf-8")
-        self.temporary.unlink(missing_ok=True)
+        for path in self.replies.iterdir():
+            if re.fullmatch(r"reply_[A-Za-z0-9_-]{1,64}_[0-9]+\.(?:json|tmp)",path.name):
+                self.retired.add(path)
+        self._cleanup()
+
+    def reply_path(self, session, request_id):
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}",session):
+            raise ValueError("Invalid file session")
+        if type(request_id) is not int or not 1<=request_id<=2**53-1:
+            raise ValueError("Invalid request ID")
+        return self.replies / f"reply_{session}_{request_id}.json"
+
+    def _cleanup(self):
+        for path in list(self.retired):
+            try: path.unlink(missing_ok=True)
+            except OSError: continue  # A Windows reader may still hold a file.
+            self.retired.discard(path)
 
     def _handle(self, request, mtime):
         session, request_id = request["session"], request["id"]
         def reply(status_code, **data):
-            return dict(session=session,id=request_id,server=self.server,status=status_code,data=data)
+            return dict(session=session,id=request_id,server=self.server,file_protocol=3,status=status_code,data=data)
+        if request.get("file_protocol") != 3:
+            return reply(400,error="Update both Python and Lua to file transport v3")
         if self.wall_clock()-mtime > .35 or mtime-self.wall_clock() > 1:
             with self.bridge.lock: self.bridge.release("PAUSED: stale file telemetry",True)
             return reply(408,error="Stale file telemetry; reconnect",disarmed=True)
@@ -100,10 +121,11 @@ class FileExchange:
         if self.pending is None: return
         encoded = json.dumps(self.pending,allow_nan=False)
         try:
-            # Always keep the same file object. Atomic rename can succeed while
-            # a persistent readfile handle still points at the preceding reply.
-            # The Lua decoder rejects incomplete writes and mismatched IDs.
-            self.response.write_text(encoded,encoding="utf-8")
+            # Publish once to a unique name. No reader needs to refresh an
+            # already-read path; incomplete temporary files stay out of view.
+            temporary = self.response.with_suffix(".tmp")
+            temporary.write_text(encoded,encoding="utf-8")
+            temporary.replace(self.response)
         except OSError as error:
             if time.monotonic()-self.last_write_warning >= 2:
                 logging.warning("FILE_REPLY_BLOCKED: %s | %s",self.response,error)
@@ -112,6 +134,9 @@ class FileExchange:
         if self.pending_route == "/hello":
             logging.info("FILE_REPLY: hello id=%s status=%s bytes=%s written to %s",
                          self.pending["id"],self.pending["status"],len(encoded.encode("utf-8")),self.response)
+        self.retained.append(self.response)
+        while len(self.retained)>16: self.retired.add(self.retained.popleft())
+        self._cleanup()
         self.pending = None
 
     def poll(self):
@@ -126,11 +151,16 @@ class FileExchange:
             return  # A client write may be incomplete. The watchdog still runs.
         if not isinstance(request,dict): return
         session, request_id = request.get("session"),request.get("id")
-        if not isinstance(session,str) or not 1<=len(session)<=128 or type(request_id) is not int or request_id<1:
+        if not isinstance(session,str):
             return
+        try: response = self.reply_path(session,request_id)
+        except ValueError: return
         key = session,request_id
         if key != self.last_request:
+            # Retries must not replace a published reply or repeat inference.
+            if response in self.retained: return
             self.last_request = key
+            self.response = response
             self.pending = self._handle(request,mtime)
             self.pending_route = request.get("route")
         self._flush()
