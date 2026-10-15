@@ -14,6 +14,16 @@ project; model weights, logs and recordings are not included in this folder.
 4. Execute the contents of `JJSploit_Launch.lua` in JJSploit.
 5. Close menus/chat and press **F6** to start or pause. **F8** stops inputs.
 
+Copy the Lua file as plain text using GitHub **Raw**, your editor, or a code
+block's Copy button. Do not include Markdown such as `**f**`, backtick fences,
+or `[http://...](http://...)` in the executor; those are not Lua source.
+
+`JJSploit_Launch.lua` first displays a **botrblx launcher** panel, then fetches
+the client. Download, compilation and client-start errors stay visible in its
+copyable text box. On successful startup, this panel closes and the main
+**Update271** control panel remains. Execute the launcher file, not the Python
+file or a browser's rendered text.
+
 Use the default bindings: WASD, Q/E air roll, Shift powerslide/free roll,
 left mouse boost, right mouse jump. Disable mouse steering, pitch inversion
 and aerial safety. Buttons hide during driving so injected boost clicks cannot
@@ -30,6 +40,13 @@ Ctrl+C in the Python console exits and releases inputs.
 - `bridge.log` is created by Python before importing Torch/NumPy or loading the
   model. Dependency, checkpoint, or port errors are reported here.
 - Neither log requires executing the JJSploit client first.
+
+The Python console logs `CLIENT_DOWNLOAD` when the launcher requests `/client`
+and `CLIENT_HELLO` when the Lua client connects. The read-only `/` and `/health`
+routes return model/client status without starting, pausing, or reconfiguring
+the bot. `model_loaded: true` with `client_connected: false` means Python is
+ready but the Lua client has not begun streaming. Older versions returned
+`Unknown route` at `/`; that response did not indicate a model-loading failure.
 
 The launcher tries the checkout containing `botrblx`, then the existing
 `E:\Downloads\Chat_GPT_AI` project. It also works when the whole folder is copied

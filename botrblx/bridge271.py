@@ -302,7 +302,16 @@ def make_handler(bridge, client_source):
 
         def do_GET(self):
             if not self.allowed(): return self.send(403,{"error":"Loopback clients only"})
+            if self.path in ("/", "/health"):
+                with bridge.lock:
+                    return self.send(200,{
+                        "service":"botrblx", "version":2, "model_loaded":True,
+                        "client_connected":bridge.seq >= 0 and bridge.clock()-bridge.last_seen < 1,
+                        "status":bridge.status, "frames":bridge.frames,
+                        "next_step":"Execute JJSploit_Launch.lua in Roblox, then click Start bot or press F6.",
+                    })
             if self.path == "/client":
+                logging.info("CLIENT_DOWNLOAD: launcher requested /client")
                 return self.send(200,client_source,"text/plain; charset=utf-8")
             if self.path == "/hello":
                 with bridge.lock:
@@ -310,6 +319,7 @@ def make_handler(bridge, client_source):
                     bridge.epoch += 1
                     bridge.token = secrets.token_hex(24)
                     bridge.release("Connected - click Start bot")
+                    logging.info("CLIENT_HELLO: Lua client connected; waiting for telemetry/start")
                     return self.send(200,{"token":bridge.token,"protocol":1})
             return self.send(404,{"error":"Unknown route"})
 

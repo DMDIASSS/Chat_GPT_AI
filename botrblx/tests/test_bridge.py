@@ -252,5 +252,25 @@ class BridgeTests(unittest.TestCase):
             finally:
                 server.shutdown(); server.server_close(); thread.join(timeout=2)
 
+    def test_health_route_is_read_only_and_reports_client_connection(self):
+        server = b.ThreadingHTTPServer(("127.0.0.1",0),b.make_handler(self.bridge,CLIENT))
+        thread = threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}"
+            with urllib.request.urlopen(url,timeout=3) as response: initial = json.load(response)
+            self.assertTrue(initial["model_loaded"])
+            self.assertFalse(initial["client_connected"])
+            self.bridge.frame(packet())
+            token, seq, held = self.bridge.token, self.bridge.seq, set(self.output.held)
+            for path in ("/", "/health"):
+                with urllib.request.urlopen(url+path,timeout=3) as response: health = json.load(response)
+                self.assertTrue(health["client_connected"])
+                self.assertEqual(health["service"],"botrblx")
+                self.assertNotIn("token",health)
+                self.assertEqual((self.bridge.token,self.bridge.seq),(token,seq))
+                self.assertEqual(self.output.held,held)
+        finally:
+            server.shutdown(); server.server_close(); thread.join(timeout=2)
+
 
 if __name__ == "__main__": unittest.main(verbosity=2)

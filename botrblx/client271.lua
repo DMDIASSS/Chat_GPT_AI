@@ -24,7 +24,7 @@ teamButton.Text="Team: BLUE"
 local close=Instance.new("TextButton",panel)
 close.Position=UDim2.fromOffset(300,120);close.Size=UDim2.fromOffset(110,30);close.Text="Close"
 gui.Parent=pg
-local requestFn=request or http_request
+local requestFn=type(request)=="function"and request or http_request
 if type(requestFn)~="function" then label.Text="HTTP request function unavailable.";return end
 if player.Name~="Deadline_coolgun"or game.PlaceId~=101880234193261 then
     label.Text="This adapter is configured for Deadline_coolgun / place 101880234193261.";return
@@ -37,9 +37,20 @@ local function call(path,packet)
     local response=requestFn({Url=URL..path,Method=packet and "POST"or "GET",
         Headers={ ["Content-Type"]="application/json",["X-Bridge-Token"]=token or ""},
         Body=packet and http:JSONEncode(packet)or nil,Timeout=2})
-    assert(type(response)=="table"and type(response.Body)=="string","No HTTP response")
-    local data=http:JSONDecode(response.Body)
-    assert((response.StatusCode or 200)==200,data.error or "HTTP request failed")
+    local body,status
+    if type(response)=="string"then body=response
+    elseif type(response)=="table"then
+        body=response.Body or response.body
+        local code=response.StatusCode or response.Status or response.status_code or response.status
+        if code~=nil then
+            status=tonumber(code)
+            assert(status,"Unrecognized HTTP status: "..tostring(code))
+        end
+    end
+    assert(type(body)=="string","No HTTP response body")
+    local data=http:JSONDecode(body)
+    assert(type(data)=="table","Invalid JSON response")
+    assert(not status or status==200,data.error or "HTTP request failed")
     return data
 end
 local function send(packet)
@@ -167,3 +178,4 @@ task.spawn(function()
         task.wait(math.max(.005,1/HZ-(os.clock()-began)))
     end
 end)
+return {started=true,version=2}

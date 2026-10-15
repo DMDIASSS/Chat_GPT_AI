@@ -117,7 +117,8 @@ local request=function(options)
  assert(p.place==101880234193261 and p.account=='Deadline_coolgun')
  if p.enabled then
   for _,item in ipairs(created)do
-   if item.ClassName=='TextButton'then assert(item.Visible==false,'Boost could click a bot UI button')end
+   -- The independent launcher/error panel is not a bot control button.
+   if item.ClassName=='TextButton'and item.Text~='Close launcher'then assert(item.Visible==false,'Boost could click a bot UI button')end
   end
  end
  local status=p.enabled and(p.valid and'RUNNING'or'WAITING')or'PAUSED'
