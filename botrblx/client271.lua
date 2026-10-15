@@ -1,0 +1,169 @@
+-- Update271 live bridge. Reads rendered state; Python sends normal OS input.
+local URL="http://127.0.0.1:28771"
+local TEAM=0 -- 0=blue, 1=orange. Freeplay spawns blue.
+local HZ=15
+local player=game:GetService("Players").LocalPlayer
+local pg=assert(player:FindFirstChildOfClass("PlayerGui"),"Join first")
+assert(not pg:FindFirstChild("Update271Bridge"),"Close the old Update271 panel first")
+local gui=Instance.new("ScreenGui")
+gui.Name="Update271Bridge";gui.ResetOnSpawn=false;gui.DisplayOrder=1000071
+local panel=Instance.new("Frame",gui)
+panel.Size=UDim2.fromOffset(420,160);panel.Position=UDim2.fromOffset(20,20)
+panel.BackgroundColor3=Color3.fromRGB(18,22,30)
+local label=Instance.new("TextLabel",panel)
+label.Position=UDim2.fromOffset(10,8);label.Size=UDim2.new(1,-20,0,105)
+label.BackgroundTransparency=1;label.TextColor3=Color3.new(1,1,1)
+label.TextSize=14;label.Font=Enum.Font.Code;label.TextWrapped=true
+label.Text="Update271: connecting to Python..."
+local start=Instance.new("TextButton",panel)
+start.Position=UDim2.fromOffset(10,120);start.Size=UDim2.fromOffset(150,30)
+start.Text="Start bot / F6"
+local teamButton=Instance.new("TextButton",panel)
+teamButton.Position=UDim2.fromOffset(170,120);teamButton.Size=UDim2.fromOffset(120,30)
+teamButton.Text="Team: BLUE"
+local close=Instance.new("TextButton",panel)
+close.Position=UDim2.fromOffset(300,120);close.Size=UDim2.fromOffset(110,30);close.Text="Close"
+gui.Parent=pg
+local requestFn=request or http_request
+if type(requestFn)~="function" then label.Text="HTTP request function unavailable.";return end
+if player.Name~="Deadline_coolgun"or game.PlaceId~=101880234193261 then
+    label.Text="This adapter is configured for Deadline_coolgun / place 101880234193261.";return
+end
+local http=game:GetService("HttpService")
+local input=game:GetService("UserInputService")
+local world=game:GetService("Workspace")
+local alive,enabled,token,seq,armAt=true,false,nil,0,0
+local function call(path,packet)
+    local response=requestFn({Url=URL..path,Method=packet and "POST"or "GET",
+        Headers={ ["Content-Type"]="application/json",["X-Bridge-Token"]=token or ""},
+        Body=packet and http:JSONEncode(packet)or nil,Timeout=2})
+    assert(type(response)=="table"and type(response.Body)=="string","No HTTP response")
+    local data=http:JSONDecode(response.Body)
+    assert((response.StatusCode or 200)==200,data.error or "HTTP request failed")
+    return data
+end
+local function send(packet)
+    seq=seq+1
+    packet.seq=seq;packet.account=player.Name;packet.place=game.PlaceId
+    return call("/frame",packet)
+end
+local function controls()
+    start.Text=enabled and "Pause / F6"or "Start bot / F6"
+    -- Injected boost clicks must not click this panel's buttons.
+    start.Visible=not enabled;teamButton.Visible=not enabled;close.Visible=not enabled
+end
+local function toggle()
+    enabled=not enabled;armAt=os.clock()+.5
+    controls()
+end
+start.Activated:Connect(toggle)
+teamButton.Activated:Connect(function()
+    enabled=false;TEAM=1-TEAM
+    teamButton.Text=TEAM==0 and "Team: BLUE"or "Team: ORANGE"
+    controls()
+end)
+local hotkey=input.InputBegan:Connect(function(key,processed)
+    if key.KeyCode==Enum.KeyCode.F8 then enabled=false;controls()end
+    if not processed and key.KeyCode==Enum.KeyCode.F6 then toggle()end
+end)
+close.Activated:Connect(function()
+    alive=false;enabled=false;hotkey:Disconnect();gui:Destroy()
+    if token then task.spawn(function()pcall(send,{enabled=false,valid=false})end)end
+end)
+local scene,car,ball,carRoot,ballRoot,lastCar,lastBall,lastTime
+local function nearest(anchor,excluded)
+    if not anchor then return nil end
+    local best,distance=nil,3
+    for _,model in ipairs(scene:GetDescendants())do
+        if model:IsA("Model")and model~=excluded and model.PrimaryPart then
+            local d=(model.PrimaryPart.Position-anchor.Position).Magnitude
+            if d<distance then best,distance=model,d end
+        end
+    end
+    return best
+end
+local boostLabel
+local function boost()
+    if boostLabel and boostLabel:IsDescendantOf(pg)then
+        local value=tonumber(boostLabel.Text)
+        if value and value>=0 and value<=100 then return value end
+    end
+    local hud=pg:FindFirstChild("CarSoccerHud")
+    local holder=hud and hud:FindFirstChild("Boost",true)
+    holder=holder and(holder:FindFirstChild("BoostS1",true)or holder)
+    if holder then
+        for _,item in ipairs(holder:GetDescendants())do
+            if item:IsA("TextLabel")then
+                local value=tonumber(item.Text)
+                if value and value>=0 and value<=100 then boostLabel=item;return value end
+            end
+        end
+    end
+end
+local function sim(v,k)return {v.X*k,v.Z*k,v.Y*k}end
+local function pose(frame,previous,dt)
+    local delta=frame.Position-previous.Position
+    local axis,angle=previous:ToObjectSpace(frame):ToAxisAngle()
+    local omega=previous:VectorToWorldSpace(axis)*(angle/dt)
+    return {position=sim(frame.Position,10),velocity=sim(delta/dt,10),
+        forward=sim(frame.LookVector,1),up=sim(frame.UpVector,1),
+        angular_velocity=sim(omega,-1)},delta.Magnitude
+end
+local function read()
+    local current=world:FindFirstChild("CarSoccer")
+    if current~=scene then scene=current;car=nil;ball=nil end
+    if not scene then return nil,"scene unavailable"end
+    if not car or not ball or not carRoot:IsDescendantOf(scene)
+        or not ballRoot:IsDescendantOf(scene)or car.PrimaryPart~=carRoot or ball.PrimaryPart~=ballRoot then
+        local sounds=scene:FindFirstChild("Sounds")
+        car=nearest(sounds and sounds:FindFirstChild("CarSound"))
+        ball=car and nearest(sounds and sounds:FindFirstChild("BallSound"),car)
+        if not car or not ball then return nil,"goal/reset: waiting for car and ball"end
+        carRoot,ballRoot=car.PrimaryPart,ball.PrimaryPart
+        lastCar,lastBall,lastTime=carRoot.CFrame,ballRoot.CFrame,os.clock()
+        return nil,"warming up poses"
+    end
+    local now=os.clock();local dt=now-lastTime
+    local cf,bf=carRoot.CFrame,ballRoot.CFrame
+    if dt<=0 then return nil,"waiting for next frame"end
+    local cp,cd=pose(cf,lastCar,dt);local bp,bd=pose(bf,lastBall,dt)
+    lastCar,lastBall,lastTime=cf,bf,now
+    if dt>.3 or cd/dt>350 or bd/dt>800 then return nil,"pose discontinuity/reset"end
+    local b=boost()
+    if b==nil then return nil,"numeric boost HUD missing"end
+    local p,u=cp.position,cp.up
+    -- Contact estimate for the standard soccer arena, NOT internal wheel state.
+    local grounded=(p[3]<38 and u[3]>.65)
+        or(p[3]>2006 and u[3]<-.65)
+        or(math.abs(p[1])>4058 and u[1]*p[1]<-2500)
+        or(math.abs(p[2])>5082 and math.abs(p[1])>1000 and u[2]*p[2]<-3200)
+    return {car=cp,ball=bp,boost=b,team=TEAM,ground_estimate=grounded,valid=true}
+end
+task.spawn(function()
+    while alive do
+        local began=os.clock()
+        local ok,err=pcall(function()
+            if not token then
+                local hello=call("/hello")
+                assert(hello.protocol==1,"Wrong Python bridge version")
+                token=hello.token;seq=0;enabled=false
+            end
+            if input:GetFocusedTextBox()then enabled=false end
+            local packet,reason=read()
+            packet=packet or {valid=false,reason=reason}
+            packet.enabled=enabled and os.clock()>=armAt
+            local reply=send(packet)
+            if not alive then return end
+            if reply.disarmed then enabled=false end
+            controls()
+            label.Text=("Update271 | %s\nKeys: %s | inference: %s ms\nF6 start/pause; F8 stop. Freeplay adapter.\nGround/flip estimated; pads/other cars unavailable.")
+                :format(reply.status or "connected",table.concat(reply.keys or {}," "),tostring(reply.ms or "-"))
+        end)
+        if not ok and alive then
+            enabled=false;token=nil;controls()
+            label.Text="Bridge stopped: "..tostring(err).."\nStart Python first. Reconnecting..."
+            task.wait(1)
+        end
+        task.wait(math.max(.005,1/HZ-(os.clock()-began)))
+    end
+end)
