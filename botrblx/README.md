@@ -58,8 +58,9 @@ they contain a local session token.
 
 Version 3 publishes a separate reply file for each session/request ID. Once
 published, its contents are not updated; a reader caching bytes by filename can
-still obtain each new response from its new filename. If `isfile` is available,
-Lua waits for publication before the first read. Python retains the newest 16
+still obtain each new response from its new filename. Lua polls `readfile`
+directly and retries missing/incomplete replies; existence metadata never gates
+the read. Python retains the newest 16
 replies and removes older ones; files held open by Windows are retried for cleanup.
 The handshake can wait four seconds; the live-input timeout stays at 0.4 seconds.
 
@@ -68,6 +69,11 @@ its Roblox panel, replace the complete `botrblx` folder, restart the BAT, then
 execute `JJSploit_File_Launch.lua` again. Older clients use one shared reply file
 and cannot communicate with v3. Session and request-ID checks remain required;
 an older reply never substitutes for the current response.
+
+Client revision **v3.1** removes the `isfile` gate that could stop every read.
+It is compatible with the running v3 Python bridge. Close the old bot panel and
+execute the updated `JJSploit_File_Client.lua` directly to update only Lua; the
+file launcher instead loads the client last installed by Python at startup.
 
 File mode exchanges bounded JSON requests and replies, with per-client sessions,
 fresh tokens, sequence checks and a stale-frame limit. It does not execute code

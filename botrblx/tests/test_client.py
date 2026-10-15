@@ -81,6 +81,11 @@ end
         for name,_,_ in CASES:
             with self.subTest(case=name):
                 self.run_case(name,extra,filename="JJSploit_File_Client.lua")
+        # Some executor metadata APIs cannot see files written externally, even
+        # though readfile can read them. Such a false negative must not gate IO.
+        with self.subTest(case="readable_reply_with_false_isfile"):
+            self.run_case("live_frames_and_close",extra+"\nlocal isfile=function()return false end\n",
+                          filename="JJSploit_File_Client.lua")
 
     def test_file_client_missing_functions_stays_visible(self):
         extra = "\nservices.HttpService.GenerateGUID=function()return 'test-session'end\nlocal readfile=nil\nlocal writefile=nil\n"
@@ -136,7 +141,8 @@ assert(#packets==0)
 local visible=false
 for _,item in ipairs(created)do
  if item.ClassName=='TextLabel'and string.find(item.Text or '',
-  'No matching file reply: readfile failed: ',1,true)then visible=true end
+  'readfile failed:',1,true)and string.find(item.Text or '',
+  'missing reply',1,true)then visible=true end
 end
 assert(visible,'Wrong workspace did not show a timeout')
 '''

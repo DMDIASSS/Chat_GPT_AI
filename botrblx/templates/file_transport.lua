@@ -1,5 +1,5 @@
 -- File transport: generated into the standalone client instead of HTTP.
-label.Text="Update271 file transport v3: connecting to Python..."
+label.Text="Update271 file client v3.1: connecting to Python..."
 local fileHttp=game:GetService("HttpService") -- JSON/UUID only; no network calls.
 local fileSession=fileHttp:GenerateGUID(false)
 local fileId=0
@@ -18,13 +18,9 @@ local function bridge_call(path,packet,token)
     local detail="readfile was not called"
     while os.clock()<deadline do
         assert(id==fileId,"File request superseded")
-        local ready=true
-        if type(isfile)=="function"then
-            local checked,exists=pcall(isfile,replyPath)
-            if checked and exists==false then ready=false end
-        end
-        local ok,body=false,"reply file not published yet"
-        if ready then ok,body=pcall(readfile,replyPath)end
+        -- The executor's existence metadata need not reflect files published by
+        -- Python. Always try the content read; missing files are retryable.
+        local ok,body=pcall(readfile,replyPath)
         if not ok then
             detail="readfile failed: "..tostring(body):sub(1,160)
         elseif type(body)~="string"then
@@ -51,5 +47,5 @@ local function bridge_call(path,packet,token)
         end
         task.wait(.01)
     end
-    error("No matching file reply: "..detail..". Requires updated Python bridge (file transport v3).",0)
+    error("No matching file reply for request "..id..": "..detail..". Keep Python open (file transport v3).",0)
 end

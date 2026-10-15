@@ -224,7 +224,7 @@ task.spawn(function()
         end)
         if not ok and alive then
             enabled=false;token=nil;controls()
-            label.Text="Bridge stopped: "..tostring(err).."\nStart Python first. Reconnecting..."
+            label.Text="Bridge stopped: "..tostring(err).."\nReconnecting..."
             task.wait(1)
         end
         task.wait(math.max(.005,1/HZ-(os.clock()-began)))
