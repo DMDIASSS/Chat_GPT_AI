@@ -388,11 +388,13 @@ def main():
     logging.info("Project: %s | Python: %s", root, os.sys.executable)
     logging.info("Model: %s | Log: %s", model_path, APP_DIR / "bridge.log")
     torch.set_num_threads(1)
+    logging.info("Loading policy on CPU...")
     model = load_model(model_path,base_path)
     with torch.inference_mode():
         warm = model((torch.zeros(1,1,32),torch.zeros(1,36,24),torch.zeros(1,36)))[0]
         if warm.shape != (1,90) or not torch.isfinite(warm).all():
             raise ValueError("Model must return 90 finite logits")
+    logging.info("MODEL_READY: policy returned 90 finite logits")
     if args.self_check:
         logging.info("SELF_CHECK_OK: model returns 90 finite logits; client271.lua found. No inputs sent.")
         return

@@ -39,9 +39,17 @@ folder. The script creates only that text file; it does not send controls.
 functions exist, but the handshake above verifies the actual shared folder.
 
 **File not found** in the launcher means the selected workspace differs from
-the executor's workspace. **No file reply** means Python has not processed a
-request in that folder. Look for `request.json` under `botrblx_exchange` while
-the client is running; do not edit these runtime files manually.
+the executor's workspace. A **No matching file reply** message includes the last
+read/decode failure, a mismatched request ID, or another client's reply.
+`CLIENT_HELLO` in Python confirms a request arrived; `FILE_REPLY: hello ... written`
+confirms Python wrote the response. `FILE_REPLY_BLOCKED` reports an OS write error.
+Look for `request.json` and `response.json` under `botrblx_exchange`; do not paste
+their full contents into a report because responses contain a local session token.
+
+Windows readers can deny renaming an open file while allowing writes. If that
+happens, Python falls back to writing the response in place and logs that choice.
+Lua ignores incomplete JSON and accepts only matching session/request IDs.
+The handshake can wait four seconds; the live-input timeout stays at 0.4 seconds.
 
 File mode exchanges bounded JSON requests and replies, with per-client sessions,
 fresh tokens, sequence checks and a stale-frame limit. It does not execute code

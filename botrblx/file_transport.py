@@ -60,6 +60,9 @@ class FileExchange:
         self.server = secrets.token_hex(16)
         self.session, self.last_id = None, -1
         self.last_request, self.pending = None, None
+        self.pending_route = None
+        self.last_write_warning = -float("inf")
+        self.in_place = False
         # Only our two mailboxes are reset; never reuse frames from an earlier run.
         for path in (self.request,self.response,self.temporary):
             path.unlink(missing_ok=True)
@@ -93,14 +96,30 @@ class FileExchange:
 
     def _flush(self):
         if self.pending is None: return
+        encoded = json.dumps(self.pending,allow_nan=False)
         try:
-            self.temporary.write_text(json.dumps(self.pending,allow_nan=False),encoding="utf-8")
-            self.temporary.replace(self.response)
-            self.pending = None
-        except PermissionError:
-            # Windows may briefly lock a file while readfile is using it. Retry
-            # the cached reply on the next poll, without repeating inference.
-            pass
+            if self.in_place:
+                self.response.write_text(encoded,encoding="utf-8")
+            else:
+                self.temporary.write_text(encoded,encoding="utf-8")
+                try:
+                    self.temporary.replace(self.response)
+                except PermissionError:
+                    # A reader on Windows can allow writes but deny renames.
+                    # Complete JSON + session/id checks make a partial in-place
+                    # read harmless: Lua retries rather than acting on it.
+                    self.response.write_text(encoded,encoding="utf-8")
+                    self.in_place = True
+                    logging.info("FILE_REPLY: Windows rename locked; using in-place writes")
+        except OSError as error:
+            if time.monotonic()-self.last_write_warning >= 2:
+                logging.warning("FILE_REPLY_BLOCKED: %s | %s",self.response,error)
+                self.last_write_warning = time.monotonic()
+            return  # Retry cached reply; never repeat inference for a write error.
+        if self.pending_route == "/hello":
+            logging.info("FILE_REPLY: hello id=%s status=%s bytes=%s written to %s",
+                         self.pending["id"],self.pending["status"],len(encoded.encode("utf-8")),self.response)
+        self.pending = None
 
     def poll(self):
         try:
@@ -120,4 +139,5 @@ class FileExchange:
         if key != self.last_request:
             self.last_request = key
             self.pending = self._handle(request,mtime)
+            self.pending_route = request.get("route")
         self._flush()

@@ -85,7 +85,12 @@ class FileTests(unittest.TestCase):
 
     def test_locked_response_retries_without_repeating_inference(self):
         self.hello()
-        with patch.object(Path,"replace",side_effect=PermissionError):
+        write_text = Path.write_text
+        def locked_write(path,*args,**kwargs):
+            if path == self.exchange.response: raise PermissionError("read handle denies writes")
+            return write_text(path,*args,**kwargs)
+        with patch.object(Path,"replace",side_effect=PermissionError), \
+             patch.object(Path,"write_text",locked_write), self.assertLogs(level="WARNING"):
             self.request_id += 1
             self.exchange.request.write_text(json.dumps(dict(session="client-A",id=self.request_id,
                 route="/frame",token=self.token,packet=packet())),encoding="utf-8")
@@ -96,6 +101,25 @@ class FileTests(unittest.TestCase):
         self.assertIsNone(self.exchange.pending)
         self.assertEqual(self.bridge.frames,1)
         self.assertEqual(json.loads(self.exchange.response.read_text())["id"],self.request_id)
+
+    def test_windows_reader_that_denies_rename_can_receive_inplace_reply(self):
+        self.hello()
+        with patch.object(Path,"replace",side_effect=PermissionError):
+            reply = self.send("/frame",packet())
+            self.assertEqual(reply["status"],200)
+            self.assertTrue(self.exchange.in_place)
+            self.assertIsNone(self.exchange.pending)
+        self.assertEqual(self.bridge.frames,1)
+        self.exchange.poll()
+        self.assertEqual(self.bridge.frames,1)
+
+    def test_hello_reply_written_is_logged_without_its_token(self):
+        with self.assertLogs(level="INFO") as logs:
+            self.hello()
+        messages = " ".join(logs.output)
+        self.assertIn("FILE_REPLY: hello",messages)
+        self.assertIn("response.json",messages)
+        self.assertNotIn(self.token,messages)
 
     def test_true_torchscript_mailbox_and_invalid_packet_release(self):
         base,_ = save_actor(self.workspace)

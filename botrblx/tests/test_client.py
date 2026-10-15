@@ -68,14 +68,14 @@ local writefile=function(path,body)
  local reply=mock_server({Url=r.route,Method=r.packet and 'POST'or 'GET',
   Headers={['X-Bridge-Token']=r.token},Body=r.packet and services.HttpService:JSONEncode(r.packet)})
  files['botrblx_exchange/response.json']=services.HttpService:JSONEncode({
-  session=r.session,id=r.id,server='file-server',status=200,data=services.HttpService:JSONDecode(reply.Body)})
+  session=r.session,id=tostring(r.id),server='file-server',status='200',data=services.HttpService:JSONDecode(reply.Body)})
  read_attempt=0
 end
 local readfile=function(path)
  read_attempt=read_attempt+1
  if read_attempt==1 then return services.HttpService:JSONEncode({session='old-session',id=1,status=200,data={}})end
  if read_attempt==2 then return 'partial JSON'end
- return assert(files[path],'missing file')
+ return string.char(239,187,191)..assert(files[path],'missing file')
 end
 '''
         for name,_,_ in CASES:
@@ -106,11 +106,23 @@ assert(#packets==0)
 local visible=false
 for _,item in ipairs(created)do
  if item.ClassName=='TextLabel'and string.find(item.Text or '',
-  'No file reply',1,true)then visible=true end
+  'No matching file reply: readfile failed: ',1,true)then visible=true end
 end
 assert(visible,'Wrong workspace did not show a timeout')
 '''
         self.run_case("live_frames_and_close",extra=extra,filename="JJSploit_File_Client.lua",checks_override=checks)
+
+    def test_file_client_explains_why_a_readable_reply_was_rejected(self):
+        for body,expected in (
+            ("'partial JSON'", "JSON decode failed"),
+            ("services.HttpService:JSONEncode({session='other-client',id=1})", "reply belongs to another client"),
+            ("services.HttpService:JSONEncode({session='test-session',id=0})", "reply id=0, waiting for id="),
+            ("false", "readfile returned boolean"),
+        ):
+            with self.subTest(detail=expected):
+                extra = "\nservices.HttpService.GenerateGUID=function()return 'test-session'end\nlocal writefile=function()end\nlocal readfile=function()return " + body + " end\n"
+                checks = "\nassert(#packets==0)\nlocal visible=false\nfor _,item in ipairs(created)do\n if item.ClassName=='TextLabel'and string.find(item.Text or ''," + repr(expected) + ",1,true)then visible=true end\nend\nassert(visible,'Missing specific reply diagnostic')\n"
+                self.run_case("live_frames_and_close",extra=extra,filename="JJSploit_File_Client.lua",checks_override=checks)
 
 
 if __name__ == "__main__": unittest.main(verbosity=2)
