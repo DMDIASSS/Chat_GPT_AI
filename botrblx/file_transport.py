@@ -55,17 +55,19 @@ class FileExchange:
         self.folder = Path(workspace) / "botrblx_exchange"
         self.folder.mkdir(exist_ok=True)
         self.request = self.folder / "request.json"
-        self.response = self.folder / "response.json"
+        # A fresh name avoids handles cached by the old atomic-replace writer.
+        self.response = self.folder / "reply_v2.json"
         self.temporary = self.folder / "response.tmp"
         self.server = secrets.token_hex(16)
         self.session, self.last_id = None, -1
         self.last_request, self.pending = None, None
         self.pending_route = None
         self.last_write_warning = -float("inf")
-        self.in_place = False
-        # Only our two mailboxes are reset; never reuse frames from an earlier run.
-        for path in (self.request,self.response,self.temporary):
-            path.unlink(missing_ok=True)
+        # Preserve the file objects: executor APIs can retain handles between
+        # reads or executions. Reset content without unlinking either mailbox.
+        self.request.write_text("{}",encoding="utf-8")
+        self.response.write_text("{}",encoding="utf-8")
+        self.temporary.unlink(missing_ok=True)
 
     def _handle(self, request, mtime):
         session, request_id = request["session"], request["id"]
@@ -98,19 +100,10 @@ class FileExchange:
         if self.pending is None: return
         encoded = json.dumps(self.pending,allow_nan=False)
         try:
-            if self.in_place:
-                self.response.write_text(encoded,encoding="utf-8")
-            else:
-                self.temporary.write_text(encoded,encoding="utf-8")
-                try:
-                    self.temporary.replace(self.response)
-                except PermissionError:
-                    # A reader on Windows can allow writes but deny renames.
-                    # Complete JSON + session/id checks make a partial in-place
-                    # read harmless: Lua retries rather than acting on it.
-                    self.response.write_text(encoded,encoding="utf-8")
-                    self.in_place = True
-                    logging.info("FILE_REPLY: Windows rename locked; using in-place writes")
+            # Always keep the same file object. Atomic rename can succeed while
+            # a persistent readfile handle still points at the preceding reply.
+            # The Lua decoder rejects incomplete writes and mismatched IDs.
+            self.response.write_text(encoded,encoding="utf-8")
         except OSError as error:
             if time.monotonic()-self.last_write_warning >= 2:
                 logging.warning("FILE_REPLY_BLOCKED: %s | %s",self.response,error)

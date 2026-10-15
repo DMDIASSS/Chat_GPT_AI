@@ -24,6 +24,7 @@ local close=Instance.new("TextButton",panel)
 close.Position=UDim2.fromOffset(300,120);close.Size=UDim2.fromOffset(110,30);close.Text="Close"
 gui.Parent=pg
 -- File transport: generated into the standalone client instead of HTTP.
+label.Text="Update271 file transport v2: connecting to Python..."
 local fileHttp=game:GetService("HttpService") -- JSON/UUID only; no network calls.
 local fileSession=fileHttp:GenerateGUID(false)
 local fileId=0
@@ -41,7 +42,7 @@ local function bridge_call(path,packet,token)
     local detail="readfile was not called"
     while os.clock()<deadline do
         assert(id==fileId,"File request superseded")
-        local ok,body=pcall(readfile,"botrblx_exchange/response.json")
+        local ok,body=pcall(readfile,"botrblx_exchange/reply_v2.json")
         if not ok then
             detail="readfile failed: "..tostring(body):sub(1,160)
         elseif type(body)~="string"then
@@ -51,7 +52,7 @@ local function bridge_call(path,packet,token)
             if body:sub(1,3)==string.char(239,187,191)then body=body:sub(4)end
             local decoded,response=pcall(function()return fileHttp:JSONDecode(body)end)
             if not decoded then
-                detail="JSON decode failed ("..#body.." bytes); check response.json"
+                detail="JSON decode failed ("..#body.." bytes); check reply_v2.json"
             elseif type(response)~="table"then
                 detail="decoded response is "..type(response)..", expected table"
             elseif response.session~=fileSession then
@@ -66,7 +67,7 @@ local function bridge_call(path,packet,token)
         end
         task.wait(.005)
     end
-    error("No matching file reply: "..detail..". Keep START_FILE_BOT.bat open.",0)
+    error("No matching file reply: "..detail..". Requires updated Python bridge (file transport v2).",0)
 end
 
 if player.Name~="Deadline_coolgun"or game.PlaceId~=101880234193261 then

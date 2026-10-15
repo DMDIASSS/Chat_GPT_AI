@@ -54,6 +54,19 @@ class FileTests(unittest.TestCase):
         self.assertTrue(self.bridge.blocked)
         self.assertEqual([event for event in self.output.events if event[0]=="W"],[("W",True),("W",False)])
 
+    def test_persistent_reader_sees_each_reply_in_same_file(self):
+        self.hello()
+        # Executors may retain a handle to a named file. Replacing that file can
+        # leave the handle reading the old object despite a new path entry.
+        with self.exchange.response.open(encoding="utf-8") as reader:
+            first = json.load(reader)
+            for seq in range(3):
+                reply = self.send("/frame",packet(seq))
+                reader.seek(0)
+                visible = json.load(reader)
+                self.assertEqual(visible["id"],reply["id"],"Open reader retained the preceding reply")
+                self.assertGreater(visible["id"],first["id"])
+
     def test_session_tokens_and_new_server_disarm_old_request(self):
         self.assertEqual(self.send("/frame",packet())["status"],401)
         self.hello()
@@ -64,10 +77,10 @@ class FileTests(unittest.TestCase):
         self.send("/hello",session="client-B")
         self.assertFalse(self.output.held)
         self.assertEqual(self.send("/frame",packet(1))["status"],401)
-        # A fresh process deletes owned leftover frames/replies before accepting IO.
+        # A fresh process clears owned mailbox contents before accepting IO.
         old_request = self.exchange.request.read_bytes()
         self.exchange = f.FileExchange(self.bridge,self.workspace)
-        self.assertFalse(self.exchange.request.exists())
+        self.assertEqual(json.loads(self.exchange.request.read_text()),{})
         self.exchange.request.write_bytes(old_request)
         self.exchange.poll()
         self.assertEqual(json.loads(self.exchange.response.read_text())["status"],401)
@@ -89,8 +102,7 @@ class FileTests(unittest.TestCase):
         def locked_write(path,*args,**kwargs):
             if path == self.exchange.response: raise PermissionError("read handle denies writes")
             return write_text(path,*args,**kwargs)
-        with patch.object(Path,"replace",side_effect=PermissionError), \
-             patch.object(Path,"write_text",locked_write), self.assertLogs(level="WARNING"):
+        with patch.object(Path,"write_text",locked_write), self.assertLogs(level="WARNING"):
             self.request_id += 1
             self.exchange.request.write_text(json.dumps(dict(session="client-A",id=self.request_id,
                 route="/frame",token=self.token,packet=packet())),encoding="utf-8")
@@ -102,24 +114,23 @@ class FileTests(unittest.TestCase):
         self.assertEqual(self.bridge.frames,1)
         self.assertEqual(json.loads(self.exchange.response.read_text())["id"],self.request_id)
 
-    def test_windows_reader_that_denies_rename_can_receive_inplace_reply(self):
-        self.hello()
-        with patch.object(Path,"replace",side_effect=PermissionError):
-            reply = self.send("/frame",packet())
-            self.assertEqual(reply["status"],200)
-            self.assertTrue(self.exchange.in_place)
-            self.assertIsNone(self.exchange.pending)
-        self.assertEqual(self.bridge.frames,1)
-        self.exchange.poll()
-        self.assertEqual(self.bridge.frames,1)
-
     def test_hello_reply_written_is_logged_without_its_token(self):
         with self.assertLogs(level="INFO") as logs:
             self.hello()
         messages = " ".join(logs.output)
         self.assertIn("FILE_REPLY: hello",messages)
-        self.assertIn("response.json",messages)
+        self.assertIn("reply_v2.json",messages)
         self.assertNotIn(self.token,messages)
+
+    def test_restart_resets_content_without_detaching_persistent_reader(self):
+        self.hello()
+        with self.exchange.response.open(encoding="utf-8") as reader:
+            self.exchange = f.FileExchange(self.bridge,self.workspace)
+            reader.seek(0)
+            self.assertEqual(json.load(reader),{})
+            self.hello()
+            reader.seek(0)
+            self.assertEqual(json.load(reader)["id"],self.request_id)
 
     def test_true_torchscript_mailbox_and_invalid_packet_release(self):
         base,_ = save_actor(self.workspace)

@@ -16,7 +16,7 @@ It requires working executor `readfile` and `writefile` functions.
 2. Run **`START_FILE_BOT.bat`**. The first launch opens a folder picker.
    Select **JJSploit's workspace root**: the folder its `readfile` and `writefile`
    functions use. This is not automatically your training project folder.
-3. Wait for **`READY FILE MODE`**. Python installs `botrblx_client.lua` in that
+3. Wait for **`READY FILE MODE v2`**. Python installs `botrblx_client.lua` in that
    workspace and creates its own `botrblx_exchange` subfolder. Keep Python open.
 4. In freeplay, execute the complete **`JJSploit_File_Launch.lua`** file.
    It loads the installed Lua client from that workspace without a download.
@@ -43,13 +43,22 @@ the executor's workspace. A **No matching file reply** message includes the last
 read/decode failure, a mismatched request ID, or another client's reply.
 `CLIENT_HELLO` in Python confirms a request arrived; `FILE_REPLY: hello ... written`
 confirms Python wrote the response. `FILE_REPLY_BLOCKED` reports an OS write error.
-Look for `request.json` and `response.json` under `botrblx_exchange`; do not paste
+Look for `request.json` and `reply_v2.json` under `botrblx_exchange`; do not paste
 their full contents into a report because responses contain a local session token.
 
-Windows readers can deny renaming an open file while allowing writes. If that
-happens, Python falls back to writing the response in place and logs that choice.
-Lua ignores incomplete JSON and accepts only matching session/request IDs.
-The handshake can wait four seconds; the live-input timeout stays at 0.4 seconds.
+Version 2 writes replies **in place**, keeping the same file object while Lua
+polls it. Atomic replacement could leave a persistent reader pointing at an old
+reply even when the file's directory entry had updated. Mailbox resets also keep
+the file objects. Lua retries incomplete JSON and accepts only matching
+session/request IDs. The handshake can wait four seconds; the live-input timeout
+stays at 0.4 seconds.
+
+**Upgrade both Python and Lua together for v2.** Stop the old bridge and close
+its Roblox panel, replace the complete `botrblx` folder, restart the BAT, then
+execute `JJSploit_File_Launch.lua` again. The previous standalone Lua link used
+`response.json`; it cannot communicate with v2. The fresh `reply_v2.json` name
+avoids any handles retained for that older file. Do not accept a reply with the
+preceding ID as a workaround: it may contain an obsolete session or result.
 
 File mode exchanges bounded JSON requests and replies, with per-client sessions,
 fresh tokens, sequence checks and a stale-frame limit. It does not execute code

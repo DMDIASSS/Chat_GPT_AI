@@ -419,7 +419,7 @@ def main():
     worker = threading.Thread(target=monitor,daemon=True)
     worker.start()
     if exchange:
-        logging.info("READY FILE MODE | workspace %s | no HTTP server",workspace)
+        logging.info("READY FILE MODE v2 | workspace %s | stable reply_v2.json | no HTTP server",workspace)
         logging.info("Execute JJSploit_File_Launch.lua. Requires executor readfile/writefile support.")
     else:
         logging.info("READY http://127.0.0.1:%s | model %s",PORT,model_path)

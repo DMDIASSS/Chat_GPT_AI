@@ -67,7 +67,7 @@ local writefile=function(path,body)
  assert(r.session=='fresh-file-session')
  local reply=mock_server({Url=r.route,Method=r.packet and 'POST'or 'GET',
   Headers={['X-Bridge-Token']=r.token},Body=r.packet and services.HttpService:JSONEncode(r.packet)})
- files['botrblx_exchange/response.json']=services.HttpService:JSONEncode({
+ files['botrblx_exchange/reply_v2.json']=services.HttpService:JSONEncode({
   session=r.session,id=tostring(r.id),server='file-server',status='200',data=services.HttpService:JSONDecode(reply.Body)})
  read_attempt=0
 end
