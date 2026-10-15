@@ -4,6 +4,15 @@ Local freeplay inference: rendered Roblox state → update271 in Python → norm
 Windows keyboard and mouse events. The model stays in your existing training
 project; model weights, logs and recordings are not included in this folder.
 
+## Download only this folder
+
+[Download botrblx.zip](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/native-quality-campaign/downloads/botrblx.zip)
+contains only the `botrblx` folder, including the Python bridge, Lua clients,
+launchers and templates. Extract it into `E:\Downloads\Chat_GPT_AI`, replacing
+the existing folder's application files after stopping the bridge. Your existing
+training environment and model stay in the project. This ZIP is stored separately
+from full-repository archives and can be downloaded for bridge updates.
+
 ## JJSploit / WRD: file mode
 
 The reported WRD HTTP request returned **403, Wrd Server Error: Connection
