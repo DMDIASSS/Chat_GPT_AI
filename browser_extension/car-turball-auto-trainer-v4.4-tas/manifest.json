@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Car Soccer + Turball AI Trainer",
-  "version": "4.4.0",
-  "description": "AI models and local TAS .data playback for Car Soccer and Turball, with saved starting-state restore and a minimizable menu.",
+  "version": "4.5.0",
+  "description": "AI models, TAS playback and a minimizable menu, plus Car Soccer local/host fun controls for ball glue, boost, jumps, speed and goal shots.",
   "permissions": [
     "debugger",
     "tabs",

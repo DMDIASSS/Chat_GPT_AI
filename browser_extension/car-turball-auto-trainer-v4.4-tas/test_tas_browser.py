@@ -32,6 +32,7 @@ with sync_playwright() as p:
         }''')
         errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
         page.add_script_tag(content=content);page.evaluate('window.pushStatus()')
+        page.wait_for_selector('#gct4-panel')
         page.keyboard.press('F7');page.get_by_role('option',name='TAS — recorded inputs').click()
         page.wait_for_selector('.gct4-tas:not([hidden])')
         page.locator('#gct4-tas-upload').set_input_files([

@@ -26,6 +26,9 @@
   let tasFiles = [];
   let tasImportGeneration = 0;
   let minimized = false;
+  let funPane = null;
+  let funStatus = null;
+  let funSpeed = null;
 
   const SITE = location.hostname === 'turball.io' ? 'turball' : 'car-soccer';
   const SITE_TITLE = SITE === 'turball' ? 'Turball' : 'Car Soccer';
@@ -379,7 +382,7 @@
     const s = latest;
     const botName = s.botName || (s.selectedBot === 'nexto' ? 'Nexto' : 'Grand Champion');
 
-    status.textContent = s.loading ? `Loading ${botName}…` : s.active ? `${botName} Control` : 'Player Control';
+    status.textContent = s.loading ? `Loading ${botName}…` : s.active ? `${botName} Control` : s.fun?.enabled ? 'Fun controls ON' : 'Player Control';
     button.disabled = !!s.loading;
     const isTas = s.selectedBot === 'tas';
     button.textContent = s.active ? (isTas ? 'Stop TAS / F8' : 'Take Back Control') : isTas ? 'Play TAS from start' : `Give Control to ${botName}`;
@@ -396,7 +399,20 @@
       const pos = v => Array.isArray(v) ? v.map(n => Number(n).toFixed(1)).join(', ') : '—';
       tasStatus.textContent = t.loaded ? `${t.name}\nFrame ${Math.min((t.frame || 0) + (t.running ? 1 : 0),t.frames)} / ${t.frames} · ${Number(t.seconds).toFixed(2)} s\nCar: ${pos(t.car)}\nBall: ${pos(t.ball)}\n${t.message || ''}` : 'Upload TAS .data files to begin.';
     }
-    if (restoreButton) restoreButton.textContent = `Trainer · ${s.active ? isTas ? 'TAS ▶' : 'AI ▶' : 'Open'}`;
+    if (restoreButton) restoreButton.textContent = `Trainer · ${s.fun?.enabled ? 'FUN' : s.active ? isTas ? 'TAS ▶' : 'AI ▶' : 'Open'}`;
+    if (funPane && SITE === 'car-soccer') {
+      const f=s.fun;
+      funStatus.textContent = f ? `${f.scope} · ${Number(f.currentSpeed||0).toFixed(0)} units/s\n${f.reason||f.error||f.message||''}` : 'Reload Car Soccer to load fun controls.';
+      for (const control of funPane.querySelectorAll('[data-fun-effect]')) {
+        const active=!!f?.[control.dataset.funEffect];
+        control.disabled=!f?.available;
+        control.setAttribute('aria-pressed',String(active));
+        control.textContent=control.dataset.label+(active?' · ON':' · OFF');
+      }
+      for (const control of funPane.querySelectorAll('[data-fun-action]')) control.disabled=!f?.available;
+      funSpeed.disabled=!f?.available;
+      if (document.activeElement!==funSpeed) funSpeed.value=String(f?.speedLimit||6000);
+    }
     panel.querySelector('.gct4-body').style.maxHeight = `${Math.max(100,innerHeight-(parseFloat(panel.style.top)||0)-55)}px`;
 
     const c = s.lastControls || {};
@@ -467,6 +483,11 @@
     style.textContent = `
 #gct4-panel{position:fixed;z-index:2147483646;left:18px;top:88px;width:300px;color:#eef5ff;background:#0e1622f2;border:1px solid #40516a;border-radius:10px;box-shadow:0 12px 38px #0007;font:12px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;overflow:hidden;backdrop-filter:blur(8px)}
 #gct4-panel[hidden],#gct4-restore[hidden],.gct4-tas[hidden]{display:none!important}
+#gct4-fun[hidden]{display:none!important}#gct4-fun{margin-top:10px;padding:8px;background:#09111d;border:1px solid #40516a;border-radius:6px}
+#gct4-fun summary{cursor:pointer;font-weight:700}.gct4-fun-status{margin:7px 0;white-space:pre-wrap;color:#bcd5ff}
+.gct4-fun-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}.gct4-fun-grid button,#gct4-fun-stop{font:inherit;color:#eef5ff;border:1px solid #40516a;border-radius:5px;background:#243650;padding:7px 5px;cursor:pointer}
+.gct4-fun-grid button[aria-pressed=true]{background:#246447;border-color:#4aa979}.gct4-fun-grid button:disabled{opacity:.5;cursor:default}
+.gct4-fun-speed{display:flex;align-items:center;justify-content:space-between;gap:5px;margin:9px 0}.gct4-fun-speed input{width:90px;color:white;background:#192538;border:1px solid #53709c;border-radius:4px;padding:5px}#gct4-fun-stop{width:100%;margin-top:7px;background:#783737}
 #gct4-restore{position:fixed;z-index:2147483647;background:#192538;color:#eef5ff;border:1px solid #53709c;border-radius:20px;padding:10px 15px;cursor:pointer;font:700 12px system-ui}
 .gct4-minimize{margin-left:auto;min-width:28px;color:white;background:#283d58;border:0;border-radius:4px;cursor:pointer;font-size:18px!important}
 .gct4-tas{padding:8px;margin-bottom:9px;border:1px solid #40516a;border-radius:6px;background:#09111d}
@@ -484,7 +505,7 @@
     panel.style.top = `${savedPos.y}px`;
 
     panel.innerHTML = `
-      <div class="gct4-head"><span class="gct4-dot"></span><span>${SITE_TITLE} Trainer v4.4.0</span><button type="button" class="gct4-minimize" title="Minimize trainer" aria-label="Minimize trainer">−</button></div>
+      <div class="gct4-head"><span class="gct4-dot"></span><span>${SITE_TITLE} Trainer v4.5.0</span><button type="button" class="gct4-minimize" title="Minimize trainer" aria-label="Minimize trainer">−</button></div>
       <div class="gct4-body">
         <div class="gct4-status"><span>Status</span><b>Connecting…</b></div>
         <label class="gct4-label">AI
@@ -500,6 +521,22 @@
           <div class="gct4-note">Standard Free Play. Play restores the saved poses and velocities, then runs one recorded car at 120 Hz. Match the recording’s car, ball size and boost setting; physics differences can change its trajectory.</div>
         </div>
         <button class="gct4-main" type="button">Give Control to Nexto</button>
+        <details id="gct4-fun" ${SITE === 'car-soccer' ? '' : 'hidden'}>
+          <summary>Fun controls · Car Soccer</summary>
+          <div class="gct4-fun-status" role="status"></div>
+          <div class="gct4-fun-grid">
+            <button type="button" data-fun-effect="glue" data-label="G · Ball glue" aria-pressed="false">G · Ball glue · OFF</button>
+            <button type="button" data-fun-effect="boost" data-label="B · Infinite boost" aria-pressed="false">B · Infinite boost · OFF</button>
+            <button type="button" data-fun-effect="jumps" data-label="J · Extra jumps/flips" aria-pressed="false">J · Extra jumps/flips · OFF</button>
+            <button type="button" data-fun-effect="speed" data-label="V · Speed override" aria-pressed="false">V · Speed override · OFF</button>
+            <button type="button" data-fun-action="recall">H · Bring ball</button>
+            <button type="button" data-fun-action="launch">L · Launch at goal</button>
+            <button type="button" data-fun-action="goal">P · Ball into goal</button>
+          </div>
+          <label class="gct4-fun-speed">Override speed limit<input id="gct4-fun-speed" aria-label="Override speed limit" type="number" min="2300" max="10000" step="100" value="6000"></label>
+          <button id="gct4-fun-stop" type="button">All fun controls OFF / F8</button>
+          <div class="gct4-note">Use in local play or a room you host. Letter keys toggle these effects when the game is focused. Chat/text fields are ignored. Enabling AI or TAS turns fun effects off.</div>
+        </details>
         <div class="gct4-note">Press <b>F7</b> to reopen models and release mouse lock. The <b>−</b> button minimizes this menu while playback continues. Emergency stop: <b>F8</b>.</div>
         <details open><summary>AI Inputs</summary><div class="gct4-inputs"></div></details>
         <details><summary>Debug</summary><div class="gct4-debug"></div></details>
@@ -529,6 +566,17 @@
     tasStatus = panel.querySelector('.gct4-tas-status');
     tasBoost = panel.querySelector('#gct4-tas-boost');
     tasPrepare = panel.querySelector('#gct4-tas-prepare');
+    funPane = panel.querySelector('#gct4-fun');
+    funStatus = panel.querySelector('.gct4-fun-status');
+    funSpeed = panel.querySelector('#gct4-fun-speed');
+    for (const control of funPane.querySelectorAll('[data-fun-effect]')) control.addEventListener('click',()=>{
+      localError='';send('fun-toggle',{effect:control.dataset.funEffect});
+    });
+    for (const control of funPane.querySelectorAll('[data-fun-action]')) control.addEventListener('click',()=>{
+      localError='';send('fun-action',{action:control.dataset.funAction});
+    });
+    funSpeed.addEventListener('change',()=>send('fun-speed',{speed:Number(funSpeed.value)}));
+    panel.querySelector('#gct4-fun-stop').addEventListener('click',()=>send('fun-stop'));
     tasPrepare.addEventListener('click',()=>{localError='';send('tas-prepare',{options:tasOptions()});});
     tasSelect.addEventListener('change',chooseTas);
     panel.querySelector('#gct4-tas-upload').addEventListener('change',async event=>{
@@ -630,6 +678,7 @@
   window.addEventListener('keydown', event => {
     if (event.code === 'F7' && !event.repeat) {
       event.preventDefault(); event.stopImmediatePropagation();
+      if (!panel) { send('snapshot'); return; }
       void releaseMouse().then(() => {const wasMinimized=minimized,wasOpen=modelMenuOpen;setMinimized(false);setModelMenuOpen(wasMinimized||!wasOpen);});
       return;
     }
@@ -637,7 +686,7 @@
       setModelMenuOpen(false);
       return;
     }
-    if (event.code !== 'F8' || event.repeat || !latest?.active) return;
+    if (event.code !== 'F8' || event.repeat || !(latest?.active || latest?.loading || latest?.fun?.enabled)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     send('disable');

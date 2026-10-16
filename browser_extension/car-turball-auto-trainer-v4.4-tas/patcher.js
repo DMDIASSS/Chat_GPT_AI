@@ -1,6 +1,7 @@
 import { createScriptedKickoff } from './kickoff.mjs';
 import { createBallVisibilityGuard } from './ball-visibility-guard.mjs';
 import { createTasPlayer } from './tas-player.mjs';
+import { createFunControls } from './fun-controls.mjs';
 export function transformMainSource(source) {
   // Vite renames minified identifiers on each deployment. Translate only
   // injected snippets, and verify signature groups before patching anything.
@@ -112,6 +113,13 @@ window.addEventListener('keydown',event=>{
 const __GCT4_KICKOFF=(${createScriptedKickoff.toString()})();
 const __GCT4_TAS=(${createTasPlayer.toString()})({environment:()=>({sim:c,fields:R,stride:De,slot:h,
   online:!!d,mode:q.state.mode,customMap:!!Z})});
+const __GCT4_FUN=(${createFunControls.toString()})({environment:()=>{
+  const online=!!(d&&m),session=online?m:null;
+  return {sim:online?session.sim:c,fields:R,stride:De,slot:online?session.carSlot:h,
+    team:online?session.carTeams[session.carSlot]:A.playerTeam,online,host:!!session?.peer?.host,
+    spectator:!!session?.spectator,mode:online?"match":q.state.mode,
+    phase:online?session.match?.state?.phase:q.state.phase,customMap:!online&&!!Z,session};
+}});
 const __GCT4_NATIVE=new sk("grand-champion");
 const __GCT4_ONLINE_KEY=32767;
 const __GCT4_CHANNEL="__grandchamp_trainer_v4__";
@@ -120,6 +128,7 @@ const __GCT4_NEUTRAL=()=>({...te});
 const __GCT4={
   active:!1,
   loading:!1,
+  activationGeneration:0,
   selectedBot:"nexto",
   mode:"offline",
   boundOnline:null,
@@ -234,8 +243,10 @@ const __GCT4={
   },
 
   async enable(){
+    __GCT4_FUN.stop("Fun controls off while AI/TAS runs.");
     if(this.active)return!0;
     if(this.loading)return!1;
+    const activation=++this.activationGeneration;
     this.loading=!0;
     this.error="";
     this.info="Loading "+this.botName+"…";
@@ -274,6 +285,7 @@ const __GCT4={
         await __GCT4_NATIVE.loadPolicy("grand-champion")
       }
 
+      if(activation!==this.activationGeneration)return!1;
       // Stability checks only; no room-public/private metadata is inspected.
       if(this.mode==="online"){
         if(!d||!m||m!==this.boundOnline)throw new Error("Online session changed while AI was loading.");
@@ -290,6 +302,7 @@ const __GCT4={
       __GCT4_postStatus();
       return!0
     }catch(e){
+      if(activation!==this.activationGeneration)return!1;
       this.active=!1;
       this.restoreOnlineProvider();
       this.boundOnline=null;
@@ -299,12 +312,13 @@ const __GCT4={
       this.info="";
       throw e
     }finally{
-      this.loading=!1;
+      if(activation===this.activationGeneration)this.loading=!1;
       __GCT4_postStatus()
     }
   },
 
   disable(reason="Player control restored"){
+    this.activationGeneration++;
     __GCT4_TAS.stop(reason);
     this.active=!1;
     this.loading=!1;
@@ -559,6 +573,7 @@ const __GCT4={
       gameMode:q?.state?.mode??"unknown",
       phase:online?(m?.match?.state?.phase??m?.stage??"unknown"):(q?.state?.phase??"unknown")
       ,tas:__GCT4_TAS.snapshot()
+      ,fun:__GCT4_FUN.snapshot()
     }
   }
 };
@@ -631,33 +646,59 @@ window.addEventListener("message",async event=>{
 
   if(data.from!=="ui")return;
   try{
-    if(data.command==="tas-load"){
+    if(data.command==="fun-toggle"){
+      if(__GCT4.active||__GCT4.loading)__GCT4.disable("Player control restored for fun controls.");
+      __GCT4_FUN.toggle(data.effect);__GCT4.error="";__GCT4.info=__GCT4_FUN.snapshot().message
+    }
+    else if(data.command==="fun-action"){
+      if(__GCT4.active||__GCT4.loading)__GCT4.disable("Player control restored for fun controls.");
+      __GCT4_FUN.action(data.action);__GCT4.error="";__GCT4.info=__GCT4_FUN.snapshot().message
+    }
+    else if(data.command==="fun-speed")__GCT4_FUN.setSpeed(Number(data.speed));
+    else if(data.command==="fun-stop")__GCT4_FUN.stop();
+    else if(data.command==="tas-load"){
+      __GCT4_FUN.stop();
       __GCT4.disable();__GCT4.selectedBot="tas";
       __GCT4_TAS.load(data.buffer,data.name);__GCT4.error="";__GCT4.info=__GCT4_TAS.snapshot().message
     }
     else if(data.command==="tas-prepare"){
+      __GCT4_FUN.stop();
       __GCT4.disable();__GCT4_TAS.prepare(data.options);__GCT4.error="";__GCT4.info=__GCT4_TAS.snapshot().message
     }
     else if(data.command==="enable"){
       if(__GCT4.selectedBot==="tas")__GCT4.tasOptions=data.options||{};
       await __GCT4.enable()
     }
-    else if(data.command==="disable")__GCT4.disable();
+    else if(data.command==="disable"){__GCT4_FUN.stop();__GCT4.disable()}
     else if(data.command==="select-bot")await __GCT4.selectBot(data.botId);
-    else if(data.command==="snapshot")__GCT4_TAS.guard();
+    else if(data.command==="snapshot"){__GCT4_TAS.guard();__GCT4_FUN.guard()}
     else return
   }catch(error){__GCT4.error=error?.message||String(error);if(__GCT4.active&&__GCT4.selectedBot==="tas")__GCT4.disable("TAS stopped after a state change.")}
   __GCT4_postStatus()
 });
 
 window.addEventListener("keydown",event=>{
-  if(event.code!=="F8"||event.repeat||!__GCT4.active)return;
+  if(event.code!=="F8"||event.repeat||!(__GCT4.active||__GCT4.loading||__GCT4_FUN.snapshot().enabled))return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  __GCT4.disable("Emergency override (F8)")
+  __GCT4_FUN.stop("Emergency override (F8)");__GCT4.disable("Emergency override (F8)")
 },!0);
-window.addEventListener("blur",()=>{if(__GCT4.active&&__GCT4.selectedBot==="tas")__GCT4.disable("TAS stopped: window lost focus.")});
-document.addEventListener("visibilitychange",()=>{if(document.hidden&&__GCT4.active&&__GCT4.selectedBot==="tas")__GCT4.disable("TAS stopped: tab hidden.")});
+window.addEventListener("blur",()=>{__GCT4_FUN.stop("Fun controls off: window lost focus.");if(__GCT4.active&&__GCT4.selectedBot==="tas")__GCT4.disable("TAS stopped: window lost focus.")});
+document.addEventListener("visibilitychange",()=>{if(document.hidden){__GCT4_FUN.stop("Fun controls off: tab hidden.");if(__GCT4.active&&__GCT4.selectedBot==="tas")__GCT4.disable("TAS stopped: tab hidden.")}});
+const __GCT4_FUN_KEYS={KeyG:["toggle","glue"],KeyB:["toggle","boost"],KeyJ:["toggle","jumps"],KeyV:["toggle","speed"],KeyL:["action","launch"],KeyP:["action","goal"],KeyH:["action","recall"]};
+window.addEventListener("keydown",event=>{
+  if(event.repeat||event.ctrlKey||event.altKey||event.metaKey||document.hidden)return;
+  const target=event.target;
+  if(target&&(target.isContentEditable||target.closest?.("input,textarea,select,[contenteditable='true'],#gct4-panel")))return;
+  const choice=__GCT4_FUN_KEYS[event.code];if(!choice)return;
+  event.preventDefault();event.stopImmediatePropagation();
+  try{
+    if(__GCT4.active||__GCT4.loading)__GCT4.disable("Player control restored for fun controls.");
+    if(choice[0]==="toggle")__GCT4_FUN.toggle(choice[1]);else __GCT4_FUN.action(choice[1]);
+    __GCT4.error="";__GCT4.info=__GCT4_FUN.snapshot().message
+  }catch(error){__GCT4.error=error?.message||String(error)}
+  __GCT4_postStatus()
+},true);
 
 window.__GCTrainerRuntime=__GCT4;
 __GCT4_post("ready",{state:__GCT4.snapshot()});

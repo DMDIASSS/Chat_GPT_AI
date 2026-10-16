@@ -1,7 +1,8 @@
-CAR SOCCER + TURBALL AI TRAINER 4.4.0
+CAR SOCCER + TURBALL AI TRAINER 4.5.0
 ===================================
 
-NEW: TAS playback and a minimize/restore button. Read TAS_README.md first.
+NEW: Car Soccer fun controls. Read FUN_CONTROLS.md for keys and host/local scope.
+TAS playback and minimize/restore are retained; see TAS_README.md.
 For an existing installation, replace files INSIDE your existing extension
 directory and click Reload in chrome://extensions. Keep private .bin files.
 Loading a different folder as a new extension changes its storage identity.
@@ -30,7 +31,7 @@ The patchers must NOT be interchanged: each targets different minified code.
 INSTALLATION
 1. Extract the ZIP. Do not load the ZIP itself.
 2. In Chrome, open chrome://extensions and enable Developer mode.
-3. Choose "Load unpacked" and select Car_Turball_Auto_Trainer_v4.4.0,
+3. Choose "Load unpacked" and select Car_Turball_Auto_Trainer_v4.5.0,
    the directory containing manifest.json.
 4. Disable/remove the previous separate AI trainer extensions before
    using this one; multiple extensions trying to patch the same page can
