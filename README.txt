@@ -1,24 +1,84 @@
-Independent Nexto benchmark v1
+IMPORTANT v4.2.7 BUG FIX
+------------------------
+- Fixed popup init crash (three missing DOM constants in v4.2.6).
+- Empty model dropdown and stuck Checking... were caused by that crash.
+- This version has NO connection to 127.0.0.1 and DOES NOT need a BAT file.
+- Close any old cmd importer window. If it starts automatically on Windows,
+  remove the old Windows Startup entry: press Win+R, run shell:startup,
+  and delete CarSoccerModelImporter.vbs if present.
+- If any popup still says "Check .pt importer" or "START_MODEL_IMPORT.bat",
+  that popup belongs to an older installed extension or installation folder.
+- In chrome://extensions verify the version is 4.2.7 and disable old copies.
 
-1. First, BACK UP your current data/autoleague/champion.pt and league_state.json somewhere safe.
-2. Unzip these three files INTO YOUR ORIGINAL E:\Downloads\Chat_GPT_AI folder
-   so independent_nexto_benchmark.py is beside auto_league.py.
-3. Ideally stop AutoLeague with Ctrl+C first, so no promotion happens during this test.
-4. Double-click INDEPENDENT_BENCHMARK.bat. It evaluates your existing accepted champion
-   against original Nexto on 200 NEW first-goal episodes with paired team sides.
-   It also evaluates original Nexto against itself for a small 40-episode control.
-5. A compact JSON report is created in benchmark_reports/. Send that report back.
+CAR SOCCER AI TRAINER v4.2.7 — DIRECT .PT UPLOAD (NO BAT)
+========================================================
 
-IMPORTANT: This is NOT a 5-minute match benchmark; it is a read-only held-out test
-matching the current AutoLeague first-goal scoring convention. It does not train,
-delete, overwrite, promote or blacklist models. It does not touch the AutoLeague
-state/history/backup directories. It DOES write an independent JSON report outside
-those directories. To avoid even that, run the Python script with --no-save.
+What's new
+----------
+- Upload compatible .pt, .zip, or .bin models directly from the extension popup.
+- Entire conversion runs inside your browser. No local Python server, BAT, command prompt, or network upload.
+- Supports standard native Nexto PyTorch ZIP state_dict checkpoints and TorchScript .pt files.
+- Supports .zip exports containing one or more identical compatible .pt models.
+- Rejects incompatible actor architectures with a clear explanation; this runner expects the native Nexto 44-tensor actor. Generic PyTorch models won't work without an architecture adapter.
+- Keeps the v4.2.5 F7 in-game model picker, model rename, saving, and switching.
+- Keeps the previously tested Car Soccer physics compatibility patches.
 
-For a quick technical smoke test, run:
-  .\.venv\Scripts\python.exe -u independent_nexto_benchmark.py --pairs 2 --baseline-pairs 2 --no-save
+Update/install
+--------------
+1. Quit the Car Soccer tab.
+2. IMPORTANT: Unzip these files into the EXISTING unpacked extension folder,
+   replacing code files without deleting your current .bin weight files.
+   Moving to a new folder or installing as a separate extension may change
+   the Chrome extension ID and isolate your previously saved imported models.
+3. Go to chrome://extensions, and click Reload on the existing extension.
+4. Open car-soccer.com, select Enable + reload in the extension popup.
+5. Use '+ Upload a model...' in the popup. Select your .pt, .zip or .bin file.
+   Import and name your model; the file is converted and saved locally.
+6. In-game, press F7 to release cursor lock and open the model picker.
+   Select the model and press Give Control. F8 returns control to you.
 
-To repeat a larger independent benchmark with a different seed:
-  .\.venv\Scripts\python.exe -u independent_nexto_benchmark.py --pairs 200 --baseline-pairs 30 --seed 74192018
+Restore Original Nexto
+----------------------
+- The code-only ZIP does NOT include copyrighted/third-party original trained weight binaries.
+- To restore the Original Nexto slot, click 'Install Original Nexto weights...'
+  and choose a compatible native Nexto .pt or .bin checkpoint.
+- If the original nexto-weights.bin was already in your existing extension folder,
+  you can leave it there; no import is needed.
+- If G9 u0073 previously worked via g9-weights.bin, retain that file too.
+- You may still import either model as a custom named model.
 
-Caution: CPU evaluation can take time, depending on your system.
+Supported model data
+--------------------
+- .bin: exactly 1,776,128 bytes / 444,032 finite float32 values in Nexto layout.
+- .pt: standard PyTorch ZIP serialized state_dict or TorchScript module
+  containing all 44 expected tensors with the native Nexto shapes.
+- .zip: standard ZIP export containing compatible .pt files; the importer
+  rejects different actors in the same archive to prevent silent mis-selection.
+- Original ZIP checkpoints up to 256 MiB; uncompressed archive safety limit 512 MiB.
+- This is not a generic PyTorch interpreter; legacy pickle-only .pt, custom
+  architectures, certain Python-specific serialization methods, and other
+  tensor layouts may not be compatible.
+- Files remain on your PC; the extension does not send model bytes to an API.
+
+Troubleshooting
+---------------
+- Error 'Incompatible model architecture': your model's tensors don't match
+  the native Nexto 44-tensor actor. Upload the .pt in chat for further adapter work.
+- Error 'Not a supported PyTorch ZIP archive': model uses a legacy format or is not a standard ZIP-based PyTorch save.
+- Error 'Missing weights for ...': reimport the .pt/.bin through the popup.
+- Error 'Failed to fetch' for Original Nexto: install its weights through the
+  popup or restore nexto-weights.bin to the existing extension folder.
+- If the game updates and the patcher reports a hook mismatch, provide the
+  latest main-*.js bundle from the Network panel; direct upload is separate.
+- The old auto-importer BAT is NO LONGER USED by this extension. If you set up
+  the old Windows startup entry you may remove it with the prior
+  REMOVE_AUTO_IMPORTER.bat file from the old version.
+
+Testing
+-------
+The .pt reader was tested against torch.save(state_dict), torch.jit.trace
+TorchScript, float16 checkpoints, dict-wrapped checkpoints, deflated .pt
+archives and compressed .zip exports. Output matched the existing Python
+converter byte-for-byte for all samples. Model storage, restore and game
+patch synthetic tests pass on the supplied game bundles. Actual gameplay
+and the user's individual checkpoint are not tested in this environment.

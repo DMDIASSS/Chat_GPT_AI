@@ -1,0 +1,5214 @@
+{
+  "protocol": 3,
+  "created_utc": "20261012T073824652854Z",
+  "bots": 7,
+  "protocol_details": {
+    "version": 3,
+    "seconds": 180,
+    "seed": 20261012,
+    "kickoffs": {},
+    "all_scripted": true,
+    "engine_rlbot_delay": true,
+    "evaluator_sha": "0ef81a7c8b99be8699c50a169d8c792d3f2cbcb4a82f45e2b0bc066a5a8f2277",
+    "scheduler_sha": "f7841fdf996cde9f2dd39b2c3e27246515b86a3f1f5edfde993870a2ce26e509",
+    "adapter_shas": {
+      "nexto_teacher.py": "d6709fa24c43b7093b066dd315b7c42a6de1884746efe85a9d99f26c95d93808",
+      "native_nexto.py": "b189ad68835efd562f9849f342cfdd75f70f52e2389230844aa2e02533ff1099",
+      "auto_league.py": "44399e7f069f1e1dd62f47b2de37a336e8acada9a42103284af070b637cd52bf",
+      "chatgpt_ai/env.py": "124b46928509c172fc20d10ce8df96b58d9676b4aecacf8fceb67a150aa34bff",
+      "chatgpt_ai/policy.py": "69bb26e601f874c2023637de1baa856125f3cfb0fd65d4651174ad8e71724ca4",
+      "vendor/nexto/nexto_obs.py": "75ea5546cf589cebff08c4850fc3316488316a8271fb445d727ddd9af7ccb59c",
+      "vendor/nexto/original_agent.py": "af5e20b5741d58da2c12d769cb72c74590653f25fda3243cef73fe7127fe61bd"
+    },
+    "rlgym_version": "2.0.1",
+    "rocketsim_version": "2.2.1",
+    "torch_version": "2.14.1+cu126",
+    "numpy_version": "1.26.4"
+  },
+  "protocol_sha256": "b5b8bcf6cac8448d516b12aa160718e388b4630a1d845d6f62b5a794adaa63e8",
+  "games_per_pair": 50,
+  "simulated_seconds": 180,
+  "seed": 20261012,
+  "definition": "first goal or censored timeout (D column)",
+  "note": "Nexto v4 kickoff is a RocketSim proxy, not exact RLBot packet timing",
+  "leaderboard": [
+    {
+      "model": "data/rlbot_exports/Original_Champion/nexto-model.pt",
+      "sha256": "a6dab0d74bb77665ecf97635149702fe43323b09dfd5183001d540015fd38d62",
+      "kind": "NEXTO_TS",
+      "kickoff": "nexto_v4",
+      "games": 300,
+      "opponents": 6,
+      "W": 171,
+      "L": 129,
+      "D": 0,
+      "score_pct": 57.0,
+      "rank": 1
+    },
+    {
+      "model": "data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt",
+      "sha256": "50f34d4a3723bc2849c97200e8e42969e0cc1d82328473b017505994be1966d2",
+      "kind": "NATIVE",
+      "kickoff": "nexto_v4",
+      "games": 300,
+      "opponents": 6,
+      "W": 167,
+      "L": 133,
+      "D": 0,
+      "score_pct": 55.667,
+      "rank": 2
+    },
+    {
+      "model": "data/rlbot_exports/V60/nexto-model.pt",
+      "sha256": "4268f1bb0847a907be0ceb4c7c4bcb8942144978ff5fc5852fc9bcca2e9880b7",
+      "kind": "NEXTO_TS",
+      "kickoff": "nexto_v4",
+      "games": 300,
+      "opponents": 6,
+      "W": 156,
+      "L": 138,
+      "D": 6,
+      "score_pct": 53.0,
+      "rank": 3
+    },
+    {
+      "model": "data/rlbot_exports/wavedash/nexto-model.pt",
+      "sha256": "8c9f41dd627363e2e0ef99a241d325cf7619e4b36cf022efdc5db776641127a6",
+      "kind": "NEXTO_TS",
+      "kickoff": "nexto_v4",
+      "games": 300,
+      "opponents": 6,
+      "W": 152,
+      "L": 148,
+      "D": 0,
+      "score_pct": 50.667,
+      "rank": 4
+    },
+    {
+      "model": "vendor/nexto/nexto-model.pt",
+      "sha256": "bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa",
+      "kind": "NEXTO_TS",
+      "kickoff": "nexto_v4",
+      "games": 300,
+      "opponents": 6,
+      "W": 139,
+      "L": 155,
+      "D": 6,
+      "score_pct": 47.333,
+      "rank": 5
+    },
+    {
+      "model": "data/isolated/v041_overnight/overnight01/trials/g00009_leader_small_2/g00009_leader_small_2_u0073.pt",
+      "sha256": "6e18ab3839d97b27d9c575ecbbfc3f63b4118cd7371588a97dd48720d15f0bae",
+      "kind": "NATIVE",
+      "kickoff": "nexto_v4",
+      "games": 300,
+      "opponents": 6,
+      "W": 132,
+      "L": 166,
+      "D": 2,
+      "score_pct": 44.333,
+      "rank": 6
+    },
+    {
+      "model": "data/isolated/v040_multirival_campaign01_u0070.pt",
+      "sha256": "a0fc51a8ec3f45f1f189300ec4f23645e94747657c4f0f8ec5c204a88767a291",
+      "kind": "NATIVE",
+      "kickoff": "nexto_v4",
+      "games": 300,
+      "opponents": 6,
+      "W": 125,
+      "L": 173,
+      "D": 2,
+      "score_pct": 42.0,
+      "rank": 7
+    }
+  ],
+  "head_to_head": [
+    {
+      "model1": "data/rlbot_exports/Original_Champion/nexto-model.pt",
+      "model2": "vendor/nexto/nexto-model.pt",
+      "W1": 37,
+      "W2": 13,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/rlbot_exports/Original_Champion/nexto-model.pt",
+      "model2": "data/rlbot_exports/V60/nexto-model.pt",
+      "W1": 19,
+      "W2": 31,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/rlbot_exports/Original_Champion/nexto-model.pt",
+      "model2": "data/rlbot_exports/wavedash/nexto-model.pt",
+      "W1": 32,
+      "W2": 18,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/rlbot_exports/V60/nexto-model.pt",
+      "model2": "vendor/nexto/nexto-model.pt",
+      "W1": 20,
+      "W2": 24,
+      "D": 6,
+      "games": 50
+    },
+    {
+      "model1": "data/rlbot_exports/V60/nexto-model.pt",
+      "model2": "data/rlbot_exports/wavedash/nexto-model.pt",
+      "W1": 38,
+      "W2": 12,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/isolated/v040_multirival_campaign01_u0070.pt",
+      "model2": "data/rlbot_exports/Original_Champion/nexto-model.pt",
+      "W1": 21,
+      "W2": 29,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/isolated/v040_multirival_campaign01_u0070.pt",
+      "model2": "vendor/nexto/nexto-model.pt",
+      "W1": 26,
+      "W2": 24,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/isolated/v040_multirival_campaign01_u0070.pt",
+      "model2": "data/rlbot_exports/V60/nexto-model.pt",
+      "W1": 36,
+      "W2": 14,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/isolated/v040_multirival_campaign01_u0070.pt",
+      "model2": "data/rlbot_exports/wavedash/nexto-model.pt",
+      "W1": 10,
+      "W2": 40,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/isolated/v040_multirival_campaign01_u0070.pt",
+      "model2": "data/isolated/v041_overnight/overnight01/trials/g00009_leader_small_2/g00009_leader_small_2_u0073.pt",
+      "W1": 22,
+      "W2": 26,
+      "D": 2,
+      "games": 50
+    },
+    {
+      "model1": "data/rlbot_exports/wavedash/nexto-model.pt",
+      "model2": "vendor/nexto/nexto-model.pt",
+      "W1": 26,
+      "W2": 24,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt",
+      "model2": "data/rlbot_exports/Original_Champion/nexto-model.pt",
+      "W1": 33,
+      "W2": 17,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt",
+      "model2": "vendor/nexto/nexto-model.pt",
+      "W1": 24,
+      "W2": 26,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt",
+      "model2": "data/rlbot_exports/V60/nexto-model.pt",
+      "W1": 25,
+      "W2": 25,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt",
+      "model2": "data/isolated/v040_multirival_campaign01_u0070.pt",
+      "W1": 40,
+      "W2": 10,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt",
+      "model2": "data/rlbot_exports/wavedash/nexto-model.pt",
+      "W1": 14,
+      "W2": 36,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt",
+      "model2": "data/isolated/v041_overnight/overnight01/trials/g00009_leader_small_2/g00009_leader_small_2_u0073.pt",
+      "W1": 31,
+      "W2": 19,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/isolated/v041_overnight/overnight01/trials/g00009_leader_small_2/g00009_leader_small_2_u0073.pt",
+      "model2": "data/rlbot_exports/Original_Champion/nexto-model.pt",
+      "W1": 13,
+      "W2": 37,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/isolated/v041_overnight/overnight01/trials/g00009_leader_small_2/g00009_leader_small_2_u0073.pt",
+      "model2": "vendor/nexto/nexto-model.pt",
+      "W1": 22,
+      "W2": 28,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/isolated/v041_overnight/overnight01/trials/g00009_leader_small_2/g00009_leader_small_2_u0073.pt",
+      "model2": "data/rlbot_exports/V60/nexto-model.pt",
+      "W1": 22,
+      "W2": 28,
+      "D": 0,
+      "games": 50
+    },
+    {
+      "model1": "data/isolated/v041_overnight/overnight01/trials/g00009_leader_small_2/g00009_leader_small_2_u0073.pt",
+      "model2": "data/rlbot_exports/wavedash/nexto-model.pt",
+      "W1": 30,
+      "W2": 20,
+      "D": 0,
+      "games": 50
+    }
+  ],
+  "inventory": [
+    {
+      "path": "data/afk_improved/aggressive_research/branches/control/backups/20261009T194723_994947Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/aggressive_research/branches/control/backups/20261009T194825_462947Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/aggressive_research/branches/control/backups/20261009T194825_462947Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/aggressive_research/branches/control/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/aggressive_research/branches/control/inconclusive/20261009T195211_280981Z_cycle0001.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/best_verified.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T170248_393506Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T170345_289614Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T172612_956694Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T172702_543696Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T172702_543696Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T172938_833441Z_cycle0002_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T173013_167437Z_cycle0002_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T173013_167437Z_cycle0002_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T173223_494285Z_cycle0003_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T173304_259254Z_cycle0003_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T173304_259254Z_cycle0003_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180028_410861Z_cycle0004_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180108_702447Z_cycle0004_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180108_702447Z_cycle0004_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180340_093803Z_cycle0005_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180412_127051Z_cycle0005_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180412_127051Z_cycle0005_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180558_684969Z_cycle0006_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180638_308603Z_cycle0006_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180638_308603Z_cycle0006_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180917_004872Z_cycle0007_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180957_197036Z_cycle0007_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T180957_197036Z_cycle0007_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T181237_161659Z_cycle0008_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T181312_593077Z_cycle0008_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T181312_593077Z_cycle0008_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T181520_671811Z_cycle0009_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T181600_594759Z_cycle0009_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T181600_594759Z_cycle0009_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T181816_708877Z_cycle0010_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T181857_618693Z_cycle0010_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T181857_618693Z_cycle0010_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T182154_782051Z_cycle0011_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T182235_400469Z_cycle0011_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/backups/20261009T182235_400469Z_cycle0011_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/inconclusive/20261009T173220_173210Z_cycle0002.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/inconclusive/20261009T173526_112289Z_cycle0003.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/inconclusive/20261009T180555_328202Z_cycle0005.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/inconclusive/20261009T181813_102794Z_cycle0009.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/inconclusive/20261009T182151_210731Z_cycle0010.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/rejected/20261009T172935_919800Z_cycle0001_00133096a149.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/rejected/20261009T180336_642234Z_cycle0004_d6b8d884b200.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/rejected/20261009T180913_652412Z_cycle0006_0c6c711259a9.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/rejected/20261009T181233_804452Z_cycle0007_bd355cb2e115.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/rejected/20261009T181517_103634Z_cycle0008_4527e7d92a3a.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/league/rejected/20261009T182457_988999Z_cycle0011_98adc6b79d15.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/manual_backups/20261009T163739Z/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/manual_backups/20261009T163739Z/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/manual_exports/20261008T231644_686997Z_cycle0022_steps000008192_candidate_5de7cba1cd7e.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/manual_exports/20261008T232141_359948Z_cycle0024_steps000008192_champion_a56528698351.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/manual_exports/20261008T232413_341596Z_cycle0025_steps000008192_candidate_9a129030605a.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_improved/replay_sweeps/small_step/replay_candidate.pt",
+      "bytes": 1791223,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120541_242943Z/inputs/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120541_242943Z/inputs/cycle09.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120541_242943Z/inputs/wavedash.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120541_242943Z/league/backups/20261009T120557_798936Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120541_242943Z/league/backups/20261009T120604_712004Z_cycle0001_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120541_242943Z/league/backups/20261009T120604_712004Z_cycle0001_steps000000512_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120541_242943Z/league/candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120541_242943Z/league/champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120541_242943Z/league/rejected/20261009T120609_707971Z_cycle0001_8bfe81bd34a9.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/inputs/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/inputs/cycle09.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/inputs/wavedash.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120823_324956Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120827_293278Z_cycle0001_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120827_293278Z_cycle0001_steps000000512_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120834_011298Z_cycle0002_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120834_011298Z_cycle0002_steps000000512_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120840_281328Z_cycle0003_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120840_281328Z_cycle0003_steps000000512_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120844_541420Z_cycle0003_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120844_541420Z_cycle0003_steps000000512_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120847_134444Z_cycle0004_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120847_134444Z_cycle0004_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120853_793607Z_cycle0005_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120853_793607Z_cycle0005_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120859_338701Z_cycle0006_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120859_338701Z_cycle0006_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120906_150796Z_cycle0007_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120906_150796Z_cycle0007_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120912_388860Z_cycle0008_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120912_388860Z_cycle0008_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120919_291852Z_cycle0009_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120919_291852Z_cycle0009_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120925_474205Z_cycle0010_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120925_474205Z_cycle0010_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120932_314289Z_cycle0011_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120932_314289Z_cycle0011_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120938_046394Z_cycle0012_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120938_046394Z_cycle0012_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120944_649538Z_cycle0013_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120944_649538Z_cycle0013_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120950_857676Z_cycle0014_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120950_857676Z_cycle0014_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120957_804727Z_cycle0015_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T120957_804727Z_cycle0015_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121004_540941Z_cycle0016_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121004_540941Z_cycle0016_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121011_395965Z_cycle0017_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121011_395965Z_cycle0017_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121018_042151Z_cycle0018_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121018_042151Z_cycle0018_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121025_086166Z_cycle0019_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121025_086166Z_cycle0019_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121031_461230Z_cycle0020_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121031_461230Z_cycle0020_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121038_220330Z_cycle0021_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121038_220330Z_cycle0021_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121045_976025Z_cycle0022_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121045_976025Z_cycle0022_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121053_044486Z_cycle0023_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121053_044486Z_cycle0023_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121059_514801Z_cycle0024_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121059_514801Z_cycle0024_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121106_112940Z_cycle0025_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121106_112940Z_cycle0025_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121113_171991Z_cycle0026_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121113_171991Z_cycle0026_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121120_303548Z_cycle0027_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121120_303548Z_cycle0027_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121126_554740Z_cycle0028_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121126_554740Z_cycle0028_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121133_750586Z_cycle0029_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121133_750586Z_cycle0029_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121140_532662Z_cycle0030_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121140_532662Z_cycle0030_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121147_789371Z_cycle0031_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121147_789371Z_cycle0031_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121154_581400Z_cycle0032_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121154_581400Z_cycle0032_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121201_417355Z_cycle0033_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121201_417355Z_cycle0033_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121208_495378Z_cycle0034_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121208_495378Z_cycle0034_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121215_464191Z_cycle0035_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121215_464191Z_cycle0035_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121220_042479Z_cycle0035_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121220_042479Z_cycle0035_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121222_866676Z_cycle0036_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121222_866676Z_cycle0036_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121229_320721Z_cycle0037_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121229_320721Z_cycle0037_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121235_536710Z_cycle0038_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121235_536710Z_cycle0038_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121242_650958Z_cycle0039_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/backups/20261009T121242_650958Z_cycle0039_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T120857_151679Z_cycle0005.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T120910_260819Z_cycle0007.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T120917_114856Z_cycle0008.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T120930_064232Z_cycle0010.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T120942_388534Z_cycle0012.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121009_160963Z_cycle0016.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121015_819063Z_cycle0017.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121036_068245Z_cycle0020.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121103_937836Z_cycle0024.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121110_944991Z_cycle0025.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121117_474112Z_cycle0026.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121124_390741Z_cycle0027.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121138_427644Z_cycle0029.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121152_433395Z_cycle0031.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/inconclusive/20261009T121212_948949Z_cycle0034.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T120831_843257Z_cycle0001_fcbfe82e064d.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T120838_026258Z_cycle0002_8c39e3c933cb.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T120851_658531Z_cycle0004_fc848a276ffd.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T120904_013797Z_cycle0006_a5435159cc91.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T120923_316204Z_cycle0009_438f15927e10.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T120935_872396Z_cycle0011_e24199d3c351.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T120948_708638Z_cycle0013_834f37a60cbd.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T120955_536670Z_cycle0014_332555914c3c.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121002_316833Z_cycle0015_f478c61af07e.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121022_763159Z_cycle0018_8f9f224bbe53.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121029_232229Z_cycle0019_df69055f125f.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121043_230369Z_cycle0021_58b626870b56.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121050_904443Z_cycle0022_721eca9ac9c0.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121057_249641Z_cycle0023_e3dcda7c20be.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121131_507600Z_cycle0028_3663d1ab8e03.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121145_311011Z_cycle0030_c9f90a049e04.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121159_260358Z_cycle0032_147a474e1585.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121206_078412Z_cycle0033_0e41f59734da.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121227_170792Z_cycle0036_5542e34b352e.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121233_424848Z_cycle0037_930c027446c0.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121240_389572Z_cycle0038_76343f2ade52.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T120807_391958Z/league/rejected/20261009T121247_334556Z_cycle0039_4eded1b9b23e.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/inputs/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/inputs/cycle09.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/inputs/wavedash.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T122736_749252Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T124445_021826Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T124516_584248Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T124516_584248Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T124715_280341Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T124715_280341Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T124743_728847Z_cycle0002_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T124743_728847Z_cycle0002_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T124959_323342Z_cycle0003_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T124959_323342Z_cycle0003_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T125231_013408Z_cycle0004_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T125231_013408Z_cycle0004_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T125456_816833Z_cycle0005_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T125456_816833Z_cycle0005_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T125726_825178Z_cycle0006_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/backups/20261009T125726_825178Z_cycle0006_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/inconclusive/20261009T124926_401177Z_cycle0002.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/inconclusive/20261009T125201_499642Z_cycle0003.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/inconclusive/20261009T125426_523067Z_cycle0004.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/inconclusive/20261009T125933_837844Z_cycle0006.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261009T121833_544323Z/league/rejected/20261009T125654_661427Z_cycle0005_2e3e07cb31e8.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/inputs/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/inputs/cycle09.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/inputs/wavedash.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123741_213531Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123751_749531Z_cycle0001_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123751_749531Z_cycle0001_steps000000512_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123805_258532Z_cycle0002_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123805_258532Z_cycle0002_steps000000512_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123817_906532Z_cycle0003_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123817_906532Z_cycle0003_steps000000512_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123827_202537Z_cycle0003_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123827_202537Z_cycle0003_steps000000512_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123832_421568Z_cycle0004_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123832_421568Z_cycle0004_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123846_479568Z_cycle0005_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123846_479568Z_cycle0005_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123856_231566Z_cycle0006_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123856_231566Z_cycle0006_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123908_903607Z_cycle0007_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123908_903607Z_cycle0007_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123920_793607Z_cycle0008_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123920_793607Z_cycle0008_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123932_943606Z_cycle0009_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123932_943606Z_cycle0009_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123942_031607Z_cycle0010_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123942_031607Z_cycle0010_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123951_443607Z_cycle0011_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123951_443607Z_cycle0011_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123959_316606Z_cycle0012_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T123959_316606Z_cycle0012_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124009_303614Z_cycle0013_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124009_303614Z_cycle0013_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124018_137605Z_cycle0014_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124018_137605Z_cycle0014_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124033_562377Z_cycle0015_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124033_562377Z_cycle0015_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124047_841982Z_cycle0016_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124047_841982Z_cycle0016_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124103_631015Z_cycle0017_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124103_631015Z_cycle0017_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124118_603671Z_cycle0018_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124118_603671Z_cycle0018_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124133_896673Z_cycle0019_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124133_896673Z_cycle0019_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124148_071817Z_cycle0020_steps000000512_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/backups/20261010T124148_071817Z_cycle0020_steps000000512_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/inconclusive/20261010T123852_898567Z_cycle0005.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/inconclusive/20261010T123916_083608Z_cycle0007.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/inconclusive/20261010T123929_578605Z_cycle0008.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/inconclusive/20261010T123948_486606Z_cycle0010.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/inconclusive/20261010T124006_298606Z_cycle0012.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/inconclusive/20261010T124058_789014Z_cycle0016.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/inconclusive/20261010T124113_613015Z_cycle0017.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/inconclusive/20261010T124157_320817Z_cycle0020.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T123800_992531Z_cycle0001_b51810dd4590.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T123813_667531Z_cycle0002_32896f583882.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T123842_153567Z_cycle0004_95cdec4bb958.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T123904_122606Z_cycle0006_20136d774341.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T123939_022605Z_cycle0009_0dd02362e985.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T123956_348607Z_cycle0011_55dcb159f5a7.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T124015_055606Z_cycle0013_3de4cd559716.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T124028_570281Z_cycle0014_7494b7045a80.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T124043_270418Z_cycle0015_829ec90aef27.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T124128_701671Z_cycle0018_52f5a0b7df78.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T123707_776939Z/league/rejected/20261010T124143_391818Z_cycle0019_1a4dc0b6dbcf.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/inputs/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/inputs/cycle09.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/inputs/wavedash.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T124754_396731Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T124902_232800Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T124902_232800Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T125405_717870Z_cycle0002_steps000005120_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T125405_717870Z_cycle0002_steps000005120_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T125430_712869Z_cycle0002_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T125430_712869Z_cycle0002_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T125908_632889Z_cycle0003_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T125908_632889Z_cycle0003_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T130358_436635Z_cycle0004_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T130358_436635Z_cycle0004_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T130826_933083Z_cycle0005_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T130826_933083Z_cycle0005_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T131208_149020Z_cycle0006_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T131208_149020Z_cycle0006_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T131543_035652Z_cycle0007_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T131543_035652Z_cycle0007_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T132043_649488Z_cycle0008_steps000007680_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T132043_649488Z_cycle0008_steps000007680_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T132047_416489Z_cycle0008_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T132047_416489Z_cycle0008_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T132549_593505Z_cycle0009_steps000006144_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T132549_593505Z_cycle0009_steps000006144_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T132603_830030Z_cycle0009_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T132603_830030Z_cycle0009_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T133023_444938Z_cycle0010_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/backups/20261010T133023_444938Z_cycle0010_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/inconclusive/20261010T125323_334558Z_cycle0001.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/inconclusive/20261010T130726_305776Z_cycle0004.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/inconclusive/20261010T131131_110975Z_cycle0005.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/inconclusive/20261010T132504_907360Z_cycle0008.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/inconclusive/20261010T132925_913744Z_cycle0009.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/rejected/20261010T125807_506009Z_cycle0002_c56e4b129e94.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/rejected/20261010T130258_744067Z_cycle0003_b3ca459c6d22.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/rejected/20261010T131503_188350Z_cycle0006_e72bce858d5a.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/rejected/20261010T131944_081469Z_cycle0007_b1eacb1c30f0.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/afk_runs/20261010T124307_042365Z/league/rejected/20261010T133407_060146Z_cycle0010_d2f75ac1b0eb.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221103_540581Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221112_951046Z_cycle0001_steps000002048_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221112_951046Z_cycle0001_steps000002048_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221126_830822Z_cycle0001_steps000000000_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221126_830822Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221149_971857Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221149_971857Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221341_251427Z_cycle0001_steps000000000_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221341_251427Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221343_237422Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221343_237422Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221418_621875Z_cycle0001_steps000000000_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221418_621875Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221420_792746Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T221420_792746Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T222458_625281Z_cycle0001_steps000000000_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T222458_625281Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T222500_711274Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T222500_711274Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T222726_329327Z_cycle0002_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T222726_329327Z_cycle0002_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T222949_027162Z_cycle0003_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T222949_027162Z_cycle0003_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T223234_594621Z_cycle0004_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T223234_594621Z_cycle0004_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T223547_137007Z_cycle0005_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T223547_137007Z_cycle0005_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T223811_417216Z_cycle0006_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T223811_417216Z_cycle0006_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T224032_438896Z_cycle0007_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T224032_438896Z_cycle0007_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T224253_710008Z_cycle0008_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T224253_710008Z_cycle0008_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "NATIVE",
+      "sha256": "50f34d4a3723bc2849c97200e8e42969e0cc1d82328473b017505994be1966d2",
+      "kickoff": "nexto_v4",
+      "reason": ""
+    },
+    {
+      "path": "data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T224733_948585Z_cycle0010_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T224733_948585Z_cycle0010_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225002_305355Z_cycle0011_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225002_305355Z_cycle0011_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225226_832145Z_cycle0012_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225226_832145Z_cycle0012_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225451_595912Z_cycle0013_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225451_595912Z_cycle0013_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225730_316654Z_cycle0014_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225730_316654Z_cycle0014_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225952_735950Z_cycle0015_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T225952_735950Z_cycle0015_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230220_378859Z_cycle0016_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230220_378859Z_cycle0016_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230439_941441Z_cycle0017_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230439_941441Z_cycle0017_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230709_444841Z_cycle0018_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230709_444841Z_cycle0018_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230908_933962Z_cycle0018_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230908_933962Z_cycle0018_steps000008192_champion.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230939_467429Z_cycle0019_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T230939_467429Z_cycle0019_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T231153_537560Z_cycle0020_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T231153_537560Z_cycle0020_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T231422_930327Z_cycle0021_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T231422_930327Z_cycle0021_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T231644_686997Z_cycle0022_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T231644_686997Z_cycle0022_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T231903_473334Z_cycle0023_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T231903_473334Z_cycle0023_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T232141_359948Z_cycle0024_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T232141_359948Z_cycle0024_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T232413_341596Z_cycle0025_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T232413_341596Z_cycle0025_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T232627_202654Z_cycle0026_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T232627_202654Z_cycle0026_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T232844_720658Z_cycle0027_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T232844_720658Z_cycle0027_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233100_113993Z_cycle0028_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233100_113993Z_cycle0028_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233245_184343Z_cycle0028_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233245_184343Z_cycle0028_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233315_158221Z_cycle0029_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233315_158221Z_cycle0029_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233522_540349Z_cycle0030_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233522_540349Z_cycle0030_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233754_206061Z_cycle0031_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T233754_206061Z_cycle0031_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234024_771868Z_cycle0032_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234024_771868Z_cycle0032_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234226_542629Z_cycle0033_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234226_542629Z_cycle0033_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234457_723086Z_cycle0034_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234457_723086Z_cycle0034_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234717_864787Z_cycle0035_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234717_864787Z_cycle0035_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234934_573971Z_cycle0036_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T234934_573971Z_cycle0036_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T235157_883167Z_cycle0037_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T235157_883167Z_cycle0037_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T235425_446486Z_cycle0038_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/backups/20261008T235425_446486Z_cycle0038_steps000008192_champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/champion.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T222655_871885Z_cycle0001.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T222917_902643Z_cycle0002.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T223505_062856Z_cycle0004.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T223742_550890Z_cycle0005.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T224225_551340Z_cycle0007.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T225156_964977Z_cycle0011.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T225701_300808Z_cycle0013.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T230640_331095Z_cycle0017.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T231124_292658Z_cycle0019.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T231353_872550Z_cycle0020.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T231615_338853Z_cycle0021.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T231834_098679Z_cycle0022.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T232111_313806Z_cycle0023.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T233030_272011Z_cycle0027.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T233453_512409Z_cycle0029.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T233954_881290Z_cycle0031.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T234157_107150Z_cycle0032.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T234648_543323Z_cycle0034.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T234906_004726Z_cycle0035.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/inconclusive/20261008T235355_053483Z_cycle0037.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T223144_930879Z_cycle0003_fc827be6684d.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T224003_400632Z_cycle0006_2fe58ec1b2ec.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T224450_186022Z_cycle0008_d76213aed4c0.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T224704_424032Z_cycle0009_50f34d4a3723.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T224931_973997Z_cycle0010_862249b69a18.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T225421_777011Z_cycle0012_bab5830c25ac.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T225924_226985Z_cycle0014_56adaf8b29b0.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T230150_678696Z_cycle0015_9b2980dce9ba.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T230410_994429Z_cycle0016_aa8f33345089.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T232344_533445Z_cycle0024_db7ba4075c22.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T232557_743643Z_cycle0025_9a129030605a.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T232815_135043Z_cycle0026_038be30dfa11.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T233725_267157Z_cycle0030_b15afe26b611.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T234427_997909Z_cycle0033_6aa7e4800e2c.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague/rejected/20261008T235128_361871Z_cycle0036_ba77e5e1b7e4.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague_kickoff/backups/20261008T221211_986336Z_cycle0001_steps000000000_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague_kickoff/backups/20261008T221242_082198Z_cycle0001_steps000008192_candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague_kickoff/backups/20261008T221242_082198Z_cycle0001_steps000008192_champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague_kickoff/candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/autoleague_kickoff/champion.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/bc_policy.pt",
+      "bytes": 1428653,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/100000/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/100000/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/100000/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/100000/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/120000/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/120000/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/120000/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/120000/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/420018/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/420018/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/420018/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai/420018/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/1000050/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/1000050/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/1000050/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/1000050/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/250012/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/250012/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/250012/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/250012/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/500026/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/500026/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/500026/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/500026/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/750046/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/750046/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/750046/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_grounded/750046/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1000050/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1000050/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1000050/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1000050/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1050050/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1050050/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1050050/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1050050/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1100050/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1100050/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1100050/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1100050/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1150050/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1150050/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1150050/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1150050/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1200050/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1200050/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1200050/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1200050/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1250050/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1250050/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1250050/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/1250050/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/500026/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/500026/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/500026/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/500026/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/750046/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/750046/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/750046/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_before_nexto_20261009_002340/750046/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_smoke_backup/100004/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_smoke_backup/100004/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_smoke_backup/100004/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_smoke_backup/100004/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_smoke_backup/50002/PPO_POLICY.pt",
+      "bytes": 1428921,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_smoke_backup/50002/PPO_POLICY_OPTIMIZER.pt",
+      "bytes": 2857957,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_smoke_backup/50002/PPO_VALUE_NET.pt",
+      "bytes": 1246365,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/checkpoints/chat_gpt_ai_smoke_backup/50002/PPO_VALUE_NET_OPTIMIZER.pt",
+      "bytes": 2492909,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/finishing_lab/candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/finishing_lab_smoke/candidate.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/cycle9_ppo_v025_smoke01.pt",
+      "bytes": 6021807,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/native_ppo_v021_smoke_01.pt",
+      "bytes": 265795,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/native_ppo_v022_facingfix_01.pt",
+      "bytes": 267395,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_kickoff_v031_run01_u0010.pt",
+      "bytes": 6024367,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_kickoff_v031_run01_u0020.pt",
+      "bytes": 6024367,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_kickoff_v031_run01_u0030.pt",
+      "bytes": 6024367,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_kickoff_v031_run01_u0040.pt",
+      "bytes": 6024367,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_u60_RLBOT_nexto-model.pt",
+      "bytes": 1857330,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_v027_campaign01_u0020.pt",
+      "bytes": 6026031,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_v027_campaign01_u0040.pt",
+      "bytes": 6026031,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_v027_campaign01_u0060.pt",
+      "bytes": 6026031,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_v027_campaign01_u0080.pt",
+      "bytes": 6026031,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_v034_livecapture_u60_01/nexto-model.pt",
+      "bytes": 1857330,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/slater_v038c_nexto_live01/nexto-model.pt",
+      "bytes": 1852625,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v037a_script_nexto_smoke01_u0062.pt",
+      "bytes": 6025711,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0070.pt",
+      "bytes": 6027567,
+      "kind": "NATIVE",
+      "sha256": "a0fc51a8ec3f45f1f189300ec4f23645e94747657c4f0f8ec5c204a88767a291",
+      "kickoff": "nexto_v4",
+      "reason": ""
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0080.pt",
+      "bytes": 6027503,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0090.pt",
+      "bytes": 6027567,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0100.pt",
+      "bytes": 6027503,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0110.pt",
+      "bytes": 6027503,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0120.pt",
+      "bytes": 6027503,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0130.pt",
+      "bytes": 6027503,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0140.pt",
+      "bytes": 6027503,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0150.pt",
+      "bytes": 6027503,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_campaign01_u0155.pt",
+      "bytes": 6027503,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v040_multirival_smoke01_u0062.pt",
+      "bytes": 6024687,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v041_overnight/overnight01/smoke/smoke_20261011T192358272602Z/seed.pt",
+      "bytes": 2440343,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v041_overnight/overnight01/smoke/smoke_20261011T192358272602Z/smoke_20261011T192358272602Z_u0071.pt",
+      "bytes": 6020655,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v041_overnight/overnight01/smoke/smoke_20261012T045153947041Z/seed.pt",
+      "bytes": 2440343,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v041_overnight/overnight01/smoke/smoke_20261012T045153947041Z/smoke_20261012T045153947041Z_u0071.pt",
+      "bytes": 6020655,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/isolated/v041_overnight/overnight01/trials/g00009_leader_small_2/g00009_leader_small_2_u0073.pt",
+      "bytes": 6020655,
+      "kind": "NATIVE",
+      "sha256": "6e18ab3839d97b27d9c575ecbbfc3f63b4118cd7371588a97dd48720d15f0bae",
+      "kickoff": "nexto_v4",
+      "reason": ""
+    },
+    {
+      "path": "data/mechanics/aerial_touch/last.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/mechanics/aerial_touch/snapshot_00001024.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/mechanics/kickoff/last.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/mechanics/kickoff/snapshot_00001024.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/mechanics/recovery/last.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/mechanics/recovery/snapshot_00001024.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/mechanics/wavedash/last.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/mechanics/wavedash/snapshot_00001024.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/native_nexto/before_kickoff_restore.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/native_nexto/best_10k.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/native_nexto/last.pt",
+      "bytes": 5736005,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/native_nexto/latest_backup.pt",
+      "bytes": 5735941,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/Newest/g00009_leader_small_2_u0073.pt",
+      "bytes": 6020655,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/nexto_student_policy.pt",
+      "bytes": 1428785,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/nexto_student_v2.pt",
+      "bytes": 1428737,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/20261008T224518_775472Z_cycle0009_step/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/20261008T232141_359948Z_cycle0024_step/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Bot_Dias/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/ChatGPT_AI_Cycle09/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Cycle09_LearnedKickoff/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Cycle09_ScriptedKickoff/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Cycle9_Finishing_Test/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Cycle9_Fusion_v1/champion-model.pt",
+      "bytes": 1859164,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Cycle9_Fusion_v1/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Cycle9_Fusion_v1/wavedash-model.pt",
+      "bytes": 1859164,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/g00009_leader_small_2_u0073/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/g00009_leader_small_2_u0073_LearnedKickoff/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/g00009_leader_small_2_u0073_ScriptedKickoff/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Original_Champion/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "NEXTO_TS",
+      "sha256": "a6dab0d74bb77665ecf97635149702fe43323b09dfd5183001d540015fd38d62",
+      "kickoff": "nexto_v4",
+      "reason": ""
+    },
+    {
+      "path": "data/rlbot_exports/slater.pt",
+      "bytes": 84,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/slater_v036_nexto_modes/Nexto_NN_Greedy/nexto-model.pt",
+      "bytes": 1852625,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/slater_v036_nexto_modes/Nexto_NN_Stochastic/nexto-model.pt",
+      "bytes": 1852625,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/slater_v036_nexto_modes/Nexto_Script_Only/nexto-model.pt",
+      "bytes": 1852625,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/slater_v036_nexto_modes/Nexto_Stock/nexto-model.pt",
+      "bytes": 1852625,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Slater_V70_LearnedKickoff/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/Slater_V70_ScriptedKickoff/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/V027/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/V60/nexto-model.pt",
+      "bytes": 1857330,
+      "kind": "NEXTO_TS",
+      "sha256": "4268f1bb0847a907be0ceb4c7c4bcb8942144978ff5fc5852fc9bcca2e9880b7",
+      "kickoff": "nexto_v4",
+      "reason": ""
+    },
+    {
+      "path": "data/rlbot_exports/V70_s9/nexto-model.pt",
+      "bytes": 6020655,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/rlbot_exports/wavedash/nexto-model.pt",
+      "bytes": 1858570,
+      "kind": "NEXTO_TS",
+      "sha256": "8c9f41dd627363e2e0ef99a241d325cf7619e4b36cf022efdc5db776641127a6",
+      "kickoff": "nexto_v4",
+      "reason": ""
+    },
+    {
+      "path": "data/teamplay_v2/cycle9_shared_2v2/candidate.pt",
+      "bytes": 5709963,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "data/teamplay_v2/cycle9_smoke/candidate.pt",
+      "bytes": 5709899,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "GigaLearn_Project/Research_Hub/Curriculum_V2/TAS_Input_Pilot/results/tas_input_20261010T074534Z_be89f5/tas_input_memory.pt",
+      "bytes": 105478,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "GigaLearn_Project/Research_Hub/Curriculum_V2/TAS_Replay_Link/results/tas_controls_20261010T080234Z_4ea0a0/tas_only.pt",
+      "bytes": 67617,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "GigaLearn_Project/Research_Hub/Curriculum_V2/TAS_Replay_Link/results/tas_controls_20261010T080234Z_4ea0a0/with_replay_cadence.pt",
+      "bytes": 71269,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "slater.pt",
+      "bytes": 5746997,
+      "kind": "FILTERED",
+      "sha256": "",
+      "kickoff": "",
+      "reason": "Outside --include globs"
+    },
+    {
+      "path": "vendor/nexto/nexto-model.pt",
+      "bytes": 1852625,
+      "kind": "NEXTO_TS",
+      "sha256": "bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa",
+      "kickoff": "nexto_v4",
+      "reason": ""
+    }
+  ],
+  "recommended_source": "E:\\Downloads\\Chat_GPT_AI\\data\\rlbot_exports\\Original_Champion\\nexto-model.pt",
+  "recommended_source_sha256": "a6dab0d74bb77665ecf97635149702fe43323b09dfd5183001d540015fd38d62",
+  "selection_status": "ROUND_ROBIN_SCREEN_NOT_FULL_MATCH_VERIFIED"
+}

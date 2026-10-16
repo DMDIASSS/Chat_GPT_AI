@@ -1,0 +1,124 @@
+diff --git a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
+--- a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
++++ b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
+@@ -510,7 +510,7 @@
+ 
+ 		while (true) {
+             if (const char* stop = std::getenv("SLATER_GL_STOP_ITERATION")) {
+-                if (totalIterations >= std::stoull(stop) || (std::getenv("SLATER_GL_PAUSE_FILE") && std::filesystem::exists(std::getenv("SLATER_GL_PAUSE_FILE")))) {
++                if (totalIterations >= std::stoull(stop) || (std::getenv("SLATER_GL_STOP_TIMESTEP") && totalTimesteps >= std::stoull(std::getenv("SLATER_GL_STOP_TIMESTEP"))) || (std::getenv("SLATER_GL_PAUSE_FILE") && std::filesystem::exists(std::getenv("SLATER_GL_PAUSE_FILE")))) {
+                     Save();
+                     std::cout << "SLATER_GIGA_COMPLETE iterations=" << totalIterations << " timesteps=" << totalTimesteps << std::endl;
+                     exit(0);
+@@ -542,7 +542,8 @@
+ 					int oldVersionIdx = RocketSim::Math::RandInt(0, versionMgr->versions.size());
+ 					oldVersion = &versionMgr->versions[oldVersionIdx];
+ 
+-					Team oldVersionTeam = Team(RocketSim::Math::RandInt(0, 2)); 
++					Team oldVersionTeam = Team(RocketSim::Math::RandInt(0, 2));
++                    if(const char* fixed=std::getenv("SLATER_GL_FIXED_FROZEN_TEAM")){int team=std::atoi(fixed);if(team==0||team==1)oldVersionTeam=Team(team);} 
+ 					
+ 					newPlayerIndices.clear();
+ 					oldVersionPlayerMask.resize(numPlayers);
+@@ -565,7 +566,17 @@
+ 				}
+ 			}
+ 
+-			int numRealPlayers = oldVersion ? newPlayerIndices.size() : envSet->state.numPlayers;
++			// Discard unfinished trajectories before changing the controlled-player mask.
++            for (auto& trajectory : trajectories) trajectory.Clear();
++            // Expose the frozen team only to an optional parser's physical script hook.
++            int slaterFrozenTeam = oldVersion ? int(envSet->state.gameStates[0].players[oldPlayerIndices[0]].team) : -1;
++#ifdef _WIN32
++            _putenv_s("SLATER_GL_FROZEN_TEAM", std::to_string(slaterFrozenTeam).c_str());
++#else
++            setenv("SLATER_GL_FROZEN_TEAM", std::to_string(slaterFrozenTeam).c_str(), 1);
++#endif
++            if (oldVersion) std::cout << "SLATER_FROZEN_ITERATION team=" << slaterFrozenTeam << " trained_players=" << newPlayerIndices.size() << " frozen_players=" << oldPlayerIndices.size() << std::endl;
++            int numRealPlayers = oldVersion ? newPlayerIndices.size() : envSet->state.numPlayers;
+ 
+ 			int stepsCollected = 0;
+ 			{ // Generate experience
+@@ -871,6 +882,14 @@
+ 					{
+ 						"Average Step Reward",
+ 						"Policy Entropy",
++						"Policy Loss",
++						"Critic Loss",
++						"Mean KL Divergence",
++						"Post-update PPO KL",
++						"SB3 Clip Fraction",
++						"Learner Speed",
++						"Learner Idle Fraction",
++						"Learner Touch Fraction",
+ 						"KL Div Loss",
+ 						"First Accuracy",
+ 						"",
+diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h
+--- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h
++++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/ActionParsers/ActionParser.h
+@@ -11,6 +11,9 @@
+ 		virtual Action ParseAction(int actionIdx, const Player& player, const GameState& state) = 0;
+ 		virtual int GetActionAmount() = 0;
+ 
++        // Optional external controls for frozen rivals; learners remain on-policy.
++        virtual void ApplyPhysicsControls(Arena* arena) {}
++
+ 		// Returns true or false for each action, depending on if it is available in the current situation
+ 		// Not using std::vector<bool> because it has major issues (see https://isocpp.org/blog/2012/11/on-vectorbool)
+ 		virtual std::vector<uint8_t> GetActionMask(const Player& player, const GameState& state) {
+diff --git a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp
+--- a/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp
++++ b/GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp
+@@ -124,7 +124,10 @@
+ 		gs.ResetBeforeStep();
+ 
+ 		// Step arena with old actions
+-		arena->Step(config.actionDelay);
++		for (int tick = 0; tick < config.actionDelay; tick++) {
++            actionParsers[arenaIdx]->ApplyPhysicsControls(arena);
++            arena->Step(1);
++        }
+ 	};
+ 
+ 	g_ThreadPool.StartBatchedJobs(fnStepArena, arenas.size(), async);
+@@ -152,7 +155,15 @@
+ 		// Step arena with new actions we got from observing the last state
+ 		// Update the gamestate after
+ 		{
+-			arena->Step(config.tickSkip - config.actionDelay);
++			for (int tick = 0; tick < config.tickSkip - config.actionDelay; tick++) {
++                actionParsers[arenaIdx]->ApplyPhysicsControls(arena);
++                arena->Step(1);
++            }
++            auto appliedCar = arena->_cars.begin();
++            for (int i = 0; i < actions.size(); i++, appliedCar++) {
++                auto a = (*appliedCar)->controls;
++                actions[i] = {a.throttle, a.steer, a.pitch, a.yaw, a.roll, float(a.jump), float(a.boost), float(a.handbrake)};
++            }
+ 
+ 			if (eventTrackers[arenaIdx])
+ 				eventTrackers[arenaIdx]->Update(arena);
+diff --git a/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp b/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp
+--- a/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp
++++ b/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp
+@@ -301,6 +301,19 @@
+ 	float policyUpdateMagnitude = (policyBefore - policyAfter).norm().item<float>();
+ 	float criticUpdateMagnitude = (criticBefore - criticAfter).norm().item<float>();
+ 
++	// Measure after the optimizer step; pre-step KL can be zero with one epoch/batch.
++	if (trainPolicy && experience.data.states.size(0)>0) {
++		torch::NoGradGuard guard;
++		auto n=std::min<int64_t>(1024,experience.data.states.size(0));
++		auto obs=experience.data.states.slice(0,0,n).to(device);
++		auto masks=experience.data.actionMasks.slice(0,0,n).to(device);
++		auto acts=experience.data.actions.slice(0,0,n).to(device);
++		auto old=experience.data.logProbs.slice(0,0,n).to(device).reshape({n});
++		auto probs=InferPolicyProbsFromModels(models,obs,masks,config.policyTemperature,false);
++		auto current=probs.log().gather(-1,acts.unsqueeze(-1)).reshape({n});
++		auto ratio=current-old;
++		report["Post-update PPO KL"]=(ratio.exp()-1-ratio).mean().cpu().item<float>();
++	}
+ 	// Assemble and return report
+ 	report["Policy Entropy"] = avgEntropy.Get();
+ 	report["Mean KL Divergence"] = avgDivergence.Get();

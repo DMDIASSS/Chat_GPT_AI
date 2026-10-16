@@ -1,0 +1,7 @@
+1. In Freestyle, click Safe pause and wait for PAUSED.
+2. Close the app. Extract this ZIP into E:\Downloads\Chat_GPT_AI and replace the included files.
+3. Open FREESTYLE_APP.bat. Choose your existing run (for example freestyle01) and Resume.
+No Build or Start new is needed. Models, settings and native binaries are not included.
+In W&B Search panels by regex, enter learning/ to view losses, entropy, policy KL and parameter changes.
+Use validation/ for independent evaluation and reward_contributions/ for collected rewards.
+Existing workspace panels may remain; fixed reward coefficients are expected to be flat.

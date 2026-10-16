@@ -1,0 +1,10 @@
+1. Safe pause Freestyle and close the app after its checkpoint saves.
+2. Extract into E:\Downloads\Chat_GPT_AI, replacing the included source files.
+3. Run FREESTYLE_REWARDS_V2.bat. It rebuilds if needed, copies the latest
+   completed freestyle01 actor into freestyle_rewards02, and trains 200 updates.
+4. Future launches resume freestyle_rewards02 for another 200 updates.
+The parent run, all checkpoints and your settings are preserved.
+First 10 child updates train the fresh critic while the actor stays fixed.
+W&B uses your existing local login and creates a new child run.
+For the GUI: Build, Run=freestyle01, Continue with revised rewards.
+See docs/FREESTYLE.md for other parent names and custom budgets.

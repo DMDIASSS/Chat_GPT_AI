@@ -89,11 +89,11 @@ class ControlCenter(tk.Tk):
         ttk.Label(head,text='Cycle 9 lineage · protected originals · local control center',font=('Segoe UI',10)).pack(side='right')
         self.tabs=ttk.Notebook(self);self.tabs.pack(fill='both',expand=True,padx=16,pady=(0,12))
         pages={}
-        for name in ('Overview','Training','Models & Backups','Reports','Replays','Replay + TAS Learning','Aggressive Research','Team modes','Mechanics Lab','Viewer & RLBot','Logs'):
+        for name in ('Overview','Training','Models & Backups','Reports','Replays','Replay + TAS Learning','Versatile Trainer','Aggressive Research','Team modes','Mechanics Lab','Viewer & RLBot','Logs'):
             p=ttk.Frame(self.tabs);self.tabs.add(p,text=name);pages[name]=p
         self.overview=pages['Overview'];self.training=pages['Training'];self.modelpage=pages['Models & Backups']
-        self.reportspage=pages['Reports'];self.replays=pages['Replays'];self.learnpage=pages['Replay + TAS Learning'];self.researchpage=pages['Aggressive Research'];self.team=pages['Team modes'];self.mechanics=pages['Mechanics Lab'];self.viewer=pages['Viewer & RLBot'];self.logs=pages['Logs']
-        self._make_overview();self._make_training();self._make_models();self._make_reports();self._make_replays();self._make_learning();self._make_research();self._make_team_modes();self._make_mechanics();self._make_viewer();self._make_logs()
+        self.reportspage=pages['Reports'];self.replays=pages['Replays'];self.learnpage=pages['Replay + TAS Learning'];self.versatilepage=pages['Versatile Trainer'];self.researchpage=pages['Aggressive Research'];self.team=pages['Team modes'];self.mechanics=pages['Mechanics Lab'];self.viewer=pages['Viewer & RLBot'];self.logs=pages['Logs']
+        self._make_overview();self._make_training();self._make_models();self._make_reports();self._make_replays();self._make_learning();self._make_versatile();self._make_research();self._make_team_modes();self._make_mechanics();self._make_viewer();self._make_logs()
         self.footer=tk.StringVar(value='Ready — nothing is started automatically')
         ttk.Label(self,textvariable=self.footer,padding=(22,8)).pack(fill='x')
 
@@ -290,6 +290,73 @@ class ControlCenter(tk.Tk):
         self.learning_info=tk.StringVar(value='No learning run has been started')
         ttk.Label(p,textvariable=self.learning_info,wraplength=940,justify='left',font=('Consolas',10)).pack(anchor='w',pady=7)
 
+    def _make_versatile(self):
+        p=self._section(self.versatilepage,'Versatile hybrid trainer',
+            'Continue a chosen native checkpoint with mixed 1v1/2v2 PPO practice and confidence-filtered replay learning. '
+            'All frozen opponents use scripted kickoff. Fresh match confirmation chooses the saved champion; '
+            'every raw candidate remains available. Stop other training jobs before starting this trainer.')
+        default=ROOT/'data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt'
+        if not default.is_file():default=ROOT/'data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt'
+        self.versatile_source=tk.StringVar(value=str(default))
+        self.versatile_dataset=tk.StringVar(value=str(ROOT/'data/isolated/versatile_data01'))
+        self.versatile_inputs=tk.StringVar(value=str(ROOT/'data/replays'))
+        self.versatile_run=tk.StringVar(value='versatile01');self.versatile_cycles=tk.StringVar(value='3')
+        self.versatile_use_data=tk.BooleanVar(value=True)
+        for label,var in [('Source checkpoint',self.versatile_source),('Replay / aligned capture folder',self.versatile_inputs),('Prepared dataset folder',self.versatile_dataset)]:
+            row=ttk.Frame(p);row.pack(fill='x',pady=4)
+            ttk.Label(row,text=label,width=28).pack(side='left')
+            ttk.Entry(row,textvariable=var,width=75).pack(side='left',padx=8)
+        ttk.Button(p,text='Browse source checkpoint…',command=self.pick_versatile_source).pack(anchor='w')
+        ttk.Checkbutton(p,text='Include prepared replay demonstrations and training replay starts',variable=self.versatile_use_data).pack(anchor='w',pady=6)
+        row=ttk.Frame(p);row.pack(fill='x',pady=4)
+        for label,var in [('Run name',self.versatile_run),('Cycles this session',self.versatile_cycles)]:
+            ttk.Label(row,text=label).pack(side='left',padx=7);ttk.Entry(row,textvariable=var,width=20).pack(side='left')
+        self._line_buttons(p,[('Install replay dependencies',lambda:self._spawn('Replay dependencies',[str(PYTHON),'-m','pip','install','-r',str(ROOT/'requirements-slater-versatile.txt')],category='versatile_install')),
+                             ('Prepare / reuse dataset',lambda:self.versatile_action('prepare')),
+                             ('Preflight',lambda:self.versatile_action('preflight'))])
+        self._line_buttons(p,[('Smoke test (new run name)',lambda:self.versatile_action('smoke')),
+                             ('Start new run',lambda:self.versatile_action('start')),
+                             ('Resume saved run',lambda:self.versatile_action('resume')),
+                             ('Request safe pause',lambda:self.versatile_action('pause'))])
+        self._line_buttons(p,[('Show saved status',lambda:self.versatile_action('status')),
+                             ('Open run / reports',self.open_versatile_run),
+                             ('Export saved champion',self.export_versatile_champion),
+                             ('Read guide',lambda:self.open_file(ROOT/'SLATER_VERSATILE_README.md'))])
+        ttk.Label(p,text='Default: 20 PPO updates per cycle; 3 cycles per session. Stops after 3 unconfirmed cycles. '
+                  'Smoke needs a separate run name. Resume uses its saved source, data and configuration. '
+                  'Legacy TAS .data files lack aligned game states and are not training inputs.',wraplength=920).pack(anchor='w',pady=10)
+
+    def pick_versatile_source(self):
+        value=filedialog.askopenfilename(parent=self,title='Choose checkpoint to continue',initialdir=str(ROOT/'data'),filetypes=[('Native Nexto checkpoint','*.pt')])
+        if value:self.versatile_source.set(value)
+
+    def versatile_action(self,part):
+        name=self.versatile_run.get().strip()
+        if not name or not name.replace('_','').replace('-','').isalnum() or len(name)>50:
+            messagebox.showerror('Invalid run name','Use letters/digits/_/-; maximum 50 characters');return
+        try:
+            cycles=int(self.versatile_cycles.get())
+            if not 1<=cycles<=100:raise ValueError()
+        except ValueError:messagebox.showerror('Invalid cycles','Choose 1..100 cycles');return
+        args=[str(PYTHON),'-u',str(ROOT/'slater_versatile_trainer.py'),part,'--run',name]
+        if part=='prepare':args+=['--inputs',self.versatile_inputs.get(),'--out',self.versatile_dataset.get()]
+        if part in ('start','smoke','preflight'):
+            args+=['--source',self.versatile_source.get()]
+            if self.versatile_use_data.get():args+=['--dataset',self.versatile_dataset.get()]
+        if part in ('start','resume'):args+=['--cycles',str(cycles)]
+        self._spawn('Versatile '+part,args,category='versatile_control' if part in ('pause','status','preflight') else 'versatile')
+
+    def open_versatile_run(self):
+        from slater_versatile_trainer import run_path
+        self.open_folder(run_path(self.versatile_run.get().strip()))
+
+    def export_versatile_champion(self):
+        from slater_versatile_trainer import run_path
+        doc=core.read_json(run_path(self.versatile_run.get().strip())/'selected.json',{})
+        if not doc.get('checkpoint'):messagebox.showerror('No saved champion','Start a versatile run first.');return
+        if core.hash_file(Path(doc['checkpoint']))!=doc['sha256']:messagebox.showerror('Changed checkpoint','Saved champion hash differs');return
+        self.rl_checkpoint.set(doc['checkpoint']);self.rl_scripted_kickoff.set(True);self.export_rlbot()
+
     def _learning_cmd(self,part):
         return [str(PYTHON),str(ROOT/'afk_replay_tas_learning.py'),part]
 
@@ -469,6 +536,10 @@ class ControlCenter(tk.Tk):
         ttk.Label(row,text='Checkpoint').pack(side='left',padx=(0,8))
         ttk.Entry(row,textvariable=self.rl_checkpoint,width=83).pack(side='left',padx=(0,8))
         ttk.Button(row,text='Browse…',command=self.pick_rl_checkpoint).pack(side='left')
+        ttk.Button(row,text='Native folder…',command=self.pick_native_rl_checkpoint).pack(side='left')
+        self.rl_scripted_kickoff=tk.BooleanVar(value=True)
+        ttk.Checkbutton(p,text='Scripted Nexto kickoff (ON by default)',
+                        variable=self.rl_scripted_kickoff).pack(anchor='w',pady=4)
         self._line_buttons(p,[('Export selected model to RLBot v4',self.export_rlbot),
                              ('Export original Nexto',lambda:self.export_rlbot(original=True)),
                              ('Open exports',lambda:self.open_folder(ROOT/'data'/'rlbot_exports'))])
@@ -476,6 +547,11 @@ class ControlCenter(tk.Tk):
             'Separate GigaLearn_Project/ folder contains C++ build bootstrap and an independent training workspace. '
             'Native Nexto .pt checkpoints are NOT directly loadable by the upstream C++ policy.')
         self._line_buttons(p,[('Open GigaLearn project',lambda:self.open_folder(ROOT/'GigaLearn_Project')),('Read migration plan',lambda:self.open_file(ROOT/'AFK_IMPROVED_GIGALEARN.md'))])
+        self._line_buttons(p,[('Prepare goal/save windows',lambda:self._spawn('Prepare event windows',[str(PYTHON),str(ROOT/'slater_native_focus_curriculum.py'),'prepare'],category='native-prepare')),
+                             ('Start focused native curriculum',lambda:self._spawn('Focused native curriculum',[str(PYTHON),str(ROOT/'slater_native_focus_curriculum.py'),'run'],category='native-focused')),
+                             ('Pause focused curriculum',lambda:self._spawn('Pause focused curriculum',[str(PYTHON),str(ROOT/'slater_native_focus_curriculum.py'),'pause'],category='native-pause')),
+                             ('Open focused reports',lambda:self.open_folder(ROOT/'data'/'isolated'/'event_curriculum'))])
+
 
     def _make_logs(self):
         p=self._section(self.logs,'Process output',
@@ -653,9 +729,14 @@ class ControlCenter(tk.Tk):
             initialdir=str(ROOT/'data'),filetypes=[('PyTorch native checkpoints','*.pt'),('All files','*.*')])
         if name:self.rl_checkpoint.set(name)
 
+    def pick_native_rl_checkpoint(self):
+        name=filedialog.askdirectory(parent=self,title='Select numbered native checkpoint folder (contains POLICY.lt)',
+            initialdir=str(ROOT/'data'/'isolated'/'gigalearn_native'/'runs'))
+        if name:self.rl_checkpoint.set(name)
+
     def export_rlbot(self,original=False):
         path=None if original else Path(self.rl_checkpoint.get())
-        if path is not None and not path.is_file():messagebox.showerror('Missing checkpoint',str(path));return
+        if path is not None and not path.exists():messagebox.showerror('Missing checkpoint',str(path));return
         name=simpledialog.askstring('RLBot v4 export name','Unique export folder name (letters/numbers/_/-):',
                     initialvalue=('Original_Nexto' if original else path.stem[:38]),parent=self)
         if not name:return
@@ -664,9 +745,11 @@ class ControlCenter(tk.Tk):
             messagebox.showerror('Invalid name','Letters/digits/_/- only, maximum 60 characters');return
         if not messagebox.askyesno('Export separate RLBot v4 bot',
                 f'Copy {"original Nexto" if original else str(path)} into an isolated RLBot v4 bot named {name}?\n'
+                f'Scripted kickoff: {"ON" if self.rl_scripted_kickoff.get() else "OFF"}.\n'
                 'No existing exports or checkpoints are overwritten.'):
             return
         args=[str(PYTHON),str(ROOT/'export_rlbot_v4.py'),'--name',name]
+        if self.rl_scripted_kickoff.get():args.append('--scripted-kickoff')
         args+=['--original'] if original else ['--checkpoint',str(path)]
         self._spawn('RLBot v4 export',args,category='export')
 
