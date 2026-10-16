@@ -61,6 +61,15 @@ def make_rows(frames,*,history=8,chunk_ticks=32,cap=1024,seed=20261016,limits=No
         return {k:tuple(x.astype(np.float16) for x in native_observation(views[k])) for k in ids}
     try:
         for current in frames:
+            # RLGym Tools sets tick_count=time_seconds*120, which is a float.
+            # Normalize absolute frame times before both differencing and the
+            # tick%8 sampling grid; int(delta) silently loses physics ticks.
+            raw_tick=float(current.state.tick_count)
+            if not math.isfinite(raw_tick):
+                previous=None;clear();kickoff=None;stats['invalid_tick_count']+=1;continue
+            current=copy.copy(current);current.state=copy.deepcopy(current.state)
+            current.state.tick_count=math.floor(raw_tick+.5)
+            if raw_tick!=current.state.tick_count:stats['fractional_tick_frames']+=1
             if previous is None:previous=current;continue
             frame=previous;previous=current;s,t=frame.state,current.state
             ticks=int(t.tick_count-s.tick_count)

@@ -3,12 +3,13 @@ setlocal
 cd /d "%~dp0"
 set PYTHONUTF8=1
 chcp 65001 >nul
-if not exist ".venv\Scripts\python.exe" (
-  echo Missing project .venv. Run this file from your Chat_GPT_AI project directory.
-  pause
-  exit /b 1
+if exist ".venv\Scripts\python.exe" (
+ ".venv\Scripts\python.exe" -u download_2v2_gc3_ssl.py auto %*
+) else (
+ py -3 -u download_2v2_gc3_ssl.py auto %*
 )
-".venv\Scripts\python.exe" -u -m replay_il.launch download-duos %*
+set "DOWNLOAD_EXIT=%ERRORLEVEL%"
 echo.
-echo Finished. The console output is also in data\isolated\replay_imitation\launcher.log
+echo Download folder: data\replays\ranked-doubles
 pause
+exit /b %DOWNLOAD_EXIT%

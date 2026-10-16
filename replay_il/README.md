@@ -18,14 +18,17 @@ The defaults are your existing `data/replays/ranked-duels` and the new
 `data/replays/ranked-doubles`. Your folder was described as GC3–SSL; files without
 rank metadata retain **user-curated / unverified ranks** provenance.
 
-**REPLAY_IL_DOWNLOAD_DUOS.bat** requests your Ballchasing token privately on your
-PC, or uses `BALLCHASING_TOKEN` / `BALLCHASING_API_KEY`. It downloads at most 100
-new doubles replays per launch, with resume, throttling and a 180-attempt hourly
-ceiling. It uses the documented broad Grand Champion API search, then accepts
+**DOWNLOAD_2V2_GC3_SSL.bat** (also **REPLAY_IL_DOWNLOAD_DUOS.bat**) reuses your
+saved local Ballchasing token or `BALLCHASING_TOKEN` / `BALLCHASING_API_KEY`,
+asking privately once if none is configured. It collects up to 1,000 new doubles
+replays per launch, with resume, throttling and automatic waits for the local
+180-API-attempt hourly ceiling or API cooldown. It uses the documented broad
+Grand Champion API search, then accepts
 only matches where **all four players** have GC3/SSL metadata (tiers 21–22).
 Missing ranks are rejected. This implements the intended quality filter from
 your website link; it does not pretend that website numeric filters are API
-parameters. Re-run to fetch another bounded batch. Keep API tokens out of chat,
+parameters. See `README_AUTO_2V2_DOWNLOAD.md` for pause, token setup and limits.
+Re-run to fetch another bounded batch. Keep API tokens out of chat,
 source files and model configuration. Downloads are separate from training.
 
 The importer supports 1v1, 2v2 and 3v3 state layouts. That does not mean a model

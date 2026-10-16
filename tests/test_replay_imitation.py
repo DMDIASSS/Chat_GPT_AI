@@ -63,6 +63,18 @@ def test_bad_observed_transition_is_rejected():
     finally:engine.close()
     assert not valid
 
+def test_fractional_replay_timestamps_do_not_drop_ticks_or_training_chunks():
+    frames=trace(2.);noisy=copy.deepcopy(frames)
+    for i,frame in enumerate(noisy):frame.state.tick_count=float(frame.state.tick_count)+(.0001 if i%2 else -.0001)
+    before=[f.state.tick_count for f in noisy]
+    baseline,_,_=make_rows(frames,cap=128);actual,_,stats=make_rows(noisy,cap=128)
+    assert len(actual)==len(baseline)>0
+    assert stats['fractional_tick_frames']==len(noisy)
+    assert [f.state.tick_count for f in noisy]==before,'Importer mutated its source frames'
+    for a,b in zip(baseline,actual):
+        for x,y in zip(a['history'],b['history']):np.testing.assert_array_equal(x,y)
+        np.testing.assert_array_equal(a['controls'],b['controls'])
+
 def test_token_book_preserves_actual_buttons_and_reconstructs(raw_rows):
     chunks=np.stack([r['controls'] for r in raw_rows]).astype(np.float32)
     book,stats=fit(chunks,16);tokens,error=tokenize(chunks,book)
