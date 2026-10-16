@@ -1,0 +1,8 @@
+Close the Freestyle app after the trainer is PAUSED or stopped.
+Extract this ZIP into E:\Downloads\Chat_GPT_AI and replace the included files.
+Open FREESTYLE_APP.bat and Resume your existing freestyle01 run.
+No native rebuild, new run, settings changes or administrator launch is required.
+Fixes Windows progress.json access/sharing errors: bounded JSON-write retries,
+nonfatal display-status locks, and separate copies for W&B file uploads.
+Your model, optimizer, curriculum and run identity remain intact.
+This patch does not change rewards or resolve the reported reward-design issue.

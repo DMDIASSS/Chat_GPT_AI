@@ -1,0 +1,8 @@
+﻿rank,model,sha256,kind,kickoff,games,opponents,W,L,D,score_pct
+1,data/rlbot_exports/Original_Champion/nexto-model.pt,a6dab0d74bb77665ecf97635149702fe43323b09dfd5183001d540015fd38d62,NEXTO_TS,nexto_v4,300,6,171,129,0,57.0
+2,data/autoleague/backups/20261008T224518_775472Z_cycle0009_steps000008192_candidate.pt,50f34d4a3723bc2849c97200e8e42969e0cc1d82328473b017505994be1966d2,NATIVE,nexto_v4,300,6,167,133,0,55.667
+3,data/rlbot_exports/V60/nexto-model.pt,4268f1bb0847a907be0ceb4c7c4bcb8942144978ff5fc5852fc9bcca2e9880b7,NEXTO_TS,nexto_v4,300,6,156,138,6,53.0
+4,data/rlbot_exports/wavedash/nexto-model.pt,8c9f41dd627363e2e0ef99a241d325cf7619e4b36cf022efdc5db776641127a6,NEXTO_TS,nexto_v4,300,6,152,148,0,50.667
+5,vendor/nexto/nexto-model.pt,bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa,NEXTO_TS,nexto_v4,300,6,139,155,6,47.333
+6,data/isolated/v041_overnight/overnight01/trials/g00009_leader_small_2/g00009_leader_small_2_u0073.pt,6e18ab3839d97b27d9c575ecbbfc3f63b4118cd7371588a97dd48720d15f0bae,NATIVE,nexto_v4,300,6,132,166,2,44.333
+7,data/isolated/v040_multirival_campaign01_u0070.pt,a0fc51a8ec3f45f1f189300ec4f23645e94747657c4f0f8ec5c204a88767a291,NATIVE,nexto_v4,300,6,125,173,2,42.0

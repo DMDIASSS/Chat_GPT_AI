@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Car Soccer AI Trainer v4.2.7 Direct .pt Import",
+  "version": "4.2.7",
+  "description": "Import .pt, .zip, and .bin Nexto models directly in-browser with no BAT, rename and switch models in-game.",
+  "permissions": [
+    "debugger",
+    "tabs",
+    "storage",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://car-soccer.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Car Soccer AI Trainer",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://car-soccer.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "nexto-worker.bundle.js",
+        "nexto-weights.bin",
+        "g9-weights.bin"
+      ],
+      "matches": [
+        "https://car-soccer.com/*"
+      ]
+    }
+  ]
+}

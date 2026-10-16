@@ -1,0 +1,5 @@
+Extract directly into E:\Downloads\Chat_GPT_AI beside the existing .venv and data folders.
+This overlay contains source, settings, launchers and tests only.
+Run FREESTYLE_SETUP.bat, then Start new in the Freestyle app.
+See docs/FREESTYLE.md for training, W&B login, safe pause and resume.
+Requires the existing native-quality-campaign project helpers.

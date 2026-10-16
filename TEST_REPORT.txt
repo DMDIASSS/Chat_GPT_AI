@@ -1,0 +1,18 @@
+Car Soccer AI Trainer v4.2.7 QA summary
+=======================================
+Fixed a real popup initialization error in v4.2.6: undeclared DOM variables
+installNextoBtn / nextoFile / nextoStatus caused a ReferenceError before the
+UI bindings for importing and the initial refresh status/model list.
+
+Verified:
+- All extension .js/.mjs pass node --check.
+- Chromium about:blank embedded popup interaction test passes: initialization,
+  upload input callback, rename, active-model change and install Nexto flow.
+  These were UI mock tests; actual extension storage was not available.
+- Direct Nexto state_dict .pt, TorchScript .pt and .zip conversion tests pass
+  on synthetic checkpoints and match the Python converter byte-for-byte.
+- Offline game patch test passes for uploaded main-DVUMtcmY.js.
+- Native runtime and control restoration tests pass.
+- v4.2.7 has no localhost importer, BAT or HTTP 403 flow.
+
+Not verified: the user's personal .pt file or live on-site gameplay.
