@@ -21,9 +21,12 @@ rank metadata retain **user-curated / unverified ranks** provenance.
 **DOWNLOAD_2V2_GC3_SSL.bat** (also **REPLAY_IL_DOWNLOAD_DUOS.bat**) reuses your
 saved local Ballchasing token or `BALLCHASING_TOKEN` / `BALLCHASING_API_KEY`,
 asking privately once if none is configured. It collects up to 1,000 new doubles
-replays per launch, with resume, throttling and automatic waits for the local
-180-API-attempt hourly ceiling or API cooldown. It uses the documented broad
-Grand Champion API search, then accepts
+replays per launch. **DOWNLOAD_2V2_ALL_PAGES.bat** walks the full search instead.
+The downloader indexes existing replay IDs and content, requests up to 200
+results/page, and waits for the local 180-file-download hourly ceiling or API
+cooldown. Search pages no longer consume the local file budget. It probes a
+narrow GC3 API search, falling back to the documented broad Grand Champion
+search if rejected, and accepts
 only matches where **all four players** have GC3/SSL metadata (tiers 21–22).
 Missing ranks are rejected. This implements the intended quality filter from
 your website link; it does not pretend that website numeric filters are API
