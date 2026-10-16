@@ -104,6 +104,16 @@ def observations(packet, previous, has_flip):
     # This TorchScript attention adds the float mask to attention logits.
     # +1 would INCREASE attention to unknown pads; a large negative hides them.
     mask[2:] = -10000
+    pads = packet.get("boost_pads", [])
+    if not isinstance(pads,list) or len(pads)>34:
+        raise ValueError("Expected up to 34 observed boost pads")
+    for i,pad in enumerate(pads,2):
+        if type(pad.get("active")) is not bool or type(pad.get("is_big")) is not bool:
+            raise ValueError("Pad availability/type must be verified booleans")
+        kv[i,5:8]=vec(pad["position"])
+        kv[i,20]=1 if pad["is_big"] else .12
+        kv[i,21]=pad["active"]
+        mask[i]=0
     if packet["team"] == 1:
         kv[:, 5:20] *= np.tile([-1, -1, 1], 5)
         kv[:, [1, 2]] = kv[:, [2, 1]]

@@ -137,6 +137,7 @@ close.Activated:Connect(function()
     if sampler then sampler:Disconnect()end
     if token then task.spawn(function()pcall(send,{enabled=false,valid=false})end)end
 end)
+local arenaAdapter,padReader -- Standalone mode supplies measured geometry/pads.
 -- POSE_READER_BEGIN (also embedded by the standalone exporter)
 local scene,car,ball,carRoot,ballRoot,lastCar,lastBall,lastTime
 local function nearest(anchor,excluded)
@@ -188,6 +189,7 @@ local function read()
         ball=car and nearest(sounds and sounds:FindFirstChild("BallSound"),car)
         if not car or not ball then return nil,"goal/reset: waiting for car and ball"end
         carRoot,ballRoot=car.PrimaryPart,ball.PrimaryPart
+        if arenaAdapter then arenaAdapter:measureCar(car,carRoot)end
         lastCar,lastBall,lastTime=carRoot.CFrame,ballRoot.CFrame,os.clock()
         return nil,"warming up poses"
     end
@@ -205,7 +207,25 @@ local function read()
         or(p[3]>2006 and u[3]<-.65)
         or(math.abs(p[1])>4058 and u[1]*p[1]<-2500)
         or(math.abs(p[2])>5082 and math.abs(p[1])>1000 and u[2]*p[2]<-3200)
-    return {car=cp,ball=bp,boost=b,team=TEAM,ground_estimate=grounded,valid=true}
+    local contacts,ballContacts,ballRadius,ballSizeVerified
+    if arenaAdapter then
+        if scene:FindFirstChild("ArenaFree")then return nil,"alternate arena needs its own physics profile"end
+        if now-(arenaAdapter.lastMeasure or -math.huge)>2 then arenaAdapter:measureCar(car,carRoot)end
+        ballRadius,ballSizeVerified=arenaAdapter:ballRadius(ballRoot)
+        grounded,contacts,ballContacts=arenaAdapter:ground(cp,bp,ballRadius)
+    end
+    local packet={car=cp,ball=bp,boost=b,team=TEAM,ground_estimate=grounded,valid=true}
+    if arenaAdapter then
+        packet.ball_radius,packet.ball_size_verified=ballRadius,ballSizeVerified
+        packet.car_preset=arenaAdapter.preset;packet.car_size_verified=arenaAdapter.hitboxVerified
+        packet.wheel_contacts=contacts
+        packet.ball_wheel_contacts=ballContacts
+    end
+    if padReader then
+        packet.boost_pads=padReader:read(scene,cp.position,now)
+        packet.boost_known=padReader.known;packet.boost_total=padReader.total
+    end
+    return packet
 end
 -- POSE_READER_END
 -- Sample poses independently of file round trips. A 1.3s RPC must not turn

@@ -105,6 +105,18 @@ class BridgeTests(unittest.TestCase):
         p = packet(); p["car"]["velocity"] = [float("nan"),0,0]
         with self.assertRaises(ValueError): b.observations(p,b.ZERO,True)
 
+    def test_observed_pad_positions_and_availability_use_existing_nexto_slots(self):
+        p=packet();p["boost_pads"]=[{"position":[111,222,73],"is_big":True,"active":True},
+            {"position":[-333,444,70],"is_big":False,"active":False}]
+        _,kv,mask=(t.numpy() for t in b.observations(p,b.ZERO,True))
+        np.testing.assert_allclose(kv[0,2,5:8],[111/2300,(222+4608)/2300,(73-17)/2300],atol=1e-6)
+        np.testing.assert_array_equal(kv[0,2,20:22],[1,1])
+        np.testing.assert_allclose(kv[0,3,20:22],[.12,0])
+        np.testing.assert_array_equal(mask[0,:4],[0,0,0,0])
+        self.assertTrue((mask[0,4:]==-10000).all())
+        p["boost_pads"][0]["active"]=None
+        with self.assertRaises(ValueError):b.observations(p,b.ZERO,True)
+
     def test_keyboard_mapping_reports_emitted_axes(self):
         keys, actual = b.mapped_keys([1,1,0,1,0,0,1,1],True)
         self.assertEqual(keys, {"W","D","LMB","SHIFT"})

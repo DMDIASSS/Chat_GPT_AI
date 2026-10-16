@@ -59,6 +59,11 @@ def test_observations():
                        "angular_velocity":rng.uniform(-3,3,3).tolist()}}
             previous=lookup_table()[int(rng.integers(90))]
             result.append(observations(p,previous,not ground))
+            # Exercise variable entity counts, availability and big/small fields.
+            p["boost_pads"]=[{"position":[float(x),float(y),73 if i%2 else 70],
+                "is_big":bool(i%2),"active":bool(i%3)}
+                for i,(x,y) in enumerate([(0,-4240),(-3584,0),(3584,0),(-3072,4096),(0,2816),(940,3308)])]
+            result.append(observations(p,previous,not ground))
     return result
 
 
@@ -83,9 +88,10 @@ def prepare_model(model):
         cases=[]
         for q,kv,mask in test_observations():
             full=model((q,kv,mask))[0].reshape(-1)
-            reduced=model((q,kv[:,:2],mask[:,:2]))[0].reshape(-1)
+            keep=mask[0]==0
+            reduced=model((q,kv[:,keep],mask[:,keep]))[0].reshape(-1)
             torch.testing.assert_close(full,reduced,atol=3e-5,rtol=3e-5)
-            cases.append({"query":q[0,0].tolist(),"entities":kv[0,:2].tolist(),
+            cases.append({"query":q[0,0].tolist(),"entities":kv[0,keep].tolist(),
                           "logits":full.tolist(),"action":int(full.argmax())+1})
     tensors={k:v.detach().cpu().numpy().astype("<f4") for k,v in state.items()
              if not k.startswith("net.output.net.")}
@@ -110,15 +116,39 @@ end
 return tensors'''
 
 
-def standalone_source(model,model_sha,app_dir=APP_DIR):
+def load_arena_profile(path):
+    profile=json.loads(Path(path).read_text(encoding="utf-8"))
+    if profile.get("version")!=1: raise ValueError("Unsupported arena profile version")
+    if not 0<=profile["policy_boost_limit"]<=34 or type(profile["policy_boost_limit"]) is not int:
+        raise ValueError("policy_boost_limit must be an integer from 0 to 34")
+    if not .001<=profile["roblox_studs_per_sim_unit"]<=10: raise ValueError("Invalid coordinate scale")
+    required=json.loads((APP_DIR/"arena_profile.json").read_text(encoding="utf-8"))
+    for section in ("arena","physics","car_presets","recovery"):
+        if not set(required[section]).issubset(profile[section]): raise ValueError("Incomplete arena profile: "+section)
+    def finite(value):
+        if isinstance(value,dict):return all(finite(v) for v in value.values())
+        if isinstance(value,list):return all(finite(v) for v in value)
+        if isinstance(value,(float,int)):return bool(np.isfinite(value))
+        return isinstance(value,(str,bool))
+    if not finite(profile):raise ValueError("Non-finite or unsupported profile value")
+    return profile
+
+
+def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None):
     tensors,cases=prepare_model(model)
     policy=(app_dir/"templates/local_policy.lua").read_text(encoding="utf-8")
     keyboard=(app_dir/"templates/local_keyboard.lua").read_text(encoding="utf-8")
+    arena=(app_dir/"templates/local_arena.lua").read_text(encoding="utf-8")
+    pads=(app_dir/"templates/local_pads.lua").read_text(encoding="utf-8")
+    if profile is None:profile=load_arena_profile(app_dir/"arena_profile.json")
     client=(app_dir/"client271.lua").read_text(encoding="utf-8")
     pose=client.split("-- POSE_READER_BEGIN",1)[1].partition("\n")[2].split("-- POSE_READER_END",1)[0]
     template=(app_dir/"templates/standalone.lua").read_text(encoding="utf-8")
     return (template.replace("-- LOCAL_POLICY_HERE", "local Policy=(function()\n"+policy+"\nend)()")
             .replace("-- LOCAL_KEYBOARD_HERE", "local Keyboard=(function()\n"+keyboard+"\nend)()")
+            .replace("-- LOCAL_ARENA_HERE", "local Arena=(function()\n"+arena+"\nend)()")
+            .replace("-- LOCAL_PADS_HERE", "local Pads=(function()\n"+pads+"\nend)()")
+            .replace("-- ARENA_PROFILE_HERE",literal(profile))
             .replace("-- MODEL_TENSORS_HERE",tensor_source(tensors))
             .replace("-- MODEL_CASES_HERE",literal(cases))
             .replace("-- POSE_READER_HERE",pose)
@@ -133,15 +163,18 @@ def main():
     parser.add_argument("--reset-workspace",action="store_true")
     parser.add_argument("--no-install",action="store_true",help="Only write --output; do not install in an executor workspace")
     parser.add_argument("--output",type=Path,default=APP_DIR/"botrblx_standalone.lua")
+    parser.add_argument("--arena-profile",type=Path,default=APP_DIR/"arena_profile.json")
     args=parser.parse_args();args.choose_workspace=True
     root,model_path,base_path=resolve_paths(args)
     torch.set_num_threads(1)
     print("Exporting private model locally:",model_path,flush=True)
     model=load_model(model_path,base_path)
     sha=hashlib.sha256(model_path.read_bytes()).hexdigest()
-    source=standalone_source(model,sha)
+    profile=load_arena_profile(args.arena_profile)
+    source=standalone_source(model,sha,profile=profile)
     args.output.write_text(source,encoding="utf-8")
     print("Saved:",args.output.resolve(),flush=True)
+    print("Arena:",profile["name"],"| live boost context limit:",profile["policy_boost_limit"],flush=True)
     if not args.no_install:
         workspace=select_workspace(args,APP_DIR/"file_connection.json")
         target=workspace/"botrblx_standalone.lua"

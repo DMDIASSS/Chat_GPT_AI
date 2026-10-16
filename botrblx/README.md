@@ -20,7 +20,7 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v2 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v3 ready | model self-test passed`**, then press **F6**.
    The first start briefly tests W/A/S/D/Q/E/Shift and chooses a keyboard method
    only when Roblox observes both keydown and keyup for every key. Then it drives.
    **F6** pauses and **F8** stops and releases the inputs. Keep default controls:
@@ -37,7 +37,8 @@ The panel reports inference time, executor input-call time, actual decisions per
 second, the keyboard method, requested keys, and keyboard keys Roblox actually
 sees. Requested keys alone are not proof that an executor delivered them.
 It targets 15 decisions/second and samples
-poses at up to 30 Hz. Startup runs four saved PyTorch reference cases and refuses
+poses at up to 30 Hz. Startup runs eight saved PyTorch reference cases (including
+live-pad entity inputs) and refuses
 to drive if local logits/actions differ or inference exceeds 200 ms. F8, focus
 loss, chat, invalid poses, missing boost HUD, and errors release owned inputs.
 Goal/reset waits resume after valid car/ball poses return.
@@ -46,15 +47,16 @@ This removes the measured file-transfer delay; inference and frame/input timing
 still take time. The cloud Luau interpreter averaged about 10 ms/inference with
 the supplied actor, matching all four reference actions within 0.000016 maximum
 absolute logit error. This is **not** a Windows/JJSploit speed measurement. The
-runtime checks and panel report the result on your PC. No executor input was
-sent during cloud validation.
+current generic kernel supports verified boost entities too: in cloud Luau, two
+entities took about 11 ms and eight took about 21 ms. More entities cost more CPU
+time. Runtime checks and the panel report the result on your PC. No executor
+input was sent during cloud validation.
 
 This version also fixes the float attention mask: unavailable boost pads now
 receive **-10000**, rather than **+1**, in the Python bridge. Local mode omits
 those masked rows, which is checked against the complete PyTorch observation.
-Neither change retrains the model. Car/ball physics differ from Rocket League;
-wheel/flip state is still estimated, and other cars and pad availability remain
-unverified. Start with freeplay when judging the improvement.
+Neither change retrains the model. Other cars are still omitted. Start with
+freeplay when judging the improvement.
 
 Local mode requires `mouse1press`, `mouse1release`, `mouse2press`, `mouse2release`,
 and Roblox's buffer API. Keyboard v2 first tests normal Roblox enum key events;
@@ -77,6 +79,63 @@ Optional exporter overrides:
 EXPORT_LOCAL_BOT.bat --workspace "C:\Users\almas\AppData\Roaming\jjsploit\workspace"
 EXPORT_LOCAL_BOT.bat --model "D:\Models\update.pt"
 ```
+
+## Measured arena, hitboxes and boost pads (local v3)
+
+`arena_profile.json` records numeric specifications recovered from the saved
+place, including six car collision presets, ball/world radii, field/goal geometry,
+faceted ramp angles, boost coordinates and basic physics constants. The original
+place, game scripts, visual mesh assets and model weights are not in this folder.
+
+The standard field is already 8192 × 10240 × 2048 simulation units, with a
+1792 × 640 rounded goal mouth, back extent ±6000, 91.25 ball/car collision radius
+and 93.15 ball/world radius. One Roblox stud is ten simulation units. Most of
+these values match Rocket League; copying different-looking visual art does not
+establish a different collision size.
+
+The local runtime now:
+
+- Queries the faceted collision volume, rounded corners, goal lips, sloped goal
+  roof/floor and rear cavity instead of flat-wall height thresholds. Four wheel
+  rays estimate contact using the selected car preset and measured ball radius.
+- Reads the car's hidden collision box via its `SelectionBox` and matches size
+  **and offset** against all six presets. Hats, rendered body bounds and the tiny
+  root marker never substitute for a hitbox. If measurement fails, `standard?`
+  explicitly marks the fallback estimate.
+- Reads the ball's source-verified trail attachment scale marker. A `?` after its
+  radius means the default was used, not that a rendered mesh was measured.
+- Discovers actual boost positions from `PadHalo` objects, identifies large/small
+  pads by 16/10 ring segments, and observes active/cooldown cues. Unknown colors,
+  missing segments and unavailable state stay excluded. No active pads are invented.
+  All discovered pads are tracked; six verified pads are supplied per policy
+  decision, reserving up to two slots for nearby large pads. This keeps the local
+  inference cost bounded. `Pads known/total -> used` shows the exact counts.
+- Briefly overrides the policy after sustained lack of movement near a boundary,
+  or when stationary upside down, with a bounded reverse/turn or upright action.
+  It avoids overriding close-ball control, has a cooldown, and labels the mode in
+  the panel. This is controller recovery, not a learned new skill.
+
+`arena_collision_preview.obj` is a closed, 42,026-triangle **inspection preview**
+generated from the same collision volume at a 128-unit sampling grid. The runtime
+uses the finer analytic surface, not this approximate preview or decorative
+Roblox mesh bounds. Its metadata records profile identity and resolution.
+Maintainers can regenerate it with `build_collision_preview.py --luau <luau-cli>`;
+the normal Windows exporter does not need a Luau CLI.
+
+**Model 271 has no hitbox-size, mesh, goal-shape or physics-parameter input.** Its
+existing 24-feature entity format does accept the measured boost positions and
+availability, which are now used. Hitbox and arena data inform contact estimation
+and recovery around the policy. Loading an OBJ cannot make frozen weights learn
+different bounce, friction, jump or steering dynamics. Matching those dynamics
+fully requires simulator validation and fine-tuning on the target physics.
+The profile and collision preview prepare that work; no training is launched by
+this update. Alternate `ArenaFree` modes are paused instead of using the standard
+stadium collision shape for them.
+
+After updating this folder, **rerun `EXPORT_LOCAL_BOT.bat`** to embed the geometry
+and pad adapter in your private standalone script. An optional
+`--arena-profile "D:\path\profile.json"` selects a numeric profile; it does not
+change model weights or create a policy mesh input.
 
 ## External bridge modes (fallback)
 
@@ -308,8 +367,9 @@ START_BOT.bat --self-check
 ## Scope and validation
 
 This adapter currently targets freeplay. Rendered-pose velocities and wheel/flip
-state are estimates. Other cars are omitted and boost pads are masked because
-their verified state is unavailable. WASD couples controller axes. These limits
+state are estimates. Other cars are omitted. Local v3 supplies verified live boost
+entities; external bridge modes still mask pads unless observed pad data is sent.
+WASD couples controller axes. These limits
 can affect policy performance compared with Rocket League or the browser
 extension; this is not a claim of equivalent match strength.
 

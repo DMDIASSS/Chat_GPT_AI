@@ -76,16 +76,17 @@ function Policy.new(tensors)
     local output=layer("net.output.emb_convertor",128,32)
     local actions=assert(tensors.action_embeddings)
     return function(query,entities)
-        -- Unknown pads have additive mask -10000. Omitting those rows is
-        -- equivalent; only the verified self and ball rows need computation.
-        assert(#query==32 and #entities==2,"Expected freeplay query/self/ball")
+        -- Unknown pads remain omitted. Verified live pads use the existing
+        -- boost entity fields; no new/untrained feature slots are introduced.
+        assert(#query==32 and #entities>=2 and #entities<=36,"Expected query/self/ball/known pads")
         local x=dense(q1,dense(q0,query,true),true)
         local kv={}
-        for i=1,2 do kv[i]=dense(k1,dense(k0,entities[i],true),true)end
+        local count=#entities
+        for i=1,count do kv[i]=dense(k1,dense(k0,entities[i],true),true)end
         for _,block in ipairs(blocks)do
             local q=dense(block.projection,norm(x,block.norm1),false,1,128)
             local keys,values={},{}
-            for i=1,2 do
+            for i=1,count do
                 local normalized=norm(kv[i],block.norm2)
                 keys[i]=dense(block.projection,normalized,false,129,128)
                 values[i]=dense(block.projection,normalized,false,257,128)
@@ -93,15 +94,19 @@ function Policy.new(tensors)
             local attended=table.create(128)
             for head=0,3 do
                 local first=head*32+1
-                local s1,s2=0,0
-                for j=first,first+31 do
-                    s1=s1+q[j]*keys[1][j];s2=s2+q[j]*keys[2][j]
+                local scores,peak={},-math.huge
+                for i=1,count do
+                    local score=0
+                    for j=first,first+31 do score=score+q[j]*keys[i][j]end
+                    score=score/sqrt(32);scores[i]=score;peak=max(peak,score)
                 end
-                s1=s1/sqrt(32);s2=s2/sqrt(32)
-                local peak=max(s1,s2)
-                local e1,e2=exp(s1-peak),exp(s2-peak)
-                local p1=e1/(e1+e2)
-                for j=first,first+31 do attended[j]=p1*values[1][j]+(1-p1)*values[2][j]end
+                local total=0
+                for i=1,count do scores[i]=exp(scores[i]-peak);total=total+scores[i]end
+                for j=first,first+31 do
+                    local value=0
+                    for i=1,count do value=value+scores[i]/total*values[i][j]end
+                    attended[j]=value
+                end
             end
             local attention=dense(block.output,attended,false)
             for i=1,128 do x[i]=x[i]+attention[i]end
@@ -136,6 +141,14 @@ function Policy.observe(packet,previous,hasFlip)
     for i=1,3 do kv[1][11+i]=car.forward[i];kv[1][14+i]=car.up[i]end
     kv[1][21]=packet.boost/100;kv[1][23]=packet.ground_estimate and 1 or 0
     kv[1][24]=hasFlip and 1 or 0
+    for i,pad in ipairs(packet.boost_pads or {})do
+        assert(i<=34 and type(pad.active)=="boolean"and type(pad.is_big)=="boolean","Unverified pad")
+        local row=table.create(24,0);row[5]=1
+        for j=1,3 do row[5+j]=pad.position[j]end
+        row[21]=pad.is_big and 1 or .12
+        row[22]=pad.active and 1 or 0 -- Matches update271's original Nexto builder.
+        kv[#kv+1]=row
+    end
     for _,row in ipairs(kv)do
         if packet.team==1 then
             for i=6,20,3 do row[i]=-row[i];row[i+1]=-row[i+1]end

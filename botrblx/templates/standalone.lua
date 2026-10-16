@@ -1,6 +1,12 @@
 -- Generated LOCAL model + telemetry + controls. Weights stay on this PC.
 -- LOCAL_POLICY_HERE
 -- LOCAL_KEYBOARD_HERE
+-- LOCAL_ARENA_HERE
+-- LOCAL_PADS_HERE
+local PROFILE=
+-- ARENA_PROFILE_HERE
+local arenaAdapter=Arena.new(PROFILE)
+local padReader=Pads.new(PROFILE)
 local TEAM=0
 local HZ=30 -- pose sampling; policy decisions target 15 Hz (tick skip 8 at 120 Hz)
 local player=game:GetService("Players").LocalPlayer
@@ -53,6 +59,7 @@ local function release()
     end
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
     keyboard:release()
+    arenaAdapter:resetRecovery()
 end
 local function controls()
     start.Visible=not enabled and not testingKeyboard
@@ -145,7 +152,7 @@ task.spawn(function()
         local period=math.max(1/15,peak*1.3)
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=("Update271 LOCAL v2 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nF6 tests keyboard, then starts. F8 stops.")
+        label.Text=("Update271 LOCAL v3 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nArena profile loaded. F6 tests keys and starts.")
             :format(peak*1000,1/period)
         local lastTick,lastDecision,lastUi=os.clock(),-math.huge,-math.huge
         local busy=false
@@ -178,7 +185,8 @@ task.spawn(function()
                 local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<1.45))
                 local query,entities=Policy.observe(packet,previous,hasFlip)
                 local index=predict(query,entities)
-                local wanted,actual=Policy.keys(actions[index],ground)
+                local override,recovery=arenaAdapter:recovery(packet,previous,now)
+                local wanted,actual=Policy.keys(override or actions[index],ground)
                 local inferenceMs=(os.clock()-began)*1000
                 assert(inferenceMs<200,"Local inference exceeded 200ms")
                 -- Recheck before pressing: executor calls and prediction can yield.
@@ -210,8 +218,11 @@ task.spawn(function()
                 if now-lastUi>=.2 then
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=("LOCAL v2 | %.1f decisions/s | %s\nInference %.1f ms | inputs %.1f ms\nRequested %s | action %d\nKeyboard seen: %s | F6 pause; F8 stop")
-                        :format(rate,keyboard.name,inferenceMs,inputMs,table.concat(names," "),index-1,keyboard:observed())
+                    label.Text=("LOCAL v3 | %.1f Hz | %s\nInfer %.1f ms | inputs %.1f ms | %s\nWant %s | seen %s\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop")
+                        :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",table.concat(names," "),keyboard:observed(),
+                            packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
+                            packet.car_preset or "standard",packet.car_size_verified and ""or "?",
+                            packet.ball_radius or PROFILE.physics.BALL_RADIUS,packet.ball_size_verified and ""or "?",packet.wheel_contacts or 0)
                 end
             end)
             busy=false
@@ -220,4 +231,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-2"}
+return {started=true,version="local-3"}
