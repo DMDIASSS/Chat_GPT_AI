@@ -21,7 +21,8 @@ def synchronize(device):
 class RuntimePlanner(Planner):
     """Same search decisions, with batched observations and cached spatial features."""
     def __init__(self,*args,**kwargs):
-        super().__init__(*args,**kwargs);self._features={};self.encoded_observations=0
+        super().__init__(*args,**kwargs);self._features={};self._feature_tensor=None;self.encoded_observations=0
+        self._causal=torch.ones(self.model.history,self.model.history,dtype=torch.bool,device=self.device).triu(1)
     def observations_batch(self,states,previous,ours):
         if len(states)!=len(previous):raise ValueError('State/control batch mismatch')
         if not states:return []
@@ -51,17 +52,20 @@ class RuntimePlanner(Planner):
             views=list(new.values())
             x=tuple(torch.as_tensor(np.stack([v[k] for v in views]),device=self.device,dtype=torch.float32) for k in range(3))
             encoded=self.model.encoder(x)
-            for view,feature in zip(views,encoded):
-                # Keep the source tuple alive to prevent Python object-id reuse.
-                self._features[id(view)]=(view,feature)
+            offset=0 if self._feature_tensor is None else len(self._feature_tensor)
+            self._feature_tensor=encoded if self._feature_tensor is None else torch.cat((self._feature_tensor,encoded),dim=0)
+            for index,view in enumerate(views):
+                # Keep source tuples alive; gather all histories in one device operation.
+                self._features[id(view)]=(view,offset+index)
             self.encoded_observations+=len(views)
-        x=torch.stack([torch.stack([self._features[id(v)][1] for v in views]) for views in padded])
+        indices=torch.as_tensor([[self._features[id(v)][1] for v in views] for views in padded],device=self.device)
+        x=self._feature_tensor[indices]
         x=self.model.project(x)+self.model.position[:,:x.shape[1]]
-        causal=torch.ones(x.shape[1],x.shape[1],dtype=torch.bool,device=self.device).triu(1)
+        causal=self._causal[:x.shape[1],:x.shape[1]]
         x=self.model.norm(self.model.temporal(x,mask=causal)[:,-1])
         return self.model.policy(x),torch.cat([head(x).tanh() for head in self.model.values],-1)
     def begin(self):
-        self._features.clear();self.encoded_observations=0
+        self._features.clear();self._feature_tensor=None;self.encoded_observations=0
     @torch.inference_mode()
     def choose_policy(self,state,previous,ours,history=None):
         synchronize(self.device);started=time.perf_counter();self.begin()
