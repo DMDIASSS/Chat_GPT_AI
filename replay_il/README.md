@@ -44,8 +44,10 @@ match counts by format and split. No 3v3 training is claimed without 3v3 replays
    controls; optionally refine pitch/yaw/roll against the observed next state.
    Use RocketSim interpolation to advance repeated car updates and hidden car
    state; raw replay physics is reapplied at observed updates.
-   Simulate each transition and reject stale, invalid or poorly reconstructed
-   motion. Position, velocity and rotation fit limits are pinned in the dataset.
+   Bound interpolation to 16 ticks (133 ms); require observed car refreshes in
+   each complete chunk. Simulate each transition and reject stale, invalid or
+   poorly reconstructed motion. Position/velocity and car-rotation fit limits
+   are pinned in the dataset; spherical ball surface orientation is ignored.
    Reconstruction is approximate, not recovery of authentic controller hardware.
 2. Reconstruct 120 Hz controls and sample causal state histories at 15 Hz.
    Each example contains eight past/current observations and the following

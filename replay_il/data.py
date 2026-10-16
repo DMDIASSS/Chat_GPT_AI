@@ -8,6 +8,7 @@ from slater_versatile_data import native_observation,valid_state
 from slater_v041_core import atomic_json,read_json,sha256,process_lock
 
 ROOT=Path(__file__).resolve().parents[1]
+MAX_INTERPOLATION_TICKS=16
 def replay_frames(replay):
     """Advance repeated physics updates and hidden car state between observations.
 
@@ -24,10 +25,14 @@ def split(group):
     return 'train' if value<80 else 'validation' if value<90 else 'test'
 
 def transition_errors(predicted,observed):
-    pairs=[(predicted.ball,observed.ball)]+[(predicted.cars[k].physics,observed.cars[k].physics) for k in observed.cars]
+    cars=[(predicted.cars[k].physics,observed.cars[k].physics) for k in observed.cars]
+    pairs=[(predicted.ball,observed.ball)]+cars
     return {'position':max(float(np.linalg.norm(a.position-b.position)) for a,b in pairs),
             'velocity':max(float(np.linalg.norm(a.linear_velocity-b.linear_velocity)) for a,b in pairs),
-            'rotation':max(float(np.linalg.norm(a.rotation_mtx-b.rotation_mtx)) for a,b in pairs)}
+            # A sphere's surface orientation neither changes collision geometry
+            # nor appears in our observations. Its position/velocity and all car
+            # orientations still have to match. Ball spin remains in simulation.
+            'rotation':max(float(np.linalg.norm(a.rotation_mtx-b.rotation_mtx)) for a,b in cars)}
 
 def simulate(engine,state,controls,ticks):
     engine.set_state(state,{})
@@ -89,7 +94,13 @@ def make_rows(frames,*,history=8,chunk_ticks=32,cap=1024,seed=20261016,limits=No
             raw={k:np.asarray(frame.actions[k],np.float32) for k in s.cars if k in frame.actions}
             if set(raw)!=set(s.cars) or any(v.shape!=(8,) or not np.isfinite(v).all() or np.any(np.abs(v)>1.001) for v in raw.values()):clear();stats['missing_controls']+=1;continue
             if any(not np.isin(v[5:],[0,1]).all() for v in raw.values()):clear();stats['invalid_buttons']+=1;continue
-            if any(not 0<=float(frame.update_age.get(k,999))<=.05 for k in s.cars):clear();stats['stale_states']+=1;continue
+            # Normal replay physics updates are often ~100 ms apart. The old
+            # 50 ms limit cleared pending chunks between those updates. Bound
+            # interpolation to 16 physics ticks and require actual observed
+            # car refreshes before accepting a complete 32-tick action chunk.
+            ages={k:float(frame.update_age.get(k,999)) for k in s.cars}
+            next_ages={k:float(current.update_age.get(k,999)) for k in t.cars}
+            if any(not 0<=age<=MAX_INTERPOLATION_TICKS/120 for age in (*ages.values(),*next_ages.values())):clear();kickoff=None;stats['stale_states']+=1;continue
             fitted,accepted,errors,attempts=fit_transition(engine,s,t,raw,ticks,limits)
             stats['fit_attempts']+=attempts;stats['transitions']+=1
             if stats['transitions']%1000==0:print('RECONSTRUCT',stats['transitions'],'transitions; accepted',stats['accepted_fit'],'rejected',stats['rejected_fit'],'saved chunks',len(rows),flush=True)
@@ -99,6 +110,8 @@ def make_rows(frames,*,history=8,chunk_ticks=32,cap=1024,seed=20261016,limits=No
                     if errors[key]>limits[key]:stats['rejected_'+key]+=1
                 continue
             stats['accepted_fit']+=1
+            stats['max_accepted_update_age_seconds']=max(stats['max_accepted_update_age_seconds'],max(*ages.values(),*next_ages.values()))
+            if any(age>0 for age in ages.values()):stats['interpolated_transitions']+=1
             for key,value in errors.items():stats['max_accepted_'+key]=max(stats['max_accepted_'+key],value)
             if kickoff is None and np.linalg.norm(s.ball.position[:2])<1 and np.linalg.norm(s.ball.linear_velocity)<1 and all(c.on_ground and np.linalg.norm(c.physics.linear_velocity)<2 and abs(c.physics.position[1])>2300 for c in s.cars.values()):
                 kickoff={'start':s.tick_count,'state':copy.deepcopy(s),'spawns':{k:(np.asarray(c.physics.position)*np.array([-1,-1,1]) if c.is_orange else np.asarray(c.physics.position)).tolist() for k,c in s.cars.items()},'controls':{k:[] for k in s.cars},'players':len(s.cars)}
@@ -107,7 +120,7 @@ def make_rows(frames,*,history=8,chunk_ticks=32,cap=1024,seed=20261016,limits=No
                 tick=int(state.tick_count)
                 if tick%8==0:
                     encoded=features(state,past)
-                    segment={'start':copy.deepcopy(state),'controls':{k:[] for k in state.cars}}
+                    segment={'start':copy.deepcopy(state),'controls':{k:[] for k in state.cars},'observed_cars':set()}
                     for aid,car in state.cars.items():
                         h=histories.setdefault(aid,deque(maxlen=history));h.append(encoded[aid])
                         observations=[h[0]]*(history-len(h))+list(h)
@@ -118,6 +131,8 @@ def make_rows(frames,*,history=8,chunk_ticks=32,cap=1024,seed=20261016,limits=No
                 count=min(remaining,8-tick%8)
                 segments={id(row['_segment']):row['_segment'] for values in pending.values() for row in values}
                 for segment in segments.values():
+                    if s.tick_count>=segment['start'].tick_count:
+                        segment['observed_cars'].update(k for k,age in ages.items() if age<=1e-6)
                     for aid in s.cars:segment['controls'][aid].extend(np.repeat(fitted[aid][None],count,axis=0).tolist())
                 ready=[]
                 for aid in s.cars:
@@ -134,6 +149,10 @@ def make_rows(frames,*,history=8,chunk_ticks=32,cap=1024,seed=20261016,limits=No
                 for row in ready:
                     segment=row.pop('_segment')
                     if 'valid' not in segment:
+                        if state.tick_count==t.tick_count:
+                            segment['observed_cars'].update(k for k,age in next_ages.items() if age<=1e-6)
+                        if segment['observed_cars']!=set(s.cars):
+                            segment['valid']=False;stats['chunks_missing_observed_refresh']+=1;continue
                         verify_engine.set_state(segment['start'],{})
                         predicted=verify_engine.step({k:np.asarray(v[:chunk_ticks],np.float32) for k,v in segment['controls'].items()},{})
                         observed=t if state.tick_count==t.tick_count else state
@@ -185,8 +204,9 @@ def _prepare(inputs,out,*,max_replays=3000,per_replay=1024,max_samples=500000):
     cap=min(per_replay,max(16,max_samples//len(paths)))
     config={'history':8,'chunk_ticks':32,'per_replay':cap,'max_samples':max_samples,'observations':'raw_no_pretrained_encoder',
             'code':sha256(__file__),'rlgym_tools':version('rlgym-tools'),'interpolation':'rocketsim',
+            'max_interpolation_ticks':MAX_INTERPOLATION_TICKS,'rotation_entities':'cars_only','chunk_requires_observed_car_refresh':True,
             'fit_limits':{'position':40.,'velocity':180.,'rotation':.3}}
-    print('RECONSTRUCTION: RocketSim interpolation; transition and full-chunk quality checks enabled',flush=True)
+    print('RECONSTRUCTION v3: RocketSim interpolation; observed car refreshes and full-chunk quality checks enabled',flush=True)
     records=[];errors=[];seen=set();samples=0
     for index,path in enumerate(paths,1):
         if (out/'pause.flag').exists():raise RuntimeError('Replay preparation paused; completed replay shards are cached. Start again to resume.')

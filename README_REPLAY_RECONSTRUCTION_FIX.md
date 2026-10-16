@@ -1,61 +1,88 @@
-# Replay reconstruction update
+# Replay reconstruction v3: verified on the supplied original replay
 
-The uploaded log processed 30 of 279 replays with 30 failures and zero samples.
-That job had not reached training; W&B authentication is unrelated to these
-reconstruction failures. The log alone does not identify every failure cause.
+This source update fixes zero-chunk reconstruction in the fresh replay imitation
+pipeline. The uploaded progress report had 33 failed replays and zero samples.
+That job had not begun training. W&B authentication is unrelated to parsing.
 
-The importer incorrectly selected the replay converter's `none` interpolation
-mode. Replay car updates can repeat across frames. That mode keeps repeated
-poses frozen and does not advance internal contact, jump, flip and boost state
-between observations. Comparing those states to a moving simulation can reject
-otherwise consistent motion.
+## Install into your existing project
 
-This update selects the converter's supported `rocketsim` interpolation. It
-predicts between updates and reapplies observed replay physics on new updates.
-Timestamp normalization, stale-state rejection, and all position, velocity,
-rotation and complete action-chunk checks remain enabled with the same limits.
-Rejection reasons now print in CMD, and reconstruction counts remain in
-`parse_progress.json` even when a replay produces zero usable chunks.
-
-## Install into the existing project
-
-1. Run `REPLAY_IL_PAUSE.bat`. If the active job used custom `--dataset` or
-   `--run` arguments, pass those same arguments to the pause script.
+1. Run `REPLAY_IL_PAUSE.bat` with your previous dataset/run arguments, if any.
 2. Wait for the **original working CMD** to finish pausing. The pause script's
-   own completion message only confirms that it sent the request.
-3. Extract this ZIP into `E:\Downloads\Chat_GPT_AI`, allowing its source files
-   to replace the old versions. Do not remove `data`, `.venv` or your models.
-4. For the incomplete, untrained dataset shown in the uploaded log, run
-   `REPLAY_IL_START.bat` again using its previous dataset/run settings.
-5. Confirm CMD prints:
+   own completion only confirms it sent the request.
+3. Extract this ZIP into `E:\Downloads\Chat_GPT_AI`, allowing included source
+   files to replace the old versions. Keep `data`, `.venv` and existing models.
+4. For the incomplete, untrained dataset shown in the log, run
+   `REPLAY_IL_START.bat` again with the previous dataset/run settings.
+5. Confirm CMD prints **`RECONSTRUCTION v3: RocketSim interpolation`** and that
+   `saved chunks` / `samples` become positive before leaving a full run active.
 
-   `RECONSTRUCTION: RocketSim interpolation; transition and full-chunk quality checks enabled`
+Outdated shards rebuild because the reconstruction configuration changed. Raw
+replays remain saved. Pause downloads during preparation: adding files can change
+its sampling budget when preparation is restarted.
 
-Preparation rebuilds outdated shards because its reconstruction configuration
-changed. It keeps raw replays. Pause downloads during preparation to avoid
-changes to the per-replay sampling budget on later starts.
-
-If you have already completed a dataset or begun training since that log, the
-source fingerprint has changed, so use a new dataset and training run instead:
+If a dataset or training run has already completed since that log, use a new
+configuration-compatible experiment instead of modifying its saved protocol:
 
 ```bat
 REPLAY_IL_START.bat --dataset data\isolated\replay_imitation\dataset_reconstruction03 --run replay_reconstruction03
 ```
 
-For that custom run, request pause with:
+Request pause for that custom experiment with:
 
 ```bat
 REPLAY_IL_PAUSE.bat --dataset data\isolated\replay_imitation\dataset_reconstruction03 --run replay_reconstruction03
 ```
 
-## Validation and limits
+## What changed
 
-A RocketSim-generated replay-converter fixture with repeated car updates
-reproduced **zero** usable chunks in `none` mode and **54** with this correction,
-without changing quality limits. This is a regression test, not professional
-replay training data. Invalid motion is still rejected, and failed-replay
-diagnostics are tested. The user's original failing `.replay` files were not
-available here, so their actual usable sample yield remains unverified.
+The preceding update enabled RocketSim interpolation, which fixed repeated car
+poses and internal contact/jump/flip/boost state not advancing. The original
+replay now reveals two further causes of zero chunks:
 
-If samples stay at zero, stop the job and share `parse_progress.json` plus one
-original failing `.replay`. Do not spend another full parsing pass guessing.
+* Car physics updates in this replay are commonly about 67-100 ms apart. The
+  50 ms cutoff repeatedly discarded partially assembled chunks. Interpolation
+  is now bounded to **16 physics ticks (133 ms)** at both transition endpoints.
+  Every accepted 32-tick chunk must also include an **observed replay refresh
+  for every car**. Unobserved predictions cannot validate their own labels.
+* The validator treated the spherical ball's surface orientation like a car's
+  orientation. Surface orientation does not change sphere collision geometry
+  or appear in the model observations. Rotation comparison now applies to cars.
+  Ball spin remains in the simulator; ball and car positions/linear velocities
+  and all car orientations still have to fit.
+
+Position (40 uu), velocity (180 uu/s), and car rotation (0.3 matrix-norm) limits
+remain unchanged for transitions and full chunks. Long gaps, malformed controls,
+nonfinite or invalid states, missing observations and failed full chunks remain
+rejected. No missing chunks or demonstration states are fabricated. These are
+reconstructed inputs, not exact recovery of human hardware inputs.
+
+Rejection reasons print in CMD. `parse_progress.json` retains reconstruction
+counts even when a replay produces no usable examples. Dataset configuration
+records the interpolation bound, car-only rotation check and refresh requirement.
+
+## Verification and limits
+
+The supplied original `.replay` was parsed with Carball and RLGym Tools 2.6.5.
+It produced 10,639 converted gameplay frames. The preceding importer produced
+**zero examples**. This correction produced **1,024 saved examples** (the
+per-replay reservoir cap), with **611 complete two-car chunks verified** and
+**295 complete chunks rejected**. Each verified joint chunk supplies one example
+per player before sampling. The single replay did not yield a verified kickoff.
+
+Automated tests cover sparse updates, excessive staleness, missing observed
+refreshes, irrelevant ball orientation, meaningful car rotation, invalid motion,
+causal observation histories, and supervised save/resume. An opt-in integration
+test parses the private original replay and checks the cached shard's finite
+values, shapes, binary buttons, identity and split guards. The raw replay is not
+included or published. To run that check locally:
+
+```bat
+set "REPLAY_IL_REAL_REPLAY=E:\Downloads\Chat_GPT_AI\data\replays\ranked-duels\098357fd-596c-4349-98d6-9c7a4117ccc6.replay"
+.venv\Scripts\python.exe -m pytest -q tests\test_replay_imitation.py tests\test_replay_interpolation.py
+```
+
+This verifies usable samples from **one original match**. It does not establish
+yield for all remaining files, training completion, playing strength or faithful
+TAS training. Training still requires two real matches per split; copies of this
+one replay are not used to bypass that guard. If another replay yields zero,
+share its progress report and original file before running many more failures.
