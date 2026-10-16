@@ -65,15 +65,39 @@ class PacketObserver:
 
 
 class ReplayController:
-    def __init__(self,kernel,book,observer,*,history=8,device='cpu'):
+    def __init__(self,kernel,book,observer,*,history=8,device='cpu',scripted_kickoff=False):
         self.kernel=kernel;self.book=np.asarray(book,np.float32);self.observer=observer
         self.history=history;self.device=torch.device(device);self.features=deque(maxlen=history)
+        self.scripted_kickoff=bool(scripted_kickoff)
         if self.book.ndim!=3 or self.book.shape[1:]!=(32,8) or not np.isfinite(self.book).all():raise ValueError('Invalid replay action vocabulary')
         self.reset()
 
     def reset(self):
         self.features.clear();self.observer.reset();self.previous=np.zeros(8,np.float32)
         self.last_tick=None;self.decision_tick=None;self.selected=None;self.kickoff=None
+        self.kickoff_start=None;self.kickoff_done=False;self.control_source='neutral'
+
+    def kickoff_action(self,packet,index,tick):
+        """Optional basic drive/steer/boost assist, explicitly separate from ML."""
+        if not self.scripted_kickoff or self.kickoff_done:return None
+        ball=vector(packet.game_ball.physics.location);velocity=vector(packet.game_ball.physics.velocity)
+        if self.kickoff_start is None:
+            if not packet.game_info.is_kickoff_pause or np.linalg.norm(ball[:2])>5 or np.linalg.norm(velocity)>5:return None
+            ours=packet.game_cars[index];teammates=[i for i in range(packet.num_cars) if packet.game_cars[i].team==ours.team]
+            distances={i:float(np.linalg.norm(vector(packet.game_cars[i].physics.location)[:2]-ball[:2])) for i in teammates}
+            nearest=min(distances.values());tied=[i for i in teammates if distances[i]<=nearest+20]
+            sign=-1 if ours.team else 1
+            taker=min(tied,key=lambda i:(float(packet.game_cars[i].physics.location.x)*sign,i))
+            if taker!=index:self.kickoff_done=True;return None
+            self.kickoff_start=tick
+        if np.linalg.norm(ball[:2])>15 or np.linalg.norm(velocity)>50 or tick-self.kickoff_start>=360:
+            self.kickoff_done=True;return None
+        car=packet.game_cars[index];offset=ball[:2]-vector(car.physics.location)[:2]
+        desired=math.atan2(offset[1],offset[0]);yaw=float(car.physics.rotation.yaw)
+        error=math.atan2(math.sin(desired-yaw),math.cos(desired-yaw))
+        action=np.zeros(8,np.float32);action[0]=1.;action[1]=np.clip(error*3,-1,1)
+        action[6]=abs(error)<.4 and np.linalg.norm(vector(car.physics.velocity))<2200
+        return action
 
     @torch.inference_mode()
     def output(self,packet,index):
@@ -84,6 +108,9 @@ class ReplayController:
         self.kickoff=kickoff;self.last_tick=tick
         if not bool(info.is_round_active) or bool(info.is_match_ended) or packet.game_cars[index].is_demolished:
             self.reset();return self.previous.copy()
+        assist=self.kickoff_action(packet,index,tick)
+        if assist is not None:
+            self.previous=assist;self.control_source='scripted_kickoff';return assist.copy()
         if self.decision_tick is None or tick-self.decision_tick>=8:
             view=self.observer.observe(packet,index,self.previous)
             tensors=tuple(torch.as_tensor(x[None],device=self.device) for x in view)
@@ -96,4 +123,5 @@ class ReplayController:
         # Replan every eight ticks, retaining exact per-tick button/control edges.
         offset=min(7,max(0,tick-self.decision_tick))
         self.previous=self.book[self.selected,offset].copy()
+        self.control_source='policy'
         return self.previous.copy()

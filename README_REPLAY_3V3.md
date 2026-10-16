@@ -1,5 +1,9 @@
 # Offline imitation with the curated 3v3 group
 
+For the consolidated start/pause/status/results workflow and fixed total-epoch
+resume semantics, use [REPLAY_FINAL_GUIDE.md](REPLAY_FINAL_GUIDE.md) and
+`REPLAY_IL_FINAL.bat`. The original launchers below remain available for compatibility.
+
 Extract this update into `E:\Downloads\Chat_GPT_AI`, replacing the included source
 files. Keep the existing `.venv` and private data. Run in CMD:
 

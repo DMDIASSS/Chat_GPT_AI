@@ -22,7 +22,8 @@ class ReplayBot(BaseAgent):
         if device=='cuda' and not torch.cuda.is_available():raise ValueError('CUDA requested but unavailable in RLBot Python')
         kernel=torch.jit.load(str(HERE/'policy.pt'),map_location=device).eval()
         book=np.load(HERE/'tokens.npy',allow_pickle=False)
-        self.controller=ReplayController(kernel,book,PacketObserver(self.get_field_info()),history=metadata['history'],device=device)
+        self.controller=ReplayController(kernel,book,PacketObserver(self.get_field_info()),history=metadata['history'],device=device,
+            scripted_kickoff=bool(settings.get('scripted_kickoff',False)))
         self.reported_error=False;self.last_output_log=None
         print('REPLAY_BOOST_MAP_READY: 34 pads | maximum XY error',round(self.controller.observer.pad_xy_error,3),flush=True)
         print('REPLAY_MODEL_READY:',metadata['name'],'device',device,'| policy inference, 8-tick replanning | no training',flush=True)
@@ -38,6 +39,7 @@ class ReplayBot(BaseAgent):
         if self.last_output_log is None or now<self.last_output_log or now-self.last_output_log>=5:
             self.last_output_log=now
             print('REPLAY_OUTPUT: time',round(now,2),'token',self.controller.selected,
+                  'source',self.controller.control_source,
                   'throttle',round(float(action[0]),3),'steer',round(float(action[1]),3),
                   'jump',bool(action[5]),'boost',bool(action[6]),
                   'round_active',bool(packet.game_info.is_round_active),flush=True)

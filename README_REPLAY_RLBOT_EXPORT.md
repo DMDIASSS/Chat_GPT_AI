@@ -1,5 +1,9 @@
 # Export the replay-only model to RLBot v4
 
+The consolidated repair/training/results/export instructions are in
+[REPLAY_FINAL_GUIDE.md](REPLAY_FINAL_GUIDE.md). `--scripted-kickoff` now enables an
+optional basic drive/steer/boost assist, explicitly separate from model inference.
+
 If an existing export crashes with `Arena boost layout differs from the training
 observation contract` on DFH Stadium: stop the match/close RLBot, extract the
 boost-fix source update into the project, then run `FIX_REPLAY_RLBOT.bat`. It

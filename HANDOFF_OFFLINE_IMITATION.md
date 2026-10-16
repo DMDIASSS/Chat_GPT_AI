@@ -3,6 +3,14 @@
 This is a ready-to-paste task brief for another coding assistant. The code and
 current local reports are authoritative; inspect them before changing anything.
 
+Latest consolidated entry point: `REPLAY_IL_FINAL.bat` / `replay_il_workflow.py`.
+Read `REPLAY_FINAL_GUIDE.md` first. It adds fixed replay input snapshots,
+total-epoch resume semantics (completed reruns do not add epochs), durable
+progress heartbeats, validation-only constant-token/collapse diagnostics and
+optional explicitly scripted kickoff assistance. These changes are outside the
+fingerprinted `replay_il` package. The old launcher semantics remain available
+for compatibility; use the final workflow for the new instructions.
+
 ## User's current goal and constraints
 
 Continue implementing a small, efficient model inspired by a community claim:

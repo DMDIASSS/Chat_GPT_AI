@@ -87,6 +87,38 @@ def test_chunk_clock_keeps_edges_previous_controls_and_does_not_fabricate_missed
     np.testing.assert_array_equal(controller.output(packet,0),np.zeros(8))
 
 
+def test_optional_scripted_kickoff_takes_turn_then_returns_to_unmodified_idle_policy():
+    class Observer:
+        def reset(self):pass
+        def observe(self,*args):return np.zeros((1,32),np.float32),np.zeros((41,24),np.float32),np.zeros(41,np.float32)
+    class IdleKernel:
+        def encode(self,obs):return torch.zeros(1,128)
+        def decode(self,history):return torch.ones(1,1),torch.zeros(1,3)
+    packet,_=packet_fixture(state_fixture());packet.game_info.is_kickoff_pause=True
+    controller=ReplayController(IdleKernel(),np.zeros((1,32,8),np.float32),Observer(),scripted_kickoff=True)
+    action=controller.output(packet,0)
+    assert action[0]==1 and controller.control_source=='scripted_kickoff'
+    assert controller.selected is None and not controller.features
+    packet.game_info.seconds_elapsed=1/120;packet.game_ball.physics.location.x=100
+    np.testing.assert_array_equal(controller.output(packet,0),np.zeros(8))
+    assert controller.control_source=='policy' and controller.selected==0
+
+
+def test_scripted_kickoff_yields_to_closer_teammate_and_disabled_mode_stays_policy():
+    class Observer:
+        def reset(self):pass
+        def observe(self,*args):return np.zeros((1,32),np.float32),np.zeros((41,24),np.float32),np.zeros(41,np.float32)
+    class IdleKernel:
+        def encode(self,obs):return torch.zeros(1,128)
+        def decode(self,history):return torch.ones(1,1),torch.zeros(1,3)
+    packet,_=packet_fixture(state_fixture(4));packet.game_info.is_kickoff_pause=True
+    packet.game_cars[0].physics.location=vec([0,-4608,17]);packet.game_cars[1].physics.location=vec([0,-2048,17])
+    for enabled in (False,True):
+        controller=ReplayController(IdleKernel(),np.zeros((1,32,8),np.float32),Observer(),scripted_kickoff=enabled)
+        np.testing.assert_array_equal(controller.output(packet,0),np.zeros(8))
+        assert controller.control_source=='policy'
+
+
 def test_complete_export_reloads_model_in_isolated_folder_and_preserves_source(tmp_path,model_book,monkeypatch):
     model,book=model_book;source=tmp_path/'source';source.mkdir()
     torch.save({'config':model.config,'model':model.state_dict()},source/'best.pt');np.save(source/'tokens.npy',book)
@@ -134,6 +166,10 @@ print('SELF_CONTAINED_EXPORT_OK')
     repair(target);repair(target) # Repair is repeatable and never re-exports weights.
     assert {p:sha256(target/p) for p in protected}==protected
     assert (target/'replay_rlbot_core.py.before_boost_xy_fix').read_text()==old
+    repair(target,scripted_kickoff=True)
+    assert json.loads((target/'runtime.json').read_text())['scripted_kickoff'] is True
+    assert set(json.loads((target/'EXPORT_INFO.json').read_text())['runtime_sha256'])==set(protected)|{'bot.py','replay_rlbot_core.py','replay_nexto_obs.py'}
+    assert {p:sha256(target/p) for p in protected}==protected
     result=subprocess.run([sys.executable,'-c',script],cwd=target,env=env,text=True,capture_output=True,timeout=30)
     assert result.returncode==0,result.stdout+result.stderr
     assert 'SELF_CONTAINED_EXPORT_OK' in result.stdout
