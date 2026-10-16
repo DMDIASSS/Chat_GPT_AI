@@ -142,6 +142,10 @@ checks remain active. No optimizer state, datasets or training results are chang
 This is an inference/backend update, not a playable adapter for the chunk model.
 Your uploaded kickoff book is empty; no pro kickoff is supplied or claimed.
 
+An optional persistent CPU-process backend and a same-network local comparison
+are described in [README_REPLAY_MULTICORE.md](README_REPLAY_MULTICORE.md).
+The compact backend remains the default in this launcher.
+
 The linked PPO guide was reviewed separately: see [REPLAY_REWARD_DESIGN.md](REPLAY_REWARD_DESIGN.md).
 This run remains supervised imitation and value regression; this patch adds no
 RL stage and does not silently change rewards or learned value targets.

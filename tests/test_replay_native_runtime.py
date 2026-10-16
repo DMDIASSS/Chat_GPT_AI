@@ -78,7 +78,8 @@ def test_native_held_control_edges_match_tick_by_tick_physics(players):
 @pytest.mark.parametrize('goal',[False,True])
 @pytest.mark.parametrize('players,orange',[(2,False),(4,True),(6,False)])
 @pytest.mark.parametrize('workers,stepping,network',[(1,'compact','original'),(1,'workers','original'),
-    (2,'workers','original'),(1,'multi_step','original'),(1,'compact','optimized'),(1,'compact','frozen')])
+    (2,'workers','original'),(1,'multi_step','original'),(1,'compact','optimized'),(1,'compact','frozen'),
+    (1,'processes','frozen'),(2,'processes','frozen')])
 def test_native_search_matches_reference_scores_and_survives_repeated_calls(model_book,goal,players,orange,workers,stepping,network):
     model,book=model_book;state=state_fixture(players)
     ours=next(aid for aid,car in state.cars.items() if car.is_orange==orange)

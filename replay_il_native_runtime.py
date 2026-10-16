@@ -6,97 +6,11 @@ import numpy as np
 import torch
 import RocketSim as rs
 from replay_il_runtime import RuntimePlanner,synchronize
-from nexto_teacher import rotation_to_quaternion
 
 
-def native_encoded(arena,cars,ordered):
-    """Encode native snapshots using the training observation contract.
-
-    Only fields consumed by batched_build_obs are populated. The unused legacy
-    inverse-physics blocks stay zero; they are never passed to a learned layer.
-    """
-    row=np.zeros(55+38*len(ordered),np.float64)
-    row[3:37]=[pad.get_state().cooldown<=1e-6 for pad in arena.get_boost_pads()]
-    ball=arena.ball.get_state();row[37:40]=ball.pos.as_numpy();row[40:43]=ball.vel.as_numpy();row[43:46]=ball.ang_vel.as_numpy()
-    for i,aid in enumerate(ordered):
-        car=cars[aid];state=car.get_state();offset=55+38*i
-        row[offset:offset+2]=i,int(car.team)
-        # get_gym_state zeroes demoed car poses. Training retains them, so read
-        # native physics directly and preserve its double-precision quaternion
-        # round trip rather than changing the observation contract.
-        row[offset+2:offset+5]=state.pos.as_numpy()
-        row[offset+5:offset+9]=rotation_to_quaternion(np.asarray(state.rot_mat.as_numpy().reshape(3,3).T,np.float64))
-        row[offset+9:offset+12]=state.vel.as_numpy();row[offset+12:offset+15]=state.ang_vel.as_numpy()
-        row[offset+33]=state.demo_respawn_timer>0
-        row[offset+34]=sum(state.wheels_with_contact)>=3
-        row[offset+36]=not state.has_double_jumped and not state.has_flipped and state.air_time_since_jump<1.25
-        row[offset+37]=float(state.boost)/100.
-    return row
-
-
-def controls(values):
-    c=rs.CarControls()
-    c.throttle,c.steer,c.pitch,c.yaw,c.roll=map(float,values[:5])
-    c.jump,c.boost,c.handbrake=map(bool,values[5:])
-    return c
-
-
-def compile_controls(book):
-    """Cache exact control edges and immutable native controls for every token."""
-    plans=[]
-    for token in book:
-        parts=[]
-        for offset in range(0,len(token),8):
-            part=token[offset:offset+8]
-            edges=np.flatnonzero(np.any(part[1:]!=part[:-1],axis=1))+1
-            bounds=[0,*edges.tolist(),len(part)];segments=[]
-            for left,right in zip(bounds,bounds[1:]):
-                absolute=offset+left
-                changed=absolute==0 or not np.array_equal(token[absolute],token[absolute-1])
-                segments.append((left,right,controls(part[left]) if changed else None))
-            parts.append(segments)
-        plans.append(parts)
-    return plans
-
-
-def advance_batch(active,ours,commands):
-    """Apply every exact control edge; batch only intervals with held controls."""
-    count=commands.shape[1]
-    changed=np.flatnonzero(np.any(commands[:,1:]!=commands[:,:-1],axis=(0,2)))+1
-    boundaries=[0,*changed.tolist(),count]
-    for left,right in zip(boundaries,boundaries[1:]):
-        for b,command in zip(active,commands[:,left]):
-            if b['last'] is None or not np.array_equal(b['last'],command):
-                b['cars'][ours].set_controls(controls(command));b['last']=command.copy()
-        rs.Arena.multi_step([b['arena'] for b in active],right-left)
-    return len(boundaries)-1
-
-
-def advance_branch(branch,ours,book,count,ordered,sign,plans=None):
-    """One worker owns one arena for a chunk; no per-tick task scheduling."""
-    from rlgym.rocket_league.common_values import GOAL_THRESHOLD
-    commands=book[branch['token']];snapshots=[];steps=0
-    for offset in range(0,count,8):
-        part=commands[offset:min(offset+8,count)]
-        if plans is None:
-            edges=np.flatnonzero(np.any(part[1:]!=part[:-1],axis=1))+1
-            boundaries=[0,*edges.tolist(),len(part)]
-            for left,right in zip(boundaries,boundaries[1:]):
-                command=part[left]
-                if branch['last'] is None or not np.array_equal(branch['last'],command):
-                    branch['cars'][ours].set_controls(controls(command));branch['last']=command.copy()
-                branch['arena'].step(right-left);steps+=1
-        else:
-            for left,right,command in plans[branch['token']][offset//8]:
-                if left>=len(part):break
-                if command is not None:branch['cars'][ours].set_controls(command)
-                branch['arena'].step(min(right,len(part))-left);steps+=1
-        branch['tick']+=len(part)
-        row=native_encoded(branch['arena'],branch['cars'],ordered)
-        snapshots.append((branch,row,part[-1].copy()))
-        if abs(row[38])>GOAL_THRESHOLD:
-            branch['goal']=1. if sign*row[38]>0 else -1.;break
-    return snapshots,steps
+# Re-export the existing helpers for callers/tests. The worker imports their
+# lightweight module directly, without loading this Torch-dependent runtime.
+from replay_il_forecast import native_encoded,controls,compile_controls,advance_batch,advance_branch
 
 
 class NativeBatchPlanner(RuntimePlanner):
@@ -108,7 +22,8 @@ class NativeBatchPlanner(RuntimePlanner):
     """
     def __init__(self,*args,workers=1,stepping="compact",network='original',**kwargs):
         setup_started=time.perf_counter()
-        if not 1<=workers<=16 or stepping not in ("compact","workers","multi_step"):raise ValueError("Invalid native stepping configuration")
+        if not 1<=workers<=16 or stepping not in ("compact","workers","multi_step","processes"):raise ValueError("Invalid native stepping configuration")
+        if stepping=='processes' and workers>8:raise ValueError('CPU forecast processes must be 1..8')
         if stepping=='compact' and workers!=1:raise ValueError('Compact stepping uses one arena; use --stepping workers for multiple workers')
         self.workers=workers;self.stepping=stepping
         if network not in ('original','optimized','frozen'):raise ValueError('Network must be original, optimized or frozen')
@@ -124,6 +39,10 @@ class NativeBatchPlanner(RuntimePlanner):
             raise ValueError('Installed RocketSim lacks native multi_step; use workers stepping instead')
         self._pool=ThreadPoolExecutor(max_workers=workers) if stepping=="workers" and workers>1 else None
         self._base_arena=self.engine._arena;self._native_arenas=[]
+        self.process_pool=None
+        if stepping=='processes':
+            from replay_il_processes import ForecastProcesses
+            self.process_pool=ForecastProcesses(self.book,min(workers,self.candidates))
         self.network_setup_ms=(time.perf_counter()-setup_started)*1000
     def encode_features(self,observations):
         return super().encode_features(observations) if self.inference_kernel is None else self.inference_kernel.encode(observations)
@@ -186,15 +105,15 @@ class NativeBatchPlanner(RuntimePlanner):
         phase_started=time.perf_counter()
         # Reuse arena allocations across decisions. Each starts via the same
         # RLGym reconstruction as the reference; no native clone ID remapping.
-        arena_count=1 if self.stepping=='compact' else len(choices)
+        arena_count=0 if self.stepping=='processes' else 1 if self.stepping=='compact' else len(choices)
         while len(self._native_arenas)<arena_count:
             self._native_arenas.append(rs.Arena(rs.GameMode.SOCCAR))
         branches=[]
         try:
             for index,first in enumerate(choices):
-                arena=self._native_arenas[0 if self.stepping=='compact' else index]
+                arena=None if self.stepping=='processes' else self._native_arenas[0 if self.stepping=='compact' else index]
                 cars={}
-                if self.stepping!='compact':
+                if self.stepping not in ('compact','processes'):
                     self.engine._arena=arena;self.engine._cars={}
                     self.engine.set_state(initial,{})
                     cars=dict(self.engine._cars)
@@ -203,6 +122,8 @@ class NativeBatchPlanner(RuntimePlanner):
                     if aid!=ours:car.set_controls(controls(old[aid]))
                 branches.append({'arena':arena,'cars':cars,'state':initial,'history':deque(history,maxlen=self.model.history),
                     'first':first,'token':first,'goal':None,'tick':initial.tick_count,'last':None,'ours':ours,'previous':old})
+            if self.process_pool is not None:
+                self.process_pool.prepare(initial,branches[0]['previous'],ours,choices,sign)
             phases['branch_setup']=(time.perf_counter()-phase_started)*1000
             chunk=len(self.book[0]);native_steps=0
             for start in range(0,self.horizon,chunk):
@@ -213,7 +134,16 @@ class NativeBatchPlanner(RuntimePlanner):
                     phases['continuation_and_value_network']+=(time.perf_counter()-phase_started)*1000
                 phase_started=time.perf_counter()
                 snapshots=[]
-                if self.stepping=='compact':
+                if self.stepping=='processes':
+                    replies=self.process_pool.step([branch['token'] for branch in branches],
+                        min(chunk,self.horizon-start),start+chunk<self.horizon)
+                    for reply in replies:
+                        native_steps+=reply['native_step_calls']
+                        snapshots.extend((branches[int(index)],row,action)
+                            for index,row,action in zip(reply['indices'],reply['rows'],reply['actions']))
+                        for index,tick,goal in reply['branches']:
+                            branches[index]['tick']=tick;branches[index]['goal']=goal
+                elif self.stepping=='compact':
                     for branch in branches:
                         if branch['goal'] is not None:continue
                         self.engine._arena=branch['arena'];self.engine._cars={}
@@ -260,7 +190,7 @@ class NativeBatchPlanner(RuntimePlanner):
                 views=self._views([r for _,r,_ in snapshots],[p for _,_,p in snapshots],our_index)
                 for (branch,_,_),view in zip(snapshots,views):branch['history'].append(view)
                 phases['observation_build']+=(time.perf_counter()-phase_started)*1000
-                if start+chunk<self.horizon and self.stepping!='compact':
+                if start+chunk<self.horizon and self.stepping not in ('compact','processes'):
                     phase_started=time.perf_counter()
                     for b in branches:
                         if b['goal'] is None:self._reset_boundary(b,initial)
@@ -274,13 +204,17 @@ class NativeBatchPlanner(RuntimePlanner):
                 score=mean-self.uncertainty*spread+self.prior*float(logp[b['first']])
                 records.append({'token':b['first'],'score':score,'value':mean,'uncertainty':spread})
             best=max(records,key=lambda r:r['score']);synchronize(self.device);elapsed=time.perf_counter()-started
-            return self.book[best['token']].copy(),{'mode':'search','backend':'native-'+self.stepping,'workers':self.workers if self.stepping=='workers' else None,'selected':best,'candidates':len(records),
+            return self.book[best['token']].copy(),{'mode':'search','backend':'native-'+self.stepping,
+                'workers':len(self.process_pool.processes) if self.process_pool is not None else self.workers if self.stepping=='workers' else None,
+                'worker_torch_loaded':[row['torch_loaded'] for row in self.process_pool.worker_info] if self.process_pool is not None else [],
+                'selected':best,'candidates':len(records),
                 'horizon_seconds':self.horizon/120,'latency_ms':elapsed*1000,'maximum_decisions_per_second':1/max(elapsed,1e-9),
                 'execute_first_ticks':8,'device':str(self.device),'encoded_observations':self.encoded_observations,
                 'native_step_calls':native_steps,'phase_ms':phases,'network':self.network,
                 'opponents':'last observed controls held; future human inputs are unknown','records':records}
         finally:self.engine._arena=self._base_arena
     def close(self):
+        if self.process_pool is not None:self.process_pool.close()
         if self._pool is not None:self._pool.shutdown(wait=True)
         self.engine._arena=self._base_arena;self.engine._cars={};self._native_arenas.clear();super().close()
 
@@ -336,7 +270,7 @@ def compare_records(reference,native,tolerance=1e-4):
 
 def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
               repeats=3,warmups=1,candidate_counts=(4,16,64),compare_reference=True,team_size=1,
-              network='original',compare_native=False):
+              network='original',compare_native=False,compare_compact=False):
     """Measure the actual checkpoint, retaining the full horizon in both paths."""
     from pathlib import Path
     import platform,importlib.metadata
@@ -347,8 +281,10 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
     from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator,KickoffMutator
     if not 1<=threads<=64 or not 1<=repeats<=20 or not 1<=warmups<=5:
         raise ValueError('Threads must be 1..64, repeats 1..20, warmups 1..5')
-    if not 1<=workers<=16 or stepping not in ('compact','workers','multi_step') or team_size not in (1,2,3):
+    if not 1<=workers<=16 or stepping not in ('compact','workers','multi_step','processes') or team_size not in (1,2,3):
         raise ValueError('Invalid simulation worker, stepping or team-size setting')
+    if stepping=='processes' and workers>8:raise ValueError('CPU forecast processes must be 1..8')
+    if compare_compact and stepping!='processes':raise ValueError('Compact comparison requires process stepping')
     if stepping=='compact' and workers!=1:raise ValueError('Compact stepping uses one arena; use --stepping workers for multiple workers')
     if network not in ('original','optimized','frozen'):raise ValueError('Network must be original, optimized or frozen')
     if not candidate_counts or any(not 1<=c<=64 for c in candidate_counts):
@@ -422,6 +358,10 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
             if compare_reference:
                 planner=RuntimePlanner(model,book,candidates=count)
                 reference_report,reference_summary=measure(planner,planner.choose,'reference')
+            compact_report=compact_summary=None
+            if compare_compact:
+                planner=NativeBatchPlanner(model,book,candidates=count,network=network)
+                compact_report,compact_summary=measure(planner,planner.choose,'native-compact-'+network)
             native_original_report=native_original_summary=None
             if network!='original' and compare_native:
                 planner=NativeBatchPlanner(model,book,candidates=count,workers=workers,stepping=stepping)
@@ -433,6 +373,8 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
                 compare(reference_report,reference_summary,report,summary,'REFERENCE')
             if native_original_report is not None:
                 compare(native_original_report,native_original_summary,report,summary,'NATIVE NETWORK')
+            if compact_report is not None:
+                compare(compact_report,compact_summary,report,summary,'COMPACT VS MULTICORE')
     finally:engine.close()
     recommended={}
     for count in sorted({row['candidates'] for row in results if row['mode']=='search'}):
@@ -444,7 +386,7 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
                                  'meets_deadline':fastest['meets_deadline_p95'],
                                  'forecast_parity':fastest.get('forecast_parity','not_checked')}
     validation='failed' if any(row['status']=='failed' for row in comparisons) else 'passed' if comparisons else 'not_checked'
-    return {'schema':'replay-il-native-runtime-v2.1','checkpoint_sha256':sha256(folder/'best.pt'),
+    return {'schema':'replay-il-native-runtime-v3' if stepping=='processes' else 'replay-il-native-runtime-v2.1','checkpoint_sha256':sha256(folder/'best.pt'),
         'book_sha256':sha256(folder/'tokens.npy'),'device':str(target),'requested_device':device,
         'device_name':torch.cuda.get_device_name(target) if target.type=='cuda' else platform.processor() or 'CPU',
         'cuda_available':torch.cuda.is_available(),'torch':torch.__version__,'rocketsim':importlib.metadata.version('rocketsim'),
@@ -465,7 +407,8 @@ def main(argv=None):
     parser.add_argument('--device',choices=('auto','cpu','cuda'),default='auto')
     parser.add_argument('--threads',type=int,default=2)
     parser.add_argument('--workers',type=int,default=1,help='Simulation workers, independent of Torch threads')
-    parser.add_argument('--stepping',choices=('compact','workers','multi_step'),default='compact')
+    parser.add_argument('--stepping',choices=('compact','workers','multi_step','processes'),default='compact')
+    parser.add_argument('--compare-compact',action='store_true',help='Compare multicore forecasts with the preceding compact backend')
     parser.add_argument('--network',choices=('original','optimized','frozen'),default='frozen')
     parser.add_argument('--skip-native-comparison',action='store_true',help='Skip timing the preceding native network')
     parser.add_argument('--team-size',type=int,choices=(1,2,3),default=1)
@@ -477,8 +420,10 @@ def main(argv=None):
     folder=Path(__file__).resolve().parent/'data/isolated/replay_imitation/runs'/args.run
     report=benchmark(folder,device=args.device,threads=args.threads,workers=args.workers,stepping=args.stepping,
         team_size=args.team_size,repeats=args.repeats,warmups=args.warmups,candidate_counts=args.candidates,
-        compare_reference=not args.skip_reference,network=args.network,compare_native=not args.skip_native_comparison)
-    output=folder/'native_runtime_v2_benchmark.json';atomic_json(output,report)
+        compare_reference=not args.skip_reference,network=args.network,compare_native=not args.skip_native_comparison,
+        compare_compact=args.compare_compact)
+    output=folder/('native_runtime_multicore_benchmark.json' if args.stepping=='processes' else 'native_runtime_v2_benchmark.json')
+    atomic_json(output,report)
     print('REPORT:',output,flush=True)
     if report['validation_status']=='failed':
         raise ValueError('Forecast parity failed. Timings and candidate diagnostics were saved in the report above; '
