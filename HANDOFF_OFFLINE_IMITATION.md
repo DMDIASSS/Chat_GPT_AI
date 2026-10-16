@@ -132,9 +132,12 @@ never widen parity tolerance just to obtain a success message.
 CUDA graphs capture only during explicit warmup, with at most six shapes.
 Irregular shapes run eager FP32. Actual CUDA capture tests skip on CPU; the
 on-laptop tuner checks numerical parity and reports failures/fallbacks.
-Existing old launchers retain their previous defaults. No game adapter has
-been installed by these benchmark commands, and the latest request does not
-authorize adding matches to training/validation.
+Existing old launchers retain their previous defaults. No game adapter is
+installed by these benchmark commands. A later user request authorized an
+RLBot v4 export: `EXPORT_REPLAY_RLBOT.bat` / `export_replay_rlbot.py` now creates
+a self-contained policy-only bot with temporal history and exact chunk controls.
+See `README_REPLAY_RLBOT_EXPORT.md`. It does not include the RocketSim search
+planner, launch a match, retrain, or authorize adding matches to learning.
 
 ## Curated 3v3 addition and exact commands
 

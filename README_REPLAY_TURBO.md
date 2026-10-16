@@ -85,7 +85,9 @@ Results in `data\isolated\replay_imitation\runs\replay_scratch01\`:
 plus explicitly rejected alternatives. It is not a claim that every path passed.
 No setting is installed into a game adapter by this benchmark. It prepares
 inference configuration for the existing chunk model; this model still needs a
-compatible playable adapter. Existing launchers keep their previous defaults.
+compatible playable adapter. A separate policy-only RLBot v4 exporter is now
+available in [README_REPLAY_RLBOT_EXPORT.md](README_REPLAY_RLBOT_EXPORT.md).
+Existing launchers keep their previous defaults.
 
 Five warmed kickoff samples are a quick comparison, not a full-match latency
 guarantee. The inference budget does not include game observation/input latency
