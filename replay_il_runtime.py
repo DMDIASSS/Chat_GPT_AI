@@ -39,6 +39,13 @@ class RuntimePlanner(Planner):
         q=q.astype(np.float32);kv=kv.astype(np.float32)
         mask=np.where(mask>0,-10000.,mask).astype(np.float32)
         return [(q[i],kv[i],mask[i]) for i in range(len(states))]
+    def encode_features(self,observations):
+        return self.model.encoder(observations)
+    def decode_features(self,features):
+        x=self.model.project(features)+self.model.position[:,:features.shape[1]]
+        causal=self._causal[:x.shape[1],:x.shape[1]]
+        x=self.model.norm(self.model.temporal(x,mask=causal)[:,-1])
+        return self.model.policy(x),torch.cat([head(x).tanh() for head in self.model.values],-1)
     @torch.inference_mode()
     def infer_batch(self,histories):
         padded=[];new={}
@@ -51,7 +58,7 @@ class RuntimePlanner(Planner):
         if new:
             views=list(new.values())
             x=tuple(torch.as_tensor(np.stack([v[k] for v in views]),device=self.device,dtype=torch.float32) for k in range(3))
-            encoded=self.model.encoder(x)
+            encoded=self.encode_features(x)
             offset=0 if self._feature_tensor is None else len(self._feature_tensor)
             self._feature_tensor=encoded if self._feature_tensor is None else torch.cat((self._feature_tensor,encoded),dim=0)
             for index,view in enumerate(views):
@@ -59,11 +66,7 @@ class RuntimePlanner(Planner):
                 self._features[id(view)]=(view,offset+index)
             self.encoded_observations+=len(views)
         indices=torch.as_tensor([[self._features[id(v)][1] for v in views] for views in padded],device=self.device)
-        x=self._feature_tensor[indices]
-        x=self.model.project(x)+self.model.position[:,:x.shape[1]]
-        causal=self._causal[:x.shape[1],:x.shape[1]]
-        x=self.model.norm(self.model.temporal(x,mask=causal)[:,-1])
-        return self.model.policy(x),torch.cat([head(x).tanh() for head in self.model.values],-1)
+        return self.decode_features(self._feature_tensor[indices])
     def begin(self):
         self._features.clear();self._feature_tensor=None;self.encoded_observations=0
     @torch.inference_mode()

@@ -41,6 +41,24 @@ def controls(values):
     return c
 
 
+def compile_controls(book):
+    """Cache exact control edges and immutable native controls for every token."""
+    plans=[]
+    for token in book:
+        parts=[]
+        for offset in range(0,len(token),8):
+            part=token[offset:offset+8]
+            edges=np.flatnonzero(np.any(part[1:]!=part[:-1],axis=1))+1
+            bounds=[0,*edges.tolist(),len(part)];segments=[]
+            for left,right in zip(bounds,bounds[1:]):
+                absolute=offset+left
+                changed=absolute==0 or not np.array_equal(token[absolute],token[absolute-1])
+                segments.append((left,right,controls(part[left]) if changed else None))
+            parts.append(segments)
+        plans.append(parts)
+    return plans
+
+
 def advance_batch(active,ours,commands):
     """Apply every exact control edge; batch only intervals with held controls."""
     count=commands.shape[1]
@@ -54,19 +72,25 @@ def advance_batch(active,ours,commands):
     return len(boundaries)-1
 
 
-def advance_branch(branch,ours,book,count,ordered,sign):
+def advance_branch(branch,ours,book,count,ordered,sign,plans=None):
     """One worker owns one arena for a chunk; no per-tick task scheduling."""
     from rlgym.rocket_league.common_values import GOAL_THRESHOLD
     commands=book[branch['token']];snapshots=[];steps=0
     for offset in range(0,count,8):
         part=commands[offset:min(offset+8,count)]
-        edges=np.flatnonzero(np.any(part[1:]!=part[:-1],axis=1))+1
-        boundaries=[0,*edges.tolist(),len(part)]
-        for left,right in zip(boundaries,boundaries[1:]):
-            command=part[left]
-            if branch['last'] is None or not np.array_equal(branch['last'],command):
-                branch['cars'][ours].set_controls(controls(command));branch['last']=command.copy()
-            branch['arena'].step(right-left);steps+=1
+        if plans is None:
+            edges=np.flatnonzero(np.any(part[1:]!=part[:-1],axis=1))+1
+            boundaries=[0,*edges.tolist(),len(part)]
+            for left,right in zip(boundaries,boundaries[1:]):
+                command=part[left]
+                if branch['last'] is None or not np.array_equal(branch['last'],command):
+                    branch['cars'][ours].set_controls(controls(command));branch['last']=command.copy()
+                branch['arena'].step(right-left);steps+=1
+        else:
+            for left,right,command in plans[branch['token']][offset//8]:
+                if left>=len(part):break
+                if command is not None:branch['cars'][ours].set_controls(command)
+                branch['arena'].step(min(right,len(part))-left);steps+=1
         branch['tick']+=len(part)
         row=native_encoded(branch['arena'],branch['cars'],ordered)
         snapshots.append((branch,row,part[-1].copy()))
@@ -82,15 +106,29 @@ class NativeBatchPlanner(RuntimePlanner):
     planner. This preserves its reset semantics while removing per-tick Python
     stepping, most GameState boxing, and branch deepcopy calls.
     """
-    def __init__(self,*args,workers=1,stepping="compact",**kwargs):
+    def __init__(self,*args,workers=1,stepping="compact",network='original',**kwargs):
+        setup_started=time.perf_counter()
         if not 1<=workers<=16 or stepping not in ("compact","workers","multi_step"):raise ValueError("Invalid native stepping configuration")
         if stepping=='compact' and workers!=1:raise ValueError('Compact stepping uses one arena; use --stepping workers for multiple workers')
         self.workers=workers;self.stepping=stepping
+        if network not in ('original','optimized','frozen'):raise ValueError('Network must be original, optimized or frozen')
+        self.network=network
         super().__init__(*args,**kwargs)
+        self.inference_kernel=None
+        if network!='original':
+            from replay_il_inference import InferenceKernel,freeze_kernel
+            self.inference_kernel=InferenceKernel(self.model)
+            if network=='frozen':self.inference_kernel=freeze_kernel(self.inference_kernel)
+        self.control_plans=compile_controls(self.book) if network!='original' else None
         if stepping=='multi_step' and not callable(getattr(rs.Arena,'multi_step',None)):
             raise ValueError('Installed RocketSim lacks native multi_step; use workers stepping instead')
         self._pool=ThreadPoolExecutor(max_workers=workers) if stepping=="workers" and workers>1 else None
         self._base_arena=self.engine._arena;self._native_arenas=[]
+        self.network_setup_ms=(time.perf_counter()-setup_started)*1000
+    def encode_features(self,observations):
+        return super().encode_features(observations) if self.inference_kernel is None else self.inference_kernel.encode(observations)
+    def decode_features(self,features):
+        return super().decode_features(features) if self.inference_kernel is None else self.inference_kernel.decode(features)
     def _reset_boundary(self,branch,initial):
         e=self.engine;e._arena=branch['arena'];e._cars=branch['cars']
         e._agent_ids={car.id:aid for aid,car in e._cars.items()}
@@ -183,7 +221,7 @@ class NativeBatchPlanner(RuntimePlanner):
                         branch['cars']=dict(self.engine._cars);branch['last']=None
                         for aid,car in branch['cars'].items():
                             if aid!=ours:car.set_controls(controls(branch['previous'][aid]))
-                        rows,steps=advance_branch(branch,ours,self.book,min(chunk,self.horizon-start),ordered,sign)
+                        rows,steps=advance_branch(branch,ours,self.book,min(chunk,self.horizon-start),ordered,sign,self.control_plans)
                         snapshots.extend(rows);native_steps+=steps
                         if start+chunk<self.horizon and branch['goal'] is None:
                             self.engine._tick_count=branch['tick']
@@ -192,7 +230,7 @@ class NativeBatchPlanner(RuntimePlanner):
                             branch['state']=self.engine._get_state()
                 elif self.stepping=='workers':
                     active=[b for b in branches if b['goal'] is None]
-                    tasks=[(b,ours,self.book,min(chunk,self.horizon-start),ordered,sign) for b in active]
+                    tasks=[(b,ours,self.book,min(chunk,self.horizon-start),ordered,sign,self.control_plans) for b in active]
                     if self._pool is None:
                         outcomes=[advance_branch(*args) for args in tasks]
                     else:
@@ -239,7 +277,7 @@ class NativeBatchPlanner(RuntimePlanner):
             return self.book[best['token']].copy(),{'mode':'search','backend':'native-'+self.stepping,'workers':self.workers if self.stepping=='workers' else None,'selected':best,'candidates':len(records),
                 'horizon_seconds':self.horizon/120,'latency_ms':elapsed*1000,'maximum_decisions_per_second':1/max(elapsed,1e-9),
                 'execute_first_ticks':8,'device':str(self.device),'encoded_observations':self.encoded_observations,
-                'native_step_calls':native_steps,'phase_ms':phases,
+                'native_step_calls':native_steps,'phase_ms':phases,'network':self.network,
                 'opponents':'last observed controls held; future human inputs are unknown','records':records}
         finally:self.engine._arena=self._base_arena
     def close(self):
@@ -263,7 +301,8 @@ def compare_records(reference,native,tolerance=1e-4):
 
 
 def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
-              repeats=3,warmups=1,candidate_counts=(4,16,64),compare_reference=True,team_size=1):
+              repeats=3,warmups=1,candidate_counts=(4,16,64),compare_reference=True,team_size=1,
+              network='original',compare_native=False):
     """Measure the actual checkpoint, retaining the full horizon in both paths."""
     from pathlib import Path
     import platform,importlib.metadata
@@ -277,11 +316,12 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
     if not 1<=workers<=16 or stepping not in ('compact','workers','multi_step') or team_size not in (1,2,3):
         raise ValueError('Invalid simulation worker, stepping or team-size setting')
     if stepping=='compact' and workers!=1:raise ValueError('Compact stepping uses one arena; use --stepping workers for multiple workers')
+    if network not in ('original','optimized','frozen'):raise ValueError('Network must be original, optimized or frozen')
     if not candidate_counts or any(not 1<=c<=64 for c in candidate_counts):
         raise ValueError('Candidates must be 1..64')
     target=resolve_device(device);torch.set_num_threads(threads);folder=Path(folder).resolve()
     print('NATIVE_RUNTIME_DEVICE:',target,'| Torch threads:',threads,'| simulation workers:',workers,
-          '| stepping:',stepping,flush=True)
+          '| stepping:',stepping,'| network:',network,flush=True)
     model,book=load(folder,device='cpu');model.to(target).eval()
     engine=RocketSimEngine(rlbot_delay=False)
     state=engine.create_base_state();FixedTeamSizeMutator(team_size,team_size).apply(state,{})
@@ -301,16 +341,22 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
             for index in range(warmups):
                 _,report=choose(state,previous,ours)
                 if index==0:cold=report['latency_ms']
-            samples=[]
+            samples=[];phase_samples=[]
             for _ in range(repeats):
                 _,report=choose(state,previous,ours);samples.append(report['latency_ms'])
+                if 'phase_ms' in report:phase_samples.append(report['phase_ms'])
             summary={key:value for key,value in report.items() if key!='records'}
             summary.update(backend=backend,latency_samples_ms=samples,latency_median_ms=float(np.median(samples)),
                 latency_p95_ms=float(np.quantile(samples,.95)),first_call_ms=cold,deadline_ms=deadline,
                 meets_deadline_p95=bool(np.quantile(samples,.95)<=deadline),warmups=warmups,repeats=repeats)
+            if hasattr(planner,'network_setup_ms'):summary['network_setup_ms']=planner.network_setup_ms
+            if phase_samples:
+                summary['phase_median_ms']={key:float(np.median([sample[key] for sample in phase_samples])) for key in phase_samples[0]}
             results.append(summary)
             print('RUNTIME',backend,'candidates',summary['candidates'],'median_ms',round(summary['latency_median_ms'],2),
                   'p95_ms',round(summary['latency_p95_ms'],2),'meets_67ms',summary['meets_deadline_p95'],flush=True)
+            if summary['candidates']==64 and phase_samples:
+                print('PHASES_MS',backend,{key:round(value,2) for key,value in summary['phase_median_ms'].items()},flush=True)
             return report,summary
         finally:planner.close()
 
@@ -322,13 +368,24 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
             if compare_reference:
                 planner=RuntimePlanner(model,book,candidates=count)
                 reference_report,reference_summary=measure(planner,planner.choose,'reference')
-            planner=NativeBatchPlanner(model,book,candidates=count,workers=workers,stepping=stepping)
-            report,summary=measure(planner,planner.choose,'native-'+stepping)
+            native_original_report=native_original_summary=None
+            if network!='original' and compare_native:
+                planner=NativeBatchPlanner(model,book,candidates=count,workers=workers,stepping=stepping)
+                native_original_report,native_original_summary=measure(planner,planner.choose,'native-'+stepping+'-original')
+            planner=NativeBatchPlanner(model,book,candidates=count,workers=workers,stepping=stepping,network=network)
+            label='native-'+stepping+('-'+network if network!='original' else '')
+            report,summary=measure(planner,planner.choose,label)
             if reference_report is not None:
                 parity=compare_records(reference_report,report)
                 ratio=reference_summary['latency_median_ms']/summary['latency_median_ms']
                 comparisons.append({'candidates':summary['candidates'],'parity':parity,'median_speedup':ratio})
                 print('PARITY OK | candidates',summary['candidates'],'| speedup',round(ratio,2),'x',flush=True)
+            if native_original_report is not None:
+                parity=compare_records(native_original_report,report)
+                ratio=native_original_summary['latency_median_ms']/summary['latency_median_ms']
+                comparisons.append({'candidates':summary['candidates'],'reference_backend':'native-'+stepping+'-original',
+                                    'parity':parity,'median_speedup':ratio})
+                print('NATIVE NETWORK PARITY OK | candidates',summary['candidates'],'| speedup',round(ratio,2),'x',flush=True)
     finally:engine.close()
     recommended={}
     for count in sorted({row['candidates'] for row in results if row['mode']=='search'}):
@@ -336,11 +393,11 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
         fastest=min(rows,key=lambda row:row['latency_p95_ms'])
         recommended[str(count)]={'backend':fastest['backend'],'p95_ms':fastest['latency_p95_ms'],
                                  'meets_deadline':fastest['meets_deadline_p95']}
-    return {'schema':'replay-il-native-runtime-v1','checkpoint_sha256':sha256(folder/'best.pt'),
+    return {'schema':'replay-il-native-runtime-v2','checkpoint_sha256':sha256(folder/'best.pt'),
         'book_sha256':sha256(folder/'tokens.npy'),'device':str(target),'requested_device':device,
         'device_name':torch.cuda.get_device_name(target) if target.type=='cuda' else platform.processor() or 'CPU',
         'cuda_available':torch.cuda.is_available(),'torch':torch.__version__,'rocketsim':importlib.metadata.version('rocketsim'),
-        'threads':threads,'workers':workers,'stepping':stepping,'format':f'{team_size}v{team_size}',
+        'threads':threads,'workers':workers,'stepping':stepping,'network':network,'format':f'{team_size}v{team_size}',
         'seed':271,'kickoff_positions':{str(aid):car.physics.position.tolist() for aid,car in state.cars.items()},
         'results':results,'comparisons':comparisons,'recommended_backend_by_candidates':recommended,'training_modified':False,
         'note':'Warmed kickoff-state latency, not match strength or a playable adapter. Simulation runs on CPU. '
@@ -357,17 +414,19 @@ def main(argv=None):
     parser.add_argument('--threads',type=int,default=2)
     parser.add_argument('--workers',type=int,default=1,help='Simulation workers, independent of Torch threads')
     parser.add_argument('--stepping',choices=('compact','workers','multi_step'),default='compact')
+    parser.add_argument('--network',choices=('original','optimized','frozen'),default='frozen')
+    parser.add_argument('--skip-native-comparison',action='store_true',help='Skip timing the preceding native network')
     parser.add_argument('--team-size',type=int,choices=(1,2,3),default=1)
     parser.add_argument('--repeats',type=int,default=3);parser.add_argument('--warmups',type=int,default=1)
-    parser.add_argument('--candidates',type=int,nargs='+',default=[4,16,64])
-    parser.add_argument('--skip-reference',action='store_true',help='Skip reference timing and local forecast parity check')
+    parser.add_argument('--candidates',type=int,nargs='+',default=[4,8,12,16,64])
+    parser.add_argument('--skip-reference',action='store_true',help='Skip older Python reference timings; native comparison still checks parity')
     args=parser.parse_args(argv)
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,50}',args.run):parser.error('Invalid run name')
     folder=Path(__file__).resolve().parent/'data/isolated/replay_imitation/runs'/args.run
     report=benchmark(folder,device=args.device,threads=args.threads,workers=args.workers,stepping=args.stepping,
         team_size=args.team_size,repeats=args.repeats,warmups=args.warmups,candidate_counts=args.candidates,
-        compare_reference=not args.skip_reference)
-    output=folder/'native_runtime_benchmark.json';atomic_json(output,report)
+        compare_reference=not args.skip_reference,network=args.network,compare_native=not args.skip_native_comparison)
+    output=folder/'native_runtime_v2_benchmark.json';atomic_json(output,report)
     print('REPORT:',output,flush=True)
     print('Inference benchmark complete. Your trained model and training code are unchanged.',flush=True)
 

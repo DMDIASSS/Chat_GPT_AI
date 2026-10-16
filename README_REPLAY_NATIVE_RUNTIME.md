@@ -1,122 +1,119 @@
-# Native replay planner optimization
+# Native replay planner optimization v2
 
-Extract this small update into **E:\Downloads\Chat_GPT_AI**, allowing the included
-runtime source to replace its previous version. Your existing project, Python
-environment and trained replay-imitation run are required.
+Extract this source-only update into **E:\Downloads\Chat_GPT_AI**, replacing the
+included runtime files. It uses the existing project, Python environment and
+trained replay-imitation run. No extra packages or C++ compiler are required.
 
 Run in CMD:
 
 ```bat
 cd /d "E:\Downloads\Chat_GPT_AI"
-REPLAY_IL_NATIVE_BENCHMARK.bat --device cuda
+REPLAY_IL_NATIVE_BENCHMARK.bat --device cuda --skip-reference --repeats 5
 ```
 
-The result is saved to:
+Results are written to a **new file**, preserving the earlier reports:
 
 ```text
-data\isolated\replay_imitation\runs\replay_scratch01\native_runtime_benchmark.json
+data\isolated\replay_imitation\runs\replay_scratch01\native_runtime_v2_benchmark.json
 ```
 
-The old `runtime_benchmark.json` remains available for comparison. A different
-existing run can be selected with `--run NAME`. Explicit `--device cuda` fails if
-CUDA is unavailable; `--device auto` chooses the available device.
+Use `--run NAME` for a different existing run. Explicit `--device cuda` fails if
+CUDA is unavailable; `--device auto` selects the available device. The report
+records the actual device, checkpoint and vocabulary hashes.
 
-## What changed
+## Changes from v1
 
-The preceding GPU report measured about **339 ms** for a full 64-candidate,
-one-second search. The desired eight-tick action interval allows **66.7 ms**.
+Your GTX 1650 measured **232.75 ms** for v1's 64-candidate search. The intended
+8-tick action interval allows **66.7 ms**. This update targets additional overhead:
 
-This inference backend reuses RocketSim arenas, steps intervals with
-identical controls directly in native code, and extracts observations without
-constructing a Python GameState every eight ticks. It preserves every individual
-jump, flip, steering and boost transition. At action-chunk boundaries it retains
-the preceding planner's state reconstruction behavior. Observation construction
-allocates only the controlled player's view, with the same quaternion conversion,
-float64 intermediates, team inversion, previous controls and masks used in training.
-The shared runtime also gathers cached history features in one tensor operation.
+- Spatial cross-attention uses packed key/value projections and SDPA directly.
+- The final temporal layer computes only the last query/output. Earlier layers
+  still compute the complete causal history; all learned weights are reused.
+- The default `frozen` network compiles and freezes that inference graph in
+  memory using the installed PyTorch. There is no Triton installation, new
+  checkpoint, quantization or reduced precision. Construction/compilation time
+  is reported separately as `network_setup_ms`.
+- Native control objects and exact control-change boundaries are cached for
+  each action token, avoiding repeated allocations and NumPy comparisons.
 
-All **64 candidates, the one-second horizon, the value heads and the first eight
-executed ticks** remain available. Four- and sixteen-candidate timings are labeled
-separately. The benchmark also measures the direct policy, which performs no search.
-Neither smaller searches nor the direct policy are assumed equally strong.
+The full **64 candidates, one-second horizon, FP32 precision, value heads and
+first eight executed ticks** remain available. All jump, flip, steering, boost
+and powerslide edges are preserved, including partial terminal chunks. Compact
+stepping reuses one arena with the preceding state reconstruction semantics.
+The optional worker and global-pool stepping modes remain available.
 
-This uses the installed RocketSim physics engine, which GigaLearn also uses.
-It is **not an all-C++ GigaLearn port**: Python still schedules branches and builds
-features, and Torch runs the network. GigaLearn's aggregate training SPS does not
-by itself measure latency of an autoregressive planning decision. No PPO, RL or
-self-play training is started and no model weights are changed.
+This uses RocketSim, the simulation engine also used by GigaLearn. Python still
+schedules simulation and builds observations. It is not an all-C++ GigaLearn port,
+and high aggregate training SPS does not establish single-decision latency.
 
-## Measurement and settings
+## Comparison and controls
 
-By default the benchmark compares the previous runtime with the optimized
-runtime at **4, 16 and 64 candidates**, using your real `best.pt` and vocabulary.
-It checks that candidate scores, values, uncertainty and selected tokens agree
-on the benchmark state. A failed check stops with an error. It reports the first
-call separately, then warmed individual samples, median and an estimated p95.
-The p95 must meet 66.7 ms before it is labeled as meeting that deadline. CUDA is
-synchronized at decision boundaries.
-`recommended_backend_by_candidates` identifies the faster measured backend by
-p95 for each budget; it can select the reference if native stepping regresses.
-This is a benchmark recommendation, not an automatic gameplay configuration change.
+The default CLI compares **4, 8, 12, 16 and 64 candidates**. The intermediate
+budgets help locate the largest measured search fitting 66.7 ms. They are
+explicitly labeled; fewer candidates are not assumed equally strong.
 
-Simulation defaults to `--stepping compact`: one reused arena, native held-control
-steps, and lightweight snapshots at action-chunk boundaries. This minimizes arena
-allocation and memory traffic. Separate arenas and parallel workers are available
-as explicit experiments, not guaranteed improvements:
+For every budget, the default also times the preceding native network and checks
+candidate order, scores, values, uncertainty and the selected token. A mismatch
+above `1e-4` or a changed selection stops with an error. `--skip-reference` skips
+only the older Python reference timing; the native comparison still runs.
+Without that flag, the Python reference is measured and compared as well.
+`--skip-native-comparison` disables the extra native comparison explicitly.
+
+Other settings:
 
 ```bat
-REPLAY_IL_NATIVE_BENCHMARK.bat --device cuda --stepping workers --workers 2 --repeats 5
+REM The algebraic optimization without graph freezing:
+REPLAY_IL_NATIVE_BENCHMARK.bat --device cuda --network optimized --skip-reference
+
+REM The preceding neural path:
+REPLAY_IL_NATIVE_BENCHMARK.bat --device cuda --network original
+
+REM Parallel native stepping is an experiment, not a promised improvement:
+REPLAY_IL_NATIVE_BENCHMARK.bat --device cuda --stepping workers --workers 2 --skip-reference
+
+REM Team-mode latency:
+REPLAY_IL_NATIVE_BENCHMARK.bat --device cuda --team-size 2 --skip-reference
 ```
 
-`--threads 2` controls Torch CPU threads independently. `--stepping workers`
-uses one arena per candidate; `--workers 1` runs those sequentially. The optional
-`--stepping multi_step` uses the installed wheel's native global worker pool;
-some machines suffer from excess worker overhead. Neither setting changes
-the search budget. Arenas are warmed and reused within each configuration.
-The initial allocation can be substantially slower than subsequent calls.
-The report includes phase timings so simulation, observation building and network
-inference can be distinguished. In compact mode, chunk state reconstruction is
-included in `simulation_and_snapshots`.
+`--threads 2` controls Torch CPU threads. `--team-size 3` measures 3v3.
+`--stepping multi_step` uses the wheel's global thread pool, which may incur
+excess worker overhead. No simulation settings are changed automatically.
 
-Use `--team-size 2` or `--team-size 3` for 2v2 or 3v3 timings, and `--repeats 10`
-for a better tail estimate. Repeated seeded kickoff timings do not establish
-full-match worst-case latency or playing strength. Each invocation replaces
-`native_runtime_benchmark.json`, so copy it first to retain multiple settings.
-`--skip-reference` skips reference timings and the on-PC parity check.
+Reports include individual samples, warmed medians, estimated p95, first-call
+latency and phase medians. The 64-candidate phase breakdown is also printed in
+CMD. `recommended_backend_by_candidates` selects the faster measured backend by
+p95 for each budget; it can retain the preceding path if the new one regresses.
+This recommendation does not change a gameplay adapter's configuration.
 
-## Compatibility and tests
+## Verification and limits
+
+Tests check neural outputs with several batch and history lengths, source-weight
+preservation, both teams in 1v1/2v2/3v3, ordinary and goal-ending forecasts,
+repeated searches and partial control chunks. Dense-contact step comparisons
+start from matching cloned collision graphs: separate arenas can order initially
+overlapping contacts differently even with ordinary stepping.
+
+```bat
+.venv\Scripts\python.exe -m pytest -q tests\test_replay_inference.py tests\test_replay_runtime.py tests\test_replay_native_runtime.py
+```
+
+On the cloud CPU, with matching 3.27M **random fixture weights** and the supplied
+vocabulary, five-call 64-candidate medians were about **523 ms original native
+versus 219 ms v2 frozen**. The v2 p95 was about **361 ms**, so it still failed
+66.7 ms there. CPU timings have varied across runs. These numbers are not a
+GTX 1650 result or evidence of playing strength.
+
+There is no CUDA device in the cloud, and the uploaded checkpoint exceeds the
+file tool's 32 MiB transfer limit. Run the command above to measure your actual
+weights and GPU. Seeded kickoff timing does not establish full-match worst-case
+latency. Repeat invocations replace only the new v2 benchmark report.
 
 All runtime changes are outside `replay_il/`, preserving its pinned training
-source hashes and resume compatibility. The existing checkpoint and vocabulary
-hash checks remain active. No weights, optimizer state, datasets, training
-progress or held-out results are written. The ZIP contains source and tests only.
+source hashes and resume compatibility. Existing checkpoint and vocabulary hash
+checks remain active. No optimizer state, datasets or training results are changed.
+This is an inference/backend update, not a playable adapter for the chunk model.
+Your uploaded kickoff book is empty; no pro kickoff is supplied or claimed.
 
-Tests compare native physics against individual 120 Hz steps through dense
-car/ball contacts and changing jump, steering and powerslide controls. They also
-check feature parity for both teams in 1v1, 2v2 and 3v3, including demos, rotations,
-ground and flip flags, pad cooldown boundaries and previous actions. Ordinary
-and goal-ending forecasts are checked with compact, sequential, bounded-worker and native
-global-pool stepping, including repeated decisions on reused arenas.
-The dense-contact step test starts from matching cloned collision graphs;
-independent arenas can order overlapping contacts differently even when both
-use the ordinary engine. Local score parity is checked on the benchmark state,
-not asserted for every possible collision configuration.
-
-```bat
-.venv\Scripts\python.exe -m pytest -q tests\test_replay_runtime.py tests\test_replay_native_runtime.py
-```
-
-The complete CPU comparisons were variable: the native 64-candidate path was
-faster in some runs and slower in another. One final compact run measured about
-**899 ms reference versus 806 ms compact** (five-call medians); both missed
-66.7 ms. These results do not establish a consistent full-planner speedup.
-
-The cloud has no CUDA device, and the uploaded trained checkpoint exceeds the
-32 MiB transfer limit. Cloud engineering measurements use the matching 3.27M
-architecture with random fixture weights and the supplied action vocabulary.
-Run the command above to measure your trained weights on the GTX 1650. A faster
-physics microbenchmark does not imply the complete search meets its deadline.
-
-This update is an inference backend and benchmark. It does not add a playable
-RLBot or Roblox adapter for this new action-chunk architecture. Your uploaded
-kickoff book is empty; no replay-derived kickoff is supplied or claimed.
+The linked PPO guide was reviewed separately: see [REPLAY_REWARD_DESIGN.md](REPLAY_REWARD_DESIGN.md).
+This run remains supervised imitation and value regression; this patch adds no
+RL stage and does not silently change rewards or learned value targets.

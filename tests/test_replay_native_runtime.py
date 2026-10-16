@@ -5,7 +5,7 @@ import pytest
 import torch
 from replay_il.model import ChunkPolicy
 from replay_il_runtime import RuntimePlanner
-from replay_il_native_runtime import NativeBatchPlanner,native_encoded,advance_batch,controls,benchmark,compare_records
+from replay_il_native_runtime import NativeBatchPlanner,native_encoded,advance_batch,advance_branch,compile_controls,controls,benchmark,compare_records
 from test_replay_runtime import model_book,state_fixture
 
 @pytest.mark.parametrize('players',[2,4,6])
@@ -77,15 +77,16 @@ def test_native_held_control_edges_match_tick_by_tick_physics(players):
 
 @pytest.mark.parametrize('goal',[False,True])
 @pytest.mark.parametrize('players,orange',[(2,False),(4,True),(6,False)])
-@pytest.mark.parametrize('workers,stepping',[(1,'compact'),(1,'workers'),(2,'workers'),(1,'multi_step')])
-def test_native_search_matches_reference_scores_and_survives_repeated_calls(model_book,goal,players,orange,workers,stepping):
+@pytest.mark.parametrize('workers,stepping,network',[(1,'compact','original'),(1,'workers','original'),
+    (2,'workers','original'),(1,'multi_step','original'),(1,'compact','optimized'),(1,'compact','frozen')])
+def test_native_search_matches_reference_scores_and_survives_repeated_calls(model_book,goal,players,orange,workers,stepping,network):
     model,book=model_book;state=state_fixture(players)
     ours=next(aid for aid,car in state.cars.items() if car.is_orange==orange)
     if goal:
         state.ball.position=np.array([0,5050,100],np.float32);state.ball.linear_velocity=np.array([0,1500,0],np.float32)
     before=copy.deepcopy(state);previous={aid:np.zeros(8,np.float32) for aid in state.cars}
     reference=RuntimePlanner(model,book,candidates=8)
-    native=NativeBatchPlanner(model,book,candidates=8,workers=workers,stepping=stepping)
+    native=NativeBatchPlanner(model,book,candidates=8,workers=workers,stepping=stepping,network=network)
     try:
         expected,report=reference.choose(state,previous,ours)
         for _ in range(2):
@@ -112,15 +113,16 @@ def test_native_benchmark_loads_checkpoint_compares_forecasts_and_preserves_trai
     root=Path(__file__).resolve().parents[1]
     paths=list((root/'replay_il').glob('*.py'))+list(tmp_path.iterdir())
     before={path:sha256(path) for path in paths}
-    report=benchmark(tmp_path,device='cpu',candidate_counts=[2],repeats=2,warmups=1)
+    report=benchmark(tmp_path,device='cpu',candidate_counts=[2],repeats=2,warmups=1,
+                     network='frozen',compare_native=True)
     assert report['checkpoint_sha256']==before[tmp_path/'best.pt']
-    assert {r['backend'] for r in report['results']}=={'policy','reference','native-compact'}
+    assert {r['backend'] for r in report['results']}=={'policy','reference','native-compact-original','native-compact-frozen'}
     assert report['comparisons'][0]['parity']['same_selected_token']
     assert report['comparisons'][0]['median_speedup']>0
     recommended=report['recommended_backend_by_candidates']['2']
     searches=[row for row in report['results'] if row['mode']=='search']
     assert recommended['p95_ms']==min(row['latency_p95_ms'] for row in searches)
-    assert recommended['backend'] in {'reference','native-compact'}
+    assert recommended['backend'] in {'reference','native-compact-original','native-compact-frozen'}
     for row in report['results']:
         assert len(row['latency_samples_ms'])==2 and row['first_call_ms']>0
         assert row['latency_p95_ms']>=row['latency_median_ms']>0
@@ -136,3 +138,23 @@ def test_forecast_comparison_rejects_changed_actions_and_scores():
         with pytest.raises(ValueError,match='parity failed'):compare_records(reference,changed)
     changed=copy.deepcopy(reference);changed['selected']['token']=2
     with pytest.raises(ValueError,match='parity failed'):compare_records(reference,changed)
+
+
+@pytest.mark.parametrize('count',[1,7,9,24,31,32])
+def test_cached_controls_preserve_partial_chunks_and_button_edges(model_book,count):
+    from rlgym.rocket_league.sim import RocketSimEngine
+    _,book=model_book;initial=state_fixture();ordered=list(initial.cars);ours=ordered[0]
+    engines=[RocketSimEngine(rlbot_delay=False) for _ in range(2)];branches=[]
+    try:
+        for engine in engines:
+            engine.set_state(initial,{})
+            branches.append({'arena':engine._arena,'cars':engine._cars,'last':None,'token':0,'tick':0,'goal':None})
+        original,_=advance_branch(branches[0],ours,book,count,ordered,1)
+        cached,_=advance_branch(branches[1],ours,book,count,ordered,1,compile_controls(book))
+        assert branches[0]['tick']==branches[1]['tick']==count
+        assert len(original)==len(cached)==(count+7)//8
+        for (_,a,old),(_,b,new) in zip(original,cached):
+            np.testing.assert_array_equal(a,b);np.testing.assert_array_equal(old,new)
+        assert branches[0]['goal']==branches[1]['goal']
+    finally:
+        for engine in engines:engine.close()
