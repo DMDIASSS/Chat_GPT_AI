@@ -139,7 +139,7 @@ task.wait=function(dt)move(dt)end
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-4')
+assert(result.version=='local-5')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -197,6 +197,49 @@ local root=object('Part','Root');root.Parent=enemy;root.CFrame=frame(50);root.Po
 enemy.PrimaryPart=root
 local tag=object('BillboardGui','Nametag');tag.Parent=root;tag.Enabled=true
 local plate=object('Frame','Plate');plate.Parent=tag;plate.BackgroundColor3={R=232/255,G=116/255,B=38/255}
+''')
+
+    def test_live_auto_team_two_v_two_and_midgame_side_switch(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,40 do move(1/30)end
+local function has(text)
+ for _,o in ipairs(created)do if o.Text and string.find(o.Text,text,1,true)then return true end end
+ return false
+end
+assert(has('AUTO ORANGE')and has('Opponents 2 | teammates 1'),'Orange 2v2 observation is wrong')
+edgePaint.BackgroundColor3={R=30/255,G=155/255,B=240/255}
+friendPlate.BackgroundColor3={R=46/255,G=120/255,B=226/255}
+enemyPlate1.BackgroundColor3={R=232/255,G=116/255,B=38/255}
+enemyPlate2.BackgroundColor3=enemyPlate1.BackgroundColor3
+for i=1,30 do move(1/30)end
+assert(has('AUTO BLUE')and has('Opponents 2 | teammates 1'),'Side switch retained old team')
+inputKey('F8')
+local down={}
+for _,e in ipairs(emissions)do if e[1]=='down'then down[e[2]]=true else down[e[2]]=nil end end
+assert(next(down)==nil,'Side-switch inputs were not released by F8')
+''',"click('Close')",extra='''
+local sheet=object('ScreenGui','CarSoccerMatchSheet');sheet.Parent=playerGui
+local row=object('Frame','Row1');row.Parent=sheet
+local face=object('Frame','Face');face.Parent=row
+local edge=object('Frame','TeamEdge');edge.Parent=face;edge.BackgroundTransparency=1
+local edgePaint=object('Frame','Paint');edgePaint.Parent=edge;edgePaint.BackgroundColor3={R=252/255,G=122/255,B=2/255}
+local me=object('TextLabel','Name');me.Parent=face;me.Text='Deadline_coolgun'
+local function remote(name,team,x,friend)
+ local model=object('Model',name);model.Parent=scene
+ local root=object('Part','Root');root.Parent=model;root.CFrame=frame(x);root.Position=root.CFrame.Position;model.PrimaryPart=root
+ local tag=object('BillboardGui','Nametag');tag.Parent=root;tag.Enabled=true
+ local plate=object('Frame','Plate');plate.Parent=tag
+ plate.BackgroundColor3=team==0 and {R=46/255,G=120/255,B=226/255}or{R=232/255,G=116/255,B=38/255}
+ plate.Size={Y={Scale=friend and .74 or 1}}
+ if friend then
+  local bar=object('Frame','Boost');bar.Parent=tag
+  local fill=object('Frame','Fill');fill.Parent=bar;fill.Size={X={Scale=.3}}
+ end
+ return plate
+end
+local friendPlate=remote('Friend',1,20,true)
+local enemyPlate1=remote('Enemy1',0,40,false)
+local enemyPlate2=remote('Enemy2',0,60,false)
 ''')
 
     def test_f8_stops_and_releases_during_scripted_kickoff(self):

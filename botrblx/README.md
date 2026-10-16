@@ -20,8 +20,11 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v4 ready | model self-test passed`**. Select your actual
-   **BLUE/ORANGE** team on the panel, then press **F6**.
+5. Wait for **`LOCAL v5 ready | model self-test passed`**, then press **F6**.
+   **Team: AUTO** identifies `Deadline_coolgun` from the match scoreboard and
+   cross-checks the rendered nameplate relationship. It follows team changes.
+   If the team cannot be identified, open the in-game scoreboard once. The
+   paused panel cycles **AUTO → manual BLUE → manual ORANGE → AUTO** as a fallback.
    The first start briefly tests W/A/S/D/Q/E/Shift and chooses a keyboard method
    only when Roblox observes both keydown and keyup for every key. Then it drives.
    **F6** pauses and **F8** stops and releases the inputs. Keep default controls:
@@ -138,7 +141,31 @@ and pad adapter in your private standalone script. An optional
 `--arena-profile "D:\path\profile.json"` selects a numeric profile; it does not
 change model weights or create a policy mesh input.
 
-## Multiplayer and scripted kickoff (local v4)
+## Automatic team selection (local v5)
+
+Rerun **EXPORT_LOCAL_BOT.bat after installing this update**: the previous generated
+standalone script contains the previous adapter. No model weights are downloaded
+or retrained. Wait for the **v5** badge to confirm the new script is installed.
+
+The game uses its own match teams. The new reader matches your name to the
+scoreboard row's team edge; it does not assume Roblox's `Player.Team` is the match
+team. As a fallback, the game's teammate nameplate has a shorter plate and a
+boost bar, while an opponent's does not. Agreement with its standard team color
+identifies your team even in 1v1 without a teammate. Unknown or conflicting match
+UI pauses input instead of choosing blue. Freeplay without an active match HUD
+uses blue. Manual override remains available while paused.
+
+Other cars use scoreboard identity where available, then the verified nameplate
+relationship, then recognized standard team color. Your own team changing clears
+held controls, the previous action and kickoff/recovery state before fresh poses
+are used. The panel displays the selected AUTO/MANUAL side and observed counts;
+opponents' hidden boost and flip state remain estimates.
+
+This is tested with executable Luau Roblox fixtures, including an orange 2v2
+player with one teammate and two opponents, a side change, and F8 release.
+A live JJSploit session cannot be run from this cloud environment.
+
+## Multiplayer and scripted kickoff
 
 The previous local adapter supplied only your car, the ball and known boost pads.
 It omitted every other car, even in matches with friends. Local v4 discovers
@@ -411,7 +438,7 @@ START_BOT.bat --self-check
 
 ## Scope and validation
 
-Local v4 targets standard soccer matches and freeplay, with scripted standard
+Local v5 targets standard soccer matches and freeplay, with scripted standard
 kickoffs, team-verified other-car observations and verified live boost entities.
 Rendered-pose velocities and wheel/flip state remain estimates. External bridge
 clients still target freeplay and omit other cars; they mask pads unless observed

@@ -32,6 +32,7 @@ local created={}
 local function object(class,name)
  local o={ClassName=class,Name=name or class,children={},Activated=event()}
  function o:GetDescendants()local a={} local function add(parent)for _,child in pairs(parent.children)do a[#a+1]=child;add(child)end end add(self);return a end
+ function o:GetChildren()local a={} for _,child in pairs(self.children)do a[#a+1]=child end return a end
  function o:IsA(c)return self.ClassName==c or c=='BasePart'and self.ClassName=='Part'end
  function o:FindFirstChild(n,recursive)if self.children[n]then return self.children[n]end if recursive then for _,child in pairs(self.children)do local found=child:FindFirstChild(n,true)if found then return found end end end end
  function o:FindFirstChildOfClass(c)for _,v in pairs(self.children)do if v:IsA(c)then return v end end end

@@ -41,7 +41,11 @@ function Cars:read(scene,ownRoot,ballRoot,now,pose,ball,ballRadius,ownTeam)
     self.opponents,self.teammates,self.unknown,self.boostUnknown=0,0,0,0
     for root,entry in pairs(self.tracked)do
         local plate=entry.tag:FindFirstChild("Plate")
-        local team=plate and Cars.team(plate.BackgroundColor3)
+        local relation=self.teams and Teams.relation(entry.tag)
+        local team=self.teams and self.teams:named(entry.tag)
+        local plateTeam=plate and Cars.team(plate.BackgroundColor3)
+        if team==nil and relation~=nil then team=relation and ownTeam or 1-ownTeam end
+        if team==nil then team=plateTeam end
         local visible=root~=ownRoot and root~=ballRoot and root:IsDescendantOf(scene)
             and entry.model.PrimaryPart==root and entry.tag:IsDescendantOf(root)and entry.tag.Enabled~=false
         if visible and team~=nil then
@@ -62,7 +66,7 @@ function Cars:read(scene,ownRoot,ballRoot,now,pose,ball,ballRadius,ownTeam)
                     local fill=holder and holder:FindFirstChild("Fill")
                     -- Only teammates have a source-backed boost bar. Opponent
                     -- boost/flip are explicitly estimates, not hidden state.
-                    body.boost_verified=team==ownTeam and fill~=nil
+                    body.boost_verified=team==ownTeam and fill~=nil and relation~=false
                     body.boost_estimate=body.boost_verified and math.clamp(fill.Size.X.Scale*100,0,100)or 50
                     rows[#rows+1]=body
                 else entry.lastGround=nil;entry.groundAt=nil end

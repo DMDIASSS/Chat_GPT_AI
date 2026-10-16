@@ -21,7 +21,7 @@ class MatchTests(unittest.TestCase):
     def run_lua(self,body,mock=False):
         source=(HERE/"fixtures/roblox_mock.luau").read_text() if mock else ""
         source+="\nlocal profile="+literal(PROFILE)+"\n"
-        for name in ("Arena","Cars","Kickoff"):
+        for name in ("Arena","Teams","Cars","Kickoff"):
             source+="local "+name+"=(function()\n"+(HERE.parent/"templates"/("local_"+name.lower()+".lua")).read_text()+"\nend)()\n"
         source+="local p="+literal(packet())+"\np.car.velocity={0,0,0};p.ball.velocity={0,0,0}\n"+body
         with tempfile.TemporaryDirectory() as directory:
@@ -192,6 +192,51 @@ local plate=object('Frame','Plate');plate.Parent=ownTag;plate.BackgroundColor3={
 read(0);local rows=read(.1)
 assert(#rows==5 and reader.opponents+reader.teammates==5)
 for i,row in ipairs(rows)do assert(row.position[1]==i*200,'Did not select nearest cars')end
+''',mock=True)
+
+    def test_auto_team_and_correct_two_v_two_counts_survive_side_switch(self):
+        self.run_lua(self.cars_fixture()+'''
+local teams=Teams.new(player);reader.teams=teams
+local hud=object('ScreenGui','CarSoccerMatchHud');hud.Parent=playerGui;hud.Enabled=true
+local sheet=object('ScreenGui','CarSoccerMatchSheet');sheet.Parent=playerGui
+local row=object('Frame','Row1');row.Parent=sheet
+local face=object('Frame','Face');face.Parent=row
+local edge=object('Frame','TeamEdge');edge.Parent=face;edge.BackgroundTransparency=1
+local paint=object('Frame','Paint');paint.Parent=edge;paint.BackgroundColor3={R=252/255,G=122/255,B=2/255}
+local name=object('TextLabel','Name');name.Text='Deadline_coolgun';name.Parent=face
+local _,fr,ft,fp=remote('Friend',1,20)
+fp.Size={Y={Scale=.74}}
+local boost=object('Frame','Boost');boost.Parent=ft
+local fill=object('Frame','Fill');fill.Parent=boost;fill.Size={X={Scale=.3}}
+local _,er,et,ep=remote('Enemy1',0,40);ep.Size={Y={Scale=1}}
+local _,r2,t2,p2=remote('Enemy2',0,60);p2.Size={Y={Scale=1}}
+local function sample(t)
+ local team,source=teams:detect(playerGui,scene,carRoot,t,nil)
+ assert(team==1 and source=='scoreboard: Deadline_coolgun','Own team was guessed blue')
+ return reader:read(scene,carRoot,ballRoot,t,pose,p.ball,91.25,team)
+end
+sample(0);local rows=sample(.1)
+assert(#rows==3 and reader.teammates==1 and reader.opponents==2,'2v2 roster inverted')
+paint.BackgroundColor3={R=30/255,G=155/255,B=240/255}
+fp.BackgroundColor3={R=46/255,G=120/255,B=226/255}
+ep.BackgroundColor3={R=232/255,G=116/255,B=38/255};p2.BackgroundColor3=ep.BackgroundColor3
+local team=teams:detect(playerGui,scene,carRoot,1,nil);assert(team==0,'Live team switch was not detected')
+reader:read(scene,carRoot,ballRoot,1,pose,p.ball,91.25,team)
+reader:read(scene,carRoot,ballRoot,1.1,pose,p.ball,91.25,team)
+assert(reader.teammates==1 and reader.opponents==2)
+assert(teams:detect(playerGui,scene,carRoot,2,1)==1,'Manual override failed')
+assert(teams:detect(playerGui,scene,carRoot,3,nil)==0,'Returning to AUTO failed')
+''',mock=True)
+
+    def test_nameplate_relationship_auto_detects_without_opening_scoreboard(self):
+        self.run_lua(self.cars_fixture()+'''
+local teams=Teams.new(player)
+local hud=object('ScreenGui','CarSoccerMatchHud');hud.Parent=playerGui;hud.Enabled=true
+local _,_,tag,plate=remote('Opponent',0,40);plate.Size={Y={Scale=1}}
+local team,source=teams:detect(playerGui,scene,carRoot,0,nil)
+assert(team==1 and source=='nameplate relationship','1v1 requires no teammate to infer own team')
+plate.BackgroundColor3={R=0,G=1,B=0}
+assert(teams:detect(playerGui,scene,carRoot,1,nil)==nil,'Unknown colors silently defaulted blue in a match')
 ''',mock=True)
 
 

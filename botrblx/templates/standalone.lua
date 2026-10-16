@@ -3,6 +3,7 @@
 -- LOCAL_KEYBOARD_HERE
 -- LOCAL_ARENA_HERE
 -- LOCAL_PADS_HERE
+-- LOCAL_TEAMS_HERE
 -- LOCAL_CARS_HERE
 -- LOCAL_KICKOFF_HERE
 local PROFILE=
@@ -11,10 +12,12 @@ local arenaAdapter=Arena.new(PROFILE)
 local padReader=Pads.new(PROFILE)
 local carReader=Cars.new(PROFILE,Arena)
 local kickoff=Kickoff.new(PROFILE)
-local TEAM=0
+local TEAM,manualTeam=nil,nil
 local HZ=30 -- pose sampling; policy decisions target 15 Hz (tick skip 8 at 120 Hz)
 local player=game:GetService("Players").LocalPlayer
 local pg=assert(player:FindFirstChildOfClass("PlayerGui"),"Join first")
+local teamReader=Teams.new(player)
+carReader.teams=teamReader
 assert(not pg:FindFirstChild("Update271Standalone"),"Close the old standalone panel first")
 local gui=Instance.new("ScreenGui")
 gui.Name="Update271Standalone";gui.ResetOnSpawn=false;gui.DisplayOrder=1000072
@@ -31,7 +34,7 @@ start.Position=UDim2.fromOffset(10,165);start.Size=UDim2.fromOffset(150,30)
 start.Text="Start bot / F6";start.Active=false
 local teamButton=Instance.new("TextButton",panel)
 teamButton.Position=UDim2.fromOffset(170,165);teamButton.Size=UDim2.fromOffset(140,30)
-teamButton.Text="Team: BLUE"
+teamButton.Text="Team: AUTO"
 local close=Instance.new("TextButton",panel)
 close.Position=UDim2.fromOffset(320,165);close.Size=UDim2.fromOffset(150,30);close.Text="Close"
 gui.Parent=pg
@@ -107,7 +110,9 @@ local function connect(signal,callback)
 end
 start.Activated:Connect(toggle)
 teamButton.Activated:Connect(function()
-    stop();TEAM=1-TEAM;teamButton.Text=TEAM==0 and "Team: BLUE"or "Team: ORANGE"
+    stop();manualTeam=manualTeam==nil and 0 or(manualTeam==0 and 1 or nil)
+    teamReader.at=-math.huge
+    teamButton.Text=manualTeam==nil and "Team: AUTO"or(manualTeam==0 and "Manual: BLUE"or "Manual: ORANGE")
 end)
 connect(input.InputBegan,function(key,processed)
     if key.KeyCode==Enum.KeyCode.F8 then stop("STOPPED by F8. F6 starts again.")
@@ -120,6 +125,11 @@ close.Activated:Connect(function()
     for _,connection in ipairs(connections)do connection:Disconnect()end
     gui:Destroy()
 end)
+local function teamChanged()
+    if testingKeyboard then stop("Team changed during keyboard test. F6 restarts.");return end
+    epoch=epoch+1;release();carReader.tracked={};carReader.scanAt=-math.huge
+    lastGround=true;armAt=os.clock()+.15
+end
 -- POSE_READER_HERE
 local function loadTensors()
 -- MODEL_TENSORS_HERE
@@ -157,7 +167,7 @@ task.spawn(function()
         local period=math.max(1/15,peak*1.3)
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=("Update271 LOCAL v4 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nKickoff + other cars loaded. Select your team; F6 starts.")
+        label.Text=("Update271 LOCAL v5 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nAUTO team enabled for Deadline_coolgun. F6 starts.")
             :format(peak*1000,1/period)
         local lastTick,lastDecision,lastUi=os.clock(),-math.huge,-math.huge
         local busy=false
@@ -229,8 +239,8 @@ task.spawn(function()
                 if now-lastUi>=.2 then
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=("LOCAL v4 | %.1f Hz | %s\nInfer %.1f ms | inputs %.1f ms | %s\nWant %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop")
-                        :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",table.concat(names," "),keyboard:observed(),
+                    label.Text=("LOCAL v5 | %.1f Hz | %s\nInfer %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop")
+                        :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
                             packet.car_preset or "standard",packet.car_size_verified and ""or "?",
@@ -243,4 +253,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-4"}
+return {started=true,version="local-5"}
