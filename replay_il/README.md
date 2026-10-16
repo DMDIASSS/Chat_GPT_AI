@@ -42,6 +42,8 @@ match counts by format and split. No 3v3 training is claimed without 3v3 replays
 
 1. Parse real `.replay` files with RLGym Tools/Carball. Infer missing aerial
    controls; optionally refine pitch/yaw/roll against the observed next state.
+   Use RocketSim interpolation to advance repeated car updates and hidden car
+   state; raw replay physics is reapplied at observed updates.
    Simulate each transition and reject stale, invalid or poorly reconstructed
    motion. Position, velocity and rotation fit limits are pinned in the dataset.
    Reconstruction is approximate, not recovery of authentic controller hardware.
@@ -73,6 +75,9 @@ is capped fairly per replay so the global sample limit does not silently train
 only on the first few hundred of 3,000 files. Raw histories can still take several
 GB. Parsing 3,000 replays is substantial work; progress and rejection counts print
 throughout, and errors remain in `parse_progress.json`.
+Rejected replays retain their reconstruction counts, including position,
+velocity and rotation failure counts. See `README_REPLAY_RECONSTRUCTION_FIX.md`
+if an older importer reports many failures with zero samples.
 
 ## W&B and local proof of optimization
 

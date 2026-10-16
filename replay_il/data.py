@@ -8,6 +8,17 @@ from slater_versatile_data import native_observation,valid_state
 from slater_v041_core import atomic_json,read_json,sha256,process_lock
 
 ROOT=Path(__file__).resolve().parents[1]
+def replay_frames(replay):
+    """Advance repeated physics updates and hidden car state between observations.
+
+    Raw replay car updates repeat across frames. The converter's ``none`` mode
+    freezes those poses and does not advance jump/flip/contact timers. Its
+    RocketSim mode predicts between updates, then reapplies observed physics.
+    make_rows still rejects stale frames and checks transitions/full chunks.
+    """
+    from rlgym_tools.rocket_league.replays.convert import replay_to_rlgym
+    return replay_to_rlgym(replay,interpolation='rocketsim',predict_pyr=True)
+
 def split(group):
     value=int(hashlib.sha256(('replay-il-v1:'+group).encode()).hexdigest()[:8],16)%100
     return 'train' if value<80 else 'validation' if value<90 else 'test'
@@ -82,7 +93,11 @@ def make_rows(frames,*,history=8,chunk_ticks=32,cap=1024,seed=20261016,limits=No
             fitted,accepted,errors,attempts=fit_transition(engine,s,t,raw,ticks,limits)
             stats['fit_attempts']+=attempts;stats['transitions']+=1
             if stats['transitions']%1000==0:print('RECONSTRUCT',stats['transitions'],'transitions; accepted',stats['accepted_fit'],'rejected',stats['rejected_fit'],'saved chunks',len(rows),flush=True)
-            if not accepted:clear();kickoff=None;stats['rejected_fit']+=1;continue
+            if not accepted:
+                clear();kickoff=None;stats['rejected_fit']+=1
+                for key in limits:
+                    if errors[key]>limits[key]:stats['rejected_'+key]+=1
+                continue
             stats['accepted_fit']+=1
             for key,value in errors.items():stats['max_accepted_'+key]=max(stats['max_accepted_'+key],value)
             if kickoff is None and np.linalg.norm(s.ball.position[:2])<1 and np.linalg.norm(s.ball.linear_velocity)<1 and all(c.on_ground and np.linalg.norm(c.physics.linear_velocity)<2 and abs(c.physics.position[1])>2300 for c in s.cars.values()):
@@ -157,7 +172,6 @@ def prepare(inputs,out,**kwargs):
 
 def _prepare(inputs,out,*,max_replays=3000,per_replay=1024,max_samples=500000):
     from rlgym_tools.rocket_league.replays.parsed_replay import ParsedReplay
-    from rlgym_tools.rocket_league.replays.convert import replay_to_rlgym
     from importlib.metadata import version
     if not 1<=max_replays<=100000 or not 16<=per_replay<=4096 or not 100<=max_samples<=2000000:raise ValueError('Invalid replay/data budget')
     out=Path(out).resolve()
@@ -170,12 +184,15 @@ def _prepare(inputs,out,*,max_replays=3000,per_replay=1024,max_samples=500000):
     out.mkdir(parents=True,exist_ok=True)
     cap=min(per_replay,max(16,max_samples//len(paths)))
     config={'history':8,'chunk_ticks':32,'per_replay':cap,'max_samples':max_samples,'observations':'raw_no_pretrained_encoder',
-            'code':sha256(__file__),'rlgym_tools':version('rlgym-tools'),'fit_limits':{'position':40.,'velocity':180.,'rotation':.3}}
+            'code':sha256(__file__),'rlgym_tools':version('rlgym-tools'),'interpolation':'rocketsim',
+            'fit_limits':{'position':40.,'velocity':180.,'rotation':.3}}
+    print('RECONSTRUCTION: RocketSim interpolation; transition and full-chunk quality checks enabled',flush=True)
     records=[];errors=[];seen=set();samples=0
     for index,path in enumerate(paths,1):
         if (out/'pause.flag').exists():raise RuntimeError('Replay preparation paused; completed replay shards are cached. Start again to resume.')
         print('REPLAY_PARSE_BEGIN',index,'/',len(paths),path.name,flush=True)
         digest=sha256(path);shard=out/'shards'/(digest+'.npz');meta=shard.with_suffix('.json')
+        reconstruction=None
         try:
             prior=read_json(meta)
             if prior and prior['config']==config and prior['sha256']==sha256(shard):record=prior
@@ -184,8 +201,9 @@ def _prepare(inputs,out,*,max_replays=3000,per_replay=1024,max_samples=500000):
                 original=str(replay.metadata.get('game',{}).get('id') or digest)
                 group=hashlib.sha256(original.encode()).hexdigest()
                 if group in seen:continue
-                frames=replay_to_rlgym(replay,interpolation='none',predict_pyr=True)
+                frames=replay_frames(replay)
                 rows,book,stats=make_rows(frames,cap=cap,seed=int(digest[:8],16))
+                reconstruction=stats
                 if not rows:raise ValueError('No contiguous, forward-verified action chunks')
                 shard.parent.mkdir(parents=True,exist_ok=True)
                 tmp=shard.with_suffix('.partial')
@@ -200,7 +218,11 @@ def _prepare(inputs,out,*,max_replays=3000,per_replay=1024,max_samples=500000):
                 atomic_json(meta,record)
             if record['group'] in seen:continue
             seen.add(record['group']);records.append(record);samples+=record['samples']
-        except Exception as error:errors.append({'file':path.name,'error':str(error)[:300]})
+        except Exception as error:
+            detail={'file':path.name,'error':str(error)[:300]}
+            if reconstruction is not None:detail['reconstruction']=reconstruction
+            errors.append(detail)
+            print('REPLAY_REJECT',path.name,detail['error'],flush=True)
         atomic_json(out/'parse_progress.json',{'completed':index,'total':len(paths),'samples':samples,'errors':errors})
         print('REPLAY_PARSE',index,'/',len(paths),'samples',samples,'errors',len(errors),flush=True)
         if samples>=max_samples:break
