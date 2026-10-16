@@ -14,13 +14,14 @@ is no file exchange, HTTP request, or Python process during driving.
    with the project's existing Python, exports all policy weights at float32
    precision, and installs **`botrblx_standalone.lua`** in the saved JJSploit
    workspace. Wait for **`READY STANDALONE`**. You can then close CMD.
-4. In freeplay, execute:
+4. In standard soccer or freeplay, execute:
 
    ```lua
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v3 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v4 ready | model self-test passed`**. Select your actual
+   **BLUE/ORANGE** team on the panel, then press **F6**.
    The first start briefly tests W/A/S/D/Q/E/Shift and chooses a keyboard method
    only when Roblox observes both keydown and keyup for every key. Then it drives.
    **F6** pauses and **F8** stops and releases the inputs. Keep default controls:
@@ -37,8 +38,8 @@ The panel reports inference time, executor input-call time, actual decisions per
 second, the keyboard method, requested keys, and keyboard keys Roblox actually
 sees. Requested keys alone are not proof that an executor delivered them.
 It targets 15 decisions/second and samples
-poses at up to 30 Hz. Startup runs eight saved PyTorch reference cases (including
-live-pad entity inputs) and refuses
+poses at up to 30 Hz. Startup runs twelve saved PyTorch reference cases (including
+live-pad and other-car entity inputs) and refuses
 to drive if local logits/actions differ or inference exceeds 200 ms. F8, focus
 loss, chat, invalid poses, missing boost HUD, and errors release owned inputs.
 Goal/reset waits resume after valid car/ball poses return.
@@ -55,8 +56,8 @@ input was sent during cloud validation.
 This version also fixes the float attention mask: unavailable boost pads now
 receive **-10000**, rather than **+1**, in the Python bridge. Local mode omits
 those masked rows, which is checked against the complete PyTorch observation.
-Neither change retrains the model. Other cars are still omitted. Start with
-freeplay when judging the improvement.
+Neither change retrains the model. Local v4 also supplies observed opponents and
+teammates through the actor's existing car entity features, as described below.
 
 Local mode requires `mouse1press`, `mouse1release`, `mouse2press`, `mouse2release`,
 and Roblox's buffer API. Keyboard v2 first tests normal Roblox enum key events;
@@ -136,6 +137,50 @@ After updating this folder, **rerun `EXPORT_LOCAL_BOT.bat`** to embed the geomet
 and pad adapter in your private standalone script. An optional
 `--arena-profile "D:\path\profile.json"` selects a numeric profile; it does not
 change model weights or create a policy mesh input.
+
+## Multiplayer and scripted kickoff (local v4)
+
+The previous local adapter supplied only your car, the ball and known boost pads.
+It omitted every other car, even in matches with friends. Local v4 discovers
+other rendered car roots through their `Nametag` billboards, reads team identity
+from the team-colored `Plate`, and samples position, orientation, linear velocity
+and angular velocity. Chassis paint, props and effects do not identify players.
+Up to five nearby cars reach the policy as separate car entities, with the same
+team rotation and coordinate normalization as your car. The panel reports
+**Opponents / teammates / unknown**; the first two counts are the cars actually
+included in that decision. Allow about half a second for discovery and a second
+pose sample. Removed, hidden, teleported and newly respawned cars are excluded
+until a fresh, valid pair of poses is available. Unknown team colors are excluded.
+Names hidden by the game and nonstandard game modes can limit discovery.
+
+Teammate boost comes from the rendered nameplate's boost fill when present.
+Opponent boost has no corresponding HUD bar, so the actor receives an explicitly
+estimated 50%, not a claimed measurement. Other cars' wheel contact and flip
+availability remain estimates; spent flips cannot be recovered reliably from
+rendered poses alone. More cars increase inference cost; use the panel's timing
+on your PC to assess this. This supplies missing observations without retraining
+271 or promising that it will make good decisions against every opponent.
+
+Kickoff detection requires a stationary ball at its measured center/rest height,
+a grounded car at one of the five standard kickoff spawns, and a car facing the
+ball. It holds neutral while confirming that state. The dedicated match HUD
+countdown keeps inputs neutral until the countdown ends. When that HUD is absent,
+the script starts driving/boosting but starts its jump timing only when the car
+actually moves. It steers toward the ball and can use one bounded front flip
+when aligned and fast enough, with explicit jump release between presses.
+It yields to an observed closer teammate or the standard left-goes tie priority.
+
+The policy takes over when the ball moves, the car approaches it, or the bounded
+kickoff timer expires. This is a generic scripted kickoff, not a trained speedflip
+or a guarantee of winning the first touch. The panel labels the active kickoff
+phase. **F8**, pause, focus loss and invalid poses release inputs and reset the
+routine. The model receives the actual scripted keys as its previous action on
+handoff. Normal play around a centered ball away from a kickoff spawn does not
+activate the routine.
+
+After replacing this folder, **rerun `EXPORT_LOCAL_BOT.bat`**, close the old panel,
+and execute the newly exported `botrblx_standalone.lua`. Merely replacing this
+folder does not update a script already running in Roblox.
 
 ## External bridge modes (fallback)
 
@@ -366,9 +411,11 @@ START_BOT.bat --self-check
 
 ## Scope and validation
 
-This adapter currently targets freeplay. Rendered-pose velocities and wheel/flip
-state are estimates. Other cars are omitted. Local v3 supplies verified live boost
-entities; external bridge modes still mask pads unless observed pad data is sent.
+Local v4 targets standard soccer matches and freeplay, with scripted standard
+kickoffs, team-verified other-car observations and verified live boost entities.
+Rendered-pose velocities and wheel/flip state remain estimates. External bridge
+clients still target freeplay and omit other cars; they mask pads unless observed
+pad data is sent.
 WASD couples controller axes. These limits
 can affect policy performance compared with Rocket League or the browser
 extension; this is not a claim of equivalent match strength.

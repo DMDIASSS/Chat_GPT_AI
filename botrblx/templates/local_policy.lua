@@ -78,7 +78,7 @@ function Policy.new(tensors)
     return function(query,entities)
         -- Unknown pads remain omitted. Verified live pads use the existing
         -- boost entity fields; no new/untrained feature slots are introduced.
-        assert(#query==32 and #entities>=2 and #entities<=36,"Expected query/self/ball/known pads")
+        assert(#query==32 and #entities>=2 and #entities<=41,"Expected query/self/ball/known pads/other cars")
         local x=dense(q1,dense(q0,query,true),true)
         local kv={}
         local count=#entities
@@ -147,6 +147,18 @@ function Policy.observe(packet,previous,hasFlip)
         for j=1,3 do row[5+j]=pad.position[j]end
         row[21]=pad.is_big and 1 or .12
         row[22]=pad.active and 1 or 0 -- Matches update271's original Nexto builder.
+        kv[#kv+1]=row
+    end
+    for i,body in ipairs(packet.other_cars or {})do
+        assert(i<=5 and(body.team==0 or body.team==1),"Unverified other car/team")
+        local row=table.create(24,0);row[body.team==0 and 2 or 3]=1
+        for j=1,3 do
+            row[5+j]=body.position[j];row[8+j]=body.velocity[j]
+            row[11+j]=body.forward[j];row[14+j]=body.up[j];row[17+j]=body.angular_velocity[j]
+        end
+        assert(type(body.boost_estimate)=="number"and body.boost_estimate>=0 and body.boost_estimate<=100,"Invalid other-car boost")
+        row[21]=body.boost_estimate/100;row[23]=body.ground_estimate and 1 or 0
+        row[24]=body.flip_estimate and 1 or 0
         kv[#kv+1]=row
     end
     for _,row in ipairs(kv)do

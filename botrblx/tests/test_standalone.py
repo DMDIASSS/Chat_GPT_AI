@@ -72,9 +72,13 @@ print('PARITY_OK',#cases)
                     yaw=float(rng.uniform(-np.pi,np.pi))
                     p["car"]["forward"]=[float(np.sin(yaw)),float(np.cos(yaw)),0]
                     previous=bridge.lookup_table()[int(rng.integers(90))]
-                    q,kv,_=bridge.observations(p,previous,not ground)
+                    p["other_cars"]=[dict(p["car"],position=rng.uniform(-3000,3000,3).tolist(),
+                        team=i%2,boost_estimate=i*20,ground_estimate=bool(i%2),flip_estimate=bool(i%3))
+                        for i in range(5)]
+                    p["boost_pads"]=[dict(position=[111,222,73],active=True,is_big=True)]
+                    q,kv,mask=bridge.observations(p,previous,not ground)
                     cases.append(dict(packet=p,previous=previous.tolist(),flip=not ground,
-                                      q=q[0,0].tolist(),kv=kv[0,:2].tolist()))
+                                      q=q[0,0].tolist(),kv=kv[0,mask[0]==0].tolist()))
         mapping=[]
         for ground in (True,False):
             for action in bridge.lookup_table():
@@ -135,7 +139,7 @@ task.wait=function(dt)move(dt)end
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-3')
+assert(result.version=='local-4')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -172,6 +176,61 @@ end
 assert(found,'Missing input error was not visible')
 click('Close')
 ''',extra="\nmouse2press=nil\n")
+
+    def test_rendered_opponent_reaches_live_policy_and_panel_then_is_removed(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,40 do move(1/30)end
+local function panelHas(text)
+ for _,o in ipairs(created)do if o.Text and string.find(o.Text,text,1,true)then return true end end
+ return false
+end
+assert(panelHas('Opponents 1 | teammates 0'),'Live policy omitted rendered opponent')
+plate.BackgroundColor3={R=46/255,G=120/255,B=226/255}
+for i=1,15 do move(1/30)end
+assert(panelHas('Opponents 0 | teammates 1'),'Team change did not update observation')
+enemy.Parent=nil
+for i=1,15 do move(1/30)end
+assert(panelHas('Opponents 0 | teammates 0'),'Removed car remained in live observation')
+''',"click('Close')",extra='''
+local enemy=object('Model','Enemy');enemy.Parent=scene
+local root=object('Part','Root');root.Parent=enemy;root.CFrame=frame(50);root.Position=root.CFrame.Position
+enemy.PrimaryPart=root
+local tag=object('BillboardGui','Nametag');tag.Parent=root;tag.Enabled=true
+local plate=object('Frame','Plate');plate.Parent=tag;plate.BackgroundColor3={R=232/255,G=116/255,B=38/255}
+''')
+
+    def test_f8_stops_and_releases_during_scripted_kickoff(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,35 do move(1/30)end
+local found=false
+for _,o in ipairs(created)do if o.Text and string.find(o.Text,'kickoff:',1,true)then found=true end end
+assert(found,'Scripted kickoff did not take control')
+local down={}
+for _,e in ipairs(emissions)do if e[1]=='down'then down[e[2]]=true else down[e[2]]=nil end end
+assert(down[0x57]and down.LMB,'Kickoff did not use verified W and boost')
+inputKey('F8');local n=#emissions
+for i=1,10 do move(1/30)end
+assert(#emissions==n,'Kickoff continued after F8')
+''','''
+local down={}
+for _,e in ipairs(emissions)do if e[1]=='down'then down[e[2]]=true else down[e[2]]=nil end end
+assert(next(down)==nil,'Kickoff inputs remained held')
+click('Close')
+''',extra='''
+local function kickoffFrame(x,y,z)
+ local f=frame(x);f.Position=Vector3.new(x,z,y);f.LookVector=Vector3.new(0,0,1)
+ f.ToObjectSpace=function()return {ToAxisAngle=function()return Vector3.new(0,1,0),0 end}end
+ return f
+end
+move=function(dt)
+ now=now+dt
+ carRoot.CFrame=kickoffFrame(0,-460.8,1.7);carRoot.Position=carRoot.CFrame.Position
+ ballRoot.CFrame=kickoffFrame(0,0,9.315);ballRoot.Position=ballRoot.CFrame.Position
+ carAnchor.Position=carRoot.Position;ballAnchor.Position=ballRoot.Position
+ beat:Fire()
+end
+task.wait=function(dt)move(dt)end
+''')
 
     def test_f8_during_executor_press_cannot_leave_a_late_key_down(self):
         self.client_case('''

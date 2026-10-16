@@ -84,8 +84,11 @@ def vec(value):
 
 def observations(packet, previous, has_flip):
     car, ball = packet["car"], packet["ball"]
-    kv = np.zeros((36, 24), dtype=np.float32)
-    mask = np.zeros(36, dtype=np.float32)
+    others = packet.get("other_cars", [])
+    if not isinstance(others,list) or len(others)>5:
+        raise ValueError("Expected up to five observed other cars")
+    kv = np.zeros((36+len(others), 24), dtype=np.float32)
+    mask = np.zeros(36+len(others), dtype=np.float32)
     kv[0, :3] = (1, 1, 0) if packet["team"] == 0 else (1, 0, 1)
     kv[1, 3] = 1
     for row, body in ((0, car), (1, ball)):
@@ -97,13 +100,13 @@ def observations(packet, previous, has_flip):
     if not math.isfinite(boost) or not 0 <= boost <= 100:
         raise ValueError("Numeric boost HUD value is required")
     kv[0, 20:24] = [boost / 100, 0, bool(packet["ground_estimate"]), has_flip]
-    kv[2:, 4], kv[2:, 5:8] = 1, PADS
-    kv[2:, 20] = np.where(PADS[:, 2] > 72, 1, .12)
+    kv[2:36, 4], kv[2:36, 5:8] = 1, PADS
+    kv[2:36, 20] = np.where(PADS[:, 2] > 72, 1, .12)
     # Pad availability is NOT observable from the supplied recordings.
     # Mask these entities instead of inventing 34 active-pad states.
     # This TorchScript attention adds the float mask to attention logits.
     # +1 would INCREASE attention to unknown pads; a large negative hides them.
-    mask[2:] = -10000
+    mask[2:36] = -10000
     pads = packet.get("boost_pads", [])
     if not isinstance(pads,list) or len(pads)>34:
         raise ValueError("Expected up to 34 observed boost pads")
@@ -114,6 +117,16 @@ def observations(packet, previous, has_flip):
         kv[i,20]=1 if pad["is_big"] else .12
         kv[i,21]=pad["active"]
         mask[i]=0
+    for i,body in enumerate(others,36):
+        if type(body.get("team")) is not int or body["team"] not in (0,1):
+            raise ValueError("Other-car team must be identified")
+        value=float(body["boost_estimate"])
+        if not math.isfinite(value) or not 0<=value<=100:
+            raise ValueError("Invalid other-car boost estimate")
+        kv[i,1+body["team"]]=1
+        for start,field in ((5,"position"),(8,"velocity"),(11,"forward"),(14,"up"),(17,"angular_velocity")):
+            kv[i,start:start+3]=vec(body[field])
+        kv[i,20:24]=[value/100,0,bool(body["ground_estimate"]),bool(body["flip_estimate"])]
     if packet["team"] == 1:
         kv[:, 5:20] *= np.tile([-1, -1, 1], 5)
         kv[:, [1, 2]] = kv[:, [2, 1]]

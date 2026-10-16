@@ -122,7 +122,7 @@ close.Activated:Connect(function()
     if sampler then sampler:Disconnect()end
     if token then task.spawn(function()pcall(send,{enabled=false,valid=false})end)end
 end)
-local arenaAdapter,padReader -- Standalone mode supplies measured geometry/pads.
+local arenaAdapter,padReader,carReader -- Standalone mode supplies geometry/pads/other cars.
 -- POSE_READER_BEGIN (also embedded by the standalone exporter)
 local scene,car,ball,carRoot,ballRoot,lastCar,lastBall,lastTime
 local function nearest(anchor,excluded)
@@ -209,6 +209,11 @@ local function read()
     if padReader then
         packet.boost_pads=padReader:read(scene,cp.position,now)
         packet.boost_known=padReader.known;packet.boost_total=padReader.total
+    end
+    if carReader then
+        packet.other_cars=carReader:read(scene,carRoot,ballRoot,now,pose,bp,ballRadius,TEAM)
+        packet.opponents=carReader.opponents;packet.teammates=carReader.teammates
+        packet.unknown_cars=carReader.unknown
     end
     return packet
 end

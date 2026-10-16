@@ -3,10 +3,14 @@
 -- LOCAL_KEYBOARD_HERE
 -- LOCAL_ARENA_HERE
 -- LOCAL_PADS_HERE
+-- LOCAL_CARS_HERE
+-- LOCAL_KICKOFF_HERE
 local PROFILE=
 -- ARENA_PROFILE_HERE
 local arenaAdapter=Arena.new(PROFILE)
 local padReader=Pads.new(PROFILE)
+local carReader=Cars.new(PROFILE,Arena)
+local kickoff=Kickoff.new(PROFILE)
 local TEAM=0
 local HZ=30 -- pose sampling; policy decisions target 15 Hz (tick skip 8 at 120 Hz)
 local player=game:GetService("Players").LocalPlayer
@@ -15,21 +19,21 @@ assert(not pg:FindFirstChild("Update271Standalone"),"Close the old standalone pa
 local gui=Instance.new("ScreenGui")
 gui.Name="Update271Standalone";gui.ResetOnSpawn=false;gui.DisplayOrder=1000072
 local panel=Instance.new("Frame",gui)
-panel.Size=UDim2.fromOffset(440,180);panel.Position=UDim2.fromOffset(20,20)
+panel.Size=UDim2.fromOffset(480,200);panel.Position=UDim2.fromOffset(20,20)
 panel.BackgroundColor3=Color3.fromRGB(18,22,30)
 local label=Instance.new("TextLabel",panel)
-label.Position=UDim2.fromOffset(10,8);label.Size=UDim2.new(1,-20,0,125)
+label.Position=UDim2.fromOffset(10,8);label.Size=UDim2.new(1,-20,0,150)
 label.BackgroundTransparency=1;label.TextColor3=Color3.new(1,1,1)
 label.TextSize=14;label.Font=Enum.Font.Code;label.TextWrapped=true
 label.Text="Update271 LOCAL: loading private model..."
 local start=Instance.new("TextButton",panel)
-start.Position=UDim2.fromOffset(10,140);start.Size=UDim2.fromOffset(150,30)
+start.Position=UDim2.fromOffset(10,165);start.Size=UDim2.fromOffset(150,30)
 start.Text="Start bot / F6";start.Active=false
 local teamButton=Instance.new("TextButton",panel)
-teamButton.Position=UDim2.fromOffset(170,140);teamButton.Size=UDim2.fromOffset(140,30)
+teamButton.Position=UDim2.fromOffset(170,165);teamButton.Size=UDim2.fromOffset(140,30)
 teamButton.Text="Team: BLUE"
 local close=Instance.new("TextButton",panel)
-close.Position=UDim2.fromOffset(320,140);close.Size=UDim2.fromOffset(110,30);close.Text="Close"
+close.Position=UDim2.fromOffset(320,165);close.Size=UDim2.fromOffset(150,30);close.Text="Close"
 gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
@@ -60,6 +64,7 @@ local function release()
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
     keyboard:release()
     arenaAdapter:resetRecovery()
+    kickoff:reset()
 end
 local function controls()
     start.Visible=not enabled and not testingKeyboard
@@ -152,7 +157,7 @@ task.spawn(function()
         local period=math.max(1/15,peak*1.3)
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=("Update271 LOCAL v3 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nArena profile loaded. F6 tests keys and starts.")
+        label.Text=("Update271 LOCAL v4 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nKickoff + other cars loaded. Select your team; F6 starts.")
             :format(peak*1000,1/period)
         local lastTick,lastDecision,lastUi=os.clock(),-math.huge,-math.huge
         local busy=false
@@ -175,7 +180,9 @@ task.spawn(function()
                 if not packet then
                     release();label.Text="LOCAL waiting: "..tostring(reason);return
                 end
-                if now-lastDecision<period then return end
+                local override,recovery=kickoff:step(packet,now,pg)
+                local decisionPeriod=override and 1/30 or period
+                if now-lastDecision<decisionPeriod then return end
                 lastDecision=now
                 local decisionEpoch=epoch
                 local began=os.clock()
@@ -183,10 +190,14 @@ task.spawn(function()
                 if ground and(not lastGround or previous[6]==0)then jumpAt=nil;usedFlip=false end
                 lastGround=ground
                 local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<1.45))
-                local query,entities=Policy.observe(packet,previous,hasFlip)
-                local index=predict(query,entities)
-                local override,recovery=arenaAdapter:recovery(packet,previous,now)
-                local wanted,actual=Policy.keys(override or actions[index],ground)
+                local action=override
+                if not action then
+                    local query,entities=Policy.observe(packet,previous,hasFlip)
+                    local index=predict(query,entities)
+                    action,recovery=arenaAdapter:recovery(packet,previous,now)
+                    action=action or actions[index]
+                end
+                local wanted,actual=Policy.keys(action,ground)
                 local inferenceMs=(os.clock()-began)*1000
                 assert(inferenceMs<200,"Local inference exceeded 200ms")
                 -- Recheck before pressing: executor calls and prediction can yield.
@@ -218,8 +229,9 @@ task.spawn(function()
                 if now-lastUi>=.2 then
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=("LOCAL v3 | %.1f Hz | %s\nInfer %.1f ms | inputs %.1f ms | %s\nWant %s | seen %s\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop")
+                    label.Text=("LOCAL v4 | %.1f Hz | %s\nInfer %.1f ms | inputs %.1f ms | %s\nWant %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",table.concat(names," "),keyboard:observed(),
+                            packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
                             packet.car_preset or "standard",packet.car_size_verified and ""or "?",
                             packet.ball_radius or PROFILE.physics.BALL_RADIUS,packet.ball_size_verified and ""or "?",packet.wheel_contacts or 0)
@@ -231,4 +243,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-3"}
+return {started=true,version="local-4"}

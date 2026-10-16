@@ -59,6 +59,11 @@ def test_observations():
                        "angular_velocity":rng.uniform(-3,3,3).tolist()}}
             previous=lookup_table()[int(rng.integers(90))]
             result.append(observations(p,previous,not ground))
+            p["other_cars"]=[dict(p["car"],position=[-600+i*500,1600-i*400,17],
+                velocity=[250,-450,0],forward=[0,-1,0],angular_velocity=[0,0,.5],
+                team=i%2,boost_estimate=50 if i%2!=team else 24,ground_estimate=True,flip_estimate=True)
+                for i in range(5)]
+            result.append(observations(p,previous,not ground))
             # Exercise variable entity counts, availability and big/small fields.
             p["boost_pads"]=[{"position":[float(x),float(y),73 if i%2 else 70],
                 "is_big":bool(i%2),"active":bool(i%3)}
@@ -140,6 +145,8 @@ def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None):
     keyboard=(app_dir/"templates/local_keyboard.lua").read_text(encoding="utf-8")
     arena=(app_dir/"templates/local_arena.lua").read_text(encoding="utf-8")
     pads=(app_dir/"templates/local_pads.lua").read_text(encoding="utf-8")
+    cars=(app_dir/"templates/local_cars.lua").read_text(encoding="utf-8")
+    kickoff=(app_dir/"templates/local_kickoff.lua").read_text(encoding="utf-8")
     if profile is None:profile=load_arena_profile(app_dir/"arena_profile.json")
     client=(app_dir/"client271.lua").read_text(encoding="utf-8")
     pose=client.split("-- POSE_READER_BEGIN",1)[1].partition("\n")[2].split("-- POSE_READER_END",1)[0]
@@ -148,6 +155,8 @@ def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None):
             .replace("-- LOCAL_KEYBOARD_HERE", "local Keyboard=(function()\n"+keyboard+"\nend)()")
             .replace("-- LOCAL_ARENA_HERE", "local Arena=(function()\n"+arena+"\nend)()")
             .replace("-- LOCAL_PADS_HERE", "local Pads=(function()\n"+pads+"\nend)()")
+            .replace("-- LOCAL_CARS_HERE", "local Cars=(function()\n"+cars+"\nend)()")
+            .replace("-- LOCAL_KICKOFF_HERE", "local Kickoff=(function()\n"+kickoff+"\nend)()")
             .replace("-- ARENA_PROFILE_HERE",literal(profile))
             .replace("-- MODEL_TENSORS_HERE",tensor_source(tensors))
             .replace("-- MODEL_CASES_HERE",literal(cases))
