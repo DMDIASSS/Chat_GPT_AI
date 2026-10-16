@@ -1,5 +1,13 @@
 # Export the replay-only model to RLBot v4
 
+If an existing export crashes with `Arena boost layout differs from the training
+observation contract` on DFH Stadium: stop the match/close RLBot, extract the
+boost-fix source update into the project, then run `FIX_REPLAY_RLBOT.bat`. It
+patches the existing `ReplayScratch01` folder and refreshes its integrity hashes;
+weights and tokens are preserved. Restart RLBot and select the same `bot.cfg`.
+The pad mapping now uses X/Y positions while retaining canonical training heights.
+For another export folder, pass `--folder "full\path\to\export"` to the fix BAT.
+
 Extract this small source update into your existing `E:\Downloads\Chat_GPT_AI`.
 It adds a compatible exporter; the older 271/Nexto exporter cannot load this
 temporal action-chunk architecture.

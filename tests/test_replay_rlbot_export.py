@@ -34,14 +34,18 @@ def packet_fixture(state):
 
 
 @pytest.mark.parametrize('players',[2,4,6])
-def test_rlbot_packet_observations_match_training_for_both_teams_and_pad_order(model_book,players):
+@pytest.mark.parametrize('anchor_height',[None,0.])
+def test_rlbot_packet_observations_match_training_for_both_teams_and_pad_order(model_book,players,anchor_height):
     model,book=model_book;state=state_fixture(players)
     for i,car in enumerate(state.cars.values()):
         car.physics.euler_angles=np.array([.2*i,.8*i,-.3*i],np.float32)
         car.physics.angular_velocity=np.array([.3,-.2,.8],np.float32)
         car.boost_amount=30+i*5;car.has_flipped=False;car.has_double_jumped=False;car.air_time_since_jump=0.
     state.boost_pad_timers[::3]=2.
-    packet,field=packet_fixture(state);observer=PacketObserver(field);planner=RuntimePlanner(model,book,candidates=2)
+    packet,field=packet_fixture(state)
+    if anchor_height is not None:
+        for pad in field.boost_pads:pad.location.z=anchor_height
+    observer=PacketObserver(field);planner=RuntimePlanner(model,book,candidates=2)
     previous=np.array([1,.2,0,.1,0,0,1,0],np.float32)
     try:
         for index in (0,players-1):
@@ -49,6 +53,15 @@ def test_rlbot_packet_observations_match_training_for_both_teams_and_pad_order(m
             actual=observer.observe(packet,index,previous);expected=planner.observation(state,{ours:previous},ours)
             for a,b in zip(actual,expected):np.testing.assert_allclose(a,b,atol=2e-6,rtol=0)
     finally:planner.close()
+
+
+def test_boost_matching_still_rejects_duplicate_or_wrong_xy_positions():
+    _,field=packet_fixture(state_fixture())
+    field.boost_pads[0].location.x+=100
+    with pytest.raises(ValueError,match='X/Y layout'):PacketObserver(field)
+    _,field=packet_fixture(state_fixture())
+    field.boost_pads[0].location=field.boost_pads[1].location
+    with pytest.raises(ValueError,match='X/Y layout'):PacketObserver(field)
 
 
 def test_chunk_clock_keeps_edges_previous_controls_and_does_not_fabricate_missed_history():
@@ -86,6 +99,7 @@ def test_complete_export_reloads_model_in_isolated_folder_and_preserves_source(t
     # A separate interpreter gets only the exported folder, not project imports.
     # Only RLBot's external BaseAgent/controller interface is stubbed.
     packet,field=packet_fixture(state_fixture())
+    for pad in field.boost_pads:pad.location.z=0.
     payload=json.dumps({'packet':packet,'field':field},default=lambda v:v.item() if isinstance(v,np.generic) else vars(v))
     (target/'fixture.json').write_text(payload)
     script='''
@@ -106,6 +120,31 @@ assert 'replay_il' not in sys.modules and 'RocketSim' not in sys.modules
 print('SELF_CONTAINED_EXPORT_OK')
 '''
     env=os.environ.copy();env['PYTHONPATH']=''
+    # Reproduce the shipped 3D-height rejection, then repair this very export.
+    core=target/'replay_rlbot_core.py';fixed=core.read_text()
+    old=fixed.replace('np.asarray(BOOST_LOCATIONS)[:,None,:2]-pads[None,:,:2]',
+                      'np.asarray(BOOST_LOCATIONS)[:,None]-pads[None,:]')
+    assert old!=fixed;core.write_text(old)
+    metadata=json.loads((target/'EXPORT_INFO.json').read_text());metadata['runtime_sha256'][core.name]=sha256(core)
+    atomic_json(target/'EXPORT_INFO.json',metadata)
+    broken=subprocess.run([sys.executable,'-c',script],cwd=target,env=env,text=True,capture_output=True,timeout=30)
+    assert broken.returncode!=0 and 'boost X/Y layout' in broken.stderr
+    protected={p:sha256(target/p) for p in ('policy.pt','tokens.npy')}
+    from repair_replay_rlbot import repair
+    repair(target);repair(target) # Repair is repeatable and never re-exports weights.
+    assert {p:sha256(target/p) for p in protected}==protected
+    assert (target/'replay_rlbot_core.py.before_boost_xy_fix').read_text()==old
     result=subprocess.run([sys.executable,'-c',script],cwd=target,env=env,text=True,capture_output=True,timeout=30)
     assert result.returncode==0,result.stdout+result.stderr
     assert 'SELF_CONTAINED_EXPORT_OK' in result.stdout
+
+
+def test_repair_refuses_tampered_exports_before_writing(tmp_path):
+    from repair_replay_rlbot import repair,RUNTIME_FILES
+    for name in RUNTIME_FILES:(tmp_path/name).write_bytes(b'original')
+    metadata={'format':'replay-chunk-rlbot-v4-v1','runtime_sha256':{n:sha256(tmp_path/n) for n in RUNTIME_FILES}}
+    atomic_json(tmp_path/'EXPORT_INFO.json',metadata)
+    (tmp_path/'tokens.npy').write_bytes(b'changed')
+    before={p:sha256(p) for p in tmp_path.iterdir()}
+    with pytest.raises(ValueError,match='Export file changed'):repair(tmp_path)
+    assert {p:sha256(p) for p in tmp_path.iterdir()}==before

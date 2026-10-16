@@ -23,10 +23,14 @@ class PacketObserver:
     def __init__(self,field):
         pads=np.array([vector(field.boost_pads[i].location) for i in range(field.num_boosts)])
         if pads.shape!=(34,3):raise ValueError('Replay export requires standard Soccar with 34 boost pads')
-        distances=np.linalg.norm(np.asarray(BOOST_LOCATIONS)[:,None]-pads[None,:],axis=-1)
+        # FieldInfo reports pickup anchors at different heights from the legacy
+        # training features. Identify pads on the field plane; keep canonical
+        # training Z coordinates inside the builder, not packet anchor heights.
+        distances=np.linalg.norm(np.asarray(BOOST_LOCATIONS)[:,None,:2]-pads[None,:,:2],axis=-1)
         self.pad_order=distances.argmin(1)
         if len(set(self.pad_order))!=34 or distances[np.arange(34),self.pad_order].max()>10:
-            raise ValueError('Arena boost layout differs from the training observation contract')
+            raise ValueError('Arena boost X/Y layout differs from the training observation contract')
+        self.pad_xy_error=float(distances[np.arange(34),self.pad_order].max())
         self.builder=NextoObsBuilder(n_players=6,tick_skip=8);self.jumps={}
 
     def reset(self):self.jumps.clear()
