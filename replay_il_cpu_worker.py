@@ -13,7 +13,7 @@ def main():
     os.dup2(sys.stderr.fileno(),sys.stdout.fileno())
     import numpy as np
     from rlgym.rocket_league.sim import RocketSimEngine
-    from replay_il_forecast import controls,compile_controls,advance_branch
+    from replay_il_forecast import controls,compile_controls,advance_branch,native_encoded
     from replay_il_pipe import read_frame,write_frame
     engine=RocketSimEngine(rlbot_delay=False);branches=[];book=plans=None
     write_frame(output,{'status':'ready','pid':os.getpid(),'torch_loaded':'torch' in sys.modules})
@@ -25,6 +25,9 @@ def main():
                 command=message['command']
                 if command=='book':
                     book=np.asarray(message['book'],np.float32);plans=compile_controls(book)
+                    if message.get('fast_snapshot'):
+                        from replay_il_snapshot import encoded as snapshot
+                    else:snapshot=native_encoded
                     write_frame(output,{'status':'ok'})
                 elif command=='prepare':
                     initial=message['state'];ours=message['ours'];sign=message['sign']
@@ -45,7 +48,7 @@ def main():
                         engine.set_state(branch['state'],{})
                         branch.update(cars=engine._cars,arena=engine._arena,last=None)
                         for aid,value in opponent_controls.items():engine._cars[aid].set_controls(value)
-                        rows,steps=advance_branch(branch,ours,book,count,ordered,sign,plans);calls+=steps
+                        rows,steps=advance_branch(branch,ours,book,count,ordered,sign,plans,snapshot);calls+=steps
                         snapshots.extend((branch['index'],row,action) for _,row,action in rows)
                         if message['retain_state'] and branch['goal'] is None:
                             engine._tick_count=branch['tick'];branch['state']=engine._get_state()

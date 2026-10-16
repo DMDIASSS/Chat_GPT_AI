@@ -70,7 +70,7 @@ def advance_batch(active,ours,commands):
     return len(boundaries)-1
 
 
-def advance_branch(branch,ours,book,count,ordered,sign,plans=None):
+def advance_branch(branch,ours,book,count,ordered,sign,plans=None,snapshot=native_encoded):
     """One worker owns one arena for a chunk; no per-tick task scheduling."""
     from rlgym.rocket_league.common_values import GOAL_THRESHOLD
     commands=book[branch['token']];snapshots=[];steps=0
@@ -90,7 +90,7 @@ def advance_branch(branch,ours,book,count,ordered,sign,plans=None):
                 if command is not None:branch['cars'][ours].set_controls(command)
                 branch['arena'].step(min(right,len(part))-left);steps+=1
         branch['tick']+=len(part)
-        row=native_encoded(branch['arena'],branch['cars'],ordered)
+        row=snapshot(branch['arena'],branch['cars'],ordered)
         snapshots.append((branch,row,part[-1].copy()))
         if abs(row[38])>GOAL_THRESHOLD:
             branch['goal']=1. if sign*row[38]>0 else -1.;break

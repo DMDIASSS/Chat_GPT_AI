@@ -20,21 +20,35 @@ class NativeBatchPlanner(RuntimePlanner):
     planner. This preserves its reset semantics while removing per-tick Python
     stepping, most GameState boxing, and branch deepcopy calls.
     """
-    def __init__(self,*args,workers=1,stepping="compact",network='original',**kwargs):
+    def __init__(self,model,*args,workers=1,stepping="compact",network='original',**kwargs):
         setup_started=time.perf_counter()
         if not 1<=workers<=16 or stepping not in ("compact","workers","multi_step","processes"):raise ValueError("Invalid native stepping configuration")
         if stepping=='processes' and workers>8:raise ValueError('CPU forecast processes must be 1..8')
         if stepping=='compact' and workers!=1:raise ValueError('Compact stepping uses one arena; use --stepping workers for multiple workers')
         self.workers=workers;self.stepping=stepping
-        if network not in ('original','optimized','frozen'):raise ValueError('Network must be original, optimized or frozen')
+        if network not in ('original','optimized','frozen','turbo','cuda-graphs'):raise ValueError('Invalid inference network')
         self.network=network
-        super().__init__(*args,**kwargs)
+        if network=='cuda-graphs' and (next(model.parameters()).device.type!='cuda' or not torch.cuda.is_available()):
+            raise ValueError('CUDA graphs require the model on an available CUDA device')
+        super().__init__(model,*args,**kwargs)
         self.inference_kernel=None
         if network!='original':
             from replay_il_inference import InferenceKernel,freeze_kernel
-            self.inference_kernel=InferenceKernel(self.model)
-            if network=='frozen':self.inference_kernel=freeze_kernel(self.inference_kernel)
+            if network in ('turbo','cuda-graphs'):
+                from replay_il_turbo import TurboKernel
+                self.inference_kernel=TurboKernel(self.model)
+            else:self.inference_kernel=InferenceKernel(self.model)
+            if network in ('frozen','turbo','cuda-graphs'):self.inference_kernel=freeze_kernel(self.inference_kernel)
+        self.graph_features=None;self.capture_graphs=False
+        if network=='cuda-graphs':
+            from replay_il_turbo import GraphFeatures
+            self.graph_features=GraphFeatures(self.inference_kernel,self.device,
+                self.model.history+self.candidates*((self.horizon+7)//8),self.model.history)
         self.control_plans=compile_controls(self.book) if network!='original' else None
+        self.snapshot=native_encoded
+        if network in ('turbo','cuda-graphs'):
+            from replay_il_snapshot import encoded
+            self.snapshot=encoded
         if stepping=='multi_step' and not callable(getattr(rs.Arena,'multi_step',None)):
             raise ValueError('Installed RocketSim lacks native multi_step; use workers stepping instead')
         self._pool=ThreadPoolExecutor(max_workers=workers) if stepping=="workers" and workers>1 else None
@@ -42,12 +56,25 @@ class NativeBatchPlanner(RuntimePlanner):
         self.process_pool=None
         if stepping=='processes':
             from replay_il_processes import ForecastProcesses
-            self.process_pool=ForecastProcesses(self.book,min(workers,self.candidates))
+            self.process_pool=ForecastProcesses(self.book,min(workers,self.candidates),fast_snapshot=network in ('turbo','cuda-graphs'))
         self.network_setup_ms=(time.perf_counter()-setup_started)*1000
     def encode_features(self,observations):
         return super().encode_features(observations) if self.inference_kernel is None else self.inference_kernel.encode(observations)
     def decode_features(self,features):
         return super().decode_features(features) if self.inference_kernel is None else self.inference_kernel.decode(features)
+    def begin(self):
+        super().begin()
+        if self.graph_features is not None:self.graph_features.begin(allow_capture=self.capture_graphs)
+    def infer_batch(self,histories):
+        if self.graph_features is None:return super().infer_batch(histories)
+        result=self.graph_features.infer(histories)
+        self.encoded_observations=self.graph_features.count
+        return result
+    def warmup(self,*args,**kwargs):
+        """Capture supported shapes before play; irregular game shapes stay eager."""
+        self.capture_graphs=True
+        try:return self.choose(*args,**kwargs)
+        finally:self.capture_graphs=False
     def _reset_boundary(self,branch,initial):
         e=self.engine;e._arena=branch['arena'];e._cars=branch['cars']
         e._agent_ids={car.id:aid for aid,car in e._cars.items()}
@@ -151,7 +178,7 @@ class NativeBatchPlanner(RuntimePlanner):
                         branch['cars']=dict(self.engine._cars);branch['last']=None
                         for aid,car in branch['cars'].items():
                             if aid!=ours:car.set_controls(controls(branch['previous'][aid]))
-                        rows,steps=advance_branch(branch,ours,self.book,min(chunk,self.horizon-start),ordered,sign,self.control_plans)
+                        rows,steps=advance_branch(branch,ours,self.book,min(chunk,self.horizon-start),ordered,sign,self.control_plans,self.snapshot)
                         snapshots.extend(rows);native_steps+=steps
                         if start+chunk<self.horizon and branch['goal'] is None:
                             self.engine._tick_count=branch['tick']
@@ -160,7 +187,7 @@ class NativeBatchPlanner(RuntimePlanner):
                             branch['state']=self.engine._get_state()
                 elif self.stepping=='workers':
                     active=[b for b in branches if b['goal'] is None]
-                    tasks=[(b,ours,self.book,min(chunk,self.horizon-start),ordered,sign,self.control_plans) for b in active]
+                    tasks=[(b,ours,self.book,min(chunk,self.horizon-start),ordered,sign,self.control_plans,self.snapshot) for b in active]
                     if self._pool is None:
                         outcomes=[advance_branch(*args) for args in tasks]
                     else:
@@ -211,9 +238,11 @@ class NativeBatchPlanner(RuntimePlanner):
                 'horizon_seconds':self.horizon/120,'latency_ms':elapsed*1000,'maximum_decisions_per_second':1/max(elapsed,1e-9),
                 'execute_first_ticks':8,'device':str(self.device),'encoded_observations':self.encoded_observations,
                 'native_step_calls':native_steps,'phase_ms':phases,'network':self.network,
+                'cuda_graphs':self.graph_features.report() if self.graph_features is not None else None,
                 'opponents':'last observed controls held; future human inputs are unknown','records':records}
         finally:self.engine._arena=self._base_arena
     def close(self):
+        if self.graph_features is not None:self.graph_features.close()
         if self.process_pool is not None:self.process_pool.close()
         if self._pool is not None:self._pool.shutdown(wait=True)
         self.engine._arena=self._base_arena;self.engine._cars={};self._native_arenas.clear();super().close()
@@ -270,7 +299,7 @@ def compare_records(reference,native,tolerance=1e-4):
 
 def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
               repeats=3,warmups=1,candidate_counts=(4,16,64),compare_reference=True,team_size=1,
-              network='original',compare_native=False,compare_compact=False):
+              network='original',compare_native=False,compare_compact=False,compare_frozen=False):
     """Measure the actual checkpoint, retaining the full horizon in both paths."""
     from pathlib import Path
     import platform,importlib.metadata
@@ -286,7 +315,7 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
     if stepping=='processes' and workers>8:raise ValueError('CPU forecast processes must be 1..8')
     if compare_compact and stepping!='processes':raise ValueError('Compact comparison requires process stepping')
     if stepping=='compact' and workers!=1:raise ValueError('Compact stepping uses one arena; use --stepping workers for multiple workers')
-    if network not in ('original','optimized','frozen'):raise ValueError('Network must be original, optimized or frozen')
+    if network not in ('original','optimized','frozen','turbo','cuda-graphs'):raise ValueError('Invalid inference network')
     if not candidate_counts or any(not 1<=c<=64 for c in candidate_counts):
         raise ValueError('Candidates must be 1..64')
     target=resolve_device(device);torch.set_num_threads(threads);folder=Path(folder).resolve()
@@ -309,7 +338,8 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
         try:
             cold=None
             for index in range(warmups):
-                _,report=choose(state,previous,ours)
+                warmup=planner.warmup if getattr(planner,'graph_features',None) is not None else choose
+                _,report=warmup(state,previous,ours)
                 if index==0:cold=report['latency_ms']
             samples=[];phase_samples=[]
             for _ in range(repeats):
@@ -366,6 +396,10 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
             if network!='original' and compare_native:
                 planner=NativeBatchPlanner(model,book,candidates=count,workers=workers,stepping=stepping)
                 native_original_report,native_original_summary=measure(planner,planner.choose,'native-'+stepping+'-original')
+            frozen_report=frozen_summary=None
+            if compare_frozen and network not in ('original','optimized','frozen'):
+                planner=NativeBatchPlanner(model,book,candidates=count,workers=workers,stepping=stepping,network='frozen')
+                frozen_report,frozen_summary=measure(planner,planner.choose,'native-'+stepping+'-frozen')
             planner=NativeBatchPlanner(model,book,candidates=count,workers=workers,stepping=stepping,network=network)
             label='native-'+stepping+('-'+network if network!='original' else '')
             report,summary=measure(planner,planner.choose,label)
@@ -375,6 +409,8 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
                 compare(native_original_report,native_original_summary,report,summary,'NATIVE NETWORK')
             if compact_report is not None:
                 compare(compact_report,compact_summary,report,summary,'COMPACT VS MULTICORE')
+            if frozen_report is not None:
+                compare(frozen_report,frozen_summary,report,summary,'FROZEN VS TURBO')
     finally:engine.close()
     recommended={}
     for count in sorted({row['candidates'] for row in results if row['mode']=='search'}):
@@ -409,7 +445,8 @@ def main(argv=None):
     parser.add_argument('--workers',type=int,default=1,help='Simulation workers, independent of Torch threads')
     parser.add_argument('--stepping',choices=('compact','workers','multi_step','processes'),default='compact')
     parser.add_argument('--compare-compact',action='store_true',help='Compare multicore forecasts with the preceding compact backend')
-    parser.add_argument('--network',choices=('original','optimized','frozen'),default='frozen')
+    parser.add_argument('--network',choices=('original','optimized','frozen','turbo','cuda-graphs'),default='frozen')
+    parser.add_argument('--compare-frozen',action='store_true',help='Compare the preceding frozen network with turbo/CUDA graphs')
     parser.add_argument('--skip-native-comparison',action='store_true',help='Skip timing the preceding native network')
     parser.add_argument('--team-size',type=int,choices=(1,2,3),default=1)
     parser.add_argument('--repeats',type=int,default=3);parser.add_argument('--warmups',type=int,default=1)
@@ -421,7 +458,7 @@ def main(argv=None):
     report=benchmark(folder,device=args.device,threads=args.threads,workers=args.workers,stepping=args.stepping,
         team_size=args.team_size,repeats=args.repeats,warmups=args.warmups,candidate_counts=args.candidates,
         compare_reference=not args.skip_reference,network=args.network,compare_native=not args.skip_native_comparison,
-        compare_compact=args.compare_compact)
+        compare_compact=args.compare_compact,compare_frozen=args.compare_frozen)
     output=folder/('native_runtime_multicore_benchmark.json' if args.stepping=='processes' else 'native_runtime_v2_benchmark.json')
     atomic_json(output,report)
     print('REPORT:',output,flush=True)

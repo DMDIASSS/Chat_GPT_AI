@@ -92,3 +92,7 @@ median / 313 ms p95**, versus **190 ms median / 446 ms p95** with four processes
 Forecast scores and selected action matched. The median improved while the tail
 regressed; this is not evidence of a reliable deadline improvement. The report
 therefore recommended compact for that budget. No 67 ms result is claimed.
+
+The optional [turbo tuner](README_REPLAY_TURBO.md) adds packed temporal kernels,
+bounded CUDA graphs and automatic worker comparisons against this frozen backend.
+Run `REPLAY_IL_TURBO_BENCHMARK.bat` to measure those paths on the target PC.

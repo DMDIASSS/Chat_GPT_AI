@@ -12,7 +12,7 @@ from replay_il_pipe import read_frame,write_frame
 
 
 class ForecastProcesses:
-    def __init__(self,book,workers):
+    def __init__(self,book,workers,fast_snapshot=False):
         if not 1<=workers<=8:raise ValueError('Forecast processes must be 1..8')
         self.processes=[];self.logs=[];self.log_threads=[];self.log_locks=[]
         self.closed=False;self.executor=ThreadPoolExecutor(max_workers=workers);self.groups=None
@@ -32,7 +32,7 @@ class ForecastProcesses:
             if any(row.get('status')!='ready' or row.get('torch_loaded') for row in ready):
                 raise RuntimeError('CPU forecast worker startup failed or unexpectedly imported Torch')
             self.worker_info=ready
-            self._request([{'command':'book','book':book} for _ in self.processes],30.)
+            self._request([{'command':'book','book':book,'fast_snapshot':fast_snapshot} for _ in self.processes],30.)
         except BaseException:
             self.close();raise
 
