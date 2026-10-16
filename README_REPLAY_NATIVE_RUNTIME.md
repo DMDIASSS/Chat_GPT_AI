@@ -1,4 +1,4 @@
-# Native replay planner optimization v2
+# Native replay planner optimization v2.1
 
 Extract this source-only update into **E:\Downloads\Chat_GPT_AI**, replacing the
 included runtime files. It uses the existing project, Python environment and
@@ -20,6 +20,33 @@ data\isolated\replay_imitation\runs\replay_scratch01\native_runtime_v2_benchmark
 Use `--run NAME` for a different existing run. Explicit `--device cuda` fails if
 CUDA is unavailable; `--device auto` selects the available device. The report
 records the actual device, checkpoint and vocabulary hashes.
+
+## v2.1 comparison/reporting hotfix
+
+The preceding comparator matched candidate lists by position. FP32 kernel
+roundoff can change the ordering of close initial logits, so the same candidates
+could be incorrectly rejected with `Native/reference candidate order differs`.
+The comparator now matches branches by token and records whether their ordering
+changed. The planner's candidate selection, inference and scoring are unchanged.
+
+A changed candidate set, different final selected token, duplicate/missing
+records, nonfinite values or errors above the existing tolerance still fail.
+Actual mismatches are saved with per-token diagnostics and both sets of records.
+The report is written before the launcher exits nonzero; failed paths are
+excluded from recommendations. `validation_status` distinguishes `passed`,
+`failed` and `not_checked`. Recommendations also state their forecast parity.
+
+To recheck just the failing budget:
+
+```bat
+REPLAY_IL_NATIVE_BENCHMARK.bat --device cuda --skip-reference --candidates 64 --repeats 5
+```
+
+Your latest GPU run measured 12 candidates at **51.63 ms median / 52.75 ms p95**,
+with its forecast comparison passing. The 64-candidate frozen timing was
+**214.57 ms median / 250.57 ms p95** and its comparison stopped at the order
+check, so its forecast parity was not established. These are limited kickoff
+timings; 12 candidates is the largest tested budget that met 66.7 ms in that run.
 
 ## Changes from v1
 
@@ -53,8 +80,9 @@ budgets help locate the largest measured search fitting 66.7 ms. They are
 explicitly labeled; fewer candidates are not assumed equally strong.
 
 For every budget, the default also times the preceding native network and checks
-candidate order, scores, values, uncertainty and the selected token. A mismatch
-above `1e-4` or a changed selection stops with an error. `--skip-reference` skips
+candidate sets, scores, values, uncertainty and the selected token, matching
+records by token. A mismatch above `1e-4` or a changed selection is recorded as
+a failure; the launcher exits nonzero after saving all results. `--skip-reference` skips
 only the older Python reference timing; the native comparison still runs.
 Without that flag, the Python reference is measured and compared as well.
 `--skip-native-comparison` disables the extra native comparison explicitly.

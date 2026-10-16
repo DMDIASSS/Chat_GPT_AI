@@ -285,19 +285,53 @@ class NativeBatchPlanner(RuntimePlanner):
         self.engine._arena=self._base_arena;self.engine._cars={};self._native_arenas.clear();super().close()
 
 
+class ForecastParityError(ValueError):
+    """A real comparison failure, with reportable diagnostics."""
+    def __init__(self,message,details=None):
+        super().__init__(message);self.details=details or {}
+
+
 def compare_records(reference,native,tolerance=1e-4):
-    """Fail visibly if an optimized forecast changes the measured decision."""
-    if reference['candidates']!=native['candidates'] or len(reference['records'])!=len(native['records']):
-        raise ValueError('Native/reference candidate counts differ')
-    errors=[]
-    for left,right in zip(reference['records'],native['records']):
-        if left['token']!=right['token']:raise ValueError('Native/reference candidate order differs')
-        errors.extend(abs(left[key]-right[key]) for key in ('score','value','uncertainty'))
-    error=float(np.max(errors)) if errors else 0.
-    same=reference['selected']['token']==native['selected']['token']
-    if not np.isfinite(error) or error>tolerance or not same:
-        raise ValueError(f'Forecast parity failed: max score/value error {error:.6g}, same selected token {same}')
-    return {'same_selected_token':same,'maximum_absolute_error':error,'tolerance':tolerance}
+    """Match branches by token; list order is not part of forecast parity.
+
+    FP32 kernel roundoff can reorder close policy logits. A different set of
+    candidates, changed selected token or excessive score/value errors still
+    fails. Nothing is rounded or reordered in the actual planner.
+    """
+    left=reference['records'];right=native['records']
+    if reference['candidates']!=native['candidates'] or any(
+            len(rows)!=report['candidates'] for rows,report in ((left,reference),(right,native))):
+        raise ForecastParityError('Forecast parity failed: candidate counts differ',
+            {'reference_candidates':reference['candidates'],'native_candidates':native['candidates'],
+             'reference_record_count':len(left),'native_record_count':len(right)})
+    by_left={row['token']:row for row in left};by_right={row['token']:row for row in right}
+    if len(by_left)!=len(left) or len(by_right)!=len(right):
+        raise ForecastParityError('Forecast parity failed: duplicate candidate tokens')
+    common=sorted(by_left.keys()&by_right.keys());errors=[];nonfinite=[];worst=None
+    for token in common:
+        for key in ('score','value','uncertainty'):
+            a=float(by_left[token][key]);b=float(by_right[token][key])
+            if not np.isfinite(a) or not np.isfinite(b):
+                nonfinite.append({'token':token,'field':key});continue
+            error=abs(a-b);errors.append(error)
+            if worst is None or error>worst['absolute_error']:
+                worst={'token':token,'field':key,'absolute_error':error,'reference':a,'native':b}
+    error=max(errors,default=0.)
+    details={'same_candidate_set':by_left.keys()==by_right.keys(),
+        'candidate_order_changed':[row['token'] for row in left]!=[row['token'] for row in right],
+        'reference_only_tokens':sorted(by_left.keys()-by_right.keys()),
+        'native_only_tokens':sorted(by_right.keys()-by_left.keys()),'matched_candidates':len(common),
+        'same_selected_token':reference['selected']['token']==native['selected']['token'],
+        'maximum_absolute_error':error if not nonfinite else None,'tolerance':tolerance,
+        'nonfinite_fields':nonfinite,'worst_difference':worst}
+    if not details['same_candidate_set']:
+        raise ForecastParityError('Forecast parity failed: candidate sets differ',details)
+    if reference['selected']['token'] not in by_left or native['selected']['token'] not in by_right:
+        raise ForecastParityError('Forecast parity failed: selected token is absent from candidates',details)
+    if nonfinite or error>tolerance or not details['same_selected_token']:
+        raise ForecastParityError(f'Forecast parity failed: max score/value error {details["maximum_absolute_error"]}, '
+                                  f'same selected token {details["same_selected_token"]}',details)
+    return details
 
 
 def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
@@ -360,6 +394,26 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
             return report,summary
         finally:planner.close()
 
+    def compare(reference_report,reference_summary,native_report,native_summary,prefix):
+        result={'candidates':native_summary['candidates'],'reference_backend':reference_summary['backend'],
+                'native_backend':native_summary['backend'],
+                'median_speedup':reference_summary['latency_median_ms']/native_summary['latency_median_ms']}
+        try:
+            result.update(status='passed',parity=compare_records(reference_report,native_report))
+            # A second comparison cannot clear a failure from the first one.
+            if native_summary.get('forecast_parity')!='failed':native_summary['forecast_parity']='passed'
+            reordered=result['parity']['candidate_order_changed']
+            print(prefix,'PARITY OK | candidates',result['candidates'],'| speedup',round(result['median_speedup'],2),
+                  'x | reordered candidates:',reordered,flush=True)
+        except ForecastParityError as error:
+            result.update(status='failed',error=str(error),parity=error.details,
+                reference_records=reference_report['records'],native_records=native_report['records'],
+                reference_selected=reference_report['selected'],native_selected=native_report['selected'])
+            native_summary['forecast_parity']='failed'
+            print(prefix,'PARITY FAILED | candidates',result['candidates'],'|',error,
+                  '| diagnostics will be saved in the report',flush=True)
+        comparisons.append(result)
+
     try:
         policy=RuntimePlanner(model,book,candidates=1)
         measure(policy,policy.choose_policy,'policy')
@@ -376,30 +430,28 @@ def benchmark(folder,*,device='auto',threads=2,workers=1,stepping='compact',
             label='native-'+stepping+('-'+network if network!='original' else '')
             report,summary=measure(planner,planner.choose,label)
             if reference_report is not None:
-                parity=compare_records(reference_report,report)
-                ratio=reference_summary['latency_median_ms']/summary['latency_median_ms']
-                comparisons.append({'candidates':summary['candidates'],'parity':parity,'median_speedup':ratio})
-                print('PARITY OK | candidates',summary['candidates'],'| speedup',round(ratio,2),'x',flush=True)
+                compare(reference_report,reference_summary,report,summary,'REFERENCE')
             if native_original_report is not None:
-                parity=compare_records(native_original_report,report)
-                ratio=native_original_summary['latency_median_ms']/summary['latency_median_ms']
-                comparisons.append({'candidates':summary['candidates'],'reference_backend':'native-'+stepping+'-original',
-                                    'parity':parity,'median_speedup':ratio})
-                print('NATIVE NETWORK PARITY OK | candidates',summary['candidates'],'| speedup',round(ratio,2),'x',flush=True)
+                compare(native_original_report,native_original_summary,report,summary,'NATIVE NETWORK')
     finally:engine.close()
     recommended={}
     for count in sorted({row['candidates'] for row in results if row['mode']=='search'}):
-        rows=[row for row in results if row['mode']=='search' and row['candidates']==count]
+        rows=[row for row in results if row['mode']=='search' and row['candidates']==count
+              and row.get('forecast_parity')!='failed']
+        if not rows:continue
         fastest=min(rows,key=lambda row:row['latency_p95_ms'])
         recommended[str(count)]={'backend':fastest['backend'],'p95_ms':fastest['latency_p95_ms'],
-                                 'meets_deadline':fastest['meets_deadline_p95']}
-    return {'schema':'replay-il-native-runtime-v2','checkpoint_sha256':sha256(folder/'best.pt'),
+                                 'meets_deadline':fastest['meets_deadline_p95'],
+                                 'forecast_parity':fastest.get('forecast_parity','not_checked')}
+    validation='failed' if any(row['status']=='failed' for row in comparisons) else 'passed' if comparisons else 'not_checked'
+    return {'schema':'replay-il-native-runtime-v2.1','checkpoint_sha256':sha256(folder/'best.pt'),
         'book_sha256':sha256(folder/'tokens.npy'),'device':str(target),'requested_device':device,
         'device_name':torch.cuda.get_device_name(target) if target.type=='cuda' else platform.processor() or 'CPU',
         'cuda_available':torch.cuda.is_available(),'torch':torch.__version__,'rocketsim':importlib.metadata.version('rocketsim'),
         'threads':threads,'workers':workers,'stepping':stepping,'network':network,'format':f'{team_size}v{team_size}',
         'seed':271,'kickoff_positions':{str(aid):car.physics.position.tolist() for aid,car in state.cars.items()},
-        'results':results,'comparisons':comparisons,'recommended_backend_by_candidates':recommended,'training_modified':False,
+        'results':results,'comparisons':comparisons,'validation_status':validation,
+        'recommended_backend_by_candidates':recommended,'training_modified':False,
         'note':'Warmed kickoff-state latency, not match strength or a playable adapter. Simulation runs on CPU. '
                'Workers stepping includes Python scheduling and feature extraction; it is not an all-C++ GigaLearn port.'}
 
@@ -428,6 +480,9 @@ def main(argv=None):
         compare_reference=not args.skip_reference,network=args.network,compare_native=not args.skip_native_comparison)
     output=folder/'native_runtime_v2_benchmark.json';atomic_json(output,report)
     print('REPORT:',output,flush=True)
+    if report['validation_status']=='failed':
+        raise ValueError('Forecast parity failed. Timings and candidate diagnostics were saved in the report above; '
+                         'failed backends are excluded from recommendations.')
     print('Inference benchmark complete. Your trained model and training code are unchanged.',flush=True)
 
 

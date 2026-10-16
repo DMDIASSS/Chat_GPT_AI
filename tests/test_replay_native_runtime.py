@@ -102,7 +102,7 @@ def test_native_search_matches_reference_scores_and_survives_repeated_calls(mode
     finally:reference.close();native.close()
 
 
-def test_native_benchmark_loads_checkpoint_compares_forecasts_and_preserves_training(tmp_path,model_book):
+def test_native_benchmark_loads_checkpoint_compares_forecasts_and_preserves_training(tmp_path,model_book,monkeypatch):
     from pathlib import Path
     from slater_v041_core import sha256,atomic_json
     model,book=model_book
@@ -113,11 +113,19 @@ def test_native_benchmark_loads_checkpoint_compares_forecasts_and_preserves_trai
     root=Path(__file__).resolve().parents[1]
     paths=list((root/'replay_il').glob('*.py'))+list(tmp_path.iterdir())
     before={path:sha256(path) for path in paths}
+    original_choose=NativeBatchPlanner.choose
+    def reordered_choose(self,*args,**kwargs):
+        actions,report=original_choose(self,*args,**kwargs)
+        if self.network=='frozen':report['records']=list(reversed(report['records']))
+        return actions,report
+    monkeypatch.setattr(NativeBatchPlanner,'choose',reordered_choose)
     report=benchmark(tmp_path,device='cpu',candidate_counts=[2],repeats=2,warmups=1,
                      network='frozen',compare_native=True)
     assert report['checkpoint_sha256']==before[tmp_path/'best.pt']
     assert {r['backend'] for r in report['results']}=={'policy','reference','native-compact-original','native-compact-frozen'}
     assert report['comparisons'][0]['parity']['same_selected_token']
+    assert report['comparisons'][0]['parity']['candidate_order_changed']
+    assert report['validation_status']=='passed'
     assert report['comparisons'][0]['median_speedup']>0
     recommended=report['recommended_backend_by_candidates']['2']
     searches=[row for row in report['results'] if row['mode']=='search']
@@ -138,6 +146,63 @@ def test_forecast_comparison_rejects_changed_actions_and_scores():
         with pytest.raises(ValueError,match='parity failed'):compare_records(reference,changed)
     changed=copy.deepcopy(reference);changed['selected']['token']=2
     with pytest.raises(ValueError,match='parity failed'):compare_records(reference,changed)
+
+
+def test_comparison_matches_tokens_and_rejects_set_changes_duplicates_and_changed_selection():
+    from replay_il_native_runtime import ForecastParityError
+    reference={'candidates':2,'selected':{'token':7},'records':[
+        {'token':7,'score':.9,'value':.8,'uncertainty':.1},
+        {'token':3,'score':.2,'value':.4,'uncertainty':.2}]}
+    reordered=copy.deepcopy(reference);reordered['records'].reverse()
+    parity=compare_records(reference,reordered)
+    assert parity['same_candidate_set'] and parity['candidate_order_changed']
+    assert parity['matched_candidates']==2 and parity['maximum_absolute_error']==0
+    changed=copy.deepcopy(reordered);changed['records'][0]['value']+=.1
+    with pytest.raises(ForecastParityError) as error:compare_records(reference,changed)
+    assert error.value.details['worst_difference']['token']==3
+    assert error.value.details['worst_difference']['field']=='value'
+    changed=copy.deepcopy(reordered);changed['records'][0]['token']=11
+    with pytest.raises(ForecastParityError,match='sets differ') as error:compare_records(reference,changed)
+    assert error.value.details['reference_only_tokens']==[3]
+    assert error.value.details['native_only_tokens']==[11]
+    changed=copy.deepcopy(reordered);changed['records'][0]['token']=7
+    with pytest.raises(ForecastParityError,match='duplicate'):compare_records(reference,changed)
+    changed=copy.deepcopy(reordered);changed['selected']['token']=3
+    with pytest.raises(ForecastParityError) as error:compare_records(reference,changed)
+    assert not error.value.details['same_selected_token']
+    changed=copy.deepcopy(reordered);changed['records'].pop()
+    with pytest.raises(ForecastParityError,match='counts differ'):compare_records(reference,changed)
+
+
+def test_failed_comparison_keeps_results_saves_report_and_excludes_failed_backend(tmp_path,model_book,monkeypatch):
+    import json
+    import replay_il_native_runtime as runtime
+    from slater_v041_core import sha256,atomic_json
+    model,book=model_book
+    torch.save({'config':model.config,'model':model.state_dict()},tmp_path/'best.pt')
+    np.save(tmp_path/'tokens.npy',book)
+    atomic_json(tmp_path/'selected.json',{'sha256':sha256(tmp_path/'best.pt')})
+    atomic_json(tmp_path/'tokenizer.json',{'book_sha256':sha256(tmp_path/'tokens.npy')})
+    original_choose=NativeBatchPlanner.choose
+    def changed_choose(self,*args,**kwargs):
+        actions,report=original_choose(self,*args,**kwargs)
+        if self.network=='frozen':report['records'][0]['value']+=.25
+        return actions,report
+    monkeypatch.setattr(NativeBatchPlanner,'choose',changed_choose)
+    report=benchmark(tmp_path,device='cpu',candidate_counts=[2],repeats=1,warmups=1,
+                     network='frozen',compare_native=True,compare_reference=False)
+    assert report['validation_status']=='failed'
+    failure=report['comparisons'][0]
+    assert failure['status']=='failed' and len(failure['native_records'])==len(failure['reference_records'])==2
+    assert report['recommended_backend_by_candidates']['2']['backend']=='native-compact-original'
+    assert len(report['results'])==3 and all(row['latency_median_ms']>0 for row in report['results'])
+    monkeypatch.setattr(runtime,'benchmark',lambda *args,**kwargs:report)
+    monkeypatch.setattr(runtime,'__file__',str(tmp_path/'replay_il_native_runtime.py'))
+    with pytest.raises(ValueError,match='were saved'):runtime.main(['--run','failure_report'])
+    output=tmp_path/'data/isolated/replay_imitation/runs/failure_report/native_runtime_v2_benchmark.json'
+    saved=json.loads(output.read_text())
+    assert saved['validation_status']=='failed' and saved['results']==report['results']
+    assert saved['comparisons']==report['comparisons']
 
 
 @pytest.mark.parametrize('count',[1,7,9,24,31,32])
