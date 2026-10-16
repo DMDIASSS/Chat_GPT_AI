@@ -21,6 +21,8 @@ with sync_playwright() as p:
             if(m.command==='fun-toggle')window.state.fun[m.effect]=!window.state.fun[m.effect];
             if(['fun-stop','disable'].includes(m.command))for(const k of ['glue','boost','jumps','speed'])window.state.fun[k]=false;
             if(m.command==='fun-speed')window.state.fun.speedLimit=m.speed;
+            if(m.command==='fun-friends')window.state.fun.allowFriends=m.allowed;
+            if(m.command==='fun-connect')window.state.fun.connected=true;
             window.state.fun.enabled=['glue','boost','jumps','speed'].some(k=>window.state.fun[k]);
             window.pushStatus();
           });
@@ -45,6 +47,15 @@ with sync_playwright() as p:
             page.evaluate('window.state.fun.available=false;window.state.fun.reason="Host the room first";window.pushStatus()')
             page.wait_for_function('document.querySelector("[data-fun-effect=boost]").disabled')
             assert 'Host the room first' in page.locator('.gct4-fun-status').inner_text()
+            page.evaluate('Object.assign(window.state.fun,{available:true,reason:"",hosting:true,joined:false,allowFriends:false});window.pushStatus()')
+            page.locator('#gct4-fun-friends').click()
+            page.wait_for_function('window.state.fun.allowFriends')
+            assert page.locator('#gct4-fun-friends').get_attribute('aria-pressed')=='true'
+            assert not page.locator('#gct4-fun-connect').is_visible()
+            page.evaluate('Object.assign(window.state.fun,{hosting:false,joined:true,connected:false});window.pushStatus()')
+            page.locator('#gct4-fun-connect').click()
+            page.wait_for_function('window.state.fun.connected')
+            assert not page.locator('#gct4-fun-friends').is_visible()
         assert not errors,errors
         print('PASS:',host,'fun panel scope, toggles/actions, speed setting, minimized F8, restore and unavailable-state controls')
         page.close()

@@ -1,7 +1,10 @@
-CAR SOCCER + TURBALL AI TRAINER 4.5.0
+CAR SOCCER + TURBALL AI TRAINER 4.5.1
 ===================================
 
 NEW: Car Soccer fun controls. Read FUN_CONTROLS.md for keys and host/local scope.
+4.5.1 fixes steering with effects enabled and adds friend-hosted controls.
+Both players update; the host enables "Allow friend controls", then the joining
+player clicks "Connect to friend's host". The friend keeps hosting normally.
 TAS playback and minimize/restore are retained; see TAS_README.md.
 For an existing installation, replace files INSIDE your existing extension
 directory and click Reload in chrome://extensions. Keep private .bin files.
@@ -31,7 +34,7 @@ The patchers must NOT be interchanged: each targets different minified code.
 INSTALLATION
 1. Extract the ZIP. Do not load the ZIP itself.
 2. In Chrome, open chrome://extensions and enable Developer mode.
-3. Choose "Load unpacked" and select Car_Turball_Auto_Trainer_v4.5.0,
+3. Choose "Load unpacked" and select Car_Turball_Auto_Trainer_v4.5.1,
    the directory containing manifest.json.
 4. Disable/remove the previous separate AI trainer extensions before
    using this one; multiple extensions trying to patch the same page can

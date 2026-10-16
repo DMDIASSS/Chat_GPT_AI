@@ -1,4 +1,7 @@
-# Car Soccer fun controls — 4.5.0
+# Car Soccer fun controls — 4.5.1
+
+This update fixes left/right steering and powersliding with continuous effects.
+It also adds friend-hosted control with both players running this update.
 
 Copy this update's files **inside your existing unpacked extension directory**,
 keeping private model binaries, then click **Reload** on `chrome://extensions`
@@ -27,15 +30,29 @@ during match countdowns/goal pauses and resumes during active play.
 
 ## Playing with friends
 
-These effects run in **local Free Play/offline play or a room you host**. Create
-the room yourself and have your friends join it. Car Soccer makes its host
-authoritative: edits to that host's native physics are included in the game's
-usual match snapshots. The panel reports **room host** or **local play**.
+Your friend can keep hosting for their better connection:
 
-If you joined somebody else's room, the controls are disabled with a host
-message. Editing a joined client's predicted snapshot would be overwritten by
-the real host. This tool does not claim to bypass that authority or change the
-server/network protocol. Both teams are supported; join a team before use.
+1. **Both players install 4.5.1**, reload the extension, and reload Car Soccer.
+2. The host opens **Fun controls · Car Soccer** and switches **Allow friend
+   controls** to **ON**. Hosting and driving continue normally.
+3. You join a team, open your fun panel, and click **Connect to friend’s host**.
+4. Use the same effect buttons or keys. The host applies effects to **your car**,
+   and your client mirrors the acknowledged effects for prediction.
+
+The shared ball actions use your team when choosing the opponent goal. One
+friend can own the effects at a time; host controls take ownership back. Other
+players keep their ordinary boost and car physics. Both teams are supported.
+
+**The host needs this update and must enable the option.** Unmodified hosts
+overwrite client-only physics changes. This mode uses the existing reliable
+peer connection and native message validation; it does not remove that authority.
+Extension frames are consumed before normal chat on updated peers. A connection
+attempt to an unmodified host may appear as one encoded chat message.
+
+Host **F8**, focus loss, starting AI/TAS, or leaving the room stops the effects
+and turns friend access off. Re-enable it when resuming. Losing heartbeats stops
+friend effects within four seconds. Your F8 asks the host to stop your effects.
+Local/offline play and hosting without friend control still work as before.
 
 The fun panel and hotkeys are **Car Soccer only**. Turball's existing AI/TAS
 adapter is retained and gets no fun controls from this update.
@@ -59,6 +76,9 @@ adapter is retained and gets no fun controls from this update.
 - Standard-arena native checkpoints are validated against observable body poses
   before editing. Custom maps, unknown native layouts and spectators are refused.
   Failed state writes roll back rather than leaving a half-applied checkpoint.
+- Per-step edits retain native wheel steering and rotation for every car. The
+  normal snapshot restore clears these values; repeatedly clearing them was the
+  cause of the previous update's steering failure. Unchanged state is not restored.
 - Effects act on the current world. Turning them off does not rewind scored
   goals or restore the car and ball to their earlier positions.
 - Enabling fun controls returns AI/TAS control to the player. Starting AI or TAS
@@ -74,6 +94,11 @@ from an already spent flip, and speed tests measuring both velocity and distance
 The overspeed test travelled about 2,498 units in 0.5 s versus 1,169 with the
 ordinary clamp. The override also accelerated from rest to about 4,875 units/s.
 The normal cap returned after disabling the override.
+Left and right turns now pass for both cars with every continuous effect alone
+and with all four combined. Powerslide turns also pass, and refreshes add no ticks.
+Two-peer tests exercise the actual game text sanitizer/message parser and native
+physics: friend-only boost, the joining player's prediction, team-aware goals,
+host opt-in/revocation, normal chat, timeouts, F8 and leaving a room.
 
 Those tests use a synthetic floor, not copied arena assets. They verify native
 state/motion/scoring behavior, not every wall interaction or a live match. Runtime
@@ -88,6 +113,8 @@ Developer checks:
 ```sh
 node test_fun_controls.mjs
 node test_fun_physics.mjs /private/path/main-DVUMtcmY.js
+node test_fun_coop.mjs
+node test_fun_coop.mjs /private/path/main-DVUMtcmY.js
 node test_fun_runtime.mjs /private/path/main-DVUMtcmY.js
 python test_fun_browser.py
 ```

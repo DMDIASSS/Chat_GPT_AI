@@ -32,7 +32,48 @@ export function createFunControls(adapter) {
   }
   function commit(env,before,after) {
     if(!after.every(n=>Number.isFinite(n)&&Math.abs(n)<=1e7))throw Error('Non-finite/out-of-range fun state rejected.');
+    if(!after.some((n,i)=>n!==before[i]))return;
+    const restoreWheels=preserveWheels(env,before);
     try{env.sim.restoreNetwork(after);}catch(error){try{env.sim.restoreNetwork(before);}catch{}throw error;}
+    finally{restoreWheels();}
+  }
+  function preserveWheels(env,net) {
+    const mod=env.sim.module;
+    if(!mod)return ()=>{}; // Non-native adapters own their restore semantics.
+    // This build's network restore deliberately clears wheel steering. That is
+    // useful for remote corrections, but doing it every tick cancels the prior
+    // tick's steer angle before native tyre friction can use it. Our effects
+    // do not change car poses: retain wheel steering/rotation for ALL cars.
+    if(mod._physics_getNetworkPtr?.()!==48848||mod._physics_getStatePtr?.()!==45248)
+      throw Error('Unsupported native wheel layout.');
+    const ints=mod.HEAP32,floats=mod.HEAPF32,count=(net.length-126)/81;
+    const valid=(ptr,size)=>Number.isInteger(ptr)&&ptr>0&&ptr%4===0&&ptr+size<=floats.byteLength;
+    const begin=ints[45228/4],end=ints[45232/4],saved=[];
+    if(!valid(begin,count*4)||end-begin!==count*4)throw Error('Native car roster changed.');
+    for(let slot=0;slot<count;slot++) {
+      const car=ints[begin/4+slot];
+      if(!valid(car,1824))throw Error('Invalid native car pointer.');
+      // Validate live chassis position and orientation, rather than trusting
+      // fixed offsets on an unrelated engine build.
+      const at=21+slot*81;
+      for(let axis=0;axis<3;axis++) {
+        if(Math.abs(floats[(car+368)/4+axis]*50-net[at+axis])>.03||
+           Math.abs(floats[(car+320)/4+axis*4]-net[at+3+axis])>.001)
+          throw Error('Native chassis layout changed.');
+      }
+      const wheels=ints[(car+272)/4],base=ints[(car+280)/4];
+      if(wheels<3||wheels>4||!valid(base,wheels*384))throw Error('Invalid native wheel array.');
+      for(let wheel=0;wheel<wheels;wheel++)for(const offset of [32,308,372]) {
+        const index=(base+wheel*384+offset)/4,value=floats[index];
+        if(!Number.isFinite(value))throw Error('Invalid native wheel state.');
+        saved.push([index,value]);
+      }
+    }
+    return ()=>{
+      for(const [index,value]of saved)mod.HEAPF32[index]=value;
+      // Refresh rendering state without advancing physics or consuming inputs.
+      mod._physics_step(0);
+    };
   }
   function inputs(env) {
     let values=env.sim.controlsView;

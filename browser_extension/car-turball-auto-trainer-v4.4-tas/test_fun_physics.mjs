@@ -45,3 +45,27 @@ assert.equal(fun.snapshot().enabled,true,fun.snapshot().message);
 assert.ok(Math.hypot(...sim.state.slice(34,37))>2400,'Speed override cannot accelerate past the default cap from rest');
 console.log('PASS: native speed override accelerates from rest past the standard cap',Math.hypot(...sim.state.slice(34,37)));
 fun.stop();
+// Native checkpoint restore clears wheel steering, so testing only throttle
+// cannot catch a car that drives forwards but never turns. Exercise both cars
+// and both directions while each continuous effect runs, including drift.
+for(const steer of [-1,1])for(const effects of [['boost'],['jumps'],['speed'],['glue'],['boost','jumps','speed','glue']]) {
+  setup({pos:[0,-1200,17.02],vel:[0,500,0]});
+  const n=sim.captureNetwork();
+  n.set([3000,-1200,17.02,0,1,0,-1,0,0,0,0,1,0,500,0,0,0,0],102);sim.restoreNetwork(n);
+  for(const effect of effects)fun.toggle(effect);
+  sim.setControls(0,{throttle:1,steer});sim.setControls(1,{throttle:1,steer:-steer});
+  const startTick=sim.state[0];sim.step(120);
+  assert.equal(fun.snapshot().enabled,true,fun.snapshot().message);
+  assert.equal(sim.state[0]-startTick,120,'State refresh advanced simulation time');
+  for(const [slot,direction]of [[0,steer],[1,-steer]]) {
+    const x=sim.state[22+slot*51+3];
+    assert.ok(Math.abs(x)>.15&&Math.sign(x)===-direction,`${effects}: car ${slot} lost ${direction<0?'left':'right'} steering: ${x}`);
+    assert.equal(sim.controlsView[slot*8+1],direction,'Fun effect changed a steering input');
+  }
+}
+setup({pos:[0,-1200,17.02],vel:[0,1000,0]});fun.toggle('boost');fun.toggle('speed');
+sim.setControls(0,{throttle:1,steer:1,handbrake:true});sim.step(90);
+assert.ok(Math.abs(sim.state[25])>.15,'Powerslide stopped turning with fun controls enabled');
+assert.equal(sim.controlsView[7],1,'Powerslide input was cleared');
+console.log('PASS: native left/right steering for player and opponent with every effect, combined effects and powerslide; no extra ticks');
+fun.stop();

@@ -39,7 +39,14 @@ await command({command:'fun-toggle',effect:'boost'});assert.equal(brain.snapshot
 session.peer.host=true;await command({command:'fun-toggle',effect:'boost'});assert.equal(brain.snapshot().fun.scope,'room host');
 env.sim.step();assert.equal(env.sim.captureNetwork()[56],100);session.peer.host=false;
 await command({command:'snapshot'});assert.equal(brain.snapshot().fun.enabled,false);assert.equal(env.sim.step,original);
+// Host opt-in is wired through the real injected runtime and F8 revokes it
+// even before any friend has enabled an effect.
+session.command=()=>{};const originalCommand=session.command;
+Object.assign(session,{epoch:1,carSeats:[0,1],teams:[0,1],members:3});session.peer.control=()=>true;session.peer.host=true;
+await command({command:'fun-friends',allowed:true});assert.equal(brain.snapshot().fun.allowFriends,true);
+assert.equal(brain.snapshot().fun.hosting,true);key('F8');assert.equal(brain.snapshot().fun.allowFriends,false);
 context.d=false;context.m=null;
+await command({command:'snapshot'});assert.equal(session.command,originalCommand,'Session command hook was not restored');
 // A worker finishing after F8 or a fun activation cannot take control back.
 let resolve;brain.ensureNexto=()=>new Promise(r=>resolve=r);
 const loading=brain.enable();assert.equal(brain.loading,true);

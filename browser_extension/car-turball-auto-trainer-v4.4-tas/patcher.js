@@ -2,6 +2,7 @@ import { createScriptedKickoff } from './kickoff.mjs';
 import { createBallVisibilityGuard } from './ball-visibility-guard.mjs';
 import { createTasPlayer } from './tas-player.mjs';
 import { createFunControls } from './fun-controls.mjs';
+import { createCooperativeFunControls } from './fun-coop.mjs';
 export function transformMainSource(source) {
   // Vite renames minified identifiers on each deployment. Translate only
   // injected snippets, and verify signature groups before patching anything.
@@ -113,13 +114,13 @@ window.addEventListener('keydown',event=>{
 const __GCT4_KICKOFF=(${createScriptedKickoff.toString()})();
 const __GCT4_TAS=(${createTasPlayer.toString()})({environment:()=>({sim:c,fields:R,stride:De,slot:h,
   online:!!d,mode:q.state.mode,customMap:!!Z})});
-const __GCT4_FUN=(${createFunControls.toString()})({environment:()=>{
+const __GCT4_FUN=(${createCooperativeFunControls.toString()})(${createFunControls.toString()},{environment:()=>{
   const online=!!(d&&m),session=online?m:null;
   return {sim:online?session.sim:c,fields:R,stride:De,slot:online?session.carSlot:h,
     team:online?session.carTeams[session.carSlot]:A.playerTeam,online,host:!!session?.peer?.host,
     spectator:!!session?.spectator,mode:online?"match":q.state.mode,
     phase:online?session.match?.state?.phase:q.state.phase,customMap:!online&&!!Z,session};
-}});
+},onRemoteStart:()=>{if(__GCT4.active||__GCT4.loading)__GCT4.disable("Player control restored for friend controls.")}});
 const __GCT4_NATIVE=new sk("grand-champion");
 const __GCT4_ONLINE_KEY=32767;
 const __GCT4_CHANNEL="__grandchamp_trainer_v4__";
@@ -655,6 +656,8 @@ window.addEventListener("message",async event=>{
       __GCT4_FUN.action(data.action);__GCT4.error="";__GCT4.info=__GCT4_FUN.snapshot().message
     }
     else if(data.command==="fun-speed")__GCT4_FUN.setSpeed(Number(data.speed));
+    else if(data.command==="fun-friends"){__GCT4_FUN.setAllowFriends(!!data.allowed);__GCT4.error=""}
+    else if(data.command==="fun-connect"){__GCT4_FUN.connect();__GCT4.error=""}
     else if(data.command==="fun-stop")__GCT4_FUN.stop();
     else if(data.command==="tas-load"){
       __GCT4_FUN.stop();
@@ -678,7 +681,7 @@ window.addEventListener("message",async event=>{
 });
 
 window.addEventListener("keydown",event=>{
-  if(event.code!=="F8"||event.repeat||!(__GCT4.active||__GCT4.loading||__GCT4_FUN.snapshot().enabled))return;
+  if(event.code!=="F8"||event.repeat||!(__GCT4.active||__GCT4.loading||__GCT4_FUN.snapshot().enabled||__GCT4_FUN.snapshot().allowFriends))return;
   event.preventDefault();
   event.stopImmediatePropagation();
   __GCT4_FUN.stop("Emergency override (F8)");__GCT4.disable("Emergency override (F8)")

@@ -412,6 +412,10 @@
       for (const control of funPane.querySelectorAll('[data-fun-action]')) control.disabled=!f?.available;
       funSpeed.disabled=!f?.available;
       if (document.activeElement!==funSpeed) funSpeed.value=String(f?.speedLimit||6000);
+      const friends=funPane.querySelector('#gct4-fun-friends'),connect=funPane.querySelector('#gct4-fun-connect');
+      friends.hidden=!f?.hosting;friends.setAttribute('aria-pressed',String(!!f?.allowFriends));
+      friends.textContent='Allow friend controls · '+(f?.allowFriends?'ON':'OFF');
+      connect.hidden=!f?.joined;connect.textContent=f?.connected?'Host connected · Reconnect':'Connect to friend’s host';
     }
     panel.querySelector('.gct4-body').style.maxHeight = `${Math.max(100,innerHeight-(parseFloat(panel.style.top)||0)-55)}px`;
 
@@ -485,7 +489,8 @@
 #gct4-panel[hidden],#gct4-restore[hidden],.gct4-tas[hidden]{display:none!important}
 #gct4-fun[hidden]{display:none!important}#gct4-fun{margin-top:10px;padding:8px;background:#09111d;border:1px solid #40516a;border-radius:6px}
 #gct4-fun summary{cursor:pointer;font-weight:700}.gct4-fun-status{margin:7px 0;white-space:pre-wrap;color:#bcd5ff}
-.gct4-fun-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}.gct4-fun-grid button,#gct4-fun-stop{font:inherit;color:#eef5ff;border:1px solid #40516a;border-radius:5px;background:#243650;padding:7px 5px;cursor:pointer}
+.gct4-fun-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}.gct4-fun-grid button,#gct4-fun-stop,#gct4-fun-friends,#gct4-fun-connect{font:inherit;color:#eef5ff;border:1px solid #40516a;border-radius:5px;background:#243650;padding:7px 5px;cursor:pointer}
+#gct4-fun-friends,#gct4-fun-connect{width:100%;margin-bottom:7px}
 .gct4-fun-grid button[aria-pressed=true]{background:#246447;border-color:#4aa979}.gct4-fun-grid button:disabled{opacity:.5;cursor:default}
 .gct4-fun-speed{display:flex;align-items:center;justify-content:space-between;gap:5px;margin:9px 0}.gct4-fun-speed input{width:90px;color:white;background:#192538;border:1px solid #53709c;border-radius:4px;padding:5px}#gct4-fun-stop{width:100%;margin-top:7px;background:#783737}
 #gct4-restore{position:fixed;z-index:2147483647;background:#192538;color:#eef5ff;border:1px solid #53709c;border-radius:20px;padding:10px 15px;cursor:pointer;font:700 12px system-ui}
@@ -505,7 +510,7 @@
     panel.style.top = `${savedPos.y}px`;
 
     panel.innerHTML = `
-      <div class="gct4-head"><span class="gct4-dot"></span><span>${SITE_TITLE} Trainer v4.5.0</span><button type="button" class="gct4-minimize" title="Minimize trainer" aria-label="Minimize trainer">−</button></div>
+      <div class="gct4-head"><span class="gct4-dot"></span><span>${SITE_TITLE} Trainer v4.5.1</span><button type="button" class="gct4-minimize" title="Minimize trainer" aria-label="Minimize trainer">−</button></div>
       <div class="gct4-body">
         <div class="gct4-status"><span>Status</span><b>Connecting…</b></div>
         <label class="gct4-label">AI
@@ -524,6 +529,8 @@
         <details id="gct4-fun" ${SITE === 'car-soccer' ? '' : 'hidden'}>
           <summary>Fun controls · Car Soccer</summary>
           <div class="gct4-fun-status" role="status"></div>
+          <button id="gct4-fun-friends" type="button" hidden aria-pressed="false">Allow friend controls · OFF</button>
+          <button id="gct4-fun-connect" type="button" hidden>Connect to friend’s host</button>
           <div class="gct4-fun-grid">
             <button type="button" data-fun-effect="glue" data-label="G · Ball glue" aria-pressed="false">G · Ball glue · OFF</button>
             <button type="button" data-fun-effect="boost" data-label="B · Infinite boost" aria-pressed="false">B · Infinite boost · OFF</button>
@@ -535,7 +542,7 @@
           </div>
           <label class="gct4-fun-speed">Override speed limit<input id="gct4-fun-speed" aria-label="Override speed limit" type="number" min="2300" max="10000" step="100" value="6000"></label>
           <button id="gct4-fun-stop" type="button">All fun controls OFF / F8</button>
-          <div class="gct4-note">Use in local play or a room you host. Letter keys toggle these effects when the game is focused. Chat/text fields are ignored. Enabling AI or TAS turns fun effects off.</div>
+          <div class="gct4-note">Friend hosting? Both install this update; the host enables Allow friend controls. One friend can control effects on their own car at a time. Letter keys work with the game focused; chat fields are ignored. AI/TAS and F8 stop effects.</div>
         </details>
         <div class="gct4-note">Press <b>F7</b> to reopen models and release mouse lock. The <b>−</b> button minimizes this menu while playback continues. Emergency stop: <b>F8</b>.</div>
         <details open><summary>AI Inputs</summary><div class="gct4-inputs"></div></details>
@@ -576,6 +583,8 @@
       localError='';send('fun-action',{action:control.dataset.funAction});
     });
     funSpeed.addEventListener('change',()=>send('fun-speed',{speed:Number(funSpeed.value)}));
+    panel.querySelector('#gct4-fun-friends').addEventListener('click',()=>send('fun-friends',{allowed:!latest?.fun?.allowFriends}));
+    panel.querySelector('#gct4-fun-connect').addEventListener('click',()=>send('fun-connect'));
     panel.querySelector('#gct4-fun-stop').addEventListener('click',()=>send('fun-stop'));
     tasPrepare.addEventListener('click',()=>{localError='';send('tas-prepare',{options:tasOptions()});});
     tasSelect.addEventListener('change',chooseTas);
