@@ -146,6 +146,25 @@ def cooldown(value,default=3600):
         except (TypeError,ValueError,OverflowError):seconds=default
     return max(1.,seconds) if math.isfinite(seconds) else float(default)
 
+def replay_bytes(raw):
+    """Reject actual API error documents without mistaking a binary header for one.
+
+    Rocket League starts with a little-endian header length. Its first byte
+    can legitimately be '{' or '<'; inspecting just that byte rejects replays.
+    """
+    if not isinstance(raw,bytes) or not raw:raise ValueError('API returned no replay data')
+    try:text=raw.decode('utf-8-sig').strip()
+    except UnicodeError:return raw
+    if text.startswith(('{','[')):
+        try:document=json.loads(text)
+        except ValueError:pass
+        else:
+            if isinstance(document,(dict,list)):raise ValueError('API returned JSON instead of replay data')
+    if '\x00' not in text and text.lower().startswith(('<!doctype html','<html','<?xml')):
+        raise ValueError('API returned HTML/XML instead of replay data')
+    return raw
+
+
 def http_fetch(secret,*,opener=None):
     opener=opener or urllib.request.build_opener(Redirect())
     def fetch(url,binary=False):
@@ -159,7 +178,7 @@ def http_fetch(secret,*,opener=None):
             raise DownloadError('Ballchasing HTTP '+str(error.code)+'.',status=error.code) from None
         except (urllib.error.URLError,TimeoutError,OSError):raise DownloadError('Ballchasing connection interrupted.',retry_after=30) from None
         if len(raw)>30*1024**2:raise ValueError('Oversized replay response')
-        if binary:return raw
+        if binary:return replay_bytes(raw)
         try:return json.loads(raw)
         except (ValueError,UnicodeError):raise DownloadError('Ballchasing returned an invalid listing.',retry_after=30) from None
     return fetch
@@ -251,7 +270,7 @@ def _download(folder,count,playlist,fetch,automatic,max_pages,index,page_size,re
                 skipped_id+=1;state['pending'].pop(0);atomic_json(statefile,state);continue
             raw=request('https://ballchasing.com/api/replays/'+rid+'/file',True)
             if raw is None:status='PAUSED';break
-            if not isinstance(raw,bytes) or not raw or raw.lstrip().startswith((b'{',b'<')):raise ValueError('API returned text rather than replay data')
+            replay_bytes(raw)
             digest=hashlib.sha256(raw).hexdigest();same=index.find_hash(digest)
             if same:
                 index.alias(rid,same);skipped_content+=1;state['pending'].pop(0);atomic_json(statefile,state);progress('RUNNING')

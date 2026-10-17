@@ -30,6 +30,34 @@ def test_format_audit_stops_when_3v3_was_rejected_or_lacks_a_split(tmp_path):
     assert not report['verified_3v3_coverage'] and report['insufficient_3v3_splits']==['validation']
 
 
+def test_all_formats_audit_verifies_saved_chunks_without_a_3v3_requirement(tmp_path):
+    dataset(tmp_path,missing='validation')
+    before=sha256(tmp_path/'manifest.json')
+    report=audit(tmp_path,require_3v3=False)
+    assert not report['require_3v3'] and not report['verified_3v3_coverage']
+    assert report['cached_shards_verified']==6 and report['cached_samples_verified']==60
+    assert report['matches_by_split_and_format']['validation']=={'1v1':2}
+    assert sha256(tmp_path/'manifest.json')==before
+
+
+def test_all_formats_audit_still_rejects_corrupted_cached_shards(tmp_path):
+    dataset(tmp_path,missing='validation')
+    (tmp_path/'train_0.npz').write_bytes(b'corrupted')
+    with pytest.raises(ValueError,match='Replay shard changed'):audit(tmp_path,require_3v3=False)
+
+
+def test_all_three_formats_are_counted_in_each_independent_split(tmp_path):
+    sources=[]
+    for split in ('train','validation','test'):
+        for players in (2,4,6):
+            path=tmp_path/f'{split}_{players}.npz';np.savez_compressed(path,players=np.full(3,players,np.uint8))
+            sources.append({'group':f'{split}-{players}','split':split,'samples':3,'shard':str(path),'sha256':sha256(path)})
+    atomic_json(tmp_path/'manifest.json',{'schema':'replay-il-v2-raw','sources':sources})
+    report=audit(tmp_path,require_3v3=False)
+    assert report['cached_samples_verified']==27 and not report['verified_3v3_coverage']
+    assert report['matches_by_split_and_format']=={s:{'1v1':1,'2v2':1,'3v3':1} for s in ('train','validation','test')}
+
+
 def test_mixed_launcher_audits_before_training_and_preserves_custom_paths(tmp_path,monkeypatch):
     import replay_il_mixed as mixed
     calls=[]

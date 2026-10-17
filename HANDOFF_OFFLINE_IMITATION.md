@@ -11,6 +11,16 @@ optional explicitly scripted kickoff assistance. These changes are outside the
 fingerprinted `replay_il` package. The old launcher semantics remain available
 for compatibility; use the final workflow for the new instructions.
 
+The final workflow now defaults to all 1v1/2v2/3v3 formats, not mandatory 3v3
+coverage. Keep the legacy mixed run/dataset names to reuse the existing cached
+work. `cache` verifies saved shards without parsing/training. Fresh inputs scan
+all of `data/replays`; old snapshots retain their original budgets. The user's
+latest log completed 287 inputs with 196,132 samples and 12 rejected replays,
+then stopped at the old 3v3 quota. Do not erase/reconstruct those completed
+shards. Eight rejections were BoxCars `MissingAttribute` errors; removing the
+quota does not make those replays decodable. The parser/trainer hashes remain
+unchanged. `--require-3v3` opts back into strict coverage.
+
 ## User's current goal and constraints
 
 Continue implementing a small, efficient model inspired by a community claim:

@@ -6,7 +6,7 @@ import json
 import re
 import time
 import urllib.parse
-from download_2v2_gc3_ssl import credentials,http_fetch,valid_url,replay_id,ReplayIndex,DownloadError,HOUR_LIMIT
+from download_2v2_gc3_ssl import credentials,http_fetch,valid_url,replay_id,ReplayIndex,DownloadError,HOUR_LIMIT,replay_bytes
 from slater_v041_core import atomic_json,read_json,process_lock
 
 ROOT=Path(__file__).resolve().parent
@@ -109,8 +109,7 @@ def download(group=DEFAULT_GROUP,*,folder=None,count=0,fetch=None,refresh=False,
                 except DownloadError as error:
                     if error.status in (404,410):rejected+=1;state['pending'].pop(0);save();continue
                     raise
-                if not isinstance(raw,bytes) or not raw or raw.lstrip().startswith((b'{',b'<')):
-                    raise ValueError('API returned text instead of replay data')
+                replay_bytes(raw)
                 digest=hashlib.sha256(raw).hexdigest();same=index.find_hash(digest)
                 if same:index.alias(rid,same);skipped+=1
                 else:

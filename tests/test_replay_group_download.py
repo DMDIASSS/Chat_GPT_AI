@@ -4,7 +4,7 @@ import uuid
 import urllib.parse
 import pytest
 from download_3v3_group import group_id,listing_url,eligible,download,DEFAULT_GROUP
-from download_2v2_gc3_ssl import DownloadError
+from download_2v2_gc3_ssl import DownloadError,replay_bytes
 
 
 def meta(rid=None):
@@ -63,3 +63,22 @@ def test_rate_limit_preserves_pending_replay_and_resumes_without_listing_again(t
     clock[0]+=61
     second=download(folder=tmp_path,fetch=resumed,existing_roots=[],min_interval=0,now=lambda:clock[0])
     assert second['status']=='COMPLETE' and second['downloaded']==1 and second['pages']==0
+
+
+@pytest.mark.parametrize('header',[b'{\x00\x00\x00',b'<\x00\x00\x00'])
+def test_binary_header_can_start_with_json_or_html_punctuation(tmp_path,header):
+    raw=header+b'\x01\x00\x00\x00replay-header\xff';item=meta()
+    assert replay_bytes(raw)==raw
+    result=download(folder=tmp_path,fetch=lambda url,binary=False:raw if binary else {'list':[item]},existing_roots=[],min_interval=0)
+    assert result['downloaded']==1
+    assert (tmp_path/(item['id']+'.replay')).read_bytes()==raw
+
+
+@pytest.mark.parametrize('body',[b'{"error":"access denied"}',b' ["error"]',b'<!DOCTYPE html><html>denied</html>',b'<html>error</html>',b''])
+def test_real_error_documents_are_not_saved_as_replays(tmp_path,body):
+    item=meta()
+    with pytest.raises(ValueError,match='API returned'):
+        download(folder=tmp_path,fetch=lambda url,binary=False:body if binary else {'list':[item]},existing_roots=[],min_interval=0)
+    assert not list(tmp_path.glob('*.replay'))
+    state=json.loads((tmp_path/'.group_download.json').read_text())
+    assert state['pending'][0]['id']==item['id']

@@ -59,7 +59,7 @@ def checkpoint_progress(folder):
     return dict(document['progress'])
 
 
-def summary(run,dataset=None,*,epochs=10):
+def summary(run,dataset=None,*,epochs=10,require_3v3=False):
     folder,dataset,marker=locations(run,dataset)
     manifest=read_json(dataset/'manifest.json',{});progress=checkpoint_progress(folder)
     selected=read_json(folder/'selected.json',{});parse=read_json(dataset/'parse_progress.json',{})
@@ -71,13 +71,15 @@ def summary(run,dataset=None,*,epochs=10):
         elif (folder/'pause.flag').exists():stage='PAUSE_REQUESTED'
     if not manifest and (dataset/'pause.flag').exists():stage='PAUSE_REQUESTED'
     coverage=read_json(dataset/'format_audit.json',{})
-    if manifest and coverage.get('verified_3v3_coverage') is False:stage='INSUFFICIENT_3V3_DATA'
+    if require_3v3 and manifest and coverage.get('verified_3v3_coverage') is False:stage='INSUFFICIENT_3V3_DATA'
     validation=selected.get('validation',{})
     report={'schema':'replay-il-workflow-results-v1','run':run,'dataset':str(dataset),'stage':stage,
         'last_launcher_stage':read_json(marker,{}).get('stage'),'parse_completed':parse.get('completed',0),
         'parse_total':parse.get('total',0),'parse_error_count':len(parse.get('errors',[])),
         'accepted_samples':manifest.get('samples',parse.get('samples',0)),
         'matches_by_format':manifest.get('matches_by_format',{}),'matches_by_split':manifest.get('matches_by_split',{}),
+        'allowed_formats':['1v1','2v2','3v3'],'require_3v3':bool(require_3v3),
+        'saved_shards':len(manifest.get('sources',[])),
         'epoch':progress.get('epoch',0),'updates':progress.get('updates',0),'stale_epochs':progress.get('stale_epochs',0),
         'validation':validation,'selected_model':str(folder/'best.pt') if (folder/'best.pt').exists() else None,
         'tokens':str(folder/'tokens.npy') if (folder/'tokens.npy').exists() else None,
@@ -100,6 +102,7 @@ def show(report):
     print('REPLAYS:',report['parse_completed'],'/',report['parse_total'],'| accepted samples:',report['accepted_samples'],
           '| parse errors:',report['parse_error_count'],flush=True)
     print('TRAINING: saved epoch',report['epoch'],'| updates',report['updates'],'| stale epochs',report['stale_epochs'],flush=True)
+    print('ACCEPTED FORMATS:',json.dumps(report['matches_by_format']),'| saved shards:',report['saved_shards'],flush=True)
     if report['validation']:print('SELECTED VALIDATION:',json.dumps(report['validation']),flush=True)
     if report['selected_model']:print('SELECTED MODEL:',report['selected_model'],flush=True)
     print('No matches are generated or used for training. Metrics do not establish competitive strength.',flush=True)
@@ -114,14 +117,15 @@ def pause(run,dataset=None):
     return written
 
 
-def start(run,dataset=None,*,epochs=10,inputs=None,device='auto',wandb_mode='online',max_replays=3000,
-          max_samples=500000,require_3v3=True):
+def start(run,dataset=None,*,epochs=10,inputs=None,device='auto',wandb_mode='online',max_replays=None,
+          max_samples=None,require_3v3=False):
     if not 1<=epochs<=200:raise ValueError('Epoch budget must be 1..200')
     folder,dataset,marker=locations(run,dataset)
     marker.parent.mkdir(parents=True,exist_ok=True)
     def stage(label,**details):
         atomic_json(marker,{'stage':label,'run':run,'dataset':str(dataset),
-            'updated_utc':datetime.now(timezone.utc).isoformat(),'total_epoch_budget':epochs,**details})
+            'updated_utc':datetime.now(timezone.utc).isoformat(),'total_epoch_budget':epochs,
+            'require_3v3':bool(require_3v3),**details})
         print('WORKFLOW:',label,flush=True)
     def invoke(command,extra=()):
         result=run_logged([sys.executable,'-u','-m','replay_il.launch',command,'--run',run,
@@ -132,7 +136,7 @@ def start(run,dataset=None,*,epochs=10,inputs=None,device='auto',wandb_mode='onl
         try:
             if not (dataset/'manifest.json').exists():
                 stage('PREPARING_REPLAYS')
-                roots=inputs or [str(ROOT/'data/replays'/n) for n in ('ranked-duels','ranked-doubles','ranked-standard')]
+                roots=inputs or [str(ROOT/'data/replays')]
                 from replay_il_prepare_snapshot import freeze_inputs
                 frozen=freeze_inputs(dataset,roots,max_replays=max_replays,max_samples=max_samples)
                 print('INPUT SNAPSHOT:',len(frozen['files']),'replays; new downloads require a new dataset.',flush=True)
@@ -142,17 +146,14 @@ def start(run,dataset=None,*,epochs=10,inputs=None,device='auto',wandb_mode='onl
                     '--dataset',str(dataset)],cwd=ROOT,folder=folder,dataset=dataset).returncode
                 if code:stage('STOPPED_WITH_SAVED_PROGRESS',exit_code=code)
                 if code:return code
+            else:print('REUSING_COMPLETED_DATASET:',dataset,'| saved chunks will be hash-verified; no replay parsing',flush=True)
             stage('VERIFYING_DATASET')
-            if require_3v3:
-                from audit_replay_mix import audit
-                audit(dataset)
-            else:
-                from replay_il.train import Dataset
-                Dataset(dataset)
+            from audit_replay_mix import audit
+            audit(dataset,require_3v3=require_3v3)
             progress=checkpoint_progress(folder);done=int(progress.get('epoch',0))
             if done>=epochs or progress.get('stale_epochs',0)>=4:
                 stage('COMPLETE' if done>=epochs else 'EARLY_STOPPED')
-                show(summary(run,dataset,epochs=epochs));return 0
+                show(summary(run,dataset,epochs=epochs,require_3v3=require_3v3));return 0
             resume=(folder/'latest.pt').is_file()
             if folder.exists() and not resume:
                 raise ValueError('Run folder exists without latest.pt. Preserve it and choose a new --run; initialization may have been interrupted.')
@@ -160,7 +161,7 @@ def start(run,dataset=None,*,epochs=10,inputs=None,device='auto',wandb_mode='onl
             stage('RESUMING_TRAINING' if resume else 'STARTING_FRESH_TRAINING',saved_epoch=done,remaining_epochs=remaining)
             code=invoke('resume' if resume else 'train',['--epochs',str(remaining)])
             if code:return code
-            report=summary(run,dataset,epochs=epochs)
+            report=summary(run,dataset,epochs=epochs,require_3v3=require_3v3)
             stage(report['stage']);show(report)
             if folder.exists():atomic_json(folder/'results_summary.json',report)
             return 0
@@ -174,26 +175,32 @@ def start(run,dataset=None,*,epochs=10,inputs=None,device='auto',wandb_mode='onl
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command',nargs='?',default='status',choices=('start','pause','status','results','analyze','test','export','repair'))
+    parser.add_argument('command',nargs='?',default='status',choices=('start','pause','status','results','cache','analyze','test','export','repair'))
     parser.add_argument('--run',default=DEFAULT_RUN);parser.add_argument('--dataset',type=Path)
     parser.add_argument('--epochs',type=int,default=10,help='Total saved-epoch target, not extra epochs per launch')
     parser.add_argument('--inputs',nargs='+');parser.add_argument('--device',choices=('auto','cpu','cuda'),default='auto')
     parser.add_argument('--wandb-mode',choices=('online','offline','disabled'),default='online')
-    parser.add_argument('--max-replays',type=int,default=3000);parser.add_argument('--max-samples',type=int,default=500000)
-    parser.add_argument('--allow-no-3v3',action='store_true',help='Explicitly operate on a duels/doubles-only dataset')
+    parser.add_argument('--max-replays',type=int,help='Fresh dataset: all discovered replays (up to 100000); resume: frozen budget')
+    parser.add_argument('--max-samples',type=int,help='Fresh dataset sample budget (default at least 500000); resume: frozen budget')
+    policy=parser.add_mutually_exclusive_group()
+    policy.add_argument('--require-3v3',action='store_true',help='Optional: require accepted 3v3 matches in every split')
+    policy.add_argument('--allow-no-3v3',action='store_true',help='Compatibility flag; all supported formats are already allowed by default')
     parser.add_argument('--name');parser.add_argument('--folder',type=Path)
     parser.add_argument('--scripted-kickoff',action='store_true')
     parser.add_argument('--analysis-samples',type=int,default=2000)
     args=parser.parse_args(argv);folder,dataset,_=locations(args.run,args.dataset)
     if args.command=='pause':pause(args.run,dataset);return 0
+    if args.command=='cache':
+        from audit_replay_mix import audit
+        audit(dataset,require_3v3=args.require_3v3);return 0
     if args.command in ('status','results'):
-        report=summary(args.run,dataset,epochs=args.epochs);show(report)
+        report=summary(args.run,dataset,epochs=args.epochs,require_3v3=args.require_3v3);show(report)
         if args.command=='results':
             if not folder.exists():raise ValueError('Training has not created this run yet')
             atomic_json(folder/'results_summary.json',report);print('REPORT:',folder/'results_summary.json',flush=True)
         return 0
     if args.command=='start':return start(args.run,dataset,epochs=args.epochs,inputs=args.inputs,device=args.device,
-        wandb_mode=args.wandb_mode,max_replays=args.max_replays,max_samples=args.max_samples,require_3v3=not args.allow_no_3v3)
+        wandb_mode=args.wandb_mode,max_replays=args.max_replays,max_samples=args.max_samples,require_3v3=args.require_3v3)
     if args.command=='test':
         return subprocess.run([sys.executable,'-u','-m','replay_il.launch','test','--run',args.run,'--dataset',str(dataset)],cwd=ROOT).returncode
     if args.command=='analyze':

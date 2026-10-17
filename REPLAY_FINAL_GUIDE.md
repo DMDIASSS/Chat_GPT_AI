@@ -1,4 +1,4 @@
-# Offline replay bot: final workflow and what to do when it stops
+# Offline replay bot: all formats, saved chunks and the final workflow
 
 Extract this source update into **E:\Downloads\Chat_GPT_AI**, replacing the
 included files. Preserve `.venv`, `data`, replays, shards, checkpoints and tokens.
@@ -6,6 +6,24 @@ This update does not overwrite the fingerprinted `replay_il` training code.
 Training remains supervised replay imitation: no RL, self-play, teacher-generated
 training games or reward shaping. Short physics checks reconstruct demonstrations;
 they are not policy training matches.
+
+**All-format update:** `REPLAY_IL_FINAL.bat start --device cuda` now accepts
+1v1, 2v2 and 3v3 by default. Missing 3v3 data no longer blocks your accepted
+duels/doubles data. The existing `replay_mixed3v3_02` / `dataset_mixed3v3_02`
+names are retained to reuse saved work; the name does not restrict the format.
+If your last launch finished parsing and stopped at the 3v3 audit, run the same
+start command again. It verifies and reuses the completed dataset without
+reconstructing those replays again. To check without starting training:
+
+```bat
+REPLAY_IL_FINAL.bat cache
+```
+
+`CACHE_VERIFIED` prints the actual hash-verified shard and saved sample counts.
+The `.npz` shards are saved reconstructed chunks/observations; `tokens.npy` is the
+action dictionary created later by training. A failure before training starts
+does not mean your reconstructed chunks were lost. Preserve the whole dataset,
+including `manifest.json`, `shards`, metadata and `input_snapshot.json`.
 
 ## 1. Repair the bot you already exported
 
@@ -39,7 +57,7 @@ The commands below default to the separate mixed-format run:
 | Purpose | Run | Dataset |
 |---|---|---|
 | Completed earlier model | `replay_scratch01` | `data\isolated\replay_imitation\dataset01` |
-| New duels/doubles/3v3 model | `replay_mixed3v3_02` | `data\isolated\replay_imitation\dataset_mixed3v3_02` |
+| Current all-format model (legacy name retained) | `replay_mixed3v3_02` | `data\isolated\replay_imitation\dataset_mixed3v3_02` |
 
 To inspect the model that already finished training:
 
@@ -58,7 +76,20 @@ For custom run names/datasets, use the same `--run` and `--dataset` arguments on
 start, status, pause, results, analysis and test. The default dataset for custom
 names remains the mixed dataset unless explicitly overridden.
 
-## 3. Collect the intended new replay batch before parsing
+## 3. Collect the intended replay batch before creating a new dataset
+
+Existing completed datasets do not need to be downloaded or parsed again.
+For a **new** dataset, the final workflow recursively discovers `.replay` files
+anywhere under `data\replays`, including custom subfolders, without filtering out
+1v1 or 2v2. By default it selects all discovered files up to the parser's
+100,000-file safety limit. `--max-replays` is an explicit optional smaller limit;
+there is no default 3,000-file selection limit in this workflow now. The default
+sample budget is at least 500,000 and grows when needed to cover a large input
+list. An explicit budget too small to cover every selected replay is rejected.
+The sample budget and per-match sampling still limit the saved chunks, not their
+quality thresholds. Validation/test matches remain excluded from optimization.
+
+The curated 3v3 downloader is optional:
 
 ```bat
 DOWNLOAD_3V3_GROUP.bat
@@ -72,6 +103,11 @@ If it says `RETRY_LATER`, wait for the saved API cooldown, then rerun it. The
 cloud cannot authenticate to your private token; live downloading occurs on
 your PC. Group quality and Octane-hitbox claims are user-curated provenance until
 independently verified from the actual replays. Missing ranks are not invented.
+
+Malformed/unsupported replays and chunks that fail reconstruction are reported
+and excluded, rather than being silently treated as usable demonstrations.
+In particular, a BoxCars `MissingAttribute` parsing failure needs reader support
+for that replay protocol; removing the format gate does not decode those files.
 
 Use a defined downloaded batch for each dataset. New downloads after parsing
 starts belong in a future dataset; do not keep changing an experiment's inputs.
@@ -88,9 +124,9 @@ The stages are:
 
 1. **PREPARING_REPLAYS:** freeze a replay input list in `input_snapshot.json`,
    reconstruct inputs, verify physics, and reuse valid completed shards.
-2. **VERIFYING_DATASET:** verify the shard hashes and require at least two accepted
-   3v3 matches in each train/validation/test split. A replay folder count does not
-   prove useful samples were produced.
+2. **VERIFYING_DATASET:** verify saved shard hashes, independent match splits and
+   the actual accepted 1v1/2v2/3v3 sample counts. There is no mandatory 3v3 quota.
+   A replay folder count does not prove useful samples were produced.
 3. **STARTING_FRESH_TRAINING** or **RESUMING_TRAINING:** invoke the existing supervised
    trainer, preserving model/optimizer state on resume.
 4. **TRAINING_BUDGET_COMPLETE** or **EARLY_STOPPED:** report the selected model and stop.
@@ -109,8 +145,11 @@ W&B remains supported; the logged `wandb_state.json` shows online/offline status
 If preparation reports many rejected replays or no contiguous chunks, inspect
 `parse_progress.json`. Rerunning the same bad data does not make its controls
 correct. Do not loosen fit thresholds or erase cached evidence just to obtain
-more samples. If the 3v3 audit fails, read `format_audit.json`; training is stopped
-rather than silently proceeding without 3v3 demonstrations.
+more samples. `format_audit.json` reports what actually survived parsing. A
+duels/doubles-only dataset is valid and is not advertised as learned 3v3 play.
+Use the optional `--require-3v3` flag only when you deliberately want at least two
+accepted 3v3 matches in each split. The old `REPLAY_IL_START_3V3.bat` remains
+strict for compatibility; use `REPLAY_IL_FINAL.bat` for these all-format defaults.
 
 ## 5. Pause and resume without confusing cached work with lost progress
 
@@ -143,6 +182,11 @@ dataset originally started by a legacy launcher, existing shards are reused only
 when their saved reconstruction configuration still matches. Source filenames,
 inputs and budgets should remain stable.
 
+Existing snapshots retain their original budgets automatically; this update
+does not change old parser settings or invalidate cached shards. A completed
+`manifest.json` takes priority over fresh discovery, so new files downloaded
+later are not silently appended to an existing training experiment.
+
 ## 6. Tell a pause, an error and completion apart
 
 ```bat
@@ -160,7 +204,7 @@ command. Saved stage labels are not proof that a process is currently alive.
 | `CHECKPOINT_SAVED` | Inspect CMD/heartbeat; `start` resumes if the previous process has stopped. |
 | `TRAINING_BUDGET_COMPLETE` | Read results, then export. No further training is required for that budget. |
 | `EARLY_STOPPED` | Validation stopped improving; use `best.pt`. More repetitions are not automatically better. |
-| `INSUFFICIENT_3V3_DATA` | Inspect accepted samples/splits; collect suitable data for a new completed-dataset path. |
+| `INSUFFICIENT_3V3_DATA` | Only enforced with `--require-3v3`. The default uses accepted 1v1/2v2/3v3 data without this quota. |
 | Nonzero exit / `STOPPED_WITH_SAVED_PROGRESS` | Read the actual error in CMD/launcher.log. Preserve checkpoints/shards and resolve the cause. |
 | Code/dataset/protocol mismatch | Restore the matching environment/source or use a new run; do not bypass identity guards. |
 

@@ -4,6 +4,11 @@ For the consolidated start/pause/status/results workflow and fixed total-epoch
 resume semantics, use [REPLAY_FINAL_GUIDE.md](REPLAY_FINAL_GUIDE.md) and
 `REPLAY_IL_FINAL.bat`. The original launchers below remain available for compatibility.
 
+The final workflow now accepts all supported formats by default and reuses
+completed chunks even if an earlier strict 3v3 audit failed. See
+[README_REPLAY_ALL_FORMATS.md](README_REPLAY_ALL_FORMATS.md). The explicitly
+3v3-named legacy launcher below still enforces 3v3 coverage.
+
 Extract this update into `E:\Downloads\Chat_GPT_AI`, replacing the included source
 files. Keep the existing `.venv` and private data. Run in CMD:
 

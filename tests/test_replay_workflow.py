@@ -21,7 +21,7 @@ def layout(tmp_path,monkeypatch,*,epoch=None,stale=0):
         folder.mkdir(parents=True);progress={'epoch':epoch,'updates':epoch*10,'stale_epochs':stale}
         torch.save({'progress':progress},folder/'latest.pt');atomic_json(folder/'progress.json',progress)
     import audit_replay_mix
-    monkeypatch.setattr(audit_replay_mix,'audit',lambda dataset:{'verified_3v3_coverage':True})
+    monkeypatch.setattr(audit_replay_mix,'audit',lambda dataset,**kwargs:{'verified_3v3_coverage':True})
     return folder,dataset,marker
 
 
@@ -55,6 +55,61 @@ def test_fresh_run_does_not_create_training_folder_before_trainer(tmp_path,monke
     monkeypatch.setattr(workflow.subprocess,'run',run)
     assert workflow.start('mixed',dataset)==0
     assert not folder.exists()
+
+
+def test_completed_dataset_survives_previous_3v3_gate_without_reparsing(tmp_path,monkeypatch):
+    folder,dataset,marker=layout(tmp_path,monkeypatch)
+    atomic_json(dataset/'format_audit.json',{'verified_3v3_coverage':False})
+    before=sha256(dataset/'manifest.json');calls=[]
+    import replay_il_prepare_snapshot
+    monkeypatch.setattr(replay_il_prepare_snapshot,'freeze_inputs',lambda *a,**k:pytest.fail('Completed cache was reparsed'))
+    import audit_replay_mix
+    def audit(path,*,require_3v3):
+        assert path==dataset and not require_3v3
+    monkeypatch.setattr(audit_replay_mix,'audit',audit)
+    def run(command,**kwargs):
+        calls.append(command);assert command[4]=='train'
+        return type('Result',(),{'returncode':0})()
+    monkeypatch.setattr(workflow.subprocess,'run',run)
+    assert workflow.summary('mixed',dataset)['stage']=='READY_TO_TRAIN'
+    assert workflow.start('mixed',dataset)==0
+    assert len(calls)==1 and sha256(dataset/'manifest.json')==before
+
+
+def test_fresh_default_discovers_all_nested_modes_and_keeps_existing_snapshot_budget(tmp_path):
+    inputs=tmp_path/'data/replays'
+    for folder in ('ranked-duels','ranked-doubles','ranked-standard/group','another-folder'):
+        path=inputs/folder;path.mkdir(parents=True);(path/'one.replay').write_bytes(folder.encode())
+    dataset=tmp_path/'dataset'
+    frozen=freeze_inputs(dataset,[inputs])
+    assert len(frozen['files'])==4 and frozen['max_replays']==100000
+    older=tmp_path/'older'
+    previous=freeze_inputs(older,[inputs],max_replays=3000,max_samples=400000)
+    assert freeze_inputs(older,[inputs])==previous
+
+
+def test_format_policy_cli_defaults_and_legacy_flag(tmp_path,monkeypatch):
+    monkeypatch.setattr(workflow,'ROOT',tmp_path);calls=[]
+    monkeypatch.setattr(workflow,'start',lambda *a,**k:calls.append(k) or 0)
+    for args in (['start'],['start','--allow-no-3v3'],['start','--require-3v3']):assert workflow.main(args)==0
+    assert [c['require_3v3'] for c in calls]==[False,False,True]
+    assert all(c['max_replays'] is None and c['max_samples'] is None for c in calls)
+
+
+def test_explicit_sample_budget_cannot_silently_skip_tail_replays(tmp_path):
+    inputs=tmp_path/'inputs';inputs.mkdir()
+    for i in range(8):(inputs/f'{i}.replay').write_bytes(str(i).encode())
+    with pytest.raises(ValueError,match='cannot cover every selected replay'):
+        freeze_inputs(tmp_path/'dataset',[inputs],max_samples=100)
+    assert not (tmp_path/'dataset/input_snapshot.json').exists()
+
+
+def test_closed_log_cleanup_does_not_throw_or_change_saved_log():
+    import io
+    from replay_il_prepare_snapshot import ClosingSafeTee
+    screen=io.StringIO();log=io.StringIO();tee=ClosingSafeTee(screen,log)
+    tee.write('saved');assert log.getvalue()=='saved';log.close()
+    tee.write('cleanup');tee.flush();assert screen.getvalue()=='savedcleanup'
 
 
 def test_pause_preserves_checkpoints_and_parser_failure_never_starts_training(tmp_path,monkeypatch):
@@ -112,7 +167,14 @@ def test_real_subprocess_workflow_trains_resumes_and_preserves_a_completed_run(r
     try:
         with tempfile.TemporaryDirectory(prefix='workflow_fixture_',dir=base) as temporary:
             dataset=fixture_dataset(Path(temporary)/'dataset',raw_rows[:8])
-            assert workflow.start(run,dataset,epochs=1,device='cpu',wandb_mode='disabled',require_3v3=False)==0
+            # No 3v3 in this completed dataset. The default must verify/reuse
+            # its chunks and actually train, even after a legacy audit failed.
+            atomic_json(dataset/'format_audit.json',{'verified_3v3_coverage':False})
+            manifest_before=sha256(dataset/'manifest.json')
+            shard_before={p:sha256(p) for p in dataset.rglob('*.npz')}
+            assert workflow.start(run,dataset,epochs=1,device='cpu',wandb_mode='disabled')==0
+            assert sha256(dataset/'manifest.json')==manifest_before
+            assert all(sha256(p)==digest for p,digest in shard_before.items())
             first=workflow.summary(run,dataset,epochs=1)
             assert first['epoch']==1 and first['updates']>0 and first['optimizer_change_verified']
             before=sha256(folder/'latest.pt')
