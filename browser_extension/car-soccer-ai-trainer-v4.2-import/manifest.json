@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Car Soccer AI Trainer v4.2 Model Import",
+  "version": "4.2.2",
+  "description": "Import compatible local Nexto actors with scripted kickoffs and manual takeover.",
+  "permissions": [
+    "debugger",
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://car-soccer.com/*",
+    "http://127.0.0.1:8765/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Car Soccer AI Trainer",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://car-soccer.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "nexto-worker.bundle.js",
+        "nexto-weights.bin",
+        "g9-weights.bin"
+      ],
+      "matches": [
+        "https://car-soccer.com/*"
+      ]
+    }
+  ]
+}

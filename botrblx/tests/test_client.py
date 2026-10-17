@@ -1,0 +1,207 @@
+"""Execute the real Lua client under deterministic Roblox API mocks."""
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+from client_cases import CASES
+
+HERE = Path(__file__).resolve().parent
+LUAU = os.environ.get("LUAU_BIN") or shutil.which("luau")
+
+
+@unittest.skipUnless(LUAU, "Set LUAU_BIN to exercise the mocked Roblox client")
+class ClientTests(unittest.TestCase):
+    def run_case(self, name, extra="", extra_checks="", filename="client271.lua", checks_override=None, behaviour_override=None):
+        _, behaviour, checks = next(case for case in CASES if case[0] == name)
+        if behaviour_override is not None: behaviour = behaviour_override
+        if checks_override is not None: checks = checks_override
+        prefix = (HERE / "fixtures/roblox_mock.luau").read_text(encoding="utf-8")
+        source = (HERE.parent / filename).read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / (name + ".luau")
+            wrapped = "\nlocal function start_client()\n" + source + "\nend\nlocal client_state=start_client()\n"
+            path.write_text(prefix + extra + behaviour + wrapped + checks + extra_checks, encoding="utf-8")
+            result = subprocess.run([LUAU,str(path)],capture_output=True,text=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    def test_live_frames_buttons_and_close(self): self.run_case("live_frames_and_close")
+    def test_goal_respawn_resumes(self): self.run_case("goal_respawn_resumes")
+    def test_teleport_invalidates_frame(self): self.run_case("teleport_invalidates_frame")
+    def test_missing_boost_never_fabricates_state(self): self.run_case("missing_boost_no_fake_state")
+
+    def test_alternate_http_response_formats(self):
+        formats = {
+            "string_status": "return {StatusCode='200',Body=response.Body}",
+            "lowercase_fields": "return {status_code='200',body=response.Body}",
+            "empty_uppercase": "return {StatusCode=200,Body='',body=response.Body}",
+            "second_return": "return true,response",
+            "raw_body": "return response.Body",
+        }
+        for name, result in formats.items():
+            with self.subTest(format=name):
+                extra = "\nlocal original_request=request\nrequest=function(options)\nlocal response=original_request(options)\n" + result + "\nend\n"
+                self.run_case("live_frames_and_close", extra)
+
+    def test_live_client_falls_back_and_caches_working_http_api(self):
+        extra = r'''
+local original_request=request
+local failed_calls=0
+request=function()failed_calls=failed_calls+1;return nil end
+http_request=original_request
+'''
+        self.run_case("live_frames_and_close",extra, "\nassert(failed_calls==1,'Repeated the failed API on every frame')\n")
+
+    def test_file_client_streams_without_http_and_rejects_unrelated_replies(self):
+        extra = r'''
+local mock_server=request
+request=function()error('File client attempted HTTP')end
+http_request=request
+services.HttpService.GenerateGUID=function()return 'fresh-file-session'end
+local files={}
+local read_attempt=0
+local writefile=function(path,body)
+ assert(path=='botrblx_exchange/request.json')
+ local r=services.HttpService:JSONDecode(body)
+ assert(r.session=='fresh-file-session'and r.file_protocol==3)
+ local reply=mock_server({Url=r.route,Method=r.packet and 'POST'or 'GET',
+  Headers={['X-Bridge-Token']=r.token},Body=r.packet and services.HttpService:JSONEncode(r.packet)})
+ files['botrblx_exchange/replies/reply_'..r.session..'_'..r.id..'.json']=services.HttpService:JSONEncode({
+  session=r.session,id=tostring(r.id),file_protocol=3,server='file-server',status='200',data=services.HttpService:JSONDecode(reply.Body)})
+ read_attempt=0
+end
+local readfile=function(path)
+ read_attempt=read_attempt+1
+ if read_attempt==1 then return services.HttpService:JSONEncode({session='old-session',id=1,status=200,data={}})end
+ if read_attempt==2 then return 'partial JSON'end
+ return string.char(239,187,191)..assert(files[path],'missing file')
+end
+'''
+        for name,_,_ in CASES:
+            with self.subTest(case=name):
+                self.run_case(name,extra,filename="JJSploit_File_Client.lua")
+        # Some executor metadata APIs cannot see files written externally, even
+        # though readfile can read them. Such a false negative must not gate IO.
+        with self.subTest(case="readable_reply_with_false_isfile"):
+            self.run_case("live_frames_and_close",extra+"\nlocal isfile=function()return false end\n",
+                          filename="JJSploit_File_Client.lua")
+
+    def test_measured_1300ms_roundtrip_keeps_sampling_valid_poses(self):
+        extra = r'''
+local mock_server=request
+services.HttpService.GenerateGUID=function()return 'slow-wrd-session'end
+local files={}
+local writefile=function(path,body)
+ local r=services.HttpService:JSONDecode(body)
+ local reply=mock_server({Url=r.route,Method=r.packet and 'POST'or 'GET',
+  Headers={['X-Bridge-Token']=r.token},Body=r.packet and services.HttpService:JSONEncode(r.packet)})
+ files['botrblx_exchange/replies/reply_'..r.session..'_'..r.id..'.json']={readyAt=now+1.3,
+  body=services.HttpService:JSONEncode({session=r.session,id=r.id,file_protocol=3,status=200,
+   data=services.HttpService:JSONDecode(reply.Body)})}
+end
+local readfile=function(path)
+ local item=assert(files[path]);assert(now>=item.readyAt,'Expected File But Got Directory')
+ return item.body
+end
+'''
+        behaviour = r'''
+local closed=false
+task.wait=function(dt)
+ move(dt)
+ if now>1.5 and not startedBot then startedBot=true;click('Start bot / F6')end
+ if now>=12 and not closed then closed=true;click('Close')end
+end
+'''
+        checks = r'''
+assert(#packets>=6,'Slow replies caused repeated reconnects')
+local valid=0
+for _,p in ipairs(packets)do
+ if p.enabled and p.valid then
+  valid=valid+1
+  assert(math.abs(p.car.velocity[1]-20)<.01,'Network interval corrupted pose velocity')
+ end
+end
+assert(valid>=3,'No valid policy frames under measured WRD delay')
+assert(packets[#packets].enabled==false)
+assert(not beat.listeners[1].connection.enabled,'Pose sampler leaked after close')
+'''
+        self.run_case("live_frames_and_close",extra,filename="JJSploit_File_Client.lua",
+                      checks_override=checks,behaviour_override=behaviour)
+
+    def test_file_client_missing_functions_stays_visible(self):
+        extra = "\nservices.HttpService.GenerateGUID=function()return 'test-session'end\nlocal readfile=nil\nlocal writefile=nil\n"
+        checks = r'''
+assert(#packets==0,'Attempted HTTP fallback')
+local visible=false
+for _,item in ipairs(created)do
+ if item.ClassName=='TextLabel'and string.find(item.Text or '',
+  'File mode needs both readfile and writefile',1,true)then visible=true end
+end
+assert(visible,'Missing APIs did not produce a visible explanation')
+'''
+        self.run_case("live_frames_and_close",extra=extra,filename="JJSploit_File_Client.lua",checks_override=checks)
+
+    def test_cached_reads_and_delayed_publication_keep_live_frames_current(self):
+        extra = r'''
+local mock_server=request
+request=function()error('File client attempted HTTP')end
+http_request=request
+services.HttpService.GenerateGUID=function()return 'cached-reader-session'end
+local files,cache={},{}
+local writes=0
+local writefile=function(path,body)
+ assert(path=='botrblx_exchange/request.json')
+ local r=services.HttpService:JSONDecode(body)
+ local target='botrblx_exchange/replies/reply_'..r.session..'_'..r.id..'.json'
+ assert(not files[target],'A reply filename was reused')
+ local reply=mock_server({Url=r.route,Method=r.packet and 'POST'or 'GET',
+  Headers={['X-Bridge-Token']=r.token},Body=r.packet and services.HttpService:JSONEncode(r.packet)})
+ files[target]={readyAt=now+.025,body=services.HttpService:JSONEncode({
+  session=r.session,id=r.id,file_protocol=3,status=200,data=services.HttpService:JSONDecode(reply.Body)})}
+ writes=writes+1
+end
+local isfile=function(path)return files[path]and now>=files[path].readyAt or false end
+local readfile=function(path)
+ if cache[path]then return cache[path]end -- Reproduce a reader caching bytes by pathname.
+ assert(isfile(path),'Reply read before publication')
+ cache[path]=files[path].body
+ return cache[path]
+end
+'''
+        self.run_case("live_frames_and_close",extra=extra,filename="JJSploit_File_Client.lua",
+                      extra_checks="\nassert(writes>150)\n")
+
+    def test_file_client_wrong_workspace_times_out_visibly(self):
+        extra = r'''
+services.HttpService.GenerateGUID=function()return 'test-session'end
+local writefile=function()end
+local readfile=function()error('missing reply')end
+'''
+        checks = r'''
+assert(#packets==0)
+local visible=false
+for _,item in ipairs(created)do
+ if item.ClassName=='TextLabel'and string.find(item.Text or '',
+  'readfile failed:',1,true)and string.find(item.Text or '',
+  'missing reply',1,true)then visible=true end
+end
+assert(visible,'Wrong workspace did not show a timeout')
+'''
+        self.run_case("live_frames_and_close",extra=extra,filename="JJSploit_File_Client.lua",checks_override=checks)
+
+    def test_file_client_explains_why_a_readable_reply_was_rejected(self):
+        for body,expected in (
+            ("'partial JSON'", "JSON decode failed"),
+            ("services.HttpService:JSONEncode({session='other-client',id=1})", "reply belongs to another client"),
+            ("services.HttpService:JSONEncode({session='test-session',id=0})", "reply id=0, waiting for id="),
+            ("false", "readfile returned boolean"),
+        ):
+            with self.subTest(detail=expected):
+                extra = "\nservices.HttpService.GenerateGUID=function()return 'test-session'end\nlocal writefile=function()end\nlocal readfile=function()return " + body + " end\n"
+                checks = "\nassert(#packets==0)\nlocal visible=false\nfor _,item in ipairs(created)do\n if item.ClassName=='TextLabel'and string.find(item.Text or ''," + repr(expected) + ",1,true)then visible=true end\nend\nassert(visible,'Missing specific reply diagnostic')\n"
+                self.run_case("live_frames_and_close",extra=extra,filename="JJSploit_File_Client.lua",checks_override=checks)
+
+
+if __name__ == "__main__": unittest.main(verbosity=2)

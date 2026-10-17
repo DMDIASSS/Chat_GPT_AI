@@ -1,0 +1,2 @@
+# Reuse the existing CUDA Torch/rlgym/RocketSim installation.
+wandb==0.30.0
