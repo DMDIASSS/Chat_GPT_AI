@@ -80,9 +80,11 @@ def test_chunk_clock_keeps_edges_previous_controls_and_does_not_fabricate_missed
         packet.game_info.seconds_elapsed=tick/120
         np.testing.assert_array_equal(controller.output(packet,0),book[0,tick%8])
     assert len(calls)==3 and len(controller.features)==3
+    assert controller.policy_decisions==3 and controller.last_inference_ms>=0
     np.testing.assert_array_equal(calls[1],book[0,7])
     packet.game_info.seconds_elapsed=36/120;controller.output(packet,0)
     assert len(controller.features)==1
+    assert controller.gap_resets==1 and controller.max_packet_gap_ticks==20
     packet.game_info.is_round_active=False
     np.testing.assert_array_equal(controller.output(packet,0),np.zeros(8))
 
@@ -149,6 +151,28 @@ for tick in range(17):
  result=agent.get_output(data.packet)
  assert not agent.reported_error and -1<=result.throttle<=1
 assert 'replay_il' not in sys.modules and 'RocketSim' not in sys.modules
+# Verify brief learned jump/boost/handbrake pulses survive the public wrapper,
+# and that counts include pulses between the five-second console snapshots.
+import numpy as np,torch
+from replay_rlbot_core import ReplayController,PacketObserver
+class PulseKernel:
+ def encode(self,obs):return torch.zeros(1,128)
+ def decode(self,history):return torch.zeros(1,1),torch.zeros(1,3)
+book=np.zeros((1,32,8),np.float32);book[0,:,0]=1
+book[0,2,5]=1;book[0,4,6]=1;book[0,6,7]=1
+agent.controller=ReplayController(PulseKernel(),book,PacketObserver(data.field))
+before=dict(agent.control_counts['policy'])
+for tick in range(8):
+ data.packet.game_info.seconds_elapsed=1+tick/120
+ result=agent.get_output(data.packet)
+ assert result.jump==bool(book[0,tick,5]) and result.boost==bool(book[0,tick,6])
+ assert result.handbrake==bool(book[0,tick,7]) and result.throttle==1
+counts=agent.control_counts['policy']
+assert counts['control_samples']-before['control_samples']==8
+for name in ('jump','boost','handbrake'):assert counts[name+'_pressed_samples']-before[name+'_pressed_samples']==1
+agent.save_diagnostics(data.packet)
+report=json.loads(Path('CONTROL_DIAGNOSTICS.json').read_text())
+assert report['control_counts']['policy']==counts and report['policy_decisions']==1
 print('SELF_CONTAINED_EXPORT_OK')
 '''
     env=os.environ.copy();env['PYTHONPATH']=''

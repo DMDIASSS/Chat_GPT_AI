@@ -227,6 +227,15 @@ REPLAY_IL_FINAL.bat analyze --device cuda
 This evaluates up to 2,000 validation samples and writes `validation_diagnostics.json`.
 It does not train, play matches or touch the held-out test. Read:
 
+For jump/boost problems in the existing `ReplayDuelsDoubles` export, close RLBot
+and run `CHECK_REPLAY_DUELS_DOUBLES.bat`. It repairs only the wrapper, compares
+the exported model with the trained model on 512 cached validation inputs, and
+reports reconstructed/tokenized/predicted button rates. After restarting RLBot,
+the export also records continuous button counts and timing in
+`CONTROL_DIAGNOSTICS.json`. See
+[README_REPLAY_CONTROL_CHECK.md](README_REPLAY_CONTROL_CHECK.md). No replay
+parsing, training or forced movement is performed by this check.
+
 * Token top-1 accuracy **versus a constant predictor using the most common
   training token**. The report states whether all training label caches were
   available for that baseline. Similar numbers mean accuracy alone is weak

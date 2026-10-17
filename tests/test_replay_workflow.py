@@ -158,7 +158,7 @@ def test_progress_tail_tolerates_partial_writes_and_reads_latest_complete_event(
     assert workflow.last_event(tmp_path/'missing')=={}
 
 
-def test_real_subprocess_workflow_trains_resumes_and_preserves_a_completed_run(raw_rows):
+def test_real_subprocess_workflow_trains_resumes_and_preserves_a_completed_run(raw_rows,monkeypatch):
     # Synthetic physics fixtures are isolated engineering tests, never user's
     # replay data or candidates for the user's selected bot.
     base=workflow.ROOT/'data/isolated/replay_debug';base.mkdir(parents=True,exist_ok=True)
@@ -183,12 +183,36 @@ def test_real_subprocess_workflow_trains_resumes_and_preserves_a_completed_run(r
             assert workflow.start(run,dataset,epochs=2,device='cpu',wandb_mode='disabled',require_3v3=False)==0
             final=workflow.summary(run,dataset,epochs=2)
             assert final['epoch']==2 and final['updates']>first['updates']
-            from analyze_replay_policy import analyze
+            from analyze_replay_policy import analyze,checked_export
             before_model=sha256(folder/'best.pt');before_training=sha256(folder/'latest.pt')
-            report=analyze(folder,dataset,device='cpu',limit=8)
+            from export_replay_rlbot import export
+            target=export(folder,'DiagnosticFixture',Path(temporary)/'exports')
+            report=analyze(folder,dataset,device='cpu',limit=8,export_folder=target)
             assert report['split']=='validation' and report['samples']==8
             assert report['training_baseline_complete'] and 0<=report['training_constant_baseline_top1']<=1
+            assert report['export_check']['numerical_parity'] and report['export_check']['argmax_disagreements']==0
+            assert set(report['buttons'])=={'reconstructed_targets','tokenized_targets','model_predictions'}
+            for profile in report['buttons'].values():
+                for button in ('jump','boost','handbrake'):assert 0<=profile['first8'][button]['chunk_fraction']<=1
+            kernel=checked_export(target,folder,'cpu')
+            class ShiftedExport:
+                def encode(self,obs):return kernel.encode(obs)
+                def decode(self,features):
+                    logits,values=kernel.decode(features);return logits+10,values
+            import analyze_replay_policy
+            monkeypatch.setattr(analyze_replay_policy,'checked_export',lambda *a,**k:ShiftedExport())
+            with pytest.raises(RuntimeError,match='Export output differs'):
+                analyze(folder,dataset,device='cpu',limit=8,export_folder=target)
+            assert not json.loads((folder/'validation_diagnostics.json').read_text())['export_check']['numerical_parity']
             assert sha256(folder/'best.pt')==before_model and sha256(folder/'latest.pt')==before_training
             assert not (folder/'heldout_test.json').exists()
     finally:
         shutil.rmtree(folder,ignore_errors=True);marker.unlink(missing_ok=True);marker.with_suffix('.lock').unlink(missing_ok=True)
+
+
+def test_button_profile_distinguishes_executed_prefix_from_discarded_chunk_tail():
+    from analyze_replay_policy import button_profile
+    chunks=np.zeros((2,32,8),np.float32);chunks[0,2,5]=1;chunks[1,12,5]=1;chunks[:,4:6,6]=1
+    profile=button_profile(chunks)
+    assert profile['first8']['jump']=={'chunks':1,'chunk_fraction':.5,'pressed_tick_fraction':1/16}
+    assert profile['full32']['jump']['chunks']==2 and profile['first8']['boost']['chunk_fraction']==1

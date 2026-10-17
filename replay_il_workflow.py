@@ -186,6 +186,7 @@ def main(argv=None):
     policy.add_argument('--require-3v3',action='store_true',help='Optional: require accepted 3v3 matches in every split')
     policy.add_argument('--allow-no-3v3',action='store_true',help='Compatibility flag; all supported formats are already allowed by default')
     parser.add_argument('--name');parser.add_argument('--folder',type=Path)
+    parser.add_argument('--export-folder',type=Path,help='Analyze: verify the matching RLBot export on validation samples')
     parser.add_argument('--scripted-kickoff',action='store_true')
     parser.add_argument('--analysis-samples',type=int,default=2000)
     args=parser.parse_args(argv);folder,dataset,_=locations(args.run,args.dataset)
@@ -205,7 +206,7 @@ def main(argv=None):
         return subprocess.run([sys.executable,'-u','-m','replay_il.launch','test','--run',args.run,'--dataset',str(dataset)],cwd=ROOT).returncode
     if args.command=='analyze':
         from analyze_replay_policy import analyze
-        analyze(folder,dataset,device=args.device,limit=args.analysis_samples);return 0
+        analyze(folder,dataset,device=args.device,limit=args.analysis_samples,export_folder=args.export_folder);return 0
     if args.command=='repair':
         from repair_replay_rlbot import repair
         repair(args.folder or ROOT/'data/rlbot_exports/ReplayScratch01',scripted_kickoff=args.scripted_kickoff);return 0

@@ -1,6 +1,7 @@
 """Standalone RLBot packet observations and causal chunk execution; no training."""
 from collections import deque
 import math
+import time
 import numpy as np
 import torch
 try:
@@ -69,6 +70,8 @@ class ReplayController:
         self.kernel=kernel;self.book=np.asarray(book,np.float32);self.observer=observer
         self.history=history;self.device=torch.device(device);self.features=deque(maxlen=history)
         self.scripted_kickoff=bool(scripted_kickoff)
+        self.gap_resets=0;self.max_packet_gap_ticks=0;self.last_inference_ms=None;self.policy_decisions=0
+        self.max_inference_ms=0.;self.over_budget_decisions=0
         if self.book.ndim!=3 or self.book.shape[1:]!=(32,8) or not np.isfinite(self.book).all():raise ValueError('Invalid replay action vocabulary')
         self.reset()
 
@@ -104,6 +107,9 @@ class ReplayController:
         info=packet.game_info;now=float(info.seconds_elapsed)
         if not math.isfinite(now):raise ValueError('Invalid packet clock')
         tick=math.floor(now*120+.5);kickoff=bool(info.is_kickoff_pause)
+        if self.last_tick is not None:
+            gap=tick-self.last_tick;self.max_packet_gap_ticks=max(self.max_packet_gap_ticks,gap)
+            if gap>16:self.gap_resets+=1
         if (self.last_tick is not None and (tick<self.last_tick or tick-self.last_tick>16)) or (kickoff and self.kickoff is False):self.reset()
         self.kickoff=kickoff;self.last_tick=tick
         if not bool(info.is_round_active) or bool(info.is_match_ended) or packet.game_cars[index].is_demolished:
@@ -112,6 +118,7 @@ class ReplayController:
         if assist is not None:
             self.previous=assist;self.control_source='scripted_kickoff';return assist.copy()
         if self.decision_tick is None or tick-self.decision_tick>=8:
+            started=time.perf_counter()
             view=self.observer.observe(packet,index,self.previous)
             tensors=tuple(torch.as_tensor(x[None],device=self.device) for x in view)
             feature=self.kernel.encode(tensors)[0].detach();self.features.append(feature)
@@ -120,6 +127,9 @@ class ReplayController:
             if logits.shape!=(1,len(self.book)) or not torch.isfinite(logits).all() or not torch.isfinite(values).all():
                 raise ValueError('Replay policy returned invalid outputs')
             self.selected=int(logits[0].argmax());self.decision_tick=tick
+            self.last_inference_ms=1000*(time.perf_counter()-started);self.policy_decisions+=1
+            self.max_inference_ms=max(self.max_inference_ms,self.last_inference_ms)
+            self.over_budget_decisions+=int(self.last_inference_ms>1000*8/120)
         # Replan every eight ticks, retaining exact per-tick button/control edges.
         offset=min(7,max(0,tick-self.decision_tick))
         self.previous=self.book[self.selected,offset].copy()

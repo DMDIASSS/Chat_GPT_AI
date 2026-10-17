@@ -21,6 +21,13 @@ shards. Eight rejections were BoxCars `MissingAttribute` errors; removing the
 quota does not make those replays decodable. The parser/trainer hashes remain
 unchanged. `--require-3v3` opts back into strict coverage.
 
+`CHECK_REPLAY_DUELS_DOUBLES.bat` checks the original `replay_scratch01` model
+against `ReplayDuelsDoubles` using cached validation samples. Analysis compares
+reconstructed, tokenized and model-predicted jump/boost/slide coverage and checks
+actual export parity. Runtime diagnostics count short button presses between
+console snapshots and record CPU/GPU inference latency and history gap resets.
+They do not force controls, change trained weights or reparse data.
+
 ## User's current goal and constraints
 
 Continue implementing a small, efficient model inspired by a community claim:
