@@ -1,5 +1,10 @@
 # Continuation brief: offline Rocket League action-chunk imitation
 
+**Current complete prompt:** [AI_CONTINUATION_PROMPT.md](AI_CONTINUATION_PROMPT.md).
+Use it for the next AI session, file-sharing checklist and current priorities.
+Some sections below retain historical strict-3v3 launcher instructions; the
+final workflow defaults to all supported formats.
+
 This is a ready-to-paste task brief for another coding assistant. The code and
 current local reports are authoritative; inspect them before changing anything.
 
