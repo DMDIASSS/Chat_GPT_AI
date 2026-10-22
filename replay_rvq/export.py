@@ -28,6 +28,7 @@ def export(root,name='ReplayRVQ01',output=None):
                 checks.append({'batch':batch,'encode_max_error':float((expected-actual).abs().max())})
         files={'bot.py':ROOT/'replay_rvq/agent.py','rvq_runtime.py':ROOT/'replay_rvq/runtime.py',
             'rvq_packet.py':ROOT/'replay_rvq/packet.py','rvq_search.py':ROOT/'replay_rvq/search.py',
+            'rvq_diagnostics.py':ROOT/'replay_rvq/diagnostics.py',
             'replay_rlbot_core.py':ROOT/'replay_rlbot_core.py','replay_nexto_obs.py':ROOT/'vendor/nexto/nexto_obs.py',
             'NEXT0_UPSTREAM_LICENSE.txt':ROOT/'rlbot_v4_template/NEXT0_UPSTREAM_LICENSE.txt',
             'appearance.cfg':ROOT/'rlbot_v4_template/appearance.cfg'}
@@ -43,7 +44,7 @@ def export(root,name='ReplayRVQ01',output=None):
         (temp/'bot.cfg').write_text('[Locations]\nlooks_config = ./appearance.cfg\npython_file = ./bot.py\nrequirements_file = ./requirements.txt\n'
             f'name = {name}\nmaximum_tick_rate_preference = 120\n\n[Details]\ndeveloper = Chat GPT AI project\n'
             'description = Offline human-replay residual VQ policy with value-guided all-car search\nlanguage = python\ntags = 1v1, 2v2, 3v3\n',encoding='utf8')
-        runtime=['policy.pt','bot.py','rvq_runtime.py','rvq_packet.py','rvq_search.py','replay_rlbot_core.py','replay_nexto_obs.py']
+        runtime=['policy.pt','bot.py','rvq_runtime.py','rvq_packet.py','rvq_search.py','rvq_diagnostics.py','replay_rlbot_core.py','replay_nexto_obs.py']
         info={'format':'replay-rvq-rlbot-v4-v1','name':name,'checkpoint_sha256':digest,'model_config':model.config,
             'parameters':sum(p.numel() for p in model.parameters()),'input':'current_state_only','codebooks':4,'codes_per_level':64,
             'horizon_ticks':128,'execute_first_ticks':8,'mode':'search','numerical_checks':checks,

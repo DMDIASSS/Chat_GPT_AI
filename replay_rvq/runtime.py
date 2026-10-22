@@ -6,9 +6,11 @@ from replay_rlbot_core import PacketObserver,ReplayController
 try:
     from rvq_packet import PacketState,StateObserver
     from rvq_search import Search
+    from rvq_diagnostics import chunk_summary
 except ModuleNotFoundError:
     from replay_rvq.packet import PacketState,StateObserver
     from replay_rvq.search import Search
+    from replay_rvq.diagnostics import chunk_summary
 
 
 class Controller:
@@ -19,10 +21,10 @@ class Controller:
         self.packet_state=PacketState(self.observer);self.adaptive=adaptive;self.fast_decisions=0
         self.kickoff=ReplayController(None,np.zeros((1,32,8),np.float32),self.observer,scripted_kickoff=scripted_kickoff)
         self.last_tick=None;self.last_kickoff=None;self.decision_tick=None;self.previous=np.zeros(8,np.float32);self.sequence=None
-        self.decisions=0;self.last_ms=None;self.max_ms=0.;self.over_budget=0;self.last_report={};self.source='neutral'
+        self.decisions=0;self.last_ms=None;self.max_ms=0.;self.over_budget=0;self.last_report={};self.source='neutral';self.neutral_reason=None
 
     def reset(self):
-        self.last_tick=None;self.last_kickoff=None;self.decision_tick=None;self.previous[:]=0;self.sequence=None;self.source='neutral'
+        self.last_tick=None;self.last_kickoff=None;self.decision_tick=None;self.previous[:]=0;self.sequence=None;self.source='neutral';self.neutral_reason=None
         self.kickoff.reset();self.packet_state.reset()
 
     @torch.inference_mode()
@@ -33,7 +35,9 @@ class Controller:
         if self.last_tick is not None and (tick<self.last_tick or tick-self.last_tick>120 or kickoff and self.last_kickoff is False):self.reset()
         self.last_tick=tick;self.last_kickoff=kickoff
         if not packet.game_info.is_round_active or packet.game_info.is_match_ended or packet.game_cars[index].is_demolished:
-            self.reset();return self.previous.copy()
+            self.reset();self.neutral_reason='match_ended' if packet.game_info.is_match_ended else 'demolished' if packet.game_cars[index].is_demolished else 'round_inactive'
+            return self.previous.copy()
+        self.neutral_reason=None
         assist=self.kickoff.kickoff_action(packet,index,tick)
         if assist is not None:self.previous=assist;self.source='scripted_kickoff';return assist.copy()
         if self.decision_tick is None or tick-self.decision_tick>=8:
@@ -48,6 +52,7 @@ class Controller:
                 self.sequence,self.last_report=self.search.choose(state,{index:self.previous},index)
             if self.sequence.shape!=(32,8) or not np.isfinite(self.sequence).all() or np.abs(self.sequence).max()>1.001 or not np.isin(self.sequence[:,5:],[0,1]).all():
                 raise ValueError('RVQ runtime returned invalid controls')
+            self.last_report['chosen_chunk']=chunk_summary(self.sequence)
             self.last_ms=1000*(time.perf_counter()-start);self.max_ms=max(self.max_ms,self.last_ms)
             self.decisions+=1;self.over_budget+=int(self.last_ms>1000*8/120);self.decision_tick=tick
             if self.search is not None and self.adaptive:

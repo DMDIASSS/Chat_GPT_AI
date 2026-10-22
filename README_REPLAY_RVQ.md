@@ -214,8 +214,11 @@ folders; choose another name to export changed weights.
 
 `RVQ_DIAGNOSTICS.json` in the export records learned/search/kickoff button counts,
 latencies, over-budget decisions, selected value/codes and the actual candidate
-budget. When several cars share a folder it contains the latest writer's record,
-identified by `car_index`. It is not a merged team statistic.
+budget. Each bot also writes `RVQ_DIAGNOSTICS_<car_index>.json`. The unsuffixed
+file contains the latest writer, not a merged team statistic. The diagnostic
+update records issued controls, stationary episodes, runtime errors, button
+edges and recent physics. See [README_REPLAY_RVQ_DIAGNOSTICS.md](README_REPLAY_RVQ_DIAGNOSTICS.md)
+for re-exporting existing weights and investigating idle play/rare jumps.
 
 ## What was actually verified, and what remains unknown
 

@@ -204,6 +204,20 @@ result=agent.get_output(data.packet)
 assert not agent.error and -1<=result.throttle<=1
 assert agent.controller.last_report['opponents'].startswith('all other cars')
 assert agent.controller.decisions==1 and Path('RVQ_DIAGNOSTICS.json').is_file()
+assert Path('RVQ_DIAGNOSTICS_0.json').is_file()
+report=json.loads(Path('RVQ_DIAGNOSTICS_0.json').read_text())
+assert len(report['motion']['issued_action'])==8 and report['motion']['recent_trace']
+original=agent.controller.output
+def fail(*args):raise ValueError('injected diagnostic check')
+agent.controller.output=fail;agent.last_log=None
+stopped=agent.get_output(data.packet)
+report=json.loads(Path('RVQ_DIAGNOSTICS_0.json').read_text())
+assert stopped.throttle==0 and report['runtime_error_active']
+assert report['last_runtime_error']['message']=='injected diagnostic check'
+agent.controller.output=original;agent.last_log=None
+agent.get_output(data.packet)
+report=json.loads(Path('RVQ_DIAGNOSTICS_0.json').read_text())
+assert not report['runtime_error_active'] and report['last_runtime_error']['message']=='injected diagnostic check'
 assert 'replay_rvq' not in sys.modules and 'replay_il' not in sys.modules
 agent.retire()
 print('SELF_CONTAINED_RVQ_SEARCH_OK')
@@ -245,3 +259,76 @@ def test_inference_refuses_changed_model_interpretation_before_loading_weights(t
     atomic_json(tmp_path/'policy/selected.json',{'sha256':sha256(tmp_path/'policy/best.pt')})
     atomic_json(tmp_path/'protocol.json',{'code':{'replay_rvq/model.py':'0'*64}})
     with pytest.raises(ValueError,match='Model interpretation source changed'):load(tmp_path)
+
+
+@pytest.mark.parametrize('throttle,expected',[(0.,'stationary_with_low_drive_commands'),(1.,'stationary_with_drive_commands')])
+def test_motion_audit_distinguishes_idle_choices_from_issued_drive_and_retains_episode(throttle,expected):
+    from replay_rvq.diagnostics import MotionAudit
+    packet,_=packet_fixture(state_fixture());packet.game_info.is_round_active=True
+    velocity=packet.game_cars[0].physics.velocity;velocity.x=velocity.y=velocity.z=0.
+    audit=MotionAudit();action=np.zeros(8,np.float32);action[0]=throttle;original=action.copy()
+    for i in range(31):
+        packet.game_info.seconds_elapsed=i/10
+        report=audit.observe(packet,0,action,decisions=i,source='search')
+    assert report['status']==expected and report['stationary_seconds']==3
+    assert report['decisions_in_recent_window']>0
+    np.testing.assert_array_equal(action,original)
+    packet.game_info.seconds_elapsed=3.1;velocity.x=500
+    report=audit.observe(packet,0,action,decisions=32,source='search')
+    assert report['status']=='moving_or_brief_wait' and report['last_stationary_episode']['status']==expected
+    packet.game_info.seconds_elapsed=0
+    report=audit.observe(packet,0,action,decisions=33,source='neutral',error={'message':'test error'})
+    assert report['status']=='runtime_error' and report['stationary_seconds']==0
+    action[5]=1
+    report=audit.observe(packet,0,action,decisions=34,source='policy')
+    assert report['button_edges']['jump']=={'press':1,'release':0}
+    action[5]=0
+    report=audit.observe(packet,0,action,decisions=35,source='policy')
+    assert report['button_edges']['jump']=={'press':1,'release':1}
+    packet.game_info.is_round_active=False
+    report=audit.observe(packet,0,action,decisions=35,source='neutral',neutral_reason='round_inactive')
+    assert report['last_inactive_trace'] and report['status']=='inactive_or_demolished'
+
+
+def test_runtime_replanning_an_idle_prefix_is_reported_without_forcing_movement():
+    from replay_rvq.runtime import Controller
+    class Kernel:
+        def encode(self,observations):return torch.zeros(len(observations[0]),4)
+        def greedy(self,features):
+            sequence=torch.zeros(len(features),32,8);sequence[:,8:,0]=1
+            return sequence,torch.zeros(len(features),4,dtype=torch.long),torch.zeros(len(features))
+    packet,field=packet_fixture(state_fixture());packet.game_info.is_round_active=True
+    controller=Controller(Kernel(),field,mode='policy',scripted_kickoff=False)
+    try:
+        for tick in range(40):
+            packet.game_info.seconds_elapsed=tick/120
+            np.testing.assert_array_equal(controller.output(packet,0),np.zeros(8))
+        assert controller.decisions==5
+        assert controller.last_report['chosen_chunk']['drive_only_after_executed_prefix']
+        assert controller.last_report['chosen_chunk']['unexecuted_last24']['throttle_abs_max']==1
+        packet.game_info.is_round_active=False
+        controller.output(packet,0)
+        assert controller.neutral_reason=='round_inactive'
+    finally:controller.close()
+
+
+@pytest.mark.parametrize('orange',[False,True])
+@pytest.mark.parametrize('goal_y_sign',[-1,1])
+def test_search_terminal_goal_scores_are_oriented_to_the_controlled_team(orange,goal_y_sign):
+    from replay_rvq.search import Search
+    class Kernel:
+        def eval(self):return self
+        def encode(self,observations):return torch.zeros(len(observations[0]),4)
+        def greedy(self,features):
+            return torch.zeros(len(features),32,8),torch.zeros(len(features),4,dtype=torch.long),torch.zeros(len(features))
+        def propose(self,features):
+            return torch.zeros(len(features),64,32,8),torch.zeros(len(features),64,4,dtype=torch.long),torch.zeros(len(features),64)
+        def value(self,features):return torch.zeros(len(features),3)
+    state=state_fixture();ours=next(aid for aid,car in state.cars.items() if car.is_orange==orange)
+    state.ball.position=np.array([0,goal_y_sign*5100,100],np.float32)
+    state.ball.linear_velocity=np.array([0,goal_y_sign*1500,0],np.float32)
+    planner=Search(Kernel(),candidates=1)
+    try:_,report=planner.choose(state,{},ours)
+    finally:planner.close()
+    expected=1. if goal_y_sign==(-1 if orange else 1) else -1.
+    assert report['selected']['value']==expected
