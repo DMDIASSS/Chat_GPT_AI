@@ -1,0 +1,9 @@
+1. Extract into E:\Downloads\Chat_GPT_AI, replacing the included files.
+2. Run FREESTYLE_EXPORT_V5.bat. Select freestyle_rewards02 and latest
+   or a saved update number. Scripted kickoff is enabled by default.
+3. Run INSTALL.bat once inside the exported bot folder under
+   data\rlbot_v5_exports, then import its bot.toml in RLBot v5.
+No native rebuild is needed. Training and saved models are preserved.
+This download contains exporter source only; your actual model is
+exported locally. Keep the project Python/Torch installation available.
+See docs/FREESTYLE_RLBOT_V5.md for commands and runtime limitations.

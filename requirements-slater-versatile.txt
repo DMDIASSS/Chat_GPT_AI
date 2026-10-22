@@ -1,0 +1,3 @@
+# Additional replay preparation dependencies; use the existing project .venv.
+rlgym-tools==2.6.5
+pyarrow==21.0.0
