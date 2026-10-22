@@ -1,5 +1,10 @@
 # Offline replay bot: all formats, saved chunks and the final workflow
 
+The separate learned-RVQ/current-state/search experiment is now documented in
+[README_REPLAY_RVQ.md](README_REPLAY_RVQ.md) and launched with `REPLAY_RVQ.bat`.
+This guide continues to describe the original medoid/temporal model; existing
+checkpoints and commands remain unchanged.
+
 Extract this source update into **E:\Downloads\Chat_GPT_AI**, replacing the
 included files. Preserve `.venv`, `data`, replays, shards, checkpoints and tokens.
 This update does not overwrite the fingerprinted `replay_il` training code.
