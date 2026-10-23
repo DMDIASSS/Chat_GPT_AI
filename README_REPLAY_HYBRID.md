@@ -99,6 +99,12 @@ REPLAY_HYBRID.bat start --device cuda --nexto "E:\path\to\nexto-model.pt"
 Nexto uses its neural policy every eight ticks, without the RLBot kickoff script
 or a separately modeled input delay. Results against this adapter do not equal
 live RLBot results. Exact local weights and simulator versions are recorded.
+The original traced Nexto model contains CPU-only tensor creation, so this
+opponent runs on CPU even with `--device cuda`; the learning model stays on CUDA.
+This update also accepts the previous hybrid release's exact code identity for
+this fix only, recording `runtime_compatibility.json` while preserving existing
+protocol hashes, checkpoints and progress. Rerun the same check/start command;
+there is no need to delete a run or parse replays again.
 
 ## Preserve mechanics and keep value meanings correct
 

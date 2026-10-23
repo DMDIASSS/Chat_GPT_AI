@@ -43,6 +43,28 @@ def identity():
     return {name:sha256(ROOT/name) for name in sorted(names)}
 
 
+def verify_protocol(root,prior,current):
+    if prior is None:
+        atomic_json(root/'protocol.json',current);return
+    if prior==current:return
+    # One narrowly scoped compatibility update for the original CPU-only
+    # traced Nexto adapter. Preserve protocol/checkpoint hashes and all progress.
+    old_code={
+        'replay_hybrid/nexto.py':'339c48a8328e0913f9ce31b5f4bb3f9c3b5a71f96b10a4a55e568d18f70cad41',
+        'replay_hybrid/train.py':'417c67843592c9d9f5ef6474fbb297ab090e0748f55be57aa5ff398a16a98456'}
+    before=prior.get('code',{});after=current.get('code',{})
+    changed={key for key in before.keys()|after.keys() if before.get(key)!=after.get(key)}
+    same_settings={k:v for k,v in prior.items() if k!='code'}=={k:v for k,v in current.items() if k!='code'}
+    compatible=bool(changed) and changed<=old_code.keys() and all(before.get(k)==old_code[k] for k in changed)
+    record={'fix':'original-nexto-cpu-constants-v1','protocol_sha256':sha256(root/'protocol.json'),
+        'code':after,'nexto_device':'cpu'}
+    approved=read_json(root/'runtime_compatibility.json')
+    if not same_settings or not compatible or approved is not None and approved!=record:
+        raise ValueError('Hybrid source/data/settings changed. Preserve this run; use a new name.')
+    if approved is None:atomic_json(root/'runtime_compatibility.json',record)
+    print('HYBRID_COMPATIBILITY: Nexto CPU adapter fix; existing checkpoints and replay caches preserved',flush=True)
+
+
 def replay_batch(data,model,rng,device,count=64):
     # One replay per update preserves cache locality; replays are selected by
     # their sample counts. Never use validation/test demonstrations for SGD.
@@ -173,8 +195,7 @@ def train(source,root,*,steps=1000000,envs=4,team_size=1,horizon=128,minibatch=1
     root.mkdir(parents=True,exist_ok=True)
     with process_lock(root/'train.lock'):
         prior=read_json(root/'protocol.json')
-        if prior is not None and prior!=protocol:raise ValueError('Hybrid source/data/settings changed. Preserve this run; use a new name.')
-        if prior is None:atomic_json(root/'protocol.json',protocol)
+        verify_protocol(root,prior,protocol)
         atomic_json(root/'dataset.json',{'path':str(dataset)});(root/'pause.flag').unlink(missing_ok=True)
         torch.set_num_threads(2);torch.manual_seed(20261023);random.seed(20261023)
         print('HYBRID_INITIALIZING: validating/snapshotting the parent model; existing weights are preserved',flush=True)
@@ -219,6 +240,7 @@ def train(source,root,*,steps=1000000,envs=4,team_size=1,horizon=128,minibatch=1
         if protocol['nexto_sha256'] is not None:
             from replay_hybrid.nexto import NextoOpponent
             nexto=NextoOpponent(nexto_path,device=device)
+            print('HYBRID_NEXTO: cpu | original traced opponent; learning model remains on',device,flush=True)
         if progress['steps']>=steps or progress['stale_evaluations']>=6:
             complete=heldout(root,anchor,device,nexto,team_size,final_games,final_seconds)
             selected=read_json(root/'policy/selected.json')

@@ -5,7 +5,10 @@ import torch
 
 class NextoOpponent:
     def __init__(self,path,device='cpu'):
-        self.device=device;self.actor=torch.jit.load(str(path),map_location=device).eval()
+        # The original traced Nexto graph creates CPU constants inside forward.
+        # map_location/.to(cuda) moves weights, not those graph constants. Keep
+        # this small opponent on CPU independently of the learning model device.
+        self.device='cpu';self.actor=torch.jit.load(str(path),map_location=self.device).eval()
 
     @torch.inference_mode()
     def logits(self,views):

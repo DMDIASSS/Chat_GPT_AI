@@ -138,13 +138,20 @@ def test_hybrid_training_checkpoint_resume_and_export_compatibility(tmp_path,raw
     dataset=fixture_dataset(tmp_path/'dataset',raw_rows);source=tmp_path/'source';source_fixture(source,dataset)
     protected={p:sha256(p) for p in list(dataset.iterdir())+list(source.rglob('*.pt'))}
     root=tmp_path/'data/isolated/hybrid'
-    monkeypatch.setattr(training,'ROOT',tmp_path);monkeypatch.setattr(training,'identity',lambda:{'fixture':'fixed'})
+    legacy_code={'replay_hybrid/nexto.py':'339c48a8328e0913f9ce31b5f4bb3f9c3b5a71f96b10a4a55e568d18f70cad41',
+        'replay_hybrid/train.py':'417c67843592c9d9f5ef6474fbb297ab090e0748f55be57aa5ff398a16a98456'}
+    monkeypatch.setattr(training,'ROOT',tmp_path);monkeypatch.setattr(training,'identity',lambda:legacy_code)
     settings=dict(envs=1,team_size=1,horizon=4,minibatch=4,device='cpu',wandb_mode='disabled',
         evaluate_every=8,evaluation_games=2,evaluation_seconds=1,final_games=2,final_seconds=1)
     training.train(source,root,steps=16,**settings)
     progress=read_json(root/'progress.json');assert progress['steps']==16 and progress['updates']==4
     digest=sha256(root/'training/latest.pt')
+    protocol_digest=sha256(root/'protocol.json')
+    current_code={key:'engineering-new-adapter-fixture' for key in legacy_code}
+    monkeypatch.setattr(training,'identity',lambda:current_code)
     training.train(source,root,steps=16,**settings);assert sha256(root/'training/latest.pt')==digest
+    assert sha256(root/'protocol.json')==protocol_digest
+    assert read_json(root/'runtime_compatibility.json')['code']==current_code
     training.train(source,root,steps=24,**settings);assert read_json(root/'progress.json')['steps']==24
     assert {p:sha256(p) for p in protected}==protected
     assert read_json(root/'protocol.json')['value_contract'].startswith('policy.values predicts discounted next goal')
@@ -165,6 +172,44 @@ def test_hybrid_training_checkpoint_resume_and_export_compatibility(tmp_path,raw
         assert read_json(target/'runtime.json')['mode']=='policy' and 'PPO' in info['learning']
     finally:
         if target is not None:shutil.rmtree(target,ignore_errors=True)
+
+
+def test_nexto_compatibility_rejects_other_changes_without_rewriting_protocol(tmp_path):
+    from replay_hybrid.train import verify_protocol
+    legacy={'replay_hybrid/nexto.py':'339c48a8328e0913f9ce31b5f4bb3f9c3b5a71f96b10a4a55e568d18f70cad41',
+        'replay_hybrid/train.py':'417c67843592c9d9f5ef6474fbb297ab090e0748f55be57aa5ff398a16a98456',
+        'replay_hybrid/policy.py':'unchanged'}
+    prior={'envs':2,'code':legacy};atomic_json(tmp_path/'protocol.json',prior)
+    digest=sha256(tmp_path/'protocol.json')
+    current=copy.deepcopy(prior);current['code']['replay_hybrid/nexto.py']='fixed-opponent'
+    for altered in ({**current,'envs':4},dict(current,code={**current['code'],'replay_hybrid/policy.py':'changed-loss'})):
+        with pytest.raises(ValueError,match='settings changed'):verify_protocol(tmp_path,prior,altered)
+    assert not (tmp_path/'runtime_compatibility.json').exists()
+    verify_protocol(tmp_path,prior,current);verify_protocol(tmp_path,prior,current)
+    assert sha256(tmp_path/'protocol.json')==digest
+    current['code']['replay_hybrid/nexto.py']='unapproved-later-edit'
+    with pytest.raises(ValueError,match='settings changed'):verify_protocol(tmp_path,prior,current)
+
+
+def test_nexto_cpu_graph_is_kept_on_cpu_when_learner_requests_cuda(tmp_path):
+    from replay_hybrid.nexto import NextoOpponent
+    class CpuConstantActor(torch.nn.Module):
+        def __init__(self):
+            super().__init__();self.linear=torch.nn.Linear(24,90)
+        def forward(self,obs):
+            # Same device contract as original Nexto's embedded action table.
+            constant=torch.arange(24,device='cpu',dtype=torch.float32).reshape(1,24)
+            return (self.linear(constant+obs[0][:,:,:24].squeeze(1)),)
+    obs=(torch.randn(2,1,32),torch.randn(2,41,24),torch.zeros(2,41))
+    actor=CpuConstantActor().eval();path=tmp_path/'cpu_constant_actor.pt'
+    torch.jit.trace(actor,(obs,)).save(str(path))
+    # Works even on a CPU-only test machine; requesting CUDA for the learner
+    # must not move this independently loaded opponent to CUDA.
+    opponent=NextoOpponent(path,device='cuda')
+    views=[tuple(value[i].numpy() for value in obs) for i in range(2)]
+    assert opponent.device=='cpu'
+    assert all(p.device.type=='cpu' for p in opponent.actor.parameters())
+    np.testing.assert_allclose(opponent.logits(views),actor(obs)[0].detach().numpy(),atol=1e-6)
 
 
 def test_hybrid_graceful_pause_preserves_consumed_rollout_and_resumes(tmp_path,raw_rows,monkeypatch):
@@ -239,7 +284,7 @@ def test_original_nexto_opponent_padding_matches_unpadded_inputs():
     world=World(21);teacher=NextoTeacher.__new__(NextoTeacher);teacher.torch=torch;teacher.device=torch.device('cpu')
     teacher.actor=torch.jit.load(path,map_location='cpu').eval()
     teacher.obs_builder=NextoObsBuilder(n_players=2,tick_skip=8)
-    opponent=NextoOpponent(path)
+    opponent=NextoOpponent(path,device='cuda')
     try:
         original=teacher.observe(world.state,world.previous);expected=teacher.logits([row[1:] for row in original])
         actual=opponent.logits(list(world.observe().values()))
