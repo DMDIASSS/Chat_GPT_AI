@@ -1,5 +1,10 @@
 # Replay RVQ: learned action chunks, state-only policy and all-car search
 
+For simulation fine-tuning of an existing selected RVQ model, see
+[README_REPLAY_HYBRID.md](README_REPLAY_HYBRID.md) and `REPLAY_HYBRID.bat`.
+That separate continuation uses PPO/self-play with a replay anchor; the
+replay-only workflow documented below is preserved.
+
 This is a **separate new experiment**, informed by the RocketLM discussion you
 supplied. It reuses your existing prepared human replay shards. It does not
 change `replay_scratch01`, `replay_mixed3v3_02`, their dictionaries, their resume
