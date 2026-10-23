@@ -9,7 +9,7 @@ from slater_v041_overnight import mutate_from,find_latest_trial_checkpoint,write
 
 
 def test_config_valid():
-    assert validate_config(copy.deepcopy(DEFAULT_CONFIG))['run_name']=='overnight01'
+    assert validate_config(copy.deepcopy(DEFAULT_CONFIG))['run_name']=='overnight02'
 
 def test_unsafe_mutations_rejected():
     v=copy.deepcopy(DEFAULT_CONFIG);v['large_mutation']=1
@@ -43,7 +43,8 @@ def test_no_ambiguous_unknown_champion(tmp_path):
     with pytest.raises(FileNotFoundError):find_model(tmp_path,'original_champion')
 
 def test_selection_pair_mathematics():
-    rows=[{'rival':n,'seed':1,'side':'blue','candidate_outcome':1,'leader_outcome':-1} for n in RIVAL_NAMES]
+    rows=[{'rival':n,'seed':seed,'side':side,'candidate_outcome':1,'leader_outcome':-1}
+          for seed in range(8) for side in ('blue','orange') for n in RIVAL_NAMES]
     summary=paired_scores(rows)
     assert summary['mean_paired_delta']==2.0
     assert should_promote(summary,margin=.1,min_resolved=6)[0]

@@ -16,8 +16,11 @@ def main(argv=None):
     p.add_argument('--seed',type=int,required=True)
     p.add_argument('--seeds',type=int,default=2)
     p.add_argument('--steps',type=int,default=600)
+    p.add_argument('--rlbot-delay',action=argparse.BooleanOptionalAction,default=True)
     args=p.parse_args(argv)
-    if not (1<=args.seeds<=24 and 120<=args.steps<=4500 and 1<=args.seed<2**31-20000):p.error('Bad evaluation settings')
+    if not (1<=args.seeds<=128 and 120<=args.steps<=4500
+            and 1<=args.seed and args.seed+(args.seeds-1)*997<2**31-20000):
+        p.error('Bad evaluation settings')
     root=Path.cwd().resolve()
     candidate=(root/args.candidate).resolve();leader=(root/args.leader).resolve()
     isolated=(root/'data/isolated').resolve()
@@ -32,7 +35,7 @@ def main(argv=None):
     if {k:v['sha256'] for k,v in current.items()} != {k:v['sha256'] for k,v in manifest.items()}:
         raise RuntimeError('An opponent changed after preflight')
     report_data=paired_eval(root,manifest,candidate,leader,seeds=args.seeds,
-                            seed_base=args.seed,episode_steps=args.steps)
+                            seed_base=args.seed,episode_steps=args.steps,rlbot_delay=args.rlbot_delay)
     result={'result':report_data,'candidate_sha':sha256(candidate),'leader_sha':sha256(leader),
             'manifest_sha':sha256(root/args.manifest),'status':'SIMULATOR_SCREEN_NOT_RLBOT_CHAMPION'}
     atomic_json(report,result)

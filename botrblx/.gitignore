@@ -1,0 +1,16 @@
+*.log
+__pycache__/
+*.pyc
+*.pt
+*.pth
+*.ckpt
+file_connection.json
+botrblx_exchange/
+botrblx_client.lua
+DIAGNOSTIC_REPORT.txt
+DIAGNOSTIC_REPORT.json
+diagnostics.lock
+botrblx_diagnose.lua
+botrblx_diag_*
+botrblx_standalone.lua
+standalone_export.log

@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Car Soccer + Turball AI Trainer",
+  "version": "4.5.1",
+  "description": "AI models, TAS playback and a minimizable menu, plus Car Soccer local/host fun controls for ball glue, boost, jumps, speed and goal shots.",
+  "permissions": [
+    "debugger",
+    "tabs",
+    "webNavigation",
+    "storage",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://car-soccer.com/*",
+    "https://turball.io/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Car Soccer + Turball AI Trainer",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://car-soccer.com/*",
+        "https://turball.io/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "nexto-worker.bundle.js",
+        "nexto-weights.bin",
+        "g9-weights.bin"
+      ],
+      "matches": [
+        "https://car-soccer.com/*",
+        "https://turball.io/*"
+      ]
+    }
+  ]
+}
