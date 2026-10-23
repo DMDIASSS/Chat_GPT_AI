@@ -202,8 +202,13 @@ agent=ReplayRVQBot();agent.index=0;agent.get_field_info=lambda:data.field;agent.
 assert agent.controller.mode=='search'
 result=agent.get_output(data.packet)
 assert not agent.error and -1<=result.throttle<=1
+assert agent.controller.asynchronous and agent.controller.pending is not None
+agent.controller.pending.result(timeout=10)
+data.packet.game_info.seconds_elapsed+=1/120
+agent.last_log=None
+agent.get_output(data.packet)
 assert agent.controller.last_report['opponents'].startswith('all other cars')
-assert agent.controller.decisions==1 and Path('RVQ_DIAGNOSTICS.json').is_file()
+assert agent.controller.decisions==2 and Path('RVQ_DIAGNOSTICS.json').is_file()
 assert Path('RVQ_DIAGNOSTICS_0.json').is_file()
 report=json.loads(Path('RVQ_DIAGNOSTICS_0.json').read_text())
 assert len(report['motion']['issued_action'])==8 and report['motion']['recent_trace']
@@ -332,3 +337,96 @@ def test_search_terminal_goal_scores_are_oriented_to_the_controlled_team(orange,
     finally:planner.close()
     expected=1. if goal_y_sign==(-1 if orange else 1) else -1.
     assert report['selected']['value']==expected
+
+
+class ManualSearchExecutor:
+    """A deliberately unfinished worker: the control path must never wait."""
+    def __init__(self,**kwargs):self.jobs=[]
+    def submit(self,function,*args):
+        from concurrent.futures import Future
+        future=Future();future.set_running_or_notify_cancel();self.jobs.append((future,function,args));return future
+    def shutdown(self,**kwargs):pass
+
+
+def asynchronous_fixture(monkeypatch):
+    import replay_rvq.runtime as runtime
+    monkeypatch.setattr(runtime,'ThreadPoolExecutor',ManualSearchExecutor)
+    class Kernel:
+        def eval(self):return self
+        def encode(self,obs):return torch.zeros(len(obs[0]),4)
+        def greedy(self,features):
+            sequence=torch.zeros(len(features),32,8);sequence[:,:,0]=.5;sequence[:,2:4,5]=1
+            return sequence,torch.zeros(len(features),4,dtype=torch.long),torch.zeros(len(features))
+    packet,field=packet_fixture(state_fixture());packet.game_info.is_round_active=True
+    controller=runtime.Controller(Kernel(),field,scripted_kickoff=False)
+    return controller,packet
+
+
+def test_background_search_does_not_block_jump_edges_and_keeps_comparing_candidates(monkeypatch):
+    controller,packet=asynchronous_fixture(monkeypatch)
+    try:
+        actions=[]
+        for tick in range(12):
+            packet.game_info.seconds_elapsed=tick/120;actions.append(controller.output(packet,0))
+        assert [i for i,action in enumerate(actions) if action[5]]==[2,3]
+        assert len(controller.executor.jobs)==1 and controller.bootstrap_decisions==1
+        assert controller.contingency_frames==4
+        sequence=np.zeros((32,8),np.float32);sequence[:,0]=1;sequence[2:4,5]=1
+        controller.pending.set_result((sequence,{'latency_ms':100.,'candidates':4}))
+        for tick in range(12,20):
+            packet.game_info.seconds_elapsed=tick/120;actions.append(controller.output(packet,0))
+        assert [i for i,action in enumerate(actions[12:],12) if action[5]]==[14,15]
+        assert controller.last_report['state_age_ticks']==12 and controller.search.candidates==2
+        assert len(controller.executor.jobs)==2 # No backlog or multiple workers.
+        controller.pending.set_result((sequence,{'latency_ms':100.,'candidates':2}))
+        packet.game_info.seconds_elapsed=20/120;controller.output(packet,0)
+        assert controller.search.candidates==2 # A slow decision cannot silently turn search into argmax.
+        assert controller.last_report['candidates']==2
+    finally:controller.close()
+
+
+@pytest.mark.parametrize('reset,completed_tick,reason',[(True,1,'reset_generation'),(False,40,'stale')])
+def test_background_rejects_old_match_and_expired_plans(monkeypatch,reset,completed_tick,reason):
+    controller,packet=asynchronous_fixture(monkeypatch)
+    try:
+        packet.game_info.seconds_elapsed=0;controller.output(packet,0);pending=controller.pending
+        if reset:controller.reset()
+        sequence=np.zeros((32,8),np.float32);sequence[:,0]=-1
+        pending.set_result((sequence,{'latency_ms':300.,'candidates':4}))
+        packet.game_info.seconds_elapsed=completed_tick/120;action=controller.output(packet,0)
+        assert action[0]==.5 and controller.discarded_results==1
+        assert controller.last_discarded_plan['reason']==reason
+        assert controller.bootstrap_decisions==2 and len(controller.executor.jobs)==2
+        assert controller.pending is not pending
+    finally:controller.close()
+
+
+def test_early_background_result_does_not_truncate_the_committed_prefix(monkeypatch):
+    controller,packet=asynchronous_fixture(monkeypatch)
+    try:
+        packet.game_info.seconds_elapsed=0;controller.output(packet,0)
+        sequence=np.zeros((32,8),np.float32);sequence[:,0]=1;sequence[6:8,5]=1
+        controller.pending.set_result((sequence,{'latency_ms':5.,'candidates':4}))
+        packet.game_info.seconds_elapsed=1/120;controller.output(packet,0)
+        packet.game_info.seconds_elapsed=8/120;action=controller.output(packet,0)
+        assert action[5]==1 and len(controller.executor.jobs)==2
+        controller.pending.set_result((np.zeros((32,8),np.float32),{'latency_ms':5.,'candidates':4}))
+        # The result is ready at tick eight, but prefix ticks 1..8 are committed.
+        action=controller.output(packet,0)
+        assert action[5]==1 and controller.decision_tick==1
+        packet.game_info.seconds_elapsed=9/120;action=controller.output(packet,0)
+        assert action[5]==0 and controller.decision_tick==9
+    finally:controller.close()
+
+
+def test_worker_exception_surfaces_without_waiting_and_next_reset_can_recover(monkeypatch):
+    controller,packet=asynchronous_fixture(monkeypatch)
+    try:
+        packet.game_info.seconds_elapsed=0;controller.output(packet,0)
+        controller.pending.set_exception(ValueError('forecast failed'))
+        packet.game_info.seconds_elapsed=1/120
+        with pytest.raises(ValueError,match='forecast failed'):controller.output(packet,0)
+        assert controller.pending is None
+        controller.reset();action=controller.output(packet,0)
+        assert action[0]==.5 and len(controller.executor.jobs)==2
+    finally:controller.close()

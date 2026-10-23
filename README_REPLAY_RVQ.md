@@ -164,7 +164,10 @@ first chunk differs between proposals. The value-head mean scores the endpoint;
 terminal goals use the known signed outcome. There is no hand-made movement,
 mechanic-complexity or ball-distance reward.
 
-The bot executes only the first eight ticks of the chosen chunk, then replans.
+The normal target is to execute eight ticks, then replan. With background search,
+slow decisions continue the previous learned chunk up to 32 ticks while a new
+plan is pending. Plans older than the configured limit are rejected. This keeps
+the control path from waiting on a forecast; it does not remove search latency.
 Other players are forecasts from the learned policy, not their actual future
 inputs. This assumption can be wrong against unusual opponents. No online
 opponent adapter is included.
@@ -196,17 +199,26 @@ no successful live-game test has been performed in this cloud environment.
 {
   "device": "auto",
   "mode": "search",
-  "candidates": 16,
+  "candidates": 4,
   "adaptive": true,
+  "asynchronous": true,
+  "max_plan_age_ticks": 32,
   "scripted_kickoff": true
 }
 ```
 
 Adaptive search starts at four candidates, reduces after slow decisions and
-grows only after repeated fast decisions, up to the configured maximum. This is
-a **soft** latency response, not a guaranteed real-time deadline. A slow search
-can still delay controls. Do not force 64 because another desktop reportedly
-handled it. `mode: "policy"` provides a direct-policy comparison, with no search.
+grows only after repeated fast decisions, up to the configured maximum. Its
+floor is two candidates unless the user explicitly configures a maximum of one.
+The single background worker never queues a second unfinished forecast. Main
+controls continue through the learned chunk, preserving per-tick button edges.
+Plans start their first prefix when ready; no latency-compensated state forecast
+is claimed. Reset/expired results are discarded. Slow search can still reduce
+decision frequency and strength. Python/GIL, bootstrap inference and diagnostic
+logging also cost time; this is not a guaranteed real-time deadline.
+Do not force 64 because another desktop reportedly handled it. `mode: "policy"`
+provides a direct-policy comparison; `asynchronous: false` retains synchronous
+search for comparisons. See [README_REPLAY_RVQ_RUNTIME_FIX.md](README_REPLAY_RVQ_RUNTIME_FIX.md).
 
 The kickoff is the existing basic scripted assist, clearly separate from the
 network. No trained pro kickoff book is claimed. New exports preserve existing

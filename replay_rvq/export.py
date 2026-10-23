@@ -33,8 +33,8 @@ def export(root,name='ReplayRVQ01',output=None):
             'NEXT0_UPSTREAM_LICENSE.txt':ROOT/'rlbot_v4_template/NEXT0_UPSTREAM_LICENSE.txt',
             'appearance.cfg':ROOT/'rlbot_v4_template/appearance.cfg'}
         for filename,source in files.items():shutil.copy2(source,temp/filename)
-        (temp/'runtime.json').write_text(json.dumps({'device':'auto','mode':'search','candidates':16,
-            'adaptive':True,'scripted_kickoff':True},indent=2),encoding='utf8')
+        (temp/'runtime.json').write_text(json.dumps({'device':'auto','mode':'search','candidates':4,
+            'adaptive':True,'asynchronous':True,'max_plan_age_ticks':32,'scripted_kickoff':True},indent=2),encoding='utf8')
         versions=read_json(root/'protocol.json').get('runtime',{})
         versions={name:versions.get(name,version(name)) for name in ('torch','numpy','rlgym','rlgym-rocket-league','rocketsim')}
         # CUDA wheel suffixes use a separate index; preserve a portable base
@@ -52,10 +52,12 @@ def export(root,name='ReplayRVQ01',output=None):
             'validation':read_json(root/'policy/selected.json').get('validation',{}),'training_runtime':versions,
             'live_game_verified':False,'limitations':'Standard Soccar only. Jump/flip, demolition and pad respawn timers are estimates. '
                 'Unknown hitboxes default to Octane only when packet dimensions are absent. No score/time features in cached inputs. '
-                'Basic scripted kickoff, not a pro replay book. Reference search may exceed laptop budget; adaptive counts are a soft limit.'}
+                'Basic scripted kickoff, not a pro replay book. Background search keeps controls updating but uses aged states without latency compensation. '
+                'Late plans are rejected; while pending, the previous learned chunk can continue beyond tick eight, up to 32 ticks. '
+                'Adaptive counts stay at least two unless the configured maximum is one. No hard timing or strength guarantee.'}
         (temp/'EXPORT_INFO.json').write_text(json.dumps(info,indent=2),encoding='utf8')
         (temp/'README_IMPORT.txt').write_text('Load bot.cfg in RLBot v4. RLBot Python needs Torch, NumPy and rlgym[rl-sim].\n'
-            'The export is self-contained and never trains. Search defaults to an adaptive maximum of 16 candidates.\n'
+            'The export is self-contained and never trains. Background search defaults to an adaptive 2..4 candidates.\n'
             'runtime.json mode can be policy for a direct-policy comparison. Benchmark the trained model before raising the budget.\n'
             +info['limitations']+'\n',encoding='utf8')
         if sha256(root/'policy/best.pt')!=digest:raise RuntimeError('Source checkpoint changed during export')
