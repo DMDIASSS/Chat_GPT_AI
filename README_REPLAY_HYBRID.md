@@ -105,6 +105,10 @@ This update also accepts the previous hybrid release's exact code identity for
 this fix only, recording `runtime_compatibility.json` while preserving existing
 protocol hashes, checkpoints and progress. Rerun the same check/start command;
 there is no need to delete a run or parse replays again.
+The compatibility check accepts Windows backslash paths from both earlier
+releases and compares them using consistent separators. Genuine code/settings
+mismatches list the changed fields and write `compatibility_diagnostic.json` in
+the child run, instead of reporting only a generic rejection.
 
 ## Preserve mechanics and keep value meanings correct
 

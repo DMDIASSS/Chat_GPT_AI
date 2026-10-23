@@ -138,8 +138,8 @@ def test_hybrid_training_checkpoint_resume_and_export_compatibility(tmp_path,raw
     dataset=fixture_dataset(tmp_path/'dataset',raw_rows);source=tmp_path/'source';source_fixture(source,dataset)
     protected={p:sha256(p) for p in list(dataset.iterdir())+list(source.rglob('*.pt'))}
     root=tmp_path/'data/isolated/hybrid'
-    legacy_code={'replay_hybrid/nexto.py':'339c48a8328e0913f9ce31b5f4bb3f9c3b5a71f96b10a4a55e568d18f70cad41',
-        'replay_hybrid/train.py':'417c67843592c9d9f5ef6474fbb297ab090e0748f55be57aa5ff398a16a98456'}
+    legacy_code={'replay_hybrid\\nexto.py':'339c48a8328e0913f9ce31b5f4bb3f9c3b5a71f96b10a4a55e568d18f70cad41',
+        'replay_hybrid\\train.py':'417c67843592c9d9f5ef6474fbb297ab090e0748f55be57aa5ff398a16a98456'}
     monkeypatch.setattr(training,'ROOT',tmp_path);monkeypatch.setattr(training,'identity',lambda:legacy_code)
     settings=dict(envs=1,team_size=1,horizon=4,minibatch=4,device='cpu',wandb_mode='disabled',
         evaluate_every=8,evaluation_games=2,evaluation_seconds=1,final_games=2,final_seconds=1)
@@ -147,7 +147,7 @@ def test_hybrid_training_checkpoint_resume_and_export_compatibility(tmp_path,raw
     progress=read_json(root/'progress.json');assert progress['steps']==16 and progress['updates']==4
     digest=sha256(root/'training/latest.pt')
     protocol_digest=sha256(root/'protocol.json')
-    current_code={key:'engineering-new-adapter-fixture' for key in legacy_code}
+    current_code={key.replace('\\','/'):'engineering-new-adapter-fixture' for key in legacy_code}
     monkeypatch.setattr(training,'identity',lambda:current_code)
     training.train(source,root,steps=16,**settings);assert sha256(root/'training/latest.pt')==digest
     assert sha256(root/'protocol.json')==protocol_digest
@@ -189,6 +189,43 @@ def test_nexto_compatibility_rejects_other_changes_without_rewriting_protocol(tm
     assert sha256(tmp_path/'protocol.json')==digest
     current['code']['replay_hybrid/nexto.py']='unapproved-later-edit'
     with pytest.raises(ValueError,match='settings changed'):verify_protocol(tmp_path,prior,current)
+
+
+@pytest.mark.parametrize('separator',['/','\\'])
+@pytest.mark.parametrize('previous_release',['initial','cpu-fix','approved-cpu-fix'])
+def test_windows_protocol_accepts_exact_released_fix_and_preserves_checkpoint_hashes(tmp_path,separator,previous_release):
+    from replay_hybrid.train import verify_protocol
+    initial={'replay_hybrid/nexto.py':'339c48a8328e0913f9ce31b5f4bb3f9c3b5a71f96b10a4a55e568d18f70cad41',
+        'replay_hybrid/train.py':'417c67843592c9d9f5ef6474fbb297ab090e0748f55be57aa5ff398a16a98456',
+        'replay_il/train.py':'unchanged-dependency'}
+    cpu_fix={**initial,'replay_hybrid/nexto.py':'751ebd71d647c9668f39f632f106b60b64cc67bc250f3c86f739dcbad5569c55',
+        'replay_hybrid/train.py':'dc3918198c4570e82053bd57140dfe773cf81705403a07b3056f1013db11d9f1'}
+    previous=cpu_fix if previous_release=='cpu-fix' else initial
+    # Original identity mixed OS-native hybrid paths with literal dependency paths.
+    legacy={key.replace('/',separator) if key.startswith('replay_hybrid/') else key:digest for key,digest in previous.items()}
+    prior={'team_size':1,'code':legacy};atomic_json(tmp_path/'protocol.json',prior)
+    digest=sha256(tmp_path/'protocol.json')
+    torch.save({'protocol_sha256':digest,'progress':{'steps':256,'updates':4}},tmp_path/'latest.pt')
+    checkpoint=sha256(tmp_path/'latest.pt')
+    if previous_release=='approved-cpu-fix':
+        atomic_json(tmp_path/'runtime_compatibility.json',{'fix':'original-nexto-cpu-constants-v1',
+            'protocol_sha256':digest,'code':cpu_fix,'nexto_device':'cpu'})
+    current={'team_size':1,'code':{**cpu_fix,'replay_hybrid/train.py':'current-engineering-fixture'}}
+    verify_protocol(tmp_path,prior,current);verify_protocol(tmp_path,prior,current)
+    assert sha256(tmp_path/'protocol.json')==digest and sha256(tmp_path/'latest.pt')==checkpoint
+    assert read_json(tmp_path/'runtime_compatibility.json')['code']==current['code']
+    if previous_release=='approved-cpu-fix':assert (tmp_path/'runtime_compatibility_v1.json').exists()
+    # Formatting differences alone also work for subsequent native-path comparisons.
+    same=copy.deepcopy(current);same['code']={key.replace('/',separator):value for key,value in current['code'].items()}
+    verify_protocol(tmp_path,current,same)
+
+
+def test_protocol_rejects_conflicting_windows_path_aliases(tmp_path):
+    from replay_hybrid.train import verify_protocol
+    prior={'code':{'replay_hybrid/train.py':'one','replay_hybrid\\train.py':'two'}}
+    atomic_json(tmp_path/'protocol.json',prior)
+    with pytest.raises(ValueError,match='Conflicting code identity paths'):
+        verify_protocol(tmp_path,prior,{'code':{}})
 
 
 def test_nexto_cpu_graph_is_kept_on_cpu_when_learner_requests_cuda(tmp_path):

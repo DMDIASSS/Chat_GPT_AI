@@ -37,7 +37,7 @@ def snapshot_parent(source,root,digest):
 
 
 def identity():
-    names=[str(p.relative_to(ROOT)) for p in (ROOT/'replay_hybrid').glob('*.py')]
+    names=[p.relative_to(ROOT).as_posix() for p in (ROOT/'replay_hybrid').glob('*.py')]
     names+=['replay_rvq/model.py','replay_rvq/data.py','replay_il/model.py','replay_il/train.py',
         'replay_il/monitor.py','replay_rvq/packet.py','replay_rlbot_core.py','slater_v041_core.py']
     return {name:sha256(ROOT/name) for name in sorted(names)}
@@ -47,22 +47,50 @@ def verify_protocol(root,prior,current):
     if prior is None:
         atomic_json(root/'protocol.json',current);return
     if prior==current:return
-    # One narrowly scoped compatibility update for the original CPU-only
-    # traced Nexto adapter. Preserve protocol/checkpoint hashes and all progress.
-    old_code={
-        'replay_hybrid/nexto.py':'339c48a8328e0913f9ce31b5f4bb3f9c3b5a71f96b10a4a55e568d18f70cad41',
-        'replay_hybrid/train.py':'417c67843592c9d9f5ef6474fbb297ab090e0748f55be57aa5ff398a16a98456'}
-    before=prior.get('code',{});after=current.get('code',{})
-    changed={key for key in before.keys()|after.keys() if before.get(key)!=after.get(key)}
-    same_settings={k:v for k,v in prior.items() if k!='code'}=={k:v for k,v in current.items() if k!='code'}
-    compatible=bool(changed) and changed<=old_code.keys() and all(before.get(k)==old_code[k] for k in changed)
-    record={'fix':'original-nexto-cpu-constants-v1','protocol_sha256':sha256(root/'protocol.json'),
+    # Windows releases used str(relative_path), producing backslashes for the
+    # hybrid files but slashes for dependencies. Normalize comparison keys only;
+    # never rewrite the original protocol or invalidate checkpoint hashes.
+    def paths(code):
+        normalized={}
+        for key,digest in code.items():
+            name=key.replace('\\','/')
+            if name in normalized and normalized[name]!=digest:
+                raise ValueError('Conflicting code identity paths: '+name)
+            normalized[name]=digest
+        return normalized
+    # Exact published CPU-adapter/compatibility versions; other code changes
+    # still need a separate experiment. Keep this list explicit on upgrades.
+    released={
+        'replay_hybrid/nexto.py':{
+            '339c48a8328e0913f9ce31b5f4bb3f9c3b5a71f96b10a4a55e568d18f70cad41',
+            '751ebd71d647c9668f39f632f106b60b64cc67bc250f3c86f739dcbad5569c55'},
+        'replay_hybrid/train.py':{
+            '417c67843592c9d9f5ef6474fbb297ab090e0748f55be57aa5ff398a16a98456',
+            'dc3918198c4570e82053bd57140dfe773cf81705403a07b3056f1013db11d9f1'}}
+    before=paths(prior.get('code',{}));after=paths(current.get('code',{}))
+    def compatible(previous):
+        changed={key for key in previous.keys()|after.keys() if previous.get(key)!=after.get(key)}
+        return changed<=released.keys() and all(previous.get(k) in released[k] for k in changed)
+    changed=sorted(key for key in before.keys()|after.keys() if before.get(key)!=after.get(key))
+    settings=sorted(k for k in prior.keys()|current.keys() if k!='code' and
+        (k not in prior or k not in current or prior[k]!=current[k]))
+    record={'fix':'original-nexto-cpu-constants-windows-v2','protocol_sha256':sha256(root/'protocol.json'),
         'code':after,'nexto_device':'cpu'}
     approved=read_json(root/'runtime_compatibility.json')
-    if not same_settings or not compatible or approved is not None and approved!=record:
-        raise ValueError('Hybrid source/data/settings changed. Preserve this run; use a new name.')
-    if approved is None:atomic_json(root/'runtime_compatibility.json',record)
-    print('HYBRID_COMPATIBILITY: Nexto CPU adapter fix; existing checkpoints and replay caches preserved',flush=True)
+    accepted=approved is None or approved==record or (
+        approved.get('fix')=='original-nexto-cpu-constants-v1' and
+        approved.get('protocol_sha256')==record['protocol_sha256'] and
+        approved.get('nexto_device')=='cpu' and compatible(paths(approved.get('code',{}))))
+    if settings or not compatible(before) or not accepted:
+        diagnostic=root/'compatibility_diagnostic.json'
+        atomic_json(diagnostic,{'settings_changed':settings,'code_changed':changed,
+            'previous_code':before,'current_code':after,'previous_compatibility_accepted':accepted})
+        raise ValueError('Hybrid source/data/settings changed. Code: '+(', '.join(changed) or 'none')+
+            '; settings: '+(', '.join(settings) or 'none')+'. Details: '+str(diagnostic))
+    if approved!=record:
+        if approved is not None:atomic_json(root/'runtime_compatibility_v1.json',approved)
+        atomic_json(root/'runtime_compatibility.json',record)
+    print('HYBRID_COMPATIBILITY: Windows paths / Nexto CPU fix; checkpoints and replay caches preserved',flush=True)
 
 
 def replay_batch(data,model,rng,device,count=64):
