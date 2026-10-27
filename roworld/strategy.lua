@@ -3,14 +3,26 @@ local Strategy={};Strategy.__index=Strategy
 local Core = require("./core")
 function Strategy.new(frame)
     local owners={};for sid,b in pairs(frame.state.structures) do owners[sid]=b.owner end
-    return setmetatable({campaigns={},peace={},structures=owners,timeline={},recoverUntil=0,board={},core=Core.new()},Strategy)
+    local allies={};for id in pairs(frame.state.owners) do if frame.state:are_allies(frame.me,id) then allies[id]=true end end
+    return setmetatable({campaigns={},peace={},structures=owners,timeline={},recoverUntil=0,board={},core=Core.new(),
+        allies=allies,relationships={},distrust={},asked={},allianceSeq=frame.state.alliance_seq or 0},Strategy)
+end
+function Strategy:trustworthy(frame,id) return frame.now>=(self.distrust[id] or 0) end
+function Strategy:canAsk(frame,id) return self:trustworthy(frame,id) and frame.now>=(self.asked[id] or 0) end
+function Strategy:allianceEnded(frame,id,confirmed,reason)
+    table.insert(self.relationships,{nation=id,tick=frame.state.tick,confirmed_betrayal=confirmed,reason=reason})
+    if #self.relationships>32 then table.remove(self.relationships,1) end
+    if confirmed then
+        self.distrust[id]=frame.now+180;self.peace[id]=nil
+        if self.core.fronts[id] or (self.adjacentAllies or {})[id] then self.recoverUntil=frame.now+12 end
+    end
 end
 function Strategy:updateCore(frame) return self.core:update(frame) end
 function Strategy:corePriority(frame,tile) return self.core:priority(frame.map,tile) end
 local function friendly(s,me,id) return id==me or id>0 and s:are_allies(me,id) end
 function Strategy:sent(action,s,me,now)
     local kind=action.intent.type
-    if kind=='ally_request' then self.peace[action.intent.target]=now+45 end
+    if kind=='ally_request' then self.peace[action.intent.target]=now+45;self.asked[action.intent.target]=now+120 end
     local target=action.intent.tile and s:tile_owner(action.intent.tile) or 0
     if (kind=='attack' or kind=='boat') and target>0 then
         local c=self.campaigns[target]
@@ -29,6 +41,23 @@ function Strategy:sent(action,s,me,now)
 end
 function Strategy:observe(frame)
     local s=frame.state
+    local recorded={}
+    for _,event in ipairs(s.alliance_events or {}) do
+        if event.seq>self.allianceSeq and (event.a==frame.me or event.b==frame.me) then
+            local other=event.a==frame.me and event.b or event.a;recorded[other]=true
+            self:allianceEnded(frame,other,event.breaker==other and not event.expired,
+                event.expired and 'expired' or event.breaker==other and 'partner broke alliance' or 'alliance ended')
+        end
+        self.allianceSeq=math.max(self.allianceSeq,event.seq)
+    end
+    for id,o in pairs(s.owners) do
+        local allied=s:are_allies(frame.me,id)
+        if self.allies[id] and not allied and not recorded[id] then
+            self:allianceEnded(frame,id,false,'ended; cause unavailable on this route')
+            if (o.traitor_until or 0)>s.tick then self.distrust[id]=frame.now+90 end
+        end
+        self.allies[id]=allied or nil
+    end
     for sid,b in pairs(s.structures) do
         local previous=self.structures[sid]
         if previous and previous~=frame.me and b.owner==frame.me then
@@ -54,6 +83,7 @@ function Strategy.countryCounter(amount,bank)
     return bank*math.clamp(amount*1.25/math.max(bank,1),.05,.4)
 end
 function Strategy:updateBoard(frame,groups,a,fronts,allies)
+    self.adjacentAllies=allies or {}
     local s,home=frame.state,a.home
     local near={};for id in pairs(groups) do near[id]=true end
     for id,m in pairs(fronts or {}) do if frame.now-m.at<=8 then near[id]=true end end
@@ -104,8 +134,13 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
     for _,row in ipairs(self.timeline) do if frame.now-row.at<20 then peak=math.max(peak,row.land) end end
     if peak>=50 and (frame.info.tiles or 0)<peak*.88 then self.recoverUntil=frame.now+15 end
     b.recover=frame.now<self.recoverUntil or a.incoming>home*.35 or core.critical==true
+    local stranded=core.center_tile and (core.clearable_tiles or 0)==0 and (core.friendly_fraction or 1)<.15
+        and a.incoming==0 and (core.naval_incoming or 0)==0 and b.committed==0
+    if stranded then self.strandedSince=self.strandedSince or frame.now else self.strandedSince=nil end
+    b.escape=self.strandedSince~=nil and frame.now-self.strandedSince>=20
     b.overextended=b.human_neighbours>0 and b.largest_human>home*1.4
     if b.recover then b.mode='recover' elseif core.at_risk or b.overextended or a.incoming>home*.15 then b.mode='guard' end
+    if b.escape then b.mode='relocate';a.reserve=math.max(a.reserve,home*.75);a.available=math.max(0,home-a.reserve) end
     table.sort(b.leaders,function(x,y) return x.land>y.land end)
     while #b.leaders>5 do table.remove(b.leaders) end
     self.board=b

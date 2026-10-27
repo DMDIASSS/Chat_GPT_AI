@@ -1,4 +1,4 @@
-# RoWorld bot 1.6.0
+# RoWorld bot 1.7.0
 
 One **Start bot / Stop bot** button, a decision status line, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
@@ -22,6 +22,32 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 1.7 addresses income, alliance changes and trapped-core recovery:
+
+- Factory/city site scoring favors partners within 15–90 full map units with a
+  clear owned/allied land corridor. This improves the chance of a usable income
+  network, but does not guarantee that the game's rail planner connects it.
+  Cities primarily provide troop capacity; factories and port trade matter for
+  additional income. Production targets now permit more factories and ports as
+  the city base expands.
+- Routine warship purchases preserve funds for a first factory/port. A visible
+  transport invasion can override that saving priority. Reports include the
+  advertised income rate, economic building counts, live trade/cargo units and
+  the current production reserve. The advertised rate is not a full ledger of
+  every shipment, donation, conquest or loss.
+- Multiplayer alliance-end events record the breaker and expiry flag. Confirmed
+  betrayers are distrusted for three minutes, pending peace grace is cleared,
+  and a nearby betrayal triggers a short defensive reassessment. Expiry and
+  unknown native-client endings are not claimed as proven betrayal. Repeated
+  outgoing proposals to the same nation back off for two minutes.
+- A core stranded without local expansion for 20 seconds can enter relocation
+  mode despite a distant/nearby naval guard warning. It requires no incoming
+  land or transport invasion and sends at most 10% of the bank to neutral coast,
+  preserving at least 75% reserves. Only one such transport may be outstanding;
+  the possible destination gets a temporary five-minute expansion anchor.
+  This is a recovery attempt, not proof that the sea journey is safe.
+
 
 Version 1.6 protects the **original home and an economic core**:
 
@@ -202,7 +228,7 @@ Incomplete, stale or corrupt observations prevent orders and request resync.
 Match changes invalidate earlier decisions. Terrain water components are built
 once per download with cooperative yields; strategy scans are bounded.
 
-**107 offline scenarios** cover policy, adapter, network, weapons, strategy and core behavior, plus UI
+**115 offline scenarios** cover policy, adapter, network, weapons, strategy and core behavior, plus UI
 start/stop/re-injection and standalone Luau compilation. Additional checks against
 the supplied game's original modules verify new naval/diplomacy command encoding,
 water connectivity, unit paths/health, traitor flags and warship prices. Nuclear checks also match

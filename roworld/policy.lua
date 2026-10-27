@@ -43,6 +43,7 @@ function Policy:sent(action, now)
     local kind=action.intent.type;self.metrics[kind]=(self.metrics[kind] or 0)+1
     self.lastPlan=action.plan
     if self.strategy then self.strategy:sent(action,self.state,self.me,now) end
+    if action.escape and self.strategy then self.strategy.core.relocation={tile=action.intent.tile,untilTime=now+300} end
     self.history=self.history or {}
     local target=action.intent.target or (action.intent.tile and self.state and self.state:tile_owner(action.intent.tile))
     table.insert(self.history,{tick=self.state and self.state.tick or 0,kind=kind,label=action.label,
@@ -450,6 +451,7 @@ function Policy:diplomacy(frame,groups,a)
         if id~=frame.me and o.alive and s:has_request(id,frame.me) and not a.targets[id] then
             local hostile=((self.opponents[id] or {}).heat or 0)>.5
             local accept=not hostile and (o.traitor_until or 0)<=s.tick and Weapons.allianceSafe(s,frame.me,id)
+                and (not self.strategy or self.strategy:trustworthy(frame,id))
             return {intent={type="ally_reply",target=id,accept=accept},channel="diplomacy",cooldown=5,
                 label=(accept and "Accepting alliance with " or "Declining unreliable ally ")..o.name}
         end
@@ -475,6 +477,7 @@ function Policy:diplomacy(frame,groups,a)
         for id in pairs(groups) do
             local o=s.owners[id]
             if id>0 and o and o.kind~=1 and not a.targets[id] and not friendly(s,frame.me,id)
+                and (not self.strategy or self.strategy:canAsk(frame,id))
                 and (o.troops or 0)>=a.home*.6
                 and not s:has_request(frame.me,id) and (o.traitor_until or 0)<=s.tick
                 and Weapons.allianceSafe(s,frame.me,id)
@@ -530,6 +533,25 @@ function Policy:armies(frame, groups)
         predictedPressure=predicted,strongest=strongest}
 end
 
+function Policy:incomeLink(frame,tile,kind)
+    if kind~='factory' and kind~='city' then return 0 end
+    local s,map=frame.state,frame.map;local best=0
+    for _,b in pairs(s.structures) do
+        local partner=kind=='factory' and (b.kind==0 or b.kind==1) or kind=='city' and b.kind==2
+        local distance=math.sqrt(map.dist2(tile,b.tile))*(map.k_lin or 1)
+        if partner and b.owner==frame.me and distance>=15 and distance<=90 then
+            local dx,dy=b.tile%map.W-tile%map.W,b.tile//map.W-tile//map.W
+            local steps=math.max(math.abs(dx),math.abs(dy));local clear=true
+            for i=0,steps do
+                local t=math.floor(tile//map.W+dy*i/math.max(1,steps)+.5)*map.W+math.floor(tile%map.W+dx*i/math.max(1,steps)+.5)
+                local owner=s:tile_owner(t)
+                if not map:is_contestable(t) or s:has_fallout(t) or owner~=frame.me and not s:are_allies(frame.me,owner) then clear=false;break end
+            end
+            if clear then best=math.max(best,30-distance*.1) end
+        end
+    end
+    return best
+end
 function Policy:build(frame, sites, kind, counts)
     if not self:ready("build", frame.now) then return nil end
     local rules = frame.ctx.rules
@@ -540,6 +562,7 @@ function Policy:build(frame, sites, kind, counts)
         local place = rules:placement(kind, sites[i])
         if place.ok and valid(frame.map, place.tile) and self:siteSafe(frame,place.tile,kind) then
             local score = place.upgrade and -10 or 10
+            score+=self:incomeLink(frame,place.tile,kind)
             if self.strategy then score+=self.strategy.core:buildScore(frame,place.tile,kind) end
             local center = frame.info.label_tile
             if valid(frame.map, center) then score -= math.sqrt(frame.map.dist2(center, place.tile)) * .02 end
@@ -610,13 +633,23 @@ function Policy:economy(frame, sites, armies)
     if city > 0 and port == 0 then table.insert(wanted, "port") end
     if armies.home >= (frame.info.max_troops or math.huge) * .75 and city < 6 then table.insert(wanted, "city") end
     if factory < math.max(1, math.ceil(city / 2)) then table.insert(wanted, "factory") end
+    if factory>0 and factory<math.min(4,math.max(1,math.ceil(city*.75))) then table.insert(wanted,'factory') end
+    if city>1 and port>0 and port<math.min(3,math.ceil(city/2)) then table.insert(wanted,'port') end
     if city >= 1 and factory > 0 and (frame.info.gold or 0)>=1750000 then
         if (counts[5] or 0) == 0 then table.insert(wanted,"silo") end
     end
     if city < 6 and (frame.info.gold or 0) > frame.ctx.rules:cost("city") * 2 then table.insert(wanted, "city") end
+    self.economyPlan={reported_income=frame.info.income or 0,cities=city,factories=factory,ports=port,
+        reserve=factory==0 and frame.ctx.rules:cost('factory') or port==0 and type(frame.ctx.borders.has_coast)=='function'
+            and frame.ctx.borders:has_coast() and frame.ctx.rules:cost('port') or 0}
+    self.economyPlan.trade_ships=0;self.economyPlan.cargo_units=0
+    for _,u in pairs(frame.state.units or {}) do
+        if u.owner==frame.me and u.kind==1 then self.economyPlan.trade_ships+=1 end
+        if u.owner==frame.me and u.kind==3 then self.economyPlan.cargo_units+=1 end
+    end
     for _, kind in ipairs(wanted) do
         local action = self:build(frame, sites, kind, counts)
-        if action then return action end
+        if action then self.economyPlan.next_kind=kind;return action end
     end
     return nil
 end
@@ -712,7 +745,10 @@ function Policy:fleet(frame,armies)
         return (valid(map,ta) and map.dist2(ta,target) or math.huge)<(valid(map,tb) and map.dist2(tb,target) or math.huge)
     end)
     local wanted=threat and math.min(3,#ports+1) or 1
+    local economicReserve=self.economyPlan and self.economyPlan.reserve or 0
+    if self.strategy and (self.strategy.core.summary.hostile_transports or 0)>0 then economicReserve=0 end
     if #ships<wanted and frame.ctx.rules:availability("warship").ok
+        and (frame.info.gold or 0)>=frame.ctx.rules:cost('warship')+economicReserve
         and (frame.info.gold or 0)>=frame.ctx.rules:cost("warship")*(threat and 1 or 1.7)
         and frame.ctx.rules:placement("warship",target).ok then
         return {intent={type="build",kind="warship",tile=target},channel="fleet",cooldown=10,
@@ -734,12 +770,14 @@ function Policy:fleet(frame,armies)
 end
 
 function Policy:naval(frame, armies)
-    if self.strategy and (self.strategy.board.mode~="develop" or (armies.enemyActive or 0)>0) then return nil end
+    local escape=self.strategy and self.strategy.board.escape
+    if escape and frame.ctx.rules:transports()>0 then return nil end
+    if self.strategy and (self.strategy.board.mode~="develop" and not escape or (armies.enemyActive or 0)>0) then return nil end
     if self.strategy then
         local core=self.strategy.core.summary
-        if core.at_risk then return nil end
+        if core.at_risk and not escape then return nil end
     end
-    if armies.incoming > 0 or not self:ready("boat", frame.now) or armies.available < armies.home * .12 then return nil end
+    if armies.incoming > 0 or not self:ready("boat", frame.now) or armies.available < armies.home * (escape and .05 or .12) then return nil end
     if frame.ctx.rules:transports() >= (frame.state.rules.MAX_BOATS_PLAYER or 3) then return nil end
     local chosen, score
     for _ = 1, 120 do
@@ -748,6 +786,7 @@ function Policy:naval(frame, armies)
             local target = frame.state:tile_owner(tile)
             local owner = frame.state.owners[target]
             local weak = target == 0 or (owner and owner.alive and (owner.troops or 0) < armies.available * .2)
+            if escape then weak=target==0 end
             if self.strategy and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 then weak=false end
             if target>0 and self.strategy and not self.strategy:canTarget(frame,target,armies) then weak=false end
             if target>0 and (armies.enemyActive or 0)>0 and not (armies.targets or {})[target] then weak=false end
@@ -768,8 +807,10 @@ function Policy:naval(frame, armies)
         local owner=frame.state.owners[frame.state:tile_owner(chosen)]
         local wanted=owner and math.max(250,(owner.troops or 0)*1.6) or math.max(100,armies.home-self:growthTarget(frame.info))
         local amount,reserve=self:attackAmount(frame,armies,wanted,owner==nil)
-        if amount then return {intent = {type = "boat", tile = chosen, ratio = amount/armies.home},
-            reserve = reserve, plan={amount=amount},channel = "boat", cooldown = 12, label = "Sending a coastal landing"} end
+        if escape and amount then amount=math.min(amount,math.floor(armies.home*.1)) end
+        if amount then return {intent = {type = "boat", tile = chosen, ratio = amount/armies.home},escape=escape,
+            reserve = reserve, plan={amount=amount},channel = "boat", cooldown = escape and 30 or 12,
+            label = escape and "Establishing a small neutral foothold outside a trapped core" or "Sending a coastal landing"} end
     end
     return nil
 end
@@ -890,7 +931,9 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.6.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+    return {version="1.7.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+        alliance_history=self.strategy and self.strategy.relationships or {},income=info and info.income or 0,
+        economy=self.economyPlan or {},
         strategy=self.strategy and self.strategy.board or {},timeline=self.strategy and self.strategy.timeline or {},
         recruitment_target=info and self:growthTarget(info) or 0,spawn_plan=self.spawnPlan,
         tick=self.state and self.state.tick or 0,alive=info and info.alive or false,

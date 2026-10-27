@@ -121,7 +121,7 @@ function Mirror.snapshot(data,map,me,yield)
     assert(typeof(data.owner)=="buffer" and buffer.len(data.owner)==map.N*4,"Incomplete ownership snapshot")
     assert(typeof(data.flags)=="buffer" and buffer.len(data.flags)==map.N,"Incomplete fallout snapshot")
     local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},units={},
-        alliances={},requests={},built={},border={},fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
+        alliances={},requests={},built={},border={},alliance_events={},alliance_seq=0,fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
         local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
         rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=10}},State)
     for _,row in ipairs(data.owners or {}) do s.owners[row[1]]=owner(row) end
@@ -189,7 +189,10 @@ function Mirror.delta(s,d)
         elseif kind==15 then s.attacks[id]=nil
         elseif kind==16 then s.requests[id*1024+e[3]]=e[4] or s.tick
         elseif kind==17 then s.alliances[key(id,e[3])]=true;s.requests[id*1024+e[3]]=nil;s.requests[e[3]*1024+id]=nil
-        elseif kind==18 then s.alliances[key(id,e[3])]=nil
+        elseif kind==18 then
+            s.alliances[key(id,e[3])]=nil;s.alliance_seq+=1
+            table.insert(s.alliance_events,{seq=s.alliance_seq,a=id,b=e[3],breaker=e[4] or 0,expired=e[5]==true,tick=s.tick})
+            if #s.alliance_events>64 then table.remove(s.alliance_events,1) end
         elseif kind==20 then s.phase=2
         elseif kind==21 then s.requests[id*1024+e[3]]=nil
         elseif kind==22 and s.owners[id] then s.owners[id].traitor_until=e[3]

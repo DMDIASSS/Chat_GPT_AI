@@ -54,6 +54,9 @@ function Core:update(frame)
     self.primary=best;self.anchors={};self.fronts={}
     if best then table.insert(self.anchors,{tile=best,radius=100,kind='economic'}) end
     if owned(spawn) and spawn~=best then table.insert(self.anchors,{tile=spawn,radius=70,kind='home'}) end
+    if self.relocation and frame.now<self.relocation.untilTime and valid(map,self.relocation.tile) then
+        table.insert(self.anchors,{tile=self.relocation.tile,radius=70,kind='relocation'})
+    end
     local summary={center_tile=best,home_tile=spawn,home_owned=owned(spawn),asset_value=math.max(0,weight),
         anchors=self.anchors,owned_samples=0,neutral_samples=0,hostile_samples=0,allied_samples=0,
         incoming=0,clearable_tiles=0,closest_hostile_distance=nil,threat_pressure=0,at_risk=false,critical=false}
