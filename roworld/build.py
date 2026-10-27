@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parent
 
 
 def source():
-    parts = ["-- RoWorld Bot 1.2.0 | paste this entire file into JJSploit.\n"
+    parts = ["-- RoWorld Bot 1.3.0 | paste this entire file into JJSploit.\n"
              "-- No external script downloads or localhost bridge.\n"]
     for name in ("Policy", "Adapter", "Wire", "Mirror", "Network"):
         parts.append(f"local {name} = (function()\n")

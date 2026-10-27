@@ -151,4 +151,58 @@ test("blast scan rejects allied and own land in the full exclusion radius", func
     f.set(12*32+10,3); f.state.allied[1027] = true
     assert(not p:blastSafe(f,12*32+9))
 end)
+test("recruitment optimum follows capacity and maximizes the actual shaped curve",function()
+    local p=Policy.new()
+    for _,cap in ipairs({1000,10000,100000,1000000}) do
+        local target=p:growthTarget({max_troops=cap})
+        local function rate(h) return (h^.73/4+10)*(1-h/cap) end
+        for i=0,1000 do assert(rate(target)+1e-6>=rate(cap*i/1000)) end
+        assert(target>cap*.3 and target<cap*.423)
+    end
+end)
+test("neutral spending varies continuously and preserves growth under low and high banks",function()
+    local f,p=fixture(),Policy.new()
+    local ratios={}
+    for _,home in ipairs({10000,60000,95000}) do
+        f.info.troops=home
+        local a={home=home,reserve=home*.35}
+        local amount,reserve=p:attackAmount(f,a,0,true)
+        assert(amount and home-amount>=reserve and amount>=home*.01)
+        table.insert(ratios,amount/home)
+    end
+    assert(ratios[3]>.55 and ratios[3]>ratios[1] and ratios[1]~=ratios[2])
+end)
+test("growth preference never authorizes an attack that violates defensive reserves",function()
+    local f,p=fixture(),Policy.new();f.info.troops=90000
+    local amount=p:attackAmount(f,{home=90000,reserve=89900},50000,false)
+    assert(not amount)
+    local early=p:attackAmount(f,{home=90000,reserve=40000},100,true)
+    assert(early and early<=50000)
+end)
+test("opportunity distinguishes other attackers from our own and a target's allies",function()
+    local f,p=fixture(),Policy.new()
+    f.state.owners[3]={alive=true,troops=5000}
+    f.state.attacks[1]={attacker=1,target=2,troops=900}
+    assert(p:opportunity(f,2)==0)
+    f.state.attacks[2]={attacker=3,target=2,troops=700}
+    assert(p:opportunity(f,2)==.7)
+    f.state.allied[2*1024+3]=true;assert(p:opportunity(f,2)==0)
+    f.state.allied={};f.state.attacks[2].retreating=true;assert(p:opportunity(f,2)==0)
+end)
+test("under attack alone never justifies invading an overwhelming enemy",function()
+    local f,p=fixture(),Policy.new();p:reset(f);p:observe(f)
+    f.state.owners[2].troops=500000;f.state.attacks[20]={attacker=3,target=2,troops=1000000}
+    local plan=p:enemyPlan(f,{id=2,tile=393,front=1},p:armies(f,{}),{})
+    assert(not plan)
+end)
+test("decision prefers an equally weak enemy facing a real third-party attack",function()
+    local f,p=fixture(),Policy.new()
+    f.set(12*32+9,2);f.set(13*32+9,3);f.refresh()
+    f.state.owners[3]={alive=true,troops=1000,name="Pressed enemy"}
+    f.state.attacks[40]={attacker=4,target=3,troops=800}
+    for t=0,f.map.N-1 do if f.state:tile_owner(t)==0 then f.state.flags[t]=true end end
+    local a=assert(p:decide(f))
+    assert(a.intent.type=="attack" and f.state:tile_owner(a.intent.tile)==3)
+    assert(a.plan.third_party_incoming==800)
+end)
 print("POLICY TESTS",tests)

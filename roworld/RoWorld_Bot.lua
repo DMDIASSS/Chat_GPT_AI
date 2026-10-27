@@ -1,4 +1,4 @@
--- RoWorld Bot 1.2.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 1.3.0 | paste this entire file into JJSploit.
 -- No external script downloads or localhost bridge.
 
 local Policy = (function()
@@ -64,6 +64,75 @@ end
 local function recruitment(info,seconds)
     local home,cap=math.max(0,info.troops or 0),math.max(1,info.max_troops or 1)
     return math.max(0,(home^.73/4+10)*(1-home/cap)*10*seconds)
+end
+
+function Policy:growthTarget(info)
+    local cap=math.max(1,info.max_troops or 1)
+    if self.growthCap~=cap then
+        -- Derivative of (h^.73/4+10)*(1-h/cap), solved without a fixed 42%.
+        local lo,hi=0,cap*.73/1.73
+        for _=1,28 do
+            local h=(lo+hi)/2
+            if 1.73*h+40*h^.27<.73*cap then lo=h else hi=h end
+        end
+        self.growthCap,self.growthBank=cap,(lo+hi)/2
+    end
+    return self.growthBank
+end
+
+function Policy:attackAmount(frame,a,wanted,neutral)
+    local target=self:growthTarget(frame.info)
+    local reserve=math.max(a.reserve,math.min(target*.92,a.home*.5))
+    local budget=math.max(0,a.home-reserve)
+    local recovery=recruitment(frame.info,5)*.7
+    if neutral then
+        -- Early expansion remains possible below the optimum. Once above it,
+        -- invest surplus in actual land rather than deliberately wasting troops.
+        wanted=math.max(math.max(0,a.home-target),math.min(a.home*.10,recovery))
+    end
+    local amount=math.floor(math.min(wanted,budget))
+    if amount<math.max(100,math.ceil(a.home*.01)) then return nil,reserve end
+    return amount,reserve
+end
+
+function Policy:opportunity(frame,target)
+    local incoming,outgoing=0,0
+    for _,a in pairs(frame.state.attacks) do
+        if not a.retreating then
+            if a.target==target and a.attacker~=frame.me and a.attacker>0
+                and not frame.state:are_allies(a.attacker,target) then incoming+=math.max(0,a.troops or 0) end
+            if a.attacker==target then outgoing+=math.max(0,a.troops or 0) end
+        end
+    end
+    local bank=math.max(1,(frame.state.owners[target] or {}).troops or 0)
+    return math.min(1,incoming/bank),incoming,outgoing
+end
+
+function Policy:enemyPlan(frame,g,a,groups)
+    local enemy=frame.state.owners[g.id]
+    local pressure,third,outgoing=self:opportunity(frame,g.id)
+    local wanted=math.max(250,(enemy.troops or 0)*1.4-(a.targets[g.id] or 0)*.5)
+    local ceiling,reserve=self:attackAmount(frame,a,wanted,false)
+    if not ceiling then return nil end
+    local coalition=self:coalitionPressure(frame,g.id,groups)
+    local best
+    for _,fraction in ipairs({.65,.85,1}) do
+        local amount=math.floor(ceiling*fraction)
+        if amount>=math.max(100,math.ceil(a.home*.01)) then
+            local plan=self:forecast(frame,g,a,amount)
+            plan.coalition_pressure=coalition;plan.third_party_incoming=third;plan.enemy_committed=outgoing
+            plan.risk+=math.max(0,coalition+a.incoming-(a.home-amount))
+            local viable=(amount>=wanted or plan.score>0 and plan.land>=3) and plan.risk<a.home*.05
+            if viable then
+                -- Preference is bounded: being attacked is an opportunity,
+                -- not evidence that an enemy's remaining army has disappeared.
+                plan.selection_score=plan.score+pressure*12
+                if not best or plan.selection_score>best.selection_score then best=plan end
+            end
+        end
+    end
+    if best then best.reserve=reserve;best.pressure=pressure end
+    return best
 end
 
 function Policy:observe(frame)
@@ -567,8 +636,13 @@ function Policy:naval(frame, armies)
             end
         end
     end
-    if chosen then return {intent = {type = "boat", tile = chosen, ratio = math.min(.25, armies.available / armies.home)},
-        reserve = armies.reserve, channel = "boat", cooldown = 12, label = "Sending a coastal landing"} end
+    if chosen then
+        local owner=frame.state.owners[frame.state:tile_owner(chosen)]
+        local wanted=owner and math.max(250,(owner.troops or 0)*1.6) or math.max(100,armies.home-self:growthTarget(frame.info))
+        local amount,reserve=self:attackAmount(frame,armies,wanted,owner==nil)
+        if amount then return {intent = {type = "boat", tile = chosen, ratio = amount/armies.home},
+            reserve = reserve, plan={amount=amount},channel = "boat", cooldown = 12, label = "Sending a coastal landing"} end
+    end
     return nil
 end
 
@@ -601,23 +675,20 @@ function Policy:decide(frame)
             local enemy = frame.state.owners[id]
             local anotherWar=a.enemyActive>0 and not a.targets[id]
             if id > 0 and enemy and enemy.alive and not anotherWar then
-                local wanted = math.max(250, (enemy.troops or 0) * 1.4 - (a.targets[id] or 0) * .5)
-                local need=math.min(wanted,a.available,a.home*.55)
-                if need>=250 and a.home > (enemy.troops or 0) * 1.35 then
-                    local plan=self:forecast(frame,g,a,need)
-                    local coalition=self:coalitionPressure(frame,id,groups)
-                    plan.coalition_pressure=coalition
-                    plan.risk+=math.max(0,coalition+a.incoming-(a.home-need))
+                local pressure=self:opportunity(frame,id)
+                if a.home > (enemy.troops or 0) * (pressure>.3 and 1.1 or 1.35) then
+                    local plan=self:enemyPlan(frame,g,a,groups)
+                    if plan then
                     local value = math.log(1 + g.front) + a.home / math.max(100, enemy.troops or 0)
                     -- A bounded tie-break: keep the established growth and army
                     -- budgets while preferring lower-cost, less exposed fronts.
-                    value+=math.clamp(plan.score/200,-1.5,1.5)
-                    local viable=(need>=wanted or plan.score>0 and plan.land>=3) and plan.risk<a.home*.05
+                    value+=math.clamp(plan.score/200,-1.5,1.5)+pressure*1.5
                     if (enemy.traitor_until or 0)>frame.state.tick then value+=.5 end
-                    if viable and (score == nil or value > score) then
-                        best, score = {intent = {type = "attack", tile = g.tile, ratio = math.min(.55, need / a.home)},
-                            reserve = a.reserve, plan=plan, channel = "attack", cooldown = 2.5,
+                    if score == nil or value > score then
+                        best, score = {intent = {type = "attack", tile = g.tile, ratio = plan.amount / a.home},
+                            reserve = plan.reserve, plan=plan, channel = "attack", cooldown = 2.5,
                             label = "Attacking " .. enemy.name}, value
+                    end
                     end
                 end
             end
@@ -627,11 +698,12 @@ function Policy:decide(frame)
     if a.incoming > a.home*.25 then return nil,"Defending - holding reserves against observed attacks" end
     local neutral = groups[0]
     if neutral and self:ready("attack", frame.now) and a.available > 200 and a.enemyActive == 0 then
-        local high = a.home > (frame.info.max_troops or math.huge) * .8
-        if a.neutralActive == 0 or (high and (a.targets[0] or 0) < a.home * .25) then
-            local amount = math.min(a.available * .5, a.home * (high and .22 or .10))
-            if amount >= 100 then return {intent = {type = "attack", tile = neutral.tile, ratio = amount / a.home},
-                reserve = a.reserve, channel = "attack", cooldown = 2.5, label = "Expanding into unclaimed land"} end
+        local surplus=math.max(0,a.home-self:growthTarget(frame.info))
+        if a.neutralActive == 0 or surplus>a.home*.08 and (a.targets[0] or 0)<surplus*.5 then
+            local amount,reserve=self:attackAmount(frame,a,0,true)
+            if amount then return {intent = {type = "attack", tile = neutral.tile, ratio = amount / a.home},
+                reserve = reserve,plan={amount=amount,growth_target=self:growthTarget(frame.info)},
+                channel = "attack", cooldown = 2.5, label = "Expanding with a recruitment-aware troop budget"} end
         end
     end
     local strike = self:strike(frame)
@@ -662,7 +734,8 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.2.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+    return {version="1.3.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+        recruitment_target=info and self:growthTarget(info) or 0,
         tick=self.state and self.state.tick or 0,alive=info and info.alive or false,
         land=info and info.tiles or 0,troops=info and info.troops or 0,metrics=self.metrics,
         gold=info and info.gold or 0,allies=allies,traitors=traitors,navy=navy,recent_orders=self.history or {},
@@ -816,7 +889,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.2.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.3.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -952,8 +1025,9 @@ function Adapter:send(action, frame)
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end
             end
             local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.35)
-            intent.ratio = math.min(tonumber(intent.ratio) or 0, .55, math.max(0, troops-reserve) / math.max(1, troops))
+            intent.ratio = math.min(tonumber(intent.ratio) or 0, 1, math.max(0, troops-reserve) / math.max(1, troops))
             if intent.ratio ~= intent.ratio or intent.ratio <= 0 or troops * intent.ratio < 100 then return false, "Holding troop reserves" end
+            if intent.ratio<.01 then return false,"Order below the game's 1% minimum; holding reserves" end
             if action.plan and action.plan.amount and troops*intent.ratio<action.plan.amount*.9 then
                 return false,"Troop budget changed; recalculating the attack"
             end

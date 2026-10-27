@@ -138,7 +138,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.2.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.3.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -274,8 +274,9 @@ function Adapter:send(action, frame)
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end
             end
             local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.35)
-            intent.ratio = math.min(tonumber(intent.ratio) or 0, .55, math.max(0, troops-reserve) / math.max(1, troops))
+            intent.ratio = math.min(tonumber(intent.ratio) or 0, 1, math.max(0, troops-reserve) / math.max(1, troops))
             if intent.ratio ~= intent.ratio or intent.ratio <= 0 or troops * intent.ratio < 100 then return false, "Holding troop reserves" end
+            if intent.ratio<.01 then return false,"Order below the game's 1% minimum; holding reserves" end
             if action.plan and action.plan.amount and troops*intent.ratio<action.plan.amount*.9 then
                 return false,"Troop budget changed; recalculating the attack"
             end

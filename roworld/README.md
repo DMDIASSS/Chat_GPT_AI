@@ -1,4 +1,4 @@
-# RoWorld bot 1.2.0
+# RoWorld bot 1.3.0
 
 One **Start bot / Stop bot** button, a decision status line, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
@@ -22,6 +22,23 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 1.3 chooses continuous attack percentages from troop budgets instead of
+fixed 10/22/25/55% settings. The game's minimum is **1% of the current home army**;
+smaller orders are held rather than letting the server silently increase them.
+The bot can send above 55% when its retained recruitment/defense budget permits.
+
+Recruitment follows `(home^.73 / 4 + 10) * (1 - home / capacity)`. Its peak is
+computed again when capacity changes, generally around **41–42%** for large
+armies. This is a preferred economic level, not a mandatory ceiling: danger can
+require banking more, and early expansion can justify investing below it. The
+bot never attacks merely to dump surplus troops when there is no suitable target.
+
+Enemy attacks compare three troop budgets using the existing cost/risk forecast.
+Real third-party attacks give a bounded opportunity bonus and can relax the army
+advantage requirement; our own attacks, retreating armies and the target's allies
+do not count as outside pressure. The target's remaining home troops and nearby
+coalition counterattacks still count. This is a heuristic, not a victory promise.
 
 - Scores 160 spawn candidates for flat unclaimed land, distance from established
   players, nearby weak tribes, and some water access. This is a bounded search,
@@ -83,7 +100,7 @@ Incomplete, stale or corrupt observations prevent orders and request resync.
 Match changes invalidate earlier decisions. Terrain water components are built
 once per download with cooperative yields; strategy scans are bounded.
 
-**54 offline scenarios** cover policy, adapter and network behavior, plus UI
+**62 offline scenarios** cover policy, adapter and network behavior, plus UI
 start/stop/re-injection and standalone Luau compilation. Additional checks against
 the supplied game's original modules verify new naval/diplomacy command encoding,
 water connectivity, unit paths/health, traitor flags and warship prices. The game

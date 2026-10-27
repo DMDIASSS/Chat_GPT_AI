@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "place_id": 137151641329864,
   "inspected_place_version": 111,
   "supplied_place_sha256": "8be1727d80e44d4c1b0045b7ff7f19c39f8251e58efedca18f2243676f988399",
@@ -7,8 +7,8 @@
   "strategy_reference": "https://greasyfork.org/en/scripts/599445",
   "runtime": "Standalone Luau; cached live client when accessible, independent multiplayer snapshot observer otherwise",
   "verification": {
-    "policy_scenarios": 17,
-    "adapter_scenarios": 21,
+    "policy_scenarios": 23,
+    "adapter_scenarios": 23,
     "ui_start_stop_and_reinjection": true,
     "standalone_compiled": true,
     "uploaded_game_module_contracts": [
@@ -27,28 +27,29 @@
     "native_network_live_verified": false,
     "naval_and_diplomacy_contracts": "Offline parity with supplied original Protocol, WorldMap, GameState and Rules: boat/build-warship/move/ally-request/ally-break encoding; water connectivity, unit paths/health, traitor flags and warship prices",
     "user_reported_prior_multiplayer_operation": true,
-    "updated_strategy_live_verified": false
+    "updated_strategy_live_verified": false,
+    "recruitment_optimum": "Computed continuous optimum compared against original Rules.troop_growth for human armies over 1001 bank levels at capacities 1000, 10000, 100000 and 1000000; all passed"
   },
   "files": {
     "JJSploit_Launch.lua": "783caf5ed8ed40cc6385fcb43b27c2074b769a0a5072262824394141fbda1c6c",
-    "README.md": "804fa53dd6578f54e54c5f123d044b674956ec43a5013e369bc2722d525dc356",
-    "RoWorld_Bot.lua": "80e070aa8b9910a88671e428bc87bfdde50831e28be2402121f3e9bb5328b72c",
-    "adapter.lua": "2161a1f38073350a732ec70293b6576d3f01c39f7192f3ee851d9fb7213925a8",
-    "build.py": "e1164ee93c295515473f01262974cb681b08f96bdbe132d2e9f7cfc0dc8f6950",
+    "README.md": "a17bb2f6d59320b618336af62cbc976290640364248c92ea02fa06654f069334",
+    "RoWorld_Bot.lua": "fffc7a6c4e21a0e415b7455e1928767a817c384c9f8c25041a4126ebed491fc4",
+    "adapter.lua": "f5dff41831dcf51c9f2f87c60576445172fa9acb78c7a1c89ad75fb4a6c22dc7",
+    "build.py": "1d393cec0590fb48cd00f1f6ddcdca5d139c0be201354929c57be9e85418414a",
     "client.lua": "08d8c2eac163cab989eaf2ef4fc678921c7864e20f2a07369a9ef4f9c8242547",
     "mirror.lua": "4e5e64bc3e7de38fbe74f055b7d69cde5a96a412e69a022138b1def71ecbe0d6",
     "network.lua": "8d5977874f4a03b632c10e905d191b554845d106c95ab9e1cfb41b36b5775091",
-    "policy.lua": "fdedb9e41c02c3f1579e97e53b072a0edde5787a7e49e1fb7f2f35db0b50c92a",
+    "policy.lua": "e1bbf13383f1ffa4e888c6b5f59801c6084e9999d207f8369949feda809f4731",
     "tests/client_fixture.lua": "b8417fc07feb465df4088f83b5f303bac341b73d323f386a2cb75af4f96c356b",
     "tests/fixture.lua": "4952719738dd48fef9543dabc5b8deb13665e2a251ed796be8bc0f07e105d890",
     "tests/run.py": "87ebd2d31b2385781af020d576a6ee6b84ebcfdb3058915e87b79f8b671735e8",
-    "tests/test_adapter.lua": "53a08c616cb2b45531509a10550e9c0dba78e9837b3e6f08453edf35df78602e",
+    "tests/test_adapter.lua": "aee60304ab175fd6810884b091b9460a79d9a7a1cbf010832cbededc02e8bd03",
     "tests/test_network.lua": "1272d29c81e5228b1f7acb4b8ee67f4e159ab8f759c9797ead8b9fc64d7ca57f",
-    "tests/test_policy.lua": "6d191597cb7db29c349a1181d800329b6f2120ff847f771a9ebff413d253f855",
+    "tests/test_policy.lua": "a873d62aa109d13e7bfb76d8a9c453c1463d71a1aec00533db2cfe0a1b06fef8",
     "tests/wire_vectors.lua": "8ef29100e1e36508e99f11f88be646f3a2dcd30ad9f72aad5756c313912626e1",
     "wire.lua": "c170937035105117fc1375ae65a7dd50e6c7fd02ff84429e0b1b10c90def1fe9"
   },
   "network_fallback_scope": "Multiplayer spawn, land combat/expansion, recall, alliance requests/replies/conditional breaks, city/factory/port/defense, transports, warship construction and patrol movement; no offensive weapons or SAM/silo state",
-  "strategy": "Bounded spawn scoring, economic building setbacks, observed hostility memory, terrain/defense-cost forecasts, nearby coalition risk, recruitment reserves and one active enemy front",
+  "strategy": "Recruitment-aware continuous troop budgets, original-game 1% minimum validation, three enemy attack budgets, third-party-pressure ranking, defensive reserves, coalition awareness, safe construction and naval patrols",
   "match_report": "RoWorld_Match_Report.json, local only when executor writefile exists, every 30 seconds and on stop/observed match end; last 64 orders and current-snapshot metrics"
 }
