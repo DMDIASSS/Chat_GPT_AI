@@ -1,4 +1,4 @@
--- RoWorld Bot 1.0.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 1.0.1 | paste this entire file into JJSploit.
 -- No downloads, localhost bridge, or external service at runtime.
 
 local Policy = (function()
@@ -343,26 +343,91 @@ local Adapter = (function()
 local Adapter = {}
 Adapter.__index = Adapter
 
-function Adapter.new(services, requireModule, now)
+function Adapter.new(services, requireModule, now, capabilities)
     return setmetatable({services = services, requireModule = requireModule,
+        capabilities = capabilities or {}, discoveryRoute = "not connected",
         now = now or os.clock, main = nil, nextDiscovery = 0, lastSent = -math.huge,
         tickState = nil, lastTick = nil, tickChangedAt = 0}, Adapter)
+end
+
+function Adapter:call(fn, ...)
+    local caps = self.capabilities
+    local original, changed
+    if type(caps.getidentity) == "function" and type(caps.setidentity) == "function" then
+        local ok, identity = pcall(caps.getidentity)
+        if ok and type(identity) == "number" then
+            original = identity
+            changed = pcall(caps.setidentity, 2)
+        end
+    end
+    local result = table.pack(pcall(fn, ...))
+    if changed then
+        local restored, err = pcall(caps.setidentity, original)
+        if not restored then return false, "Cannot restore executor thread identity: " .. tostring(err) end
+    end
+    return table.unpack(result, 1, result.n)
+end
+
+local function liveContext(candidate)
+    if type(candidate) ~= "table" then return nil end
+    local session = rawget(candidate, "session")
+    local ui = rawget(candidate, "ui")
+    local ctx = type(ui) == "table" and rawget(ui, "ctx") or rawget(candidate, "ctx")
+    if type(ctx) ~= "table" and type(rawget(candidate, "rules")) == "table" then ctx = candidate end
+    if type(ctx) ~= "table" then return nil end
+    session = session or rawget(ctx, "session")
+    if type(session) ~= "table" or rawget(ctx, "session") ~= session then return nil end
+    local state = rawget(session, "state")
+    if type(state) ~= "table" or rawget(ctx, "state") ~= state or type(rawget(state, "owners")) ~= "table"
+        or type(rawget(state, "map")) ~= "table" or type(rawget(ctx, "borders")) ~= "table"
+        or type(rawget(ctx, "rules")) ~= "table" then return nil end
+    if type(session.send_intent) ~= "function" or type(ctx.in_match) ~= "function" then return nil end
+    return {session = session, ui = {ctx = ctx}}
+end
+
+function Adapter:findLiveClient()
+    local gc = self.capabilities.getgc
+    if type(gc) ~= "function" then return nil end
+    local ok, values = pcall(gc, true)
+    if not ok or type(values) ~= "table" then self.gcError = tostring(values); return nil end
+    for _, value in pairs(values) do
+        local found = liveContext(value)
+        if found then self.discoveryRoute = "existing client tables"; return found end
+    end
+    self.gcError = "No live RoWorld context found yet"
+    return nil
+end
+
+function Adapter:diagnostics()
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.0.1 - client access diagnostics"}
+    for _, key in ipairs({"getidentity", "setidentity", "getgc"}) do
+        table.insert(lines, key .. "=" .. type(caps[key]))
+    end
+    table.insert(lines, "route=" .. self.discoveryRoute)
+    table.insert(lines, "module_error=" .. tostring(self.moduleError or "none"))
+    table.insert(lines, "table_scan=" .. tostring(self.gcError or "not needed"))
+    return table.concat(lines, "\n")
 end
 
 function Adapter:discover()
     if self.main and self.main.session and self.main.ui and self.main.ui.ctx then return self.main end
     if self.now() < self.nextDiscovery then return nil end
-    self.nextDiscovery = self.now() + 2
+    self.nextDiscovery = self.now() + 8
     local player = self.services.Players.LocalPlayer
     local scripts = player and player:FindFirstChild("PlayerScripts")
     local client = scripts and scripts:FindFirstChild("AirfrontClient")
     local module = client and client:FindFirstChild("Main")
     if not module or not module:IsA("ModuleScript") then return nil end
-    local ok, main = pcall(self.requireModule, module)
-    if not ok then self.discoveryError = "Cannot read RoWorld client: " .. tostring(main); return nil end
-    if type(main) ~= "table" then self.discoveryError = "RoWorld Main API changed"; return nil end
-    self.main = main
-    return main
+    local ok, main = self:call(self.requireModule, module)
+    if ok and type(main) == "table" and main.session and main.ui and main.ui.ctx then
+        self.main, self.discoveryError, self.discoveryRoute = main, nil, "cached Main module"
+        return main
+    end
+    self.moduleError = ok and "Main module has no running session in this context" or tostring(main)
+    local found = self:findLiveClient()
+    if found then self.main, self.discoveryError = found, nil; return found end
+    self.discoveryError = "Client access blocked or not ready; see diagnostics in JJSploit workspace / F9"
+    return nil
 end
 
 function Adapter:frame()
@@ -532,7 +597,21 @@ local function repaint(message)
     status.Text = message or "Stopped - press Start bot (F6 also toggles)"
 end
 
-local adapter = Adapter.new(Services, require)
+local adapter = Adapter.new(Services, require, nil, {
+    getidentity = getthreadidentity or getidentity,
+    setidentity = setthreadidentity or setidentity,
+    getgc = getgc,
+})
+local reported
+function api.diagnostics() return adapter:diagnostics() end
+local function reportAccessFailure()
+    if not adapter.discoveryError then return end
+    local report = adapter:diagnostics()
+    if report == reported then return end
+    reported = report
+    if type(writefile) == "function" then pcall(writefile, "RoWorld_Diagnostics.txt", report) end
+    warn(report)
+end
 local policy = Policy.new()
 local lastCommand, lastCommandAt = "", -math.huge
 local function toggle()
@@ -561,9 +640,10 @@ repaint()
 task.spawn(function()
     while api.alive do
         if api.enabled then
-            local ok, err = pcall(function()
+            local ok, message = adapter:call(function()
                 local frame, reason = adapter:frame()
-                if not frame then repaint(reason); return end
+                if not api.enabled or not api.alive then return end
+                if not frame then return reason end
                 -- The normal client sends a rate-limited activity heartbeat
                 -- from user input. Keep that same heartbeat while autoplay is on.
                 if type(frame.session.note_activity) == "function" then frame.session:note_activity() end
@@ -574,19 +654,23 @@ task.spawn(function()
                     if sent then
                         policy:sent(action, frame.now)
                         lastCommand, lastCommandAt = action.label, os.clock()
-                        repaint("Order sent: " .. action.label)
+                        return "Order sent: " .. action.label
                     else
-                        repaint(blocked)
+                        return blocked
                     end
                 else
                     local suffix = os.clock() - lastCommandAt < 5 and ("\nLast: " .. lastCommand) or ""
-                    repaint((waiting or "Watching the match") .. suffix)
+                    return (waiting or "Watching the match") .. suffix
                 end
             end)
-            if not ok then
+            -- UI and executor file operations run after the identity is restored.
+            if ok then
+                reportAccessFailure()
+                repaint(message)
+            else
                 api.enabled = false
-                repaint("Stopped after an error: " .. tostring(err))
-                warn("[RoWorldBot] " .. tostring(err))
+                repaint("Stopped after an error: " .. tostring(message))
+                warn("[RoWorldBot] " .. tostring(message))
             end
         end
         task.wait(.55)

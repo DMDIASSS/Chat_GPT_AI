@@ -57,7 +57,21 @@ local function repaint(message)
     status.Text = message or "Stopped - press Start bot (F6 also toggles)"
 end
 
-local adapter = Adapter.new(Services, require)
+local adapter = Adapter.new(Services, require, nil, {
+    getidentity = getthreadidentity or getidentity,
+    setidentity = setthreadidentity or setidentity,
+    getgc = getgc,
+})
+local reported
+function api.diagnostics() return adapter:diagnostics() end
+local function reportAccessFailure()
+    if not adapter.discoveryError then return end
+    local report = adapter:diagnostics()
+    if report == reported then return end
+    reported = report
+    if type(writefile) == "function" then pcall(writefile, "RoWorld_Diagnostics.txt", report) end
+    warn(report)
+end
 local policy = Policy.new()
 local lastCommand, lastCommandAt = "", -math.huge
 local function toggle()
@@ -86,9 +100,10 @@ repaint()
 task.spawn(function()
     while api.alive do
         if api.enabled then
-            local ok, err = pcall(function()
+            local ok, message = adapter:call(function()
                 local frame, reason = adapter:frame()
-                if not frame then repaint(reason); return end
+                if not api.enabled or not api.alive then return end
+                if not frame then return reason end
                 -- The normal client sends a rate-limited activity heartbeat
                 -- from user input. Keep that same heartbeat while autoplay is on.
                 if type(frame.session.note_activity) == "function" then frame.session:note_activity() end
@@ -99,19 +114,23 @@ task.spawn(function()
                     if sent then
                         policy:sent(action, frame.now)
                         lastCommand, lastCommandAt = action.label, os.clock()
-                        repaint("Order sent: " .. action.label)
+                        return "Order sent: " .. action.label
                     else
-                        repaint(blocked)
+                        return blocked
                     end
                 else
                     local suffix = os.clock() - lastCommandAt < 5 and ("\nLast: " .. lastCommand) or ""
-                    repaint((waiting or "Watching the match") .. suffix)
+                    return (waiting or "Watching the match") .. suffix
                 end
             end)
-            if not ok then
+            -- UI and executor file operations run after the identity is restored.
+            if ok then
+                reportAccessFailure()
+                repaint(message)
+            else
                 api.enabled = false
-                repaint("Stopped after an error: " .. tostring(err))
-                warn("[RoWorldBot] " .. tostring(err))
+                repaint("Stopped after an error: " .. tostring(message))
+                warn("[RoWorldBot] " .. tostring(message))
             end
         end
         task.wait(.55)

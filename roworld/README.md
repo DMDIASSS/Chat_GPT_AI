@@ -12,6 +12,10 @@ an external AI service, or a second simulation.
    JJSploit, and execute. It starts stopped.
 4. Press **Start bot**. The same button stops new orders. F6 also toggles it.
 
+Extract the ZIP **anywhere**, such as Downloads. Pasting the complete script
+does not depend on where you extracted it. Only the optional `readfile` loader
+below needs the file in the executor workspace.
+
 You can instead put `RoWorld_Bot.lua` directly in your JJSploit workspace
 (`C:\Users\almas\AppData\Roaming\jjsploit\workspace` on your PC) and execute:
 
@@ -44,6 +48,15 @@ not claim that a sent order was accepted or that an attack succeeded. It follows
 the local owner's ID from the live session, including changes after a new match.
 It waits in menus, while spectating, while loading, on a paused solo game, or
 when game ticks stop updating. It does not choose queues or buy shop items.
+
+If client access is blocked, version 1.0.1 tries requiring the game module at
+ordinary client thread identity (restoring the prior identity afterward), then
+looks for the already-running client tables when `getgc(true)` is available.
+It never boots a second client. Access failures automatically write
+`RoWorld_Diagnostics.txt` to the JJSploit workspace if `writefile` is available,
+and also print the same capability/error report to F9. That report contains no
+session tokens or account information. No additional place files are needed
+for the module-permission error; that diagnostic is useful if both routes fail.
 
 ## Compatibility and verification
 

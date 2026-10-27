@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "place_id": 137151641329864,
   "inspected_place_version": 111,
   "supplied_place_sha256": "8be1727d80e44d4c1b0045b7ff7f19c39f8251e58efedca18f2243676f988399",
@@ -8,7 +8,7 @@
   "runtime": "Standalone Luau, cached RoWorld Main.session and UI context",
   "verification": {
     "policy_scenarios": 10,
-    "adapter_scenarios": 10,
+    "adapter_scenarios": 13,
     "ui_start_stop_and_reinjection": true,
     "standalone_compiled": true,
     "uploaded_game_module_contracts": [
@@ -19,20 +19,21 @@
       "Session.send_intent"
     ],
     "live_jjsploit_verified": false,
-    "competitive_strength_verified": false
+    "competitive_strength_verified": false,
+    "module_identity_and_gc_fallback": true
   },
   "files": {
     "JJSploit_Launch.lua": "783caf5ed8ed40cc6385fcb43b27c2074b769a0a5072262824394141fbda1c6c",
-    "README.md": "6862200bbd77777b67df5adc390451ba648022d49247b2415b2ec9bfc59824ad",
-    "RoWorld_Bot.lua": "f8a1d2328b59aea5c7bb3a86a0d513522fc15911e6c1417d7392a04183d6f578",
-    "adapter.lua": "0b69e18fef4af38b20c04dcaba8069aa66c4aab174800ae7ce4b4e8234e5545e",
-    "build.py": "eb332d9f175e51c835c1be7478d81a173f34d692ba374111e61c03b6d3b6f81a",
-    "client.lua": "71987299a642b0478e5623d6cf3ff8896f7d6ca6f1eb74df18af5f3752f2575c",
+    "README.md": "e69d6f78899fbaae32a11c3a4f7308dd296aaa8700c952eb74da023ab3acc637",
+    "RoWorld_Bot.lua": "a110c483fc70b15bd593cc4b9f94fde3032b64863c38acd476d7dd2f9c93abaa",
+    "adapter.lua": "fe40b30455a9a6461c5dbe26d3b5df3b3b334a04533c61509d6e06d15399f1e9",
+    "build.py": "a7e6b003d9a50b5fe2b882253dbbc63698a42f90a998299ff5c28ca1d31864bf",
+    "client.lua": "f04e9386746298179e0d7cd9e9737b0645c24815e05ccad9e86022930198326c",
     "policy.lua": "c44f15b012fe6ab9ef9bb69f2ade3c389421eef9207432de91c090cf04e00a30",
     "tests/client_fixture.lua": "d5b2f896d2f261bd650e2dbb5454d4ee4fed07eea5fd579981aec97cf2becf29",
     "tests/fixture.lua": "4952719738dd48fef9543dabc5b8deb13665e2a251ed796be8bc0f07e105d890",
-    "tests/run.py": "2ed3c43acf4adc24bae76162a81fee7a2ec3a972d99d0cab987e05b0254dae0a",
-    "tests/test_adapter.lua": "b622be6117ecf0d8ab5879c171c1b354ebf45c218b185181e22d4438d30b1f78",
+    "tests/run.py": "ce234ace97e864c877f7fa70ff290bc3e4f6be03f6c373242813b01cfb984a59",
+    "tests/test_adapter.lua": "d92ed3ed4863472a7f87234275079db4bf78b8c475e3b421ca4dbc3ae4d84ba7",
     "tests/test_policy.lua": "56360f918e0581d1e0dfb94cf49570becf919eacc2189c3cb6b6a85fde52a988"
   }
 }

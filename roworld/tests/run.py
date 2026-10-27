@@ -47,7 +47,7 @@ local scripts, client, module = object("PlayerScripts"), object("LocalScript"), 
 services.Players.LocalPlayer.children.PlayerScripts = scripts
 scripts.children.AirfrontClient = client
 client.children.Main = module
-for _ = 1,6 do step() end
+for _ = 1,18 do step() end
 assert(#world.session.sent > 0 and world.session.sent[1].type == "attack")
 toggle.Activated:Fire()
 local count = #world.session.sent

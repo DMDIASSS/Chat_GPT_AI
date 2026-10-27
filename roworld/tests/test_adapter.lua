@@ -11,6 +11,49 @@ local function attack(tile)
     return {intent = {type = "attack", tile = tile, ratio = .2}, reserve = 17500}
 end
 
+local function moduleServices()
+    local module = {IsA = function(_, name) return name == "ModuleScript" end}
+    local client = {FindFirstChild = function(_, name) return name == "Main" and module or nil end}
+    local scripts = {FindFirstChild = function(_, name) return name == "AirfrontClient" and client or nil end}
+    return {Players = {LocalPlayer = {FindFirstChild = function(_, name) return name == "PlayerScripts" and scripts or nil end}}}
+end
+
+test("uses ordinary client identity for require and restores executor identity", function()
+    local f, identity = fixture(), 8
+    local a = Adapter.new(moduleServices(),function()
+        assert(identity == 2, "Cannot require a non-RobloxScript module from a RobloxScript")
+        return f.main
+    end,function() return f.now end,{
+        getidentity = function() return identity end,
+        setidentity = function(value) identity = value end,
+    })
+    assert(a:frame().session == f.session and identity == 8)
+    local ok = a:call(function() assert(identity == 2); error("test failure") end)
+    assert(not ok and identity == 8)
+end)
+
+test("finds the existing live client when direct require is blocked", function()
+    for _, variant in ipairs({"main", "ui", "context"}) do
+        local f = fixture()
+        local candidate = variant == "main" and f.main or variant == "ui" and f.main.ui or f.ctx
+        local a = Adapter.new(moduleServices(),function()
+            error("Cannot require a non-RobloxScript module from a RobloxScript")
+        end,function() return f.now end,{getgc = function(tables)
+            assert(tables); return {function() end, {}, {session={}}, candidate}
+        end})
+        assert(a:frame().session == f.session and a.discoveryRoute == "existing client tables")
+        assert(#f.session.sent == 0)
+    end
+end)
+
+test("reports missing executor capabilities without inventing a session", function()
+    local a = Adapter.new(moduleServices(),function() error("Cannot require a non-RobloxScript module") end,function() return 10 end)
+    local view, reason = a:frame()
+    assert(not view and reason:find("diagnostics"))
+    local report = a:diagnostics()
+    assert(report:find("getgc=nil") and report:find("non%-RobloxScript"))
+end)
+
 test("discovers the original cached Main module without starting another client", function()
     local f = fixture()
     local module = {IsA = function(_, name) return name == "ModuleScript" end}
