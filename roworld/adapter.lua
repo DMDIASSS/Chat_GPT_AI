@@ -139,7 +139,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.4.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.5.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -266,6 +266,7 @@ function Adapter:send(action, frame)
             end
             local target = s:tile_owner(intent.tile)
             if target == me or (target > 0 and s:are_allies(me, target)) then return false, "Target is now friendly" end
+            if target>0 and s:has_request(me,target) then return false,"Waiting for our alliance proposal before attacking" end
             if kind == "attack" and not s:borders_tile(me, intent.tile) then return false, "Target no longer borders your land" end
             if kind == "boat" and (not live.map:is_coastal(intent.tile) or not live.ctx.borders:can_reach_by_sea(intent.tile)
                 or rules:transports() >= (s.rules.MAX_BOATS_PLAYER or 3)) then return false, "Sea route unavailable" end
@@ -274,7 +275,7 @@ function Adapter:send(action, frame)
             for _, attack in pairs(s.attacks) do
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end
             end
-            local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.35)
+            local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.5)
             intent.ratio = math.min(tonumber(intent.ratio) or 0, 1, math.max(0, troops-reserve) / math.max(1, troops))
             if intent.ratio ~= intent.ratio or intent.ratio <= 0 or troops * intent.ratio < 100 then return false, "Holding troop reserves" end
             if intent.ratio<.01 then return false,"Order below the game's 1% minimum; holding reserves" end

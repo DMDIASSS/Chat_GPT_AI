@@ -1,4 +1,4 @@
-# RoWorld bot 1.4.0
+# RoWorld bot 1.5.0
 
 One **Start bot / Stop bot** button, a decision status line, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
@@ -22,6 +22,35 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 1.5 adds a board review before choosing new military orders:
+
+- Distinguishes humans (kind 2), AI countries (kind 0), and tribes (kind 1).
+  Human invasions need a larger advantage, smaller first commitments and slower
+  reinforcement. Nearby human armies, multiple fronts, reachable remote human
+  ports and potentially unreliable dominant country allies raise reserves.
+- An outgoing alliance proposal blocks land attacks, boats and nuclear launches
+  against that nation while pending. A 45-second policy grace period also avoids
+  immediately attacking after a proposal is declined or expires.
+- Compares affordable opponents and visible asset opportunities each decision;
+  neutral growth competes with war. A clearly better opportunity can end a
+  stalled front first. It does not open a second war just to change targets.
+- Stops feeding stalled campaigns, pauses after recalls, and enters recovery
+  after recent territory loss. A bank drop caused by its own troop dispatch is
+  not automatically treated as battlefield damage.
+- Looks for shallow, visible country buildings worth capturing. After captures,
+  it can recall and bank the gain when human pressure or campaign cost warrants
+  it; it does not abandon every successful conquest after the first building.
+  Attacks and recalls still cost troops. It does not assume it can force the
+  country AI to construct a desired building.
+- Saves for the first city instead of buying repeated defense posts under
+  moderate pressure. Emergency defense can still take precedence when necessary.
+- Spawn scoring counts nearby **humans separately from countries**, penalizes
+  multiple/opposing player directions, and prefers flat expansion space backed
+  by water over a cramped island or an exposed crowded start. It is a bounded
+  sample of known current positions; future player spawns are unknown.
+
+[Country AI notes](./COUNTRY_AI_NOTES.md) describe the inspected rules and limits.
 
 Version 1.3 introduced continuous attack percentages from troop budgets instead of
 fixed 10/22/25/55% settings. The game's minimum is **1% of the current home army**;
@@ -115,7 +144,10 @@ in the JJSploit workspace every 30 seconds, when stopped, and on an observed
 match end/elimination. It includes current troops/gold/land, peak land, order
 counts, the last 64 orders, alliances, traitor flags, fleet counts, observed
 threats, enemy silo construction/readiness, own SAM counts, fallout tile count,
-and the latest attack forecast. Nothing is uploaded automatically.
+and the latest attack forecast. Version 1.5 also records the board mode, nearby
+human pressure, alternative military candidates, spawn assessment, target owner
+IDs/types and a bounded five-second timeline of territory, reserves and incoming
+attacks. Territory changes do not identify which attacker caused every loss. Nothing is uploaded automatically.
 Send that file after a completed match to investigate its decisions. It covers
 the current observer snapshot onward; a fresh snapshot or re-execution resets
 its history. It records orders sent, not server confirmation of success.
@@ -138,13 +170,20 @@ Incomplete, stale or corrupt observations prevent orders and request resync.
 Match changes invalidate earlier decisions. Terrain water components are built
 once per download with cooperative yields; strategy scans are bounded.
 
-**78 offline scenarios** cover policy, adapter and network behavior, plus UI
+**93 offline scenarios** cover policy, adapter, network, weapons and strategy behavior, plus UI
 start/stop/re-injection and standalone Luau compilation. Additional checks against
 the supplied game's original modules verify new naval/diplomacy command encoding,
 water connectivity, unit paths/health, traitor flags and warship prices. Nuclear checks also match
 command encoding, missile/shot observations, all five construction/weapon prices,
 trajectory coordinates and MIRV carrier/warhead interception constants. The game
 scripts and assets used for these private checks are not redistributed.
+
+Four paired three-minute development worlds also ran with the supplied game
+simulator. Both versions survived all four; the new version retained more troops
+in all four, but held less territory in three. These are small synthetic worlds
+against built-in country/tribe AI, not tests against humans or proof of a higher
+win rate. The full results and setup are in
+[the development comparison](./benchmarks/strategy_v1.5.json).
 
 **This is a heuristic bot, not a neural model or a guaranteed winner.** Opponent
 intent and coalition intervention are estimates. The updated strategy's live
@@ -153,6 +192,7 @@ API can prevent operation; the panel reports connection failures.
 
 ## Development
 
+`strategy.lua` tracks campaigns, diplomacy grace periods and board conditions;
 `policy.lua` selects orders; `adapter.lua` revalidates the live observation;
 `client.lua` provides the button/reporting. `weapons.lua` shares nuclear
 readiness, blast and SAM coverage checks between planning and order validation. `wire.lua`, `mirror.lua` and

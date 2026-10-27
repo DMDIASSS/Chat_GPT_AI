@@ -88,6 +88,7 @@ function Weapons.canLaunch(s,me,tile,kind)
     if Weapons.kinds[kind]==nil or not valid(s,tile) then return false,"Unsupported weapon or target" end
     local id=s:tile_owner(tile)
     if id==0 or friendly(s,me,id) then return false,"Target is no longer hostile" end
+    if s:has_request(me,id) then return false,"Our alliance proposal is still pending" end
     if s:has_fallout(tile) then return false,"Target is already a fallout zone" end
     if not Weapons.blastSafe(s,me,tile,kind) then return false,"Friendly territory is inside the possible strike area" end
     local launchers=Weapons.launchers(s,me,tile)
