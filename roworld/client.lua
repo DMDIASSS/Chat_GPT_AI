@@ -3,6 +3,7 @@ local Services = {
     Players = game:GetService("Players"),
     CoreGui = game:GetService("CoreGui"),
     UserInputService = game:GetService("UserInputService"),
+    RunService = game:GetService("RunService"),
 }
 local env = (type(getgenv) == "function" and getgenv()) or _G
 local previous = env.__RoWorldBot
@@ -61,6 +62,12 @@ local adapter = Adapter.new(Services, require, nil, {
     getidentity = getthreadidentity or getidentity,
     setidentity = setthreadidentity or setidentity,
     getgc = getgc,
+    getconnections = getconnections,
+    getupvalues = getupvalues or (debug and debug.getupvalues),
+    getupvalue = getupvalue or (debug and debug.getupvalue),
+    getfenv = getfenv,
+    getsenv = getsenv,
+    getrenv = getrenv,
 })
 local reported
 function api.diagnostics() return adapter:diagnostics() end

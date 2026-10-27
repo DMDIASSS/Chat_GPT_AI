@@ -22,7 +22,8 @@ local function object(class)
     return o
 end
 local input = {InputBegan = event()}
-local services = {Players = {LocalPlayer = object("Player")}, CoreGui = object("CoreGui"), UserInputService = input}
+local services = {Players = {LocalPlayer = object("Player")}, CoreGui = object("CoreGui"), UserInputService = input,
+    RunService = {Heartbeat = event()}}
 local game = {GetService = function(_, name) return assert(services[name]) end}
 local Instance = {new = object}
 local UDim2 = {new = function(...) return {...} end,fromOffset = function(...) return {...} end}

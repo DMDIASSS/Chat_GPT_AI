@@ -6,6 +6,7 @@ Adapter.__index = Adapter
 function Adapter.new(services, requireModule, now, capabilities)
     return setmetatable({services = services, requireModule = requireModule,
         capabilities = capabilities or {}, discoveryRoute = "not connected",
+        accessStats = {},
         now = now or os.clock, main = nil, nextDiscovery = 0, lastSent = -math.huge,
         tickState = nil, lastTick = nil, tickChangedAt = 0}, Adapter)
 end
@@ -18,6 +19,8 @@ function Adapter:call(fn, ...)
         if ok and type(identity) == "number" then
             original = identity
             changed = pcall(caps.setidentity, 2)
+            local readOK, actual = pcall(caps.getidentity)
+            self.accessStats.identity_after_set = readOK and tostring(actual) or "read failed"
         end
     end
     local result = table.pack(pcall(fn, ...))
@@ -45,27 +48,107 @@ local function liveContext(candidate)
     return {session = session, ui = {ctx = ctx}}
 end
 
+function Adapter:inspectFunction(fn)
+    local caps = self.capabilities
+    if type(fn) ~= "function" then return nil end
+    self.accessStats.functions_inspected = (self.accessStats.functions_inspected or 0) + 1
+    local values
+    if type(caps.getupvalues) == "function" then
+        local ok, result = pcall(caps.getupvalues, fn)
+        if ok and type(result) == "table" and next(result) ~= nil then values = result end
+    end
+    if not values and type(caps.getupvalue) == "function" then
+        values = {}
+        for index = 1, 80 do
+            local result = table.pack(pcall(caps.getupvalue, fn, index))
+            if not result[1] or result.n < 2 then break end
+            local value = result.n >= 3 and result[3] or result[2]
+            values[index] = value
+        end
+    end
+    if not values then return nil end
+    for _, value in pairs(values) do
+        local found = liveContext(value)
+        if found then return found end
+    end
+    return nil
+end
+
+function Adapter:findCallbacks()
+    local getter = self.capabilities.getconnections
+    if type(getter) ~= "function" then return nil end
+    local signals = {}
+    local input, run = self.services.UserInputService, self.services.RunService
+    if input then
+        table.insert(signals, input.InputBegan)
+        table.insert(signals, input.InputEnded)
+    end
+    if run then table.insert(signals, run.Heartbeat) end
+    for _, signal in ipairs(signals) do
+        local ok, connections = pcall(getter, signal)
+        if ok and type(connections) == "table" then
+            for _, connection in pairs(connections) do
+                -- Read callbacks only: never fire, disable, replace or hook them.
+                local readable, fn = pcall(function() return connection.Function end)
+                if readable then
+                    local found = self:inspectFunction(fn)
+                    if found then self.discoveryRoute = "existing input callback"; return found end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 function Adapter:findLiveClient()
     local gc = self.capabilities.getgc
     if type(gc) ~= "function" then return nil end
     local ok, values = pcall(gc, true)
     if not ok or type(values) ~= "table" then self.gcError = tostring(values); return nil end
+    local functions = {}
+    self.accessStats.gc_tables, self.accessStats.gc_functions = 0, 0
     for _, value in pairs(values) do
+        if type(value) == "table" then self.accessStats.gc_tables += 1 end
+        if type(value) == "function" then
+            self.accessStats.gc_functions += 1
+            table.insert(functions, value)
+        end
         local found = liveContext(value)
         if found then self.discoveryRoute = "existing client tables"; return found end
+    end
+    for _, fn in ipairs(functions) do
+        local ownGameFunction = false
+        if type(self.capabilities.getfenv) == "function" and self.clientScript then
+            local okEnv, environment = pcall(self.capabilities.getfenv, fn)
+            if okEnv and type(environment) == "table" then
+                local okScript, matches = pcall(function()
+                    local script = environment.script
+                    return script and (script == self.clientScript or script:IsDescendantOf(self.clientScript))
+                end)
+                ownGameFunction = okScript and matches == true
+            end
+        end
+        if ownGameFunction then
+            local found = self:inspectFunction(fn)
+            if found then self.discoveryRoute = "existing game closure"; return found end
+        end
     end
     self.gcError = "No live RoWorld context found yet"
     return nil
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.0.1 - client access diagnostics"}
-    for _, key in ipairs({"getidentity", "setidentity", "getgc"}) do
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.0.2 - client access diagnostics"}
+    for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
     table.insert(lines, "route=" .. self.discoveryRoute)
     table.insert(lines, "module_error=" .. tostring(self.moduleError or "none"))
     table.insert(lines, "table_scan=" .. tostring(self.gcError or "not needed"))
+    local keys = {}
+    for key in pairs(self.accessStats) do table.insert(keys, key) end
+    table.sort(keys)
+    for _, key in ipairs(keys) do table.insert(lines, key .. "=" .. tostring(self.accessStats[key])) end
     return table.concat(lines, "\n")
 end
 
@@ -73,9 +156,11 @@ function Adapter:discover()
     if self.main and self.main.session and self.main.ui and self.main.ui.ctx then return self.main end
     if self.now() < self.nextDiscovery then return nil end
     self.nextDiscovery = self.now() + 8
+    self.accessStats.functions_inspected = 0
     local player = self.services.Players.LocalPlayer
     local scripts = player and player:FindFirstChild("PlayerScripts")
     local client = scripts and scripts:FindFirstChild("AirfrontClient")
+    self.clientScript = client
     local module = client and client:FindFirstChild("Main")
     if not module or not module:IsA("ModuleScript") then return nil end
     local ok, main = self:call(self.requireModule, module)
@@ -84,7 +169,25 @@ function Adapter:discover()
         return main
     end
     self.moduleError = ok and "Main module has no running session in this context" or tostring(main)
-    local found = self:findLiveClient()
+    -- Some executors replace require. Try the original client environment too.
+    for _, getter in ipairs({"getsenv", "getrenv"}) do
+        if type(self.capabilities[getter]) == "function" then
+            local envOK, environment
+            if getter == "getsenv" then envOK, environment = pcall(self.capabilities[getter], client)
+            else envOK, environment = pcall(self.capabilities[getter]) end
+            if envOK and type(environment) == "table" then
+                local readOK, nativeRequire = pcall(function() return environment.require end)
+                if readOK and type(nativeRequire) == "function" and nativeRequire ~= self.requireModule then
+                    local loaded, nativeMain = self:call(nativeRequire, module)
+                    if loaded and liveContext(nativeMain) then
+                        self.main, self.discoveryError, self.discoveryRoute = nativeMain, nil, "client environment require"
+                        return nativeMain
+                    end
+                end
+            end
+        end
+    end
+    local found = self:findCallbacks() or self:findLiveClient()
     if found then self.main, self.discoveryError = found, nil; return found end
     self.discoveryError = "Client access blocked or not ready; see diagnostics in JJSploit workspace / F9"
     return nil

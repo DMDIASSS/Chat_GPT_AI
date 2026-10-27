@@ -54,6 +54,61 @@ test("reports missing executor capabilities without inventing a session", functi
     assert(report:find("getgc=nil") and report:find("non%-RobloxScript"))
 end)
 
+test("reads a live context from input callback upvalues without calling the callback", function()
+    local f, called = fixture(), false
+    local callback = function() called = true end
+    local services = moduleServices()
+    services.UserInputService = {InputBegan = {}, InputEnded = {}}
+    local a = Adapter.new(services,function() error("module restricted") end,function() return 10 end,{
+        getconnections = function(signal)
+            assert(signal == services.UserInputService.InputBegan or signal == services.UserInputService.InputEnded)
+            return {{Function = callback}}
+        end,
+        getupvalues = function(fn) assert(fn == callback); return {f.main} end,
+    })
+    assert(a:frame().session == f.session and a.discoveryRoute == "existing input callback")
+    assert(not called and #f.session.sent == 0)
+end)
+
+test("handles function-only GC results and single-upvalue API variants", function()
+    for _, nativeStyle in ipairs({false,true}) do
+        local f, a = fixture(), nil
+        local callback = function() error("Must never invoke game callbacks") end
+        a = Adapter.new(moduleServices(),function() error("module restricted") end,function() return 10 end,{
+            getgc = function() return {callback} end,
+            getfenv = function(fn)
+                assert(fn == callback)
+                return {script = {IsDescendantOf = function(_, root) return root == a.clientScript end}}
+            end,
+            getupvalue = function(fn,index)
+                assert(fn == callback)
+                if index > 3 then error("No more upvalues") end
+                local value = index == 3 and f.ctx or nil
+                if nativeStyle then return "capture",value end
+                return value
+            end,
+        })
+        assert(a:frame().session == f.session and a.discoveryRoute == "existing game closure")
+        assert(a:diagnostics():find("gc_tables=0") and a:diagnostics():find("gc_functions=1"))
+    end
+end)
+
+test("uses the original client environment require when the executor wrapper fails", function()
+    local f = fixture()
+    local a = Adapter.new(moduleServices(),function() error("restricted wrapper") end,function() return 10 end,{
+        getrenv = function(...) assert(select("#",...) == 0); return {require = function() return f.main end} end,
+    })
+    assert(a:frame().session == f.session and a.discoveryRoute == "client environment require")
+end)
+
+test("diagnostics expose an identity setter that did not change the identity", function()
+    local a = Adapter.new(moduleServices(),function() error("restricted") end,function() return 10 end,{
+        getidentity = function() return 8 end, setidentity = function() end, getgc = function() return {} end,
+    })
+    assert(a:frame() == nil)
+    assert(a:diagnostics():find("identity_after_set=8"))
+end)
+
 test("discovers the original cached Main module without starting another client", function()
     local f = fixture()
     local module = {IsA = function(_, name) return name == "ModuleScript" end}

@@ -49,14 +49,21 @@ the local owner's ID from the live session, including changes after a new match.
 It waits in menus, while spectating, while loading, on a paused solo game, or
 when game ticks stop updating. It does not choose queues or buy shop items.
 
-If client access is blocked, version 1.0.1 tries requiring the game module at
+If client access is blocked, version 1.0.2 tries requiring the game module at
 ordinary client thread identity (restoring the prior identity afterward), then
 looks for the already-running client tables when `getgc(true)` is available.
 It never boots a second client. Access failures automatically write
 `RoWorld_Diagnostics.txt` to the JJSploit workspace if `writefile` is available,
-and also print the same capability/error report to F9. That report contains no
-session tokens or account information. No additional place files are needed
+and also print the same capability/error report to F9. The report records
+capabilities and access errors, not game state or session tokens. No additional place files are needed
 for the module-permission error; that diagnostic is useful if both routes fail.
+Version 1.0.2 also tries the original client environment's `require`, reads
+existing input/heartbeat callback upvalues, and supports executors whose
+`getgc(true)` returns functions without tables. It never invokes or replaces
+those callbacks. Diagnostics include the actual identity returned after setting
+it, the GC table/function counts, and available upvalue/connection APIs. These
+fallbacks need real executor support; having a function name alone does not
+establish that it works. No executor binaries are included in this download.
 
 ## Compatibility and verification
 
