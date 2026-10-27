@@ -3,6 +3,7 @@
 local Policy = {}
 local Weapons = require("./weapons")
 local Strategy = require("./strategy")
+local Diplomacy = require("./diplomacy")
 Policy.__index = Policy
 
 local function neighbours(map, tile, visit)
@@ -58,7 +59,7 @@ function Policy:reset(frame)
     self.cursor, self.border = nil, nil
     self.cooldowns = {}
     self.opponents,self.attacksSeen,self.frontsSeen={},{},{}
-    self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={}
+    self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={};self.spatialTick=nil
     self.spawnPlan=nil
     self.strategy=Strategy.new(frame)
     self.metrics={orders=0,attack=0,build=0,retreat=0,spawn=0,peakLand=frame.info.tiles or 0,initialLand=frame.info.tiles or 0}
@@ -158,6 +159,7 @@ function Policy:observe(frame)
                 -- Spending is an observation, not proof of a future attack.
                 m.spending=m.spending*.75+math.max(0,m.home-(info.troops or 0))*.25
                 m.trend=((info.troops or 0)-m.home)/dt
+                m.landTrend=((info.tiles or 0)-(m.tiles or 0))/dt
             end
             m.home,m.tiles=info.troops or 0,info.tiles or 0
             self.opponents[id]=m
@@ -322,8 +324,9 @@ function Policy:spawnScore(frame,tile)
         blocked_directions=blocked,opposing_player_sectors=opposed,local_land_samples=land}
 end
 
-function Policy:spawn(frame)
+function Policy:spawn(frame,reconsider)
     if not self:ready("spawn", frame.now) then return nil, "Waiting for spawn confirmation" end
+    if reconsider then self.cooldowns.spawn=frame.now+.5 end
     local s, map, best, bestScore = frame.state, frame.map, nil, -math.huge
     for _ = 1, 160 do
         local tile = self:landSample(map, "land_list")
@@ -332,7 +335,14 @@ function Policy:spawn(frame)
             if score > bestScore then best, bestScore = tile, score;self.spawnPlan=detail end
         end
     end
-    if best then return {intent = {type = "spawn", tile = best}, channel = "spawn", cooldown = 4,
+    if reconsider and best then
+        local current,currentDetail=self:spawnScore(frame,frame.info.spawn_tile)
+        if bestScore<current+15 or frame.map.dist2(best,frame.info.spawn_tile)<(30/(frame.map.k_lin or 1))^2 then
+            self.spawnPlan=currentDetail
+            return nil,'Current spawn remains suitable; watching new player marks'
+        end
+    end
+    if best then return {intent = {type = "spawn", tile = best}, channel = "spawn", cooldown = 2,
         label = "Choosing a starting territory"} end
     return nil, "Searching for unclaimed spawn land"
 end
@@ -446,14 +456,29 @@ end
 
 function Policy:diplomacy(frame,groups,a)
     if not self:ready("diplomacy",frame.now) then return nil end
-    local s=frame.state
+    local s=frame.state;self.diplomacyScores={}
+    local function evaluate(id,mode)
+        local result=Diplomacy.evaluate(self,frame,id,a,groups,mode)
+        table.insert(self.diplomacyScores,result)
+        table.sort(self.diplomacyScores,function(x,y) return x.score>y.score end)
+        if #self.diplomacyScores>20 then table.remove(self.diplomacyScores) end
+        return result
+    end
     for id,o in pairs(s.owners) do
-        if id~=frame.me and o.alive and s:has_request(id,frame.me) and not a.targets[id] then
-            local hostile=((self.opponents[id] or {}).heat or 0)>.5
-            local accept=not hostile and (o.traitor_until or 0)<=s.tick and Weapons.allianceSafe(s,frame.me,id)
-                and (not self.strategy or self.strategy:trustworthy(frame,id))
-            return {intent={type="ally_reply",target=id,accept=accept},channel="diplomacy",cooldown=5,
-                label=(accept and "Accepting alliance with " or "Declining unreliable ally ")..o.name}
+        if id~=frame.me and o.alive and s:has_request(id,frame.me) then
+            local r=evaluate(id,'accept')
+            return {intent={type='ally_reply',target=id,accept=r.eligible},plan={diplomacy=r},
+                channel='diplomacy',cooldown=5,label=(r.eligible and 'Accepting useful alliance with ' or 'Declining low-value or risky alliance with ')..o.name}
+        end
+    end
+    if type(s.alliance_info)=='function' then
+        for id,o in pairs(s.owners) do
+            local info=id~=frame.me and s:alliance_info(frame.me,id)
+            if info and info.can_extend then
+                local r=evaluate(id,'renew')
+                if r.eligible then return {intent={type='ally_extend',target=id},plan={diplomacy=r},
+                    channel='diplomacy',cooldown=8,label='Renewing a useful alliance with '..o.name} end
+            end
         end
     end
     for id,o in pairs(s.owners) do
@@ -470,24 +495,17 @@ function Policy:diplomacy(frame,groups,a)
             end
         end
     end
-    -- Ask a strong neighbouring nontraitor for cover, rather than starting
-    -- simultaneous wars. Existing requests and allies are not spammed.
-    if a.incoming>0 or a.enemyActive>0 or a.strongest>a.home*.8 then
-        local best,power
-        for id in pairs(groups) do
-            local o=s.owners[id]
-            if id>0 and o and o.kind~=1 and not a.targets[id] and not friendly(s,frame.me,id)
-                and (not self.strategy or self.strategy:canAsk(frame,id))
-                and (o.troops or 0)>=a.home*.6
-                and not s:has_request(frame.me,id) and (o.traitor_until or 0)<=s.tick
-                and Weapons.allianceSafe(s,frame.me,id)
-                and ((self.opponents[id] or {}).heat or 0)<.2 then
-                if not power or (o.troops or 0)>power then best,power=id,o.troops or 0 end
-            end
+
+    local best
+    for id,o in pairs(s.owners) do
+        if id~=frame.me and o.alive and not s:are_allies(frame.me,id) and not s:has_request(frame.me,id)
+            and (not self.strategy or self.strategy:canAsk(frame,id)) then
+            local r=evaluate(id,'offer')
+            if r.eligible and (not best or r.score>best.score) then best=r end
         end
-        if best then return {intent={type="ally_request",target=best},channel="diplomacy",cooldown=35,
-            label="Seeking a safer frontier with "..s:owner_name(best)} end
     end
+    if best then return {intent={type='ally_request',target=best.nation},plan={diplomacy=best},
+        channel='diplomacy',cooldown=35,label='Offering a beneficial alliance to '..s:owner_name(best.nation)} end
     return nil
 end
 
@@ -769,15 +787,16 @@ function Policy:fleet(frame,armies)
     return nil
 end
 
-function Policy:naval(frame, armies)
-    local escape=self.strategy and self.strategy.board.escape
+function Policy:naval(frame, armies,survival)
+    local escape=survival or self.strategy and self.strategy.board.escape
     if escape and frame.ctx.rules:transports()>0 then return nil end
     if self.strategy and (self.strategy.board.mode~="develop" and not escape or (armies.enemyActive or 0)>0) then return nil end
     if self.strategy then
         local core=self.strategy.core.summary
         if core.at_risk and not escape then return nil end
     end
-    if armies.incoming > 0 or not self:ready("boat", frame.now) or armies.available < armies.home * (escape and .05 or .12) then return nil end
+    if survival then armies=table.clone(armies);armies.reserve=armies.home*.9;armies.available=armies.home*.1 end
+    if armies.incoming > 0 and not survival or not self:ready("boat", frame.now) or armies.available < armies.home * (escape and .05 or .12) then return nil end
     if frame.ctx.rules:transports() >= (frame.state.rules.MAX_BOATS_PLAYER or 3) then return nil end
     local chosen, score
     for _ = 1, 120 do
@@ -787,7 +806,7 @@ function Policy:naval(frame, armies)
             local owner = frame.state.owners[target]
             local weak = target == 0 or (owner and owner.alive and (owner.troops or 0) < armies.available * .2)
             if escape then weak=target==0 end
-            if self.strategy and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 then weak=false end
+            if self.strategy and not escape and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 then weak=false end
             if target>0 and self.strategy and not self.strategy:canTarget(frame,target,armies) then weak=false end
             if target>0 and (armies.enemyActive or 0)>0 and not (armies.targets or {})[target] then weak=false end
             if weak and not friendly(frame.state, frame.me, target) and frame.ctx.borders:can_reach_by_sea(tile) then
@@ -808,7 +827,7 @@ function Policy:naval(frame, armies)
         local wanted=owner and math.max(250,(owner.troops or 0)*1.6) or math.max(100,armies.home-self:growthTarget(frame.info))
         local amount,reserve=self:attackAmount(frame,armies,wanted,owner==nil)
         if escape and amount then amount=math.min(amount,math.floor(armies.home*.1)) end
-        if amount then return {intent = {type = "boat", tile = chosen, ratio = amount/armies.home},escape=escape,
+        if amount then return {intent = {type = "boat", tile = chosen, ratio = amount/armies.home},escape=escape,survival=survival,
             reserve = reserve, plan={amount=amount},channel = "boat", cooldown = escape and 30 or 12,
             label = escape and "Establishing a small neutral foothold outside a trapped core" or "Sending a coastal landing"} end
     end
@@ -820,9 +839,11 @@ function Policy:decide(frame)
     self:observe(frame)
     if not frame.info.alive then return nil, "Eliminated - waiting for the next match" end
     if not frame.info.spawned then return self:spawn(frame) end
-    if frame.state.phase == 0 then return nil, "Spawned - waiting for the round" end
+    if frame.state.phase == 0 then return self:spawn(frame,true) end
     if frame.state.phase ~= 1 then return nil, "Match finished" end
-    self.strategy:updateCore(frame)
+    if not self.spatialTick or frame.state.tick-self.spatialTick>=2 then
+        self.strategy:updateCore(frame);self.spatialTick=frame.state.tick
+    end
     local groups, sites = self:fronts(frame)
     local a = self:armies(frame, groups)
     local board=self.strategy:updateBoard(frame,groups,a,self.frontsSeen,self.adjacentAllies)
@@ -832,9 +853,24 @@ function Policy:decide(frame)
     end
     if a.incoming > a.home * .75 and self:ready("retreat", frame.now) then
         for _, attack in ipairs(a.outgoing) do
-            return {intent = {type = "retreat", attack_id = attack.aid}, channel = "retreat", cooldown = 3,
+            return {intent = {type = "retreat", attack_id = attack.aid}, channel = "retreat", cooldown = .6,
                 label = "Recalling troops to defend"}
         end
+    end
+    if a.incoming>a.home*.5 then
+        board.emergency=true
+        local peace=self:diplomacy(frame,groups,a)
+        if peace then return peace end
+        local counter=self:strike(frame)
+        if counter then return counter end
+        if a.incoming>a.home*1.25 then
+            local escape=self:naval(frame,a,true)
+            if escape then return escape end
+        end
+        local defensive=self:build(frame,sites,'defense',{})
+        if defensive then return defensive end
+        board.emergency_reason='Defending; no affordable safe missile, peace order or escape is available'
+        return nil,board.emergency_reason
     end
     -- Economy / defensive construction has its own cooldown and never drains
     -- the troop reserve. Observed structures (including construction) are used.
@@ -931,7 +967,9 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.7.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+    return {version="1.8.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+        diplomacy_candidates=self.diplomacyScores or {},
+        nominal_runtime={poll_hz=10,core_scan_max_hz=5,order_max_hz=5},
         alliance_history=self.strategy and self.strategy.relationships or {},income=info and info.income or 0,
         economy=self.economyPlan or {},
         strategy=self.strategy and self.strategy.board or {},timeline=self.strategy and self.strategy.timeline or {},

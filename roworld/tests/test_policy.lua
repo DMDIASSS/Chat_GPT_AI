@@ -117,6 +117,7 @@ test("chooses an unclaimed spawn without treating an eliminated owner as respawn
 end)
 test("accepts a real incoming alliance request", function()
     local f, p = fixture(), Policy.new()
+    f.set(393,2);f.refresh()
     f.state.requests[2*1024+1] = f.state.tick
     local a = assert(p:decide(f))
     assert(a.intent.type == "ally_reply" and a.intent.target == 2 and a.intent.accept)

@@ -1,4 +1,4 @@
--- RoWorld Bot 1.7.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 1.8.0 | paste this entire file into JJSploit.
 -- No external script downloads or localhost bridge.
 
 local Weapons = (function()
@@ -591,9 +591,97 @@ function Strategy:review(frame,a)
             best,priority,reason=attack,attack.troops or 0,'Recalling distant expansion to secure home and core buildings'
         end
     end
-    if best then return {intent={type='retreat',attack_id=best.aid},channel='retreat',cooldown=3,label=reason} end
+    if best then return {intent={type='retreat',attack_id=best.aid},channel='retreat',
+        cooldown=(self.core.summary.critical or a.incoming>a.home*.5) and .6 or 3,label=reason} end
 end
 return Strategy
+
+
+end)()
+
+local Diplomacy = (function()
+
+-- Benefits and risks are estimates from visible state, not promises of loyalty.
+local Diplomacy={}
+
+local function pose(s,u)
+ local p=u.path or {};if #p==0 then return u.patrol_tile end
+ local i=math.clamp(math.floor(math.max(0,s.tick-(u.start_tick or s.tick))*100/math.max(1,u.ticks_per_tile_x100 or 100))+1,1,#p)
+ return p[i]
+end
+function Diplomacy.evaluate(policy,frame,id,a,groups,mode)
+ local s=frame.state;local o=s.owners[id];local reasons={}
+ local function veto(reason) return {nation=id,mode=mode,score=-100,eligible=false,reasons={reason}} end
+ if not o or not o.alive or id==frame.me then return veto('not a live foreign nation') end
+ if (o.traitor_until or 0)>s.tick then return veto('currently marked traitor') end
+ if policy.strategy and not policy.strategy:trustworthy(frame,id) then return veto('recent confirmed betrayal or unresolved distrust') end
+ if (a.targets or {})[id] then return veto('our land campaign is still active') end
+ if not Weapons.allianceSafe(s,frame.me,id) then return veto('our in-flight weapons endanger this alliance') end
+ local near=groups[id]~=nil or (policy.adjacentAllies or {})[id]==true
+ local home=math.max(1,a.home or frame.info.troops or 1)
+ local ratio=(o.troops or 0)/home
+ local memory=policy.opponents[id] or {};local heat=memory.heat or 0
+ local kind=o.kind==nil and 2 or o.kind
+ local score=kind==2 and 4 or kind==0 and .5 or -3
+ local function add(value,reason) score+=value;table.insert(reasons,reason) end
+ table.insert(reasons,kind==2 and 'human partnership preferred' or kind==0 and 'country partnership needs concrete benefits' or 'tribe has limited strategic value')
+ if near then add(2,'shared frontier can be stabilized') end
+ add(math.min(3,math.log(1+ratio)*2),'relative army strength')
+ if s:are_allies(frame.me,id) then add(1,'existing relationship') end
+ if heat>.2 then add(-math.min(6,heat*3),'recent observed aggression') end
+ local enemies={};local shared=false;local direct=false
+ for _,attack in pairs(s.attacks) do
+  if not attack.retreating then
+   if attack.target==frame.me and attack.attacker~=id then enemies[attack.attacker]=true end
+   if attack.attacker==frame.me and attack.target>0 then enemies[attack.target]=true end
+   if attack.attacker==id and attack.target==frame.me then direct=true end
+  end
+ end
+ for _,attack in pairs(s.attacks) do
+  if attack.attacker==id and enemies[attack.target] and not attack.retreating then shared=true end
+ end
+ if shared then add(4,'actively opposing a shared threat') end
+ for enemy in pairs(enemies) do if s:are_allies(id,enemy) then add(-3,'also allied with a current enemy');break end end
+ if direct then
+  add(-6,'currently attacking us')
+  if ratio>1.5 and (a.incoming or 0)>home*.2 then add(4,'peace could relieve an overwhelming attack') end
+  if (a.incoming or 0)>home*.8 then add(12,'last-resort peace under an overwhelming invasion') end
+ end
+ if kind==0 and near and ratio<.6 then add(-5,'weak neighbouring country is an expansion opportunity') end
+ local early=s.playing_since and s.playing_since>=0 and s.tick-s.playing_since<1200
+ if kind==0 and early and heat<.1 and not direct then add(-2,'early country grace may reduce immediate alliance value; retaliation remains possible') end
+ if kind==0 and near and ratio>3 and not (direct and (a.incoming or 0)>home*.8) then
+  return veto('dominant bordering country could later betray and absorb us')
+ end
+ if near and (memory.landTrend or 0)>math.max(5,(o.tiles or 0)*.003) and ratio>1.5 then add(-4,'rapid observed expansion raises future domination risk') end
+ local fleet=0
+ for _,u in pairs(s.units or {}) do
+  if u.owner==id and u.kind==2 then
+   local t=pose(s,u)
+   if t and t>=0 and t<frame.map.N and policy.strategy and policy.strategy.core:isSite(frame.map,t) then fleet+=1 end
+  end
+ end
+ if fleet>0 then
+  add(2,'alliance could reduce immediate naval pressure')
+  if ratio>1.5 or fleet>1 then add(-4,'concentrated warships near our core create coercion risk') end
+ end
+ local ports={};for _,b in pairs(s.structures) do if b.kind==1 and b.owner==frame.me then table.insert(ports,b) end end
+ local trade=false
+ for _,b in pairs(s.structures) do
+  if b.kind==1 and b.owner==id then for _,ours in ipairs(ports) do
+   if type(frame.map.coast_body_of)=='function' then
+    local body=frame.map:coast_body_of(ours.tile)
+    if body>0 and body==frame.map:coast_body_of(b.tile) then trade=true end
+   end
+  end end
+ end
+ if trade then add(2,'ports share a water body; potential trade relationship') end
+ if not near and not shared and not trade then add(-1,'limited visible local relevance') end
+ local threshold=mode=='offer' and 7 or mode=='renew' and 4.5 or 4
+ return {nation=id,mode=mode,score=score,eligible=score>=threshold,reasons=reasons,
+  threshold=threshold,army_ratio=ratio,nearby_warships=fleet,shared_enemy=shared,potential_trade=trade}
+end
+return Diplomacy
 
 
 end)()
@@ -603,6 +691,7 @@ local Policy = (function()
 -- RoWorld strategy adapted from Solo AggroBot's reserve / expansion approach.
 -- This module reads client observations and returns one ordinary game order.
 local Policy = {}
+
 
 
 Policy.__index = Policy
@@ -660,7 +749,7 @@ function Policy:reset(frame)
     self.cursor, self.border = nil, nil
     self.cooldowns = {}
     self.opponents,self.attacksSeen,self.frontsSeen={},{},{}
-    self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={}
+    self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={};self.spatialTick=nil
     self.spawnPlan=nil
     self.strategy=Strategy.new(frame)
     self.metrics={orders=0,attack=0,build=0,retreat=0,spawn=0,peakLand=frame.info.tiles or 0,initialLand=frame.info.tiles or 0}
@@ -760,6 +849,7 @@ function Policy:observe(frame)
                 -- Spending is an observation, not proof of a future attack.
                 m.spending=m.spending*.75+math.max(0,m.home-(info.troops or 0))*.25
                 m.trend=((info.troops or 0)-m.home)/dt
+                m.landTrend=((info.tiles or 0)-(m.tiles or 0))/dt
             end
             m.home,m.tiles=info.troops or 0,info.tiles or 0
             self.opponents[id]=m
@@ -924,8 +1014,9 @@ function Policy:spawnScore(frame,tile)
         blocked_directions=blocked,opposing_player_sectors=opposed,local_land_samples=land}
 end
 
-function Policy:spawn(frame)
+function Policy:spawn(frame,reconsider)
     if not self:ready("spawn", frame.now) then return nil, "Waiting for spawn confirmation" end
+    if reconsider then self.cooldowns.spawn=frame.now+.5 end
     local s, map, best, bestScore = frame.state, frame.map, nil, -math.huge
     for _ = 1, 160 do
         local tile = self:landSample(map, "land_list")
@@ -934,7 +1025,14 @@ function Policy:spawn(frame)
             if score > bestScore then best, bestScore = tile, score;self.spawnPlan=detail end
         end
     end
-    if best then return {intent = {type = "spawn", tile = best}, channel = "spawn", cooldown = 4,
+    if reconsider and best then
+        local current,currentDetail=self:spawnScore(frame,frame.info.spawn_tile)
+        if bestScore<current+15 or frame.map.dist2(best,frame.info.spawn_tile)<(30/(frame.map.k_lin or 1))^2 then
+            self.spawnPlan=currentDetail
+            return nil,'Current spawn remains suitable; watching new player marks'
+        end
+    end
+    if best then return {intent = {type = "spawn", tile = best}, channel = "spawn", cooldown = 2,
         label = "Choosing a starting territory"} end
     return nil, "Searching for unclaimed spawn land"
 end
@@ -1048,14 +1146,29 @@ end
 
 function Policy:diplomacy(frame,groups,a)
     if not self:ready("diplomacy",frame.now) then return nil end
-    local s=frame.state
+    local s=frame.state;self.diplomacyScores={}
+    local function evaluate(id,mode)
+        local result=Diplomacy.evaluate(self,frame,id,a,groups,mode)
+        table.insert(self.diplomacyScores,result)
+        table.sort(self.diplomacyScores,function(x,y) return x.score>y.score end)
+        if #self.diplomacyScores>20 then table.remove(self.diplomacyScores) end
+        return result
+    end
     for id,o in pairs(s.owners) do
-        if id~=frame.me and o.alive and s:has_request(id,frame.me) and not a.targets[id] then
-            local hostile=((self.opponents[id] or {}).heat or 0)>.5
-            local accept=not hostile and (o.traitor_until or 0)<=s.tick and Weapons.allianceSafe(s,frame.me,id)
-                and (not self.strategy or self.strategy:trustworthy(frame,id))
-            return {intent={type="ally_reply",target=id,accept=accept},channel="diplomacy",cooldown=5,
-                label=(accept and "Accepting alliance with " or "Declining unreliable ally ")..o.name}
+        if id~=frame.me and o.alive and s:has_request(id,frame.me) then
+            local r=evaluate(id,'accept')
+            return {intent={type='ally_reply',target=id,accept=r.eligible},plan={diplomacy=r},
+                channel='diplomacy',cooldown=5,label=(r.eligible and 'Accepting useful alliance with ' or 'Declining low-value or risky alliance with ')..o.name}
+        end
+    end
+    if type(s.alliance_info)=='function' then
+        for id,o in pairs(s.owners) do
+            local info=id~=frame.me and s:alliance_info(frame.me,id)
+            if info and info.can_extend then
+                local r=evaluate(id,'renew')
+                if r.eligible then return {intent={type='ally_extend',target=id},plan={diplomacy=r},
+                    channel='diplomacy',cooldown=8,label='Renewing a useful alliance with '..o.name} end
+            end
         end
     end
     for id,o in pairs(s.owners) do
@@ -1072,24 +1185,17 @@ function Policy:diplomacy(frame,groups,a)
             end
         end
     end
-    -- Ask a strong neighbouring nontraitor for cover, rather than starting
-    -- simultaneous wars. Existing requests and allies are not spammed.
-    if a.incoming>0 or a.enemyActive>0 or a.strongest>a.home*.8 then
-        local best,power
-        for id in pairs(groups) do
-            local o=s.owners[id]
-            if id>0 and o and o.kind~=1 and not a.targets[id] and not friendly(s,frame.me,id)
-                and (not self.strategy or self.strategy:canAsk(frame,id))
-                and (o.troops or 0)>=a.home*.6
-                and not s:has_request(frame.me,id) and (o.traitor_until or 0)<=s.tick
-                and Weapons.allianceSafe(s,frame.me,id)
-                and ((self.opponents[id] or {}).heat or 0)<.2 then
-                if not power or (o.troops or 0)>power then best,power=id,o.troops or 0 end
-            end
+
+    local best
+    for id,o in pairs(s.owners) do
+        if id~=frame.me and o.alive and not s:are_allies(frame.me,id) and not s:has_request(frame.me,id)
+            and (not self.strategy or self.strategy:canAsk(frame,id)) then
+            local r=evaluate(id,'offer')
+            if r.eligible and (not best or r.score>best.score) then best=r end
         end
-        if best then return {intent={type="ally_request",target=best},channel="diplomacy",cooldown=35,
-            label="Seeking a safer frontier with "..s:owner_name(best)} end
     end
+    if best then return {intent={type='ally_request',target=best.nation},plan={diplomacy=best},
+        channel='diplomacy',cooldown=35,label='Offering a beneficial alliance to '..s:owner_name(best.nation)} end
     return nil
 end
 
@@ -1371,15 +1477,16 @@ function Policy:fleet(frame,armies)
     return nil
 end
 
-function Policy:naval(frame, armies)
-    local escape=self.strategy and self.strategy.board.escape
+function Policy:naval(frame, armies,survival)
+    local escape=survival or self.strategy and self.strategy.board.escape
     if escape and frame.ctx.rules:transports()>0 then return nil end
     if self.strategy and (self.strategy.board.mode~="develop" and not escape or (armies.enemyActive or 0)>0) then return nil end
     if self.strategy then
         local core=self.strategy.core.summary
         if core.at_risk and not escape then return nil end
     end
-    if armies.incoming > 0 or not self:ready("boat", frame.now) or armies.available < armies.home * (escape and .05 or .12) then return nil end
+    if survival then armies=table.clone(armies);armies.reserve=armies.home*.9;armies.available=armies.home*.1 end
+    if armies.incoming > 0 and not survival or not self:ready("boat", frame.now) or armies.available < armies.home * (escape and .05 or .12) then return nil end
     if frame.ctx.rules:transports() >= (frame.state.rules.MAX_BOATS_PLAYER or 3) then return nil end
     local chosen, score
     for _ = 1, 120 do
@@ -1389,7 +1496,7 @@ function Policy:naval(frame, armies)
             local owner = frame.state.owners[target]
             local weak = target == 0 or (owner and owner.alive and (owner.troops or 0) < armies.available * .2)
             if escape then weak=target==0 end
-            if self.strategy and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 then weak=false end
+            if self.strategy and not escape and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 then weak=false end
             if target>0 and self.strategy and not self.strategy:canTarget(frame,target,armies) then weak=false end
             if target>0 and (armies.enemyActive or 0)>0 and not (armies.targets or {})[target] then weak=false end
             if weak and not friendly(frame.state, frame.me, target) and frame.ctx.borders:can_reach_by_sea(tile) then
@@ -1410,7 +1517,7 @@ function Policy:naval(frame, armies)
         local wanted=owner and math.max(250,(owner.troops or 0)*1.6) or math.max(100,armies.home-self:growthTarget(frame.info))
         local amount,reserve=self:attackAmount(frame,armies,wanted,owner==nil)
         if escape and amount then amount=math.min(amount,math.floor(armies.home*.1)) end
-        if amount then return {intent = {type = "boat", tile = chosen, ratio = amount/armies.home},escape=escape,
+        if amount then return {intent = {type = "boat", tile = chosen, ratio = amount/armies.home},escape=escape,survival=survival,
             reserve = reserve, plan={amount=amount},channel = "boat", cooldown = escape and 30 or 12,
             label = escape and "Establishing a small neutral foothold outside a trapped core" or "Sending a coastal landing"} end
     end
@@ -1422,9 +1529,11 @@ function Policy:decide(frame)
     self:observe(frame)
     if not frame.info.alive then return nil, "Eliminated - waiting for the next match" end
     if not frame.info.spawned then return self:spawn(frame) end
-    if frame.state.phase == 0 then return nil, "Spawned - waiting for the round" end
+    if frame.state.phase == 0 then return self:spawn(frame,true) end
     if frame.state.phase ~= 1 then return nil, "Match finished" end
-    self.strategy:updateCore(frame)
+    if not self.spatialTick or frame.state.tick-self.spatialTick>=2 then
+        self.strategy:updateCore(frame);self.spatialTick=frame.state.tick
+    end
     local groups, sites = self:fronts(frame)
     local a = self:armies(frame, groups)
     local board=self.strategy:updateBoard(frame,groups,a,self.frontsSeen,self.adjacentAllies)
@@ -1434,9 +1543,24 @@ function Policy:decide(frame)
     end
     if a.incoming > a.home * .75 and self:ready("retreat", frame.now) then
         for _, attack in ipairs(a.outgoing) do
-            return {intent = {type = "retreat", attack_id = attack.aid}, channel = "retreat", cooldown = 3,
+            return {intent = {type = "retreat", attack_id = attack.aid}, channel = "retreat", cooldown = .6,
                 label = "Recalling troops to defend"}
         end
+    end
+    if a.incoming>a.home*.5 then
+        board.emergency=true
+        local peace=self:diplomacy(frame,groups,a)
+        if peace then return peace end
+        local counter=self:strike(frame)
+        if counter then return counter end
+        if a.incoming>a.home*1.25 then
+            local escape=self:naval(frame,a,true)
+            if escape then return escape end
+        end
+        local defensive=self:build(frame,sites,'defense',{})
+        if defensive then return defensive end
+        board.emergency_reason='Defending; no affordable safe missile, peace order or escape is available'
+        return nil,board.emergency_reason
     end
     -- Economy / defensive construction has its own cooldown and never drains
     -- the troop reserve. Observed structures (including construction) are used.
@@ -1533,7 +1657,9 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.7.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+    return {version="1.8.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+        diplomacy_candidates=self.diplomacyScores or {},
+        nominal_runtime={poll_hz=10,core_scan_max_hz=5,order_max_hz=5},
         alliance_history=self.strategy and self.strategy.relationships or {},income=info and info.income or 0,
         economy=self.economyPlan or {},
         strategy=self.strategy and self.strategy.board or {},timeline=self.strategy and self.strategy.timeline or {},
@@ -1693,7 +1819,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.7.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.8.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -1804,13 +1930,13 @@ function Adapter:send(action, frame)
     if live.session ~= frame.session or live.state ~= frame.state or live.me ~= frame.me then
         return false, "Match changed; recalculating"
     end
-    if live.now - self.lastSent < .5 then return false, "Waiting for the next order slot" end
+    if live.now - self.lastSent < .2 then return false, "Waiting for the next order slot" end
     local s, me, rules = live.state, live.me, live.ctx.rules
     local intent = table.clone(action.intent)
     local kind = intent.type
     if not live.info.alive or s.phase == 2 then return false, "Match finished or nation eliminated" end
     if kind == "spawn" then
-        if live.info.spawned or not tileValid(live, intent.tile) or not live.map:is_contestable(intent.tile)
+        if live.info.spawned and s.phase~=0 or not tileValid(live, intent.tile) or not live.map:is_contestable(intent.tile)
             or s:tile_owner(intent.tile) ~= 0 or s:has_fallout(intent.tile) then return false, "Spawn point changed" end
     else
         if not live.info.spawned or s.phase ~= 1 then return false, "Waiting for the playing phase" end
@@ -1830,6 +1956,12 @@ function Adapter:send(action, frame)
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end
             end
             local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.5)
+            if action.survival then
+                if kind~='boat' or target~=0 or incoming<=troops*1.25 or rules:transports()>0 then
+                    return false,'Survival expedition conditions changed'
+                end
+                reserve=troops*.9
+            end
             intent.ratio = math.min(tonumber(intent.ratio) or 0, 1, math.max(0, troops-reserve) / math.max(1, troops))
             if intent.ratio ~= intent.ratio or intent.ratio <= 0 or troops * intent.ratio < 100 then return false, "Holding troop reserves" end
             if intent.ratio<.01 then return false,"Order below the game's 1% minimum; holding reserves" end
@@ -1861,6 +1993,11 @@ function Adapter:send(action, frame)
         elseif kind == "retreat" then
             local attack = s.attacks[intent.attack_id]
             if not attack or attack.attacker ~= me or attack.retreating then return false, "Attack already ended" end
+        elseif kind=='ally_extend' then
+            local info=type(s.alliance_info)=='function' and s:alliance_info(me,intent.target)
+            if not info or not info.can_extend then return false,'Alliance renewal window changed or already requested' end
+            if not Weapons.allianceSafe(s,me,intent.target) then return false,'Our strike endangers this alliance' end
+            if (s.owners[intent.target].traitor_until or 0)>s.tick then return false,'Alliance partner is marked traitor' end
         elseif kind == "ally_reply" then
             if not s:has_request(intent.target, me) then return false, "Alliance request expired" end
             if intent.accept and not Weapons.allianceSafe(s,me,intent.target) then return false,"Our in-flight strike endangers this alliance" end
@@ -2052,7 +2189,7 @@ function Wire.delta(packet,tail,decompress)
     return result
 end
 function Wire.intent(intent)
-    local types={spawn=1,attack=2,boat=3,build=4,nuke=5,retreat=6,move_warship=7,ally_request=8,ally_reply=9,ally_break=10}
+    local types={spawn=1,attack=2,boat=3,build=4,nuke=5,retreat=6,move_warship=7,ally_request=8,ally_reply=9,ally_break=10,ally_extend=12}
     local fields={"tile","target","attack_id","troops","uid"}
     local out=buffer.create(128);local at=3
     buffer.writeu8(out,1,4);buffer.writeu8(out,2,assert(types[intent.type],"Unsupported order"))
@@ -2100,6 +2237,16 @@ function State:are_allies(a,b)
     return self.alliances[key(a,b)]==true or (x and y and x.team>0 and x.team==y.team) or false
 end
 function State:has_request(a,b) return self.requests[a*1024+b]~=nil end
+function State:has_alliance(a,b) return self.alliances[key(a,b)]==true end
+function State:alliance_info(a,b)
+    if not self:has_alliance(a,b) then return nil end
+    local k=key(a,b);local expires=self.alliance_expires[k] or -1;local flags=self.alliance_ext[k] or 0
+    local mine=a<b and 1 or 2;local window=expires>=self.tick and expires<=self.tick+300
+    local meAsked=bit32.band(flags,mine)~=0
+    return {expires_at=expires,ticks_left=math.max(0,expires-self.tick),in_window=window,
+        me_asked=meAsked,other_asked=bit32.band(flags,3-mine)~=0,
+        can_extend=window and not meAsked and self.owners[a] and self.owners[a].alive and self.owners[b] and self.owners[b].alive or false}
+end
 function State:borders_tile(id,t)
     local found=false;adjacent(self.map,t,function(n) if self:tile_owner(n)==id then found=true end end);return found
 end
@@ -2203,7 +2350,8 @@ function Mirror.snapshot(data,map,me,yield)
     assert(typeof(data.owner)=="buffer" and buffer.len(data.owner)==map.N*4,"Incomplete ownership snapshot")
     assert(typeof(data.flags)=="buffer" and buffer.len(data.flags)==map.N,"Incomplete fallout snapshot")
     local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},units={},
-        alliances={},requests={},built={},border={},alliance_events={},alliance_seq=0,fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
+        alliances={},alliance_expires={},alliance_ext={},playing_since=data.playing_since or -1,
+        requests={},built={},border={},alliance_events={},alliance_seq=0,fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
         local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
         rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=10}},State)
     for _,row in ipairs(data.owners or {}) do s.owners[row[1]]=owner(row) end
@@ -2211,7 +2359,9 @@ function Mirror.snapshot(data,map,me,yield)
     for _,row in ipairs(data.attacks or {}) do attack(s,row) end
     for _,row in ipairs(data.units or {}) do unit(s,row) end
     for _,row in ipairs(data.nukes or {}) do nuke(s,row) end
-    for _,row in ipairs(data.allies or {}) do s.alliances[key(row[1],row[2])]=true end
+    for _,row in ipairs(data.allies or {}) do
+        local k=key(row[1],row[2]);s.alliances[k]=true;s.alliance_expires[k]=row[3];s.alliance_ext[k]=row[4] or 0
+    end
     for _,row in ipairs(data.requests or {}) do s.requests[row[1]*1024+row[2]]=row[3] or s.tick end
     for _,row in ipairs(data.built or {}) do
         s.built[row[1]]={};for i=0,15 do s.built[row[1]][i]=row[i+2] or 0 end
@@ -2257,7 +2407,7 @@ function Mirror.delta(s,d)
         local kind,id=e[1],e[2]
         if kind==0 then s.owners[id]={id=id,name=tostring(e[3]),kind=e[5],team=e[6] or 0,alive=true,spawned=false,spawn_tile=-1,label_tile=-1,tiles=0,troops=0,gold=0,max_troops=0}
         elseif kind==1 and s.owners[id] then s.owners[id].alive=false
-        elseif kind==2 then s.phase=id
+        elseif kind==2 then s.phase=id;if id==1 and s.playing_since<0 then s.playing_since=s.tick end
         elseif kind==3 and s.owners[id] then local info=s.owners[id];info.spawned=true;info.spawn_tile=e[3];info.label_tile=e[3]
         elseif kind==4 then local b=structure(s,e,1);built(s,b.owner,b.kind)
         elseif kind==5 and s.structures[id] then s.structures[id].owner=e[3]
@@ -2270,9 +2420,12 @@ function Mirror.delta(s,d)
         elseif kind==14 then attack(s,e,1)
         elseif kind==15 then s.attacks[id]=nil
         elseif kind==16 then s.requests[id*1024+e[3]]=e[4] or s.tick
-        elseif kind==17 then s.alliances[key(id,e[3])]=true;s.requests[id*1024+e[3]]=nil;s.requests[e[3]*1024+id]=nil
+        elseif kind==17 then
+            local k=key(id,e[3]);s.alliances[k]=true;s.alliance_expires[k]=e[4] or s.tick+3000;s.alliance_ext[k]=0
+            s.requests[id*1024+e[3]]=nil;s.requests[e[3]*1024+id]=nil
         elseif kind==18 then
             s.alliances[key(id,e[3])]=nil;s.alliance_seq+=1
+            s.alliance_expires[key(id,e[3])]=nil;s.alliance_ext[key(id,e[3])]=nil
             table.insert(s.alliance_events,{seq=s.alliance_seq,a=id,b=e[3],breaker=e[4] or 0,expired=e[5]==true,tick=s.tick})
             if #s.alliance_events>64 then table.remove(s.alliance_events,1) end
         elseif kind==20 then s.phase=2
@@ -2288,6 +2441,8 @@ function Mirror.delta(s,d)
         elseif kind==28 and s.units[id] then
             local u=s.units[id];u.path=e[3];u.start_tick=e[4];u.ticks_per_tile_x100=e[5]
         elseif kind==29 and s.nukes[e[3]] then s.nukes[e[3]].sam_sid=id
+        elseif kind==30 and s:has_alliance(id,e[3]) then
+            local k=key(id,e[3]);s.alliance_expires[k]=e[4];s.alliance_ext[k]=e[5] or 0
         elseif kind==32 and s.structures[id] then s.structures[id].shots=e[3]
         end
     end
@@ -2634,6 +2789,7 @@ local function saveMatchReport(force,reason)
     if ok then pcall(writefile,"RoWorld_Match_Report.json",encoded) end
 end
 local lastCommand, lastCommandAt = "", -math.huge
+local evaluatedState,evaluatedTick,evaluatedAt
 local function toggle()
     api.enabled = not api.enabled
     if api.enabled then
@@ -2667,6 +2823,10 @@ task.spawn(function()
                 local frame, reason = adapter:frame()
                 if not api.enabled or not api.alive then return end
                 if not frame then return reason end
+                if evaluatedState==frame.state and evaluatedTick==frame.state.tick and frame.now-(evaluatedAt or 0)<.5 then
+                    return 'Watching for a fresh game update'
+                end
+                evaluatedState,evaluatedTick,evaluatedAt=frame.state,frame.state.tick,frame.now
                 -- The normal client sends a rate-limited activity heartbeat
                 -- from user input. Keep that same heartbeat while autoplay is on.
                 if type(frame.session.note_activity) == "function" then frame.session:note_activity() end
@@ -2703,6 +2863,6 @@ task.spawn(function()
                 warn("[RoWorldBot] " .. tostring(message))
             end
         end
-        task.wait(.55)
+        task.wait(.1)
     end
 end)

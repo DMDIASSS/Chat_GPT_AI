@@ -18,6 +18,16 @@ function State:are_allies(a,b)
     return self.alliances[key(a,b)]==true or (x and y and x.team>0 and x.team==y.team) or false
 end
 function State:has_request(a,b) return self.requests[a*1024+b]~=nil end
+function State:has_alliance(a,b) return self.alliances[key(a,b)]==true end
+function State:alliance_info(a,b)
+    if not self:has_alliance(a,b) then return nil end
+    local k=key(a,b);local expires=self.alliance_expires[k] or -1;local flags=self.alliance_ext[k] or 0
+    local mine=a<b and 1 or 2;local window=expires>=self.tick and expires<=self.tick+300
+    local meAsked=bit32.band(flags,mine)~=0
+    return {expires_at=expires,ticks_left=math.max(0,expires-self.tick),in_window=window,
+        me_asked=meAsked,other_asked=bit32.band(flags,3-mine)~=0,
+        can_extend=window and not meAsked and self.owners[a] and self.owners[a].alive and self.owners[b] and self.owners[b].alive or false}
+end
 function State:borders_tile(id,t)
     local found=false;adjacent(self.map,t,function(n) if self:tile_owner(n)==id then found=true end end);return found
 end
@@ -121,7 +131,8 @@ function Mirror.snapshot(data,map,me,yield)
     assert(typeof(data.owner)=="buffer" and buffer.len(data.owner)==map.N*4,"Incomplete ownership snapshot")
     assert(typeof(data.flags)=="buffer" and buffer.len(data.flags)==map.N,"Incomplete fallout snapshot")
     local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},units={},
-        alliances={},requests={},built={},border={},alliance_events={},alliance_seq=0,fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
+        alliances={},alliance_expires={},alliance_ext={},playing_since=data.playing_since or -1,
+        requests={},built={},border={},alliance_events={},alliance_seq=0,fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
         local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
         rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=10}},State)
     for _,row in ipairs(data.owners or {}) do s.owners[row[1]]=owner(row) end
@@ -129,7 +140,9 @@ function Mirror.snapshot(data,map,me,yield)
     for _,row in ipairs(data.attacks or {}) do attack(s,row) end
     for _,row in ipairs(data.units or {}) do unit(s,row) end
     for _,row in ipairs(data.nukes or {}) do nuke(s,row) end
-    for _,row in ipairs(data.allies or {}) do s.alliances[key(row[1],row[2])]=true end
+    for _,row in ipairs(data.allies or {}) do
+        local k=key(row[1],row[2]);s.alliances[k]=true;s.alliance_expires[k]=row[3];s.alliance_ext[k]=row[4] or 0
+    end
     for _,row in ipairs(data.requests or {}) do s.requests[row[1]*1024+row[2]]=row[3] or s.tick end
     for _,row in ipairs(data.built or {}) do
         s.built[row[1]]={};for i=0,15 do s.built[row[1]][i]=row[i+2] or 0 end
@@ -175,7 +188,7 @@ function Mirror.delta(s,d)
         local kind,id=e[1],e[2]
         if kind==0 then s.owners[id]={id=id,name=tostring(e[3]),kind=e[5],team=e[6] or 0,alive=true,spawned=false,spawn_tile=-1,label_tile=-1,tiles=0,troops=0,gold=0,max_troops=0}
         elseif kind==1 and s.owners[id] then s.owners[id].alive=false
-        elseif kind==2 then s.phase=id
+        elseif kind==2 then s.phase=id;if id==1 and s.playing_since<0 then s.playing_since=s.tick end
         elseif kind==3 and s.owners[id] then local info=s.owners[id];info.spawned=true;info.spawn_tile=e[3];info.label_tile=e[3]
         elseif kind==4 then local b=structure(s,e,1);built(s,b.owner,b.kind)
         elseif kind==5 and s.structures[id] then s.structures[id].owner=e[3]
@@ -188,9 +201,12 @@ function Mirror.delta(s,d)
         elseif kind==14 then attack(s,e,1)
         elseif kind==15 then s.attacks[id]=nil
         elseif kind==16 then s.requests[id*1024+e[3]]=e[4] or s.tick
-        elseif kind==17 then s.alliances[key(id,e[3])]=true;s.requests[id*1024+e[3]]=nil;s.requests[e[3]*1024+id]=nil
+        elseif kind==17 then
+            local k=key(id,e[3]);s.alliances[k]=true;s.alliance_expires[k]=e[4] or s.tick+3000;s.alliance_ext[k]=0
+            s.requests[id*1024+e[3]]=nil;s.requests[e[3]*1024+id]=nil
         elseif kind==18 then
             s.alliances[key(id,e[3])]=nil;s.alliance_seq+=1
+            s.alliance_expires[key(id,e[3])]=nil;s.alliance_ext[key(id,e[3])]=nil
             table.insert(s.alliance_events,{seq=s.alliance_seq,a=id,b=e[3],breaker=e[4] or 0,expired=e[5]==true,tick=s.tick})
             if #s.alliance_events>64 then table.remove(s.alliance_events,1) end
         elseif kind==20 then s.phase=2
@@ -206,6 +222,8 @@ function Mirror.delta(s,d)
         elseif kind==28 and s.units[id] then
             local u=s.units[id];u.path=e[3];u.start_tick=e[4];u.ticks_per_tile_x100=e[5]
         elseif kind==29 and s.nukes[e[3]] then s.nukes[e[3]].sam_sid=id
+        elseif kind==30 and s:has_alliance(id,e[3]) then
+            local k=key(id,e[3]);s.alliance_expires[k]=e[4];s.alliance_ext[k]=e[5] or 0
         elseif kind==32 and s.structures[id] then s.structures[id].shots=e[3]
         end
     end

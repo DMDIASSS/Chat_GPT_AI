@@ -139,7 +139,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.7.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.8.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -250,13 +250,13 @@ function Adapter:send(action, frame)
     if live.session ~= frame.session or live.state ~= frame.state or live.me ~= frame.me then
         return false, "Match changed; recalculating"
     end
-    if live.now - self.lastSent < .5 then return false, "Waiting for the next order slot" end
+    if live.now - self.lastSent < .2 then return false, "Waiting for the next order slot" end
     local s, me, rules = live.state, live.me, live.ctx.rules
     local intent = table.clone(action.intent)
     local kind = intent.type
     if not live.info.alive or s.phase == 2 then return false, "Match finished or nation eliminated" end
     if kind == "spawn" then
-        if live.info.spawned or not tileValid(live, intent.tile) or not live.map:is_contestable(intent.tile)
+        if live.info.spawned and s.phase~=0 or not tileValid(live, intent.tile) or not live.map:is_contestable(intent.tile)
             or s:tile_owner(intent.tile) ~= 0 or s:has_fallout(intent.tile) then return false, "Spawn point changed" end
     else
         if not live.info.spawned or s.phase ~= 1 then return false, "Waiting for the playing phase" end
@@ -276,6 +276,12 @@ function Adapter:send(action, frame)
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end
             end
             local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.5)
+            if action.survival then
+                if kind~='boat' or target~=0 or incoming<=troops*1.25 or rules:transports()>0 then
+                    return false,'Survival expedition conditions changed'
+                end
+                reserve=troops*.9
+            end
             intent.ratio = math.min(tonumber(intent.ratio) or 0, 1, math.max(0, troops-reserve) / math.max(1, troops))
             if intent.ratio ~= intent.ratio or intent.ratio <= 0 or troops * intent.ratio < 100 then return false, "Holding troop reserves" end
             if intent.ratio<.01 then return false,"Order below the game's 1% minimum; holding reserves" end
@@ -307,6 +313,11 @@ function Adapter:send(action, frame)
         elseif kind == "retreat" then
             local attack = s.attacks[intent.attack_id]
             if not attack or attack.attacker ~= me or attack.retreating then return false, "Attack already ended" end
+        elseif kind=='ally_extend' then
+            local info=type(s.alliance_info)=='function' and s:alliance_info(me,intent.target)
+            if not info or not info.can_extend then return false,'Alliance renewal window changed or already requested' end
+            if not Weapons.allianceSafe(s,me,intent.target) then return false,'Our strike endangers this alliance' end
+            if (s.owners[intent.target].traitor_until or 0)>s.tick then return false,'Alliance partner is marked traitor' end
         elseif kind == "ally_reply" then
             if not s:has_request(intent.target, me) then return false, "Alliance request expired" end
             if intent.accept and not Weapons.allianceSafe(s,me,intent.target) then return false,"Our in-flight strike endangers this alliance" end

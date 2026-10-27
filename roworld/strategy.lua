@@ -244,6 +244,7 @@ function Strategy:review(frame,a)
             best,priority,reason=attack,attack.troops or 0,'Recalling distant expansion to secure home and core buildings'
         end
     end
-    if best then return {intent={type='retreat',attack_id=best.aid},channel='retreat',cooldown=3,label=reason} end
+    if best then return {intent={type='retreat',attack_id=best.aid},channel='retreat',
+        cooldown=(self.core.summary.critical or a.incoming>a.home*.5) and .6 or 3,label=reason} end
 end
 return Strategy

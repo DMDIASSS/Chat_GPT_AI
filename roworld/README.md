@@ -1,4 +1,4 @@
-# RoWorld bot 1.7.0
+# RoWorld bot 1.8.0
 
 One **Start bot / Stop bot** button, a decision status line, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
@@ -22,6 +22,43 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 1.8 expands diplomacy and emergency responses:
+
+- Requests, offers and renewals use a scored assessment with recorded reasons.
+  Humans receive preference over tribes/countries; nearby weak countries carry
+  an expansion-opportunity cost. Shared active enemies and compatible ports add
+  value. Strength, recent aggression, betrayal history, nearby warships, rapid
+  expansion and alliances with our enemies alter the score.
+- Dominant bordering countries are normally rejected because of future betrayal
+  risk. During an already overwhelming invasion, last-resort peace can outweigh
+  that normal rule. Agreement is voluntary; a positive score cannot force peace.
+- The first two minutes of known match age reduce the value of an otherwise
+  quiet country alliance. The exact country grace depends on hidden difficulty,
+  jitter, distance and other state; it is **not immunity from retaliation**.
+- Formal alliances are reassessed in the actual final 30-second renewal window.
+  The bot may request/accept extension for a useful partner or let an unhelpful
+  alliance expire. It checks the two-party extension bits and expiry again
+  before sending, avoiding duplicate requests. Permanent teams need no renewal.
+- Heavy incoming armies trigger emergency decisions before routine industry:
+  recall, useful peace proposals, affordable safe missile targets, then a possible
+  small neutral survival expedition or defensive construction. Survival boats
+  require incoming troops above 125% of the home bank, no other transport, a safe
+  observed destination and a retained 90% bank. Ordinary reserve rules remain for
+  every other order. A rejected peace offer or unavailable weapon is not a fix
+  for a lost military position; the report records when no safe option exists.
+- During the spawn countdown it reassesses approximately twice per second and
+  may move to a materially better location, at most once every two seconds.
+  This is permitted by the inspected game. It never relocates an already-spawned
+  nation after play begins. Future player marks remain unknown.
+- The UI/observation loop polls at up to **10 Hz**; heavy core scans are capped
+  at **5 Hz** and outgoing orders at **5/second**, with separate action cooldowns.
+  Repeated unchanged ticks are skipped. These are nominal limits, not measured
+  guarantees on a particular PC, network or game update rate.
+
+Reports add `diplomacy_candidates` with score/reasons, renewal decisions in the
+order log, emergency state/reason, and nominal runtime limits.
+
 
 Version 1.7 addresses income, alliance changes and trapped-core recovery:
 
@@ -228,7 +265,7 @@ Incomplete, stale or corrupt observations prevent orders and request resync.
 Match changes invalidate earlier decisions. Terrain water components are built
 once per download with cooperative yields; strategy scans are bounded.
 
-**115 offline scenarios** cover policy, adapter, network, weapons, strategy and core behavior, plus UI
+**128 offline scenarios** cover policy, adapter, network, weapons, strategy and core behavior, plus UI
 start/stop/re-injection and standalone Luau compilation. Additional checks against
 the supplied game's original modules verify new naval/diplomacy command encoding,
 water connectivity, unit paths/health, traitor flags and warship prices. Nuclear checks also match
@@ -254,6 +291,7 @@ API can prevent operation; the panel reports connection failures.
 
 ## Development
 
+`diplomacy.lua` scores alliance value/risk and renewal candidates;
 `core.lua` tracks owned building clusters, the home buffer and local threats;
 `strategy.lua` tracks campaigns, diplomacy grace periods and board conditions;
 `policy.lua` selects orders; `adapter.lua` revalidates the live observation;

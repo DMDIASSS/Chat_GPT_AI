@@ -99,6 +99,7 @@ local function saveMatchReport(force,reason)
     if ok then pcall(writefile,"RoWorld_Match_Report.json",encoded) end
 end
 local lastCommand, lastCommandAt = "", -math.huge
+local evaluatedState,evaluatedTick,evaluatedAt
 local function toggle()
     api.enabled = not api.enabled
     if api.enabled then
@@ -132,6 +133,10 @@ task.spawn(function()
                 local frame, reason = adapter:frame()
                 if not api.enabled or not api.alive then return end
                 if not frame then return reason end
+                if evaluatedState==frame.state and evaluatedTick==frame.state.tick and frame.now-(evaluatedAt or 0)<.5 then
+                    return 'Watching for a fresh game update'
+                end
+                evaluatedState,evaluatedTick,evaluatedAt=frame.state,frame.state.tick,frame.now
                 -- The normal client sends a rate-limited activity heartbeat
                 -- from user input. Keep that same heartbeat while autoplay is on.
                 if type(frame.session.note_activity) == "function" then frame.session:note_activity() end
@@ -168,6 +173,6 @@ task.spawn(function()
                 warn("[RoWorldBot] " .. tostring(message))
             end
         end
-        task.wait(.55)
+        task.wait(.1)
     end
 end)
