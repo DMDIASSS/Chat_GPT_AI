@@ -1,4 +1,4 @@
--- RoWorld Bot 1.5.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 1.6.0 | paste this entire file into JJSploit.
 -- No external script downloads or localhost bridge.
 
 local Weapons = (function()
@@ -157,14 +157,200 @@ return Weapons
 
 end)()
 
+local Core = (function()
+
+-- Local territory objectives. Troops remain a global bank in RoWorld; these
+-- anchors guide expansion and coverage rather than inventing regional garrisons.
+local Core={};Core.__index=Core
+local VALUES={[0]=8,[1]=7,[2]=8,[3]=2,[4]=3,[5]=6,[6]=4,[7]=5,[8]=5}
+local function valid(map,t) return type(t)=='number' and t>=0 and t<map.N end
+local function friendly(s,me,id) return id==me or id>0 and s:are_allies(me,id) end
+local function neighbours(map,t,fn)
+    local x=t%map.W
+    if x>0 then fn(t-1) end;if x<map.W-1 then fn(t+1) end
+    if t>=map.W then fn(t-map.W) end;if t<map.N-map.W then fn(t+map.W) end
+end
+function Core.new() return setmetatable({anchors={},fronts={},summary={}},Core) end
+function Core:priority(map,tile)
+    if not valid(map,tile) then return 0 end
+    local best=0
+    for _,a in ipairs(self.anchors) do
+        local distance=math.sqrt(map.dist2(tile,a.tile))*(map.k_lin or 1)
+        best=math.max(best,math.max(0,1-distance/a.radius)*(a.kind=='economic' and 9 or 7))
+    end
+    return best
+end
+function Core:isSite(map,tile) return self:priority(map,tile)>0 end
+function Core:update(frame)
+    local s,map,me=frame.state,frame.map,frame.me
+    local function owned(t) return valid(map,t) and s:tile_owner(t)==me and not s:has_fallout(t) end
+    local assets,candidates={},{}
+    local spawn=frame.info.spawn_tile
+    if owned(spawn) then table.insert(candidates,spawn) end
+    if owned(frame.info.label_tile) then table.insert(candidates,frame.info.label_tile) end
+    for _,b in pairs(s.structures) do
+        if b.owner==me and owned(b.tile) then
+            table.insert(assets,{tile=b.tile,kind=b.kind,level=b.level or 1,sid=b.sid,
+                value=(VALUES[b.kind] or 1)*(b.level or 1)})
+            if #candidates<64 then table.insert(candidates,b.tile) end
+        end
+    end
+    if #candidates==0 then
+        -- A lost spawn must not keep the bot defending an empty enemy island.
+        for t in pairs(frame.ctx.borders.border) do if owned(t) then table.insert(candidates,t);break end end
+    end
+    local function value(tile)
+        local total=0
+        for _,b in ipairs(assets) do
+            local d=math.sqrt(map.dist2(tile,b.tile))*(map.k_lin or 1)
+            if d<=120 then total+=b.value*(1-d/240) end
+        end
+        return total
+    end
+    local best,weight=nil,-1
+    for _,t in ipairs(candidates) do local v=value(t);if v>weight then best,weight=t,v end end
+    -- Keep the center stable through small changes in levels and ownership.
+    if owned(self.primary) and best and value(self.primary)*1.25+3>=weight then best=self.primary;weight=value(best) end
+    local changed=best~=self.primary
+    self.primary=best;self.anchors={};self.fronts={}
+    if best then table.insert(self.anchors,{tile=best,radius=100,kind='economic'}) end
+    if owned(spawn) and spawn~=best then table.insert(self.anchors,{tile=spawn,radius=70,kind='home'}) end
+    local summary={center_tile=best,home_tile=spawn,home_owned=owned(spawn),asset_value=math.max(0,weight),
+        anchors=self.anchors,owned_samples=0,neutral_samples=0,hostile_samples=0,allied_samples=0,
+        incoming=0,clearable_tiles=0,closest_hostile_distance=nil,threat_pressure=0,at_risk=false,critical=false}
+    summary.buildings={};summary.protected_building_count=0
+    for _,b in ipairs(assets) do
+        if self:isSite(map,b.tile) then
+            summary.protected_building_count+=1
+            if #summary.buildings<32 then table.insert(summary.buildings,{tile=b.tile,kind=b.kind,level=b.level,sid=b.sid}) end
+        end
+    end
+    summary.naval_incoming=0;summary.hostile_transports=0;summary.hostile_warships=0
+    local seen,hostiles,frontSeen={},{},{}
+    local function frontier(t)
+        local id=s:tile_owner(t)
+        if friendly(s,me,id) or not map:is_contestable(t) or s:has_fallout(t) or frontSeen[t] then return end
+        if not s:borders_tile(me,t) then return end
+        frontSeen[t]=true;summary.clearable_tiles+=1
+        local g=self.fronts[id]
+        if not g then g={id=id,tile=t,front=0,tiles={}};self.fronts[id]=g end
+        g.front+=1
+        if self:priority(map,t)>self:priority(map,g.tile) then g.tile=t end
+        if #g.tiles<12 then table.insert(g.tiles,t) end
+    end
+    local function sample(t)
+        if seen[t] or not map:is_contestable(t) or s:has_fallout(t) then return end
+        seen[t]=true;local id=s:tile_owner(t)
+        if id==me then summary.owned_samples+=1;neighbours(map,t,frontier)
+        elseif id==0 then summary.neutral_samples+=1;frontier(t)
+        elseif friendly(s,me,id) then summary.allied_samples+=1
+        else
+            summary.hostile_samples+=1;frontier(t)
+            local distance=math.huge
+            for _,a in ipairs(self.anchors) do distance=math.min(distance,math.sqrt(map.dist2(t,a.tile))*(map.k_lin or 1)) end
+            hostiles[id]=math.min(hostiles[id] or math.huge,distance)
+            summary.closest_hostile_distance=math.min(summary.closest_hostile_distance or math.huge,distance)
+        end
+    end
+    for _,a in ipairs(self.anchors) do
+        local radius=math.ceil(a.radius/(map.k_lin or 1));local stride=math.max(1,math.ceil(radius/32))
+        local x,y=a.tile%map.W,a.tile//map.W
+        for yy=math.max(0,y-radius),math.min(map.H-1,y+radius),stride do
+            for xx=math.max(0,x-radius),math.min(map.W-1,x+radius),stride do
+                if (xx-x)^2+(yy-y)^2<=radius^2 then sample(yy*map.W+xx) end
+            end
+        end
+        -- Exact radial probes supplement a coarse grid on high-resolution maps,
+        -- keeping narrow nearby frontiers visible without a whole-map scan.
+        for _,d in ipairs({{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1},{0,-1},{1,-1}}) do
+            for n=0,radius do
+                local xx,yy=x+d[1]*n,y+d[2]*n
+                if xx<0 or yy<0 or xx>=map.W or yy>=map.H then break end
+                if (xx-x)^2+(yy-y)^2<=radius^2 then sample(yy*map.W+xx) end
+            end
+        end
+    end
+    local pressures={}
+    for id,distance in pairs(hostiles) do
+        local o=s.owners[id]
+        if o and o.alive then
+            local pressure=(o.troops or 0)*(o.kind==2 and .4 or o.kind==0 and .22 or .08)
+            table.insert(pressures,pressure)
+            if o.kind==2 and distance<=40 and (o.troops or 0)>(frame.info.troops or 0)*.5 then summary.at_risk=true end
+        end
+    end
+    table.sort(pressures,function(a,b) return a>b end)
+    summary.threat_pressure=(pressures[1] or 0)+(pressures[2] or 0)*.5
+    for _,attack in pairs(s.attacks) do
+        if attack.target==me and not attack.retreating then
+            if valid(map,attack.anchor_tile) and self:isSite(map,attack.anchor_tile)
+                or not valid(map,attack.anchor_tile) and hostiles[attack.attacker] then summary.incoming+=attack.troops or 0 end
+        end
+    end
+    for _,u in pairs(s.units or {}) do
+        if not friendly(s,me,u.owner) and (u.kind==0 or u.kind==2) then
+            local path=u.path or {};local tile=u.patrol_tile
+            if #path>0 then
+                local index=math.clamp(math.floor(math.max(0,s.tick-(u.start_tick or s.tick))*100/math.max(1,u.ticks_per_tile_x100 or 100))+1,1,#path)
+                tile=path[index]
+            end
+            if valid(map,tile) and self:isSite(map,tile) then
+                if u.kind==0 then
+                    summary.hostile_transports+=1;summary.naval_incoming+=math.max(0,u.troops or 0)
+                else summary.hostile_warships+=1 end
+            end
+        end
+    end
+    summary.land_incoming=summary.incoming
+    summary.incoming+=summary.naval_incoming
+    local home=math.max(1,frame.info.troops or 0)
+    summary.at_risk=summary.at_risk or summary.incoming>home*.08
+        or summary.hostile_samples>0 and summary.threat_pressure>home*.4 or summary.hostile_warships>0
+    summary.critical=summary.incoming>home*.2
+    local total=summary.owned_samples+summary.neutral_samples+summary.hostile_samples+summary.allied_samples
+    summary.owned_fraction=summary.owned_samples/math.max(1,total)
+    summary.friendly_fraction=(summary.owned_samples+summary.allied_samples)/math.max(1,total)
+    summary.secured=summary.hostile_samples==0 and summary.friendly_fraction>=.7
+    summary.needs_buffer=summary.clearable_tiles>0 and summary.friendly_fraction<.55
+    if changed then self.samples={} end
+    self.samples=self.samples or {}
+    for _,row in ipairs(self.samples) do
+        if frame.now-row.at<15 and row.share-summary.owned_fraction>.15 then summary.critical=true;summary.at_risk=true end
+    end
+    if not self.lastSample or changed or frame.now-self.lastSample>=5 then
+        self.lastSample=frame.now;table.insert(self.samples,{at=frame.now,share=summary.owned_fraction})
+        if #self.samples>6 then table.remove(self.samples,1) end
+    end
+    self.summary=summary;return summary
+end
+function Core:buildScore(frame,tile,kind)
+    local map=frame.map;local priority=self:priority(map,tile)
+    if kind=='defense' or kind=='sam' then
+        local radius=(kind=='defense' and 30 or 70)/(map.k_lin or 1);local score=0
+        for _,a in ipairs(self.anchors) do
+            if map.dist2(tile,a.tile)<=radius^2 then score+=a.kind=='economic' and 14 or 9 end
+        end
+        return score
+    end
+    if kind=='port' then return priority end
+    return priority*2-(priority==0 and 12 or 0)
+end
+return Core
+
+
+end)()
+
 local Strategy = (function()
 
 -- Strategic memory for the observed board; no hidden player inputs are assumed.
 local Strategy={};Strategy.__index=Strategy
+
 function Strategy.new(frame)
     local owners={};for sid,b in pairs(frame.state.structures) do owners[sid]=b.owner end
-    return setmetatable({campaigns={},peace={},structures=owners,timeline={},recoverUntil=0,board={}},Strategy)
+    return setmetatable({campaigns={},peace={},structures=owners,timeline={},recoverUntil=0,board={},core=Core.new()},Strategy)
 end
+function Strategy:updateCore(frame) return self.core:update(frame) end
+function Strategy:corePriority(frame,tile) return self.core:priority(frame.map,tile) end
 local function friendly(s,me,id) return id==me or id>0 and s:are_allies(me,id) end
 function Strategy:sent(action,s,me,now)
     local kind=action.intent.type
@@ -217,6 +403,8 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
     for id,m in pairs(fronts or {}) do if frame.now-m.at<=8 then near[id]=true end end
     local b={human_neighbours=0,country_neighbours=0,largest_human=0,pressure=0,
         incoming=a.incoming,committed=0,leaders={},candidates={},mode='develop',unreliable_ally_pressure=0}
+    local core=self.core.summary
+    b.core=core
     local pressures={}
     b.naval_pressure=0
     for id,o in pairs(s.owners) do
@@ -249,15 +437,19 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
     end
     local retained=math.min(home*.9,b.pressure+b.unreliable_ally_pressure+b.naval_pressure)
     a.reserve=math.min(home,math.max(a.reserve,retained,a.incoming*1.5))
+    if core.at_risk then
+        a.reserve=math.min(home,math.max(a.reserve,home*.65,core.incoming*1.8,
+            math.min(home*.9,core.threat_pressure)))
+    end
     a.available=math.max(0,home-a.reserve)
     for _,attack in ipairs(a.outgoing) do b.committed+=attack.troops or 0 end
     -- Land losses are stronger evidence than a bank drop caused by our own order.
     local peak=frame.info.tiles or 0
     for _,row in ipairs(self.timeline) do if frame.now-row.at<20 then peak=math.max(peak,row.land) end end
     if peak>=50 and (frame.info.tiles or 0)<peak*.88 then self.recoverUntil=frame.now+15 end
-    b.recover=frame.now<self.recoverUntil or a.incoming>home*.35
+    b.recover=frame.now<self.recoverUntil or a.incoming>home*.35 or core.critical==true
     b.overextended=b.human_neighbours>0 and b.largest_human>home*1.4
-    if b.recover then b.mode='recover' elseif b.overextended or a.incoming>home*.15 then b.mode='guard' end
+    if b.recover then b.mode='recover' elseif core.at_risk or b.overextended or a.incoming>home*.15 then b.mode='guard' end
     table.sort(b.leaders,function(x,y) return x.land>y.land end)
     while #b.leaders>5 do table.remove(b.leaders) end
     self.board=b
@@ -265,7 +457,8 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
         self.lastSample=frame.now
         table.insert(self.timeline,{at=frame.now,tick=s.tick,land=frame.info.tiles or 0,troops=home,
             capacity=frame.info.max_troops or 0,gold=frame.info.gold or 0,incoming=a.incoming,
-            committed=b.committed,reserve=a.reserve,mode=b.mode,human_neighbours=b.human_neighbours})
+            committed=b.committed,reserve=a.reserve,mode=b.mode,human_neighbours=b.human_neighbours,
+            core_tile=core.center_tile,core_at_risk=core.at_risk,core_owned_fraction=core.owned_fraction})
         if #self.timeline>120 then table.remove(self.timeline,1) end
     end
     return b
@@ -275,6 +468,7 @@ function Strategy:canTarget(frame,id,a)
     if not o or friendly(s,frame.me,id) then return false end
     if frame.now<(self.peace[id] or 0) or s:has_request(frame.me,id) then return false end
     if a.incoming>a.home*.2 then return false end
+    if (self.core.summary.at_risk or self.core.summary.needs_buffer) and not self.core.fronts[id] then return false end
     if b.recover or b.overextended and o.kind~=1 then return false end
     local c=self.campaigns[id]
     if c and frame.now-(c.lastSent or c.started)>45 and not (a.targets or {})[id] then
@@ -292,6 +486,13 @@ end
 function Strategy:nuclearTarget(frame,id)
     if frame.now<(self.peace[id] or 0) or frame.state:has_request(frame.me,id) then return false end
     local o=frame.state.owners[id]
+    if self.core.summary.at_risk and not self.core.fronts[id] then
+        local direct=false
+        for _,a in pairs(frame.state.attacks) do
+            if a.attacker==id and a.target==frame.me and not a.retreating then direct=true end
+        end
+        if not direct then return false end
+    end
     if o and o.kind==2 and self.board.mode~='develop' then
         for _,a in pairs(frame.state.attacks) do
             if a.attacker==id and a.target==frame.me and not a.retreating then return true end
@@ -302,13 +503,15 @@ function Strategy:nuclearTarget(frame,id)
 end
 function Strategy:assetOpportunity(frame,g)
     local map=frame.map;local best,tile,sid=0,g.tile,nil
+    local bestScore=self:corePriority(frame,g.tile)
     for _,b in pairs(frame.state.structures) do
         if b.owner==g.id and b.kind~=3 then
             local weight=({[0]=4,[1]=5,[2]=5,[4]=2,[5]=3})[b.kind] or 1
             for _,t in ipairs(g.tiles or {g.tile}) do
                 local d=math.sqrt(map.dist2(t,b.tile))*(map.k_lin or 1)
                 local value=weight*math.max(0,1-d/40)
-                if value>best then best,tile,sid=value,t,b.sid end
+                local score=value+self:corePriority(frame,t)
+                if score>bestScore then bestScore=score;best,tile,sid=value,t,b.sid end
             end
         end
     end
@@ -322,15 +525,21 @@ function Strategy:utility(frame,g,plan,a)
         -plan.amount/math.max(1,a.home)*8+(o.kind==2 and -7 or o.kind==0 and -1.5 or 0)
         -math.min(4,(c and c.sends or 0)*.6)-math.max(0,(self.board.human_neighbours or 0)-1)*1.5
     value+=math.clamp(plan.score/200,-1,1)
+    value+=self:corePriority(frame,g.tile)
     return value
 end
 function Strategy:review(frame,a)
     local best,priority,reason
     for _,attack in ipairs(a.outgoing) do
+        local known=type(attack.anchor_tile)=='number' and attack.anchor_tile>=0 and attack.anchor_tile<frame.map.N
+        local away=known and not self.core:isSite(frame.map,attack.anchor_tile) or not known and self.core.summary.at_risk
         if attack.target>0 then
             local o=frame.state.owners[attack.target] or {};local c=self.campaigns[attack.target]
             local why
-            if friendly(frame.state,frame.me,attack.target) then why='Recalling troops after an alliance changed'
+            local core=self.core.summary
+            if (core.at_risk or core.needs_buffer) and away then
+                why='Recalling a distant raid to protect the home and economic center'
+            elseif friendly(frame.state,frame.me,attack.target) then why='Recalling troops after an alliance changed'
             elseif self.board.recover or a.incoming>a.home*.5 then why='Recalling the largest raid to defend the whole territory'
             elseif c and c.captures>0 and o.kind==0 and ((self.board.human_neighbours or 0)>0
                 or self.board.mode=='guard' or c.sends>=3 or frame.now-c.lastProgress>6) then
@@ -339,8 +548,9 @@ function Strategy:review(frame,a)
             elseif c and o.kind==2 and c.spent>a.home*.35 and frame.now-c.started>7 then why='Limiting exposure against a human player'
             end
             if why and (not priority or (attack.troops or 0)>priority) then best,priority,reason=attack,attack.troops or 0,why end
-        elseif self.board.recover and (not priority or (attack.troops or 0)>priority) then
-            best,priority,reason=attack,attack.troops or 0,'Recalling expansion troops while recovering territory'
+        elseif (self.board.recover or (self.core.summary.at_risk or self.core.summary.needs_buffer) and away)
+            and (not priority or (attack.troops or 0)>priority) then
+            best,priority,reason=attack,attack.troops or 0,'Recalling distant expansion to secure home and core buildings'
         end
     end
     if best then return {intent={type='retreat',attack_id=best.aid},channel='retreat',cooldown=3,label=reason} end
@@ -742,6 +952,24 @@ function Policy:fronts(frame)
     end
     -- A border-only candidate list missed safe interior construction sites.
     for _=1,96 do site(self:landSample(map,"land_list"),true) end
+    if self.strategy then
+        -- Give the home area its own local scan so distant coastline cannot
+        -- consume the entire rotating frontier budget.
+        for id,nearby in pairs(self.strategy.core.fronts) do
+            local samples=table.clone(nearby.tiles);table.insert(samples,1,nearby.tile)
+            for _,t in ipairs(samples) do
+                if s:tile_owner(t)==id and s:borders_tile(me,t) and not s:has_fallout(t) and not Weapons.hazard(s,t,0,3) then
+                    local g=groups[id]
+                    if not g then g={id=id,tile=t,front=0,tiles={},seen={}};groups[id]=g end
+                    if not g.seen[t] then
+                        g.seen[t]=true;g.front+=1;table.insert(g.tiles,1,t)
+                        if #g.tiles>12 then table.remove(g.tiles) end
+                    end
+                    if self.strategy:corePriority(frame,t)>self.strategy:corePriority(frame,g.tile) then g.tile=t end
+                end
+            end
+        end
+    end
     for id,g in pairs(groups) do self.frontsSeen[id]={at=frame.now,tile=g.tile} end
     return groups, sites
 end
@@ -876,6 +1104,7 @@ function Policy:build(frame, sites, kind, counts)
         local place = rules:placement(kind, sites[i])
         if place.ok and valid(frame.map, place.tile) and self:siteSafe(frame,place.tile,kind) then
             local score = place.upgrade and -10 or 10
+            if self.strategy then score+=self.strategy.core:buildScore(frame,place.tile,kind) end
             local center = frame.info.label_tile
             if valid(frame.map, center) then score -= math.sqrt(frame.map.dist2(center, place.tile)) * .02 end
             if kind == "defense" or kind == "sam" then
@@ -897,7 +1126,11 @@ function Policy:build(frame, sites, kind, counts)
                     for _,b in pairs(frame.state.structures) do
                         if b.owner==frame.me and b.kind~=4 and frame.map.dist2(place.tile,b.tile)<=radius^2
                             and (not place.upgrade or frame.map.dist2(place.tile,b.tile)>oldRadius^2)
-                            and not Weapons.covered(frame.state,frame.me,b.tile,self.desiredSAMCoverage) then protected+=b.kind==5 and 8 or 3 end
+                            and not Weapons.covered(frame.state,frame.me,b.tile,self.desiredSAMCoverage) then
+                            local weight=b.kind==5 and 8 or 3
+                            if self.strategy and self.strategy.core:isSite(frame.map,b.tile) then weight*=2 end
+                            protected+=weight
+                        end
                     end
                     if protected==0 then score=-math.huge else score+=protected*30 end
                 end
@@ -934,7 +1167,9 @@ function Policy:economy(frame, sites, armies)
     if exposed and (counts[4] or 0)<6 and (incomingNuke or enemySilo or city+factory>=3) then table.insert(wanted,"sam") end
     -- Protect the first city budget instead of spending every 50K on posts.
     if city==0 then table.insert(wanted,"city") end
-    if armies.incoming > armies.home * (city==0 and .6 or .2) and (counts[3] or 0) < 3 then table.insert(wanted, "defense") end
+    local coreRisk=self.strategy and self.strategy.core.summary.at_risk
+    if (armies.incoming > armies.home * (city==0 and .6 or .2) or city>0 and coreRisk)
+        and (counts[3] or 0) < 3 then table.insert(wanted, "defense") end
     if city > 0 and factory == 0 then table.insert(wanted, "factory") end
     if city > 0 and port == 0 then table.insert(wanted, "port") end
     if armies.home >= (frame.info.max_troops or math.huge) * .75 and city < 6 then table.insert(wanted, "city") end
@@ -1017,21 +1252,29 @@ function Policy:fleet(frame,armies)
     end
     if #ports==0 then return nil end
     for _,u in pairs(s.units or {}) do if u.owner==frame.me and u.kind==2 then table.insert(ships,u) end end
-    local threat,threatScore,patrol
+    local threat,threatScore,patrol,patrolScore
     for _,port in ipairs(ports) do
-        neighbours(map,port.tile,function(t) if map:is_water(t) then patrol=patrol or t end end)
+        local corePriority=self.strategy and self.strategy:corePriority(frame,port.tile) or 0
+        neighbours(map,port.tile,function(t)
+            if map:is_water(t) and (not patrolScore or corePriority>patrolScore) then patrol=t;patrolScore=corePriority end
+        end)
         for _,u in pairs(s.units or {}) do
             local t=unitTile(s,u)
             if u.owner>0 and not friendly(s,frame.me,u.owner) and (u.kind==0 or u.kind==2)
                 and valid(map,t) and map:is_water(t) then
                 local distance=math.sqrt(map.dist2(t,port.tile))*(map.k_lin or 1)
                 local value=(u.kind==0 and 180 or 130)-distance
+                if value>0 then value+=corePriority*12 end
                 if value>0 and (not threatScore or value>threatScore) then threat,threatScore=t,value end
             end
         end
     end
     local target=threat or patrol
     if not target then return nil end
+    table.sort(ships,function(a,b)
+        local ta,tb=unitTile(s,a),unitTile(s,b)
+        return (valid(map,ta) and map.dist2(ta,target) or math.huge)<(valid(map,tb) and map.dist2(tb,target) or math.huge)
+    end)
     local wanted=threat and math.min(3,#ports+1) or 1
     if #ships<wanted and frame.ctx.rules:availability("warship").ok
         and (frame.info.gold or 0)>=frame.ctx.rules:cost("warship")*(threat and 1 or 1.7)
@@ -1056,6 +1299,10 @@ end
 
 function Policy:naval(frame, armies)
     if self.strategy and (self.strategy.board.mode~="develop" or (armies.enemyActive or 0)>0) then return nil end
+    if self.strategy then
+        local core=self.strategy.core.summary
+        if core.at_risk then return nil end
+    end
     if armies.incoming > 0 or not self:ready("boat", frame.now) or armies.available < armies.home * .12 then return nil end
     if frame.ctx.rules:transports() >= (frame.state.rules.MAX_BOATS_PLAYER or 3) then return nil end
     local chosen, score
@@ -1065,6 +1312,7 @@ function Policy:naval(frame, armies)
             local target = frame.state:tile_owner(tile)
             local owner = frame.state.owners[target]
             local weak = target == 0 or (owner and owner.alive and (owner.troops or 0) < armies.available * .2)
+            if self.strategy and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 then weak=false end
             if target>0 and self.strategy and not self.strategy:canTarget(frame,target,armies) then weak=false end
             if target>0 and (armies.enemyActive or 0)>0 and not (armies.targets or {})[target] then weak=false end
             if weak and not friendly(frame.state, frame.me, target) and frame.ctx.borders:can_reach_by_sea(tile) then
@@ -1097,6 +1345,7 @@ function Policy:decide(frame)
     if not frame.info.spawned then return self:spawn(frame) end
     if frame.state.phase == 0 then return nil, "Spawned - waiting for the round" end
     if frame.state.phase ~= 1 then return nil, "Match finished" end
+    self.strategy:updateCore(frame)
     local groups, sites = self:fronts(frame)
     local a = self:armies(frame, groups)
     local board=self.strategy:updateBoard(frame,groups,a,self.frontsSeen,self.adjacentAllies)
@@ -1164,7 +1413,7 @@ function Policy:decide(frame)
         best,score=currentBest,currentScore
     end
     local neutral = groups[0]
-    local neutralScore=neutral and 5+math.min(2,math.log(1+neutral.front)) or -math.huge
+    local neutralScore=neutral and 5+math.min(2,math.log(1+neutral.front))+self.strategy:corePriority(frame,neutral.tile) or -math.huge
     if best and (not neutral or a.neutralActive>0 or score>neutralScore) then return best end
     if board.recover or a.incoming > a.home*.25 then return nil,"Defending - holding reserves and reassessing the whole board" end
     if neutral and self:ready("attack", frame.now) and a.available > 200 and a.enemyActive == 0 then
@@ -1173,7 +1422,9 @@ function Policy:decide(frame)
             local amount,reserve=self:attackAmount(frame,a,0,true)
             if amount then return {intent = {type = "attack", tile = neutral.tile, ratio = amount / a.home},
                 reserve = reserve,plan={amount=amount,growth_target=self:growthTarget(frame.info)},
-                channel = "attack", cooldown = 2.5, label = "Expanding with a recruitment-aware troop budget"} end
+                channel = "attack", cooldown = 2.5,
+                label = self.strategy:corePriority(frame,neutral.tile)>0 and "Clearing a territory buffer around home and core buildings"
+                    or "Expanding with a recruitment-aware troop budget"} end
         end
     end
     if best then return best end
@@ -1203,7 +1454,7 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.5.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+    return {version="1.6.0",scope="Since the current observer snapshot; intent estimates are heuristic",
         strategy=self.strategy and self.strategy.board or {},timeline=self.strategy and self.strategy.timeline or {},
         recruitment_target=info and self:growthTarget(info) or 0,spawn_plan=self.spawnPlan,
         tick=self.state and self.state.tick or 0,alive=info and info.alive or false,
@@ -1361,7 +1612,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.5.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.6.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end

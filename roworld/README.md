@@ -1,4 +1,4 @@
-# RoWorld bot 1.5.0
+# RoWorld bot 1.6.0
 
 One **Start bot / Stop bot** button, a decision status line, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
@@ -22,6 +22,34 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 1.6 protects the **original home and an economic core**:
+
+- Chooses a stable center from the concentration and levels of owned buildings,
+  rather than following whichever distant port was encountered first. The owned
+  spawn remains a secondary objective when the economic center moves elsewhere.
+- Performs a bounded local ownership scan around those anchors, supplemented by
+  exact radial probes. This finds home-front expansion even when the rotating
+  global border scan is busy with distant outposts. Neutral buffer growth and
+  affordable nearby enemy clearance receive priority over distant opportunities.
+- Pauses new distant wars and landings while the home buffer needs consolidation.
+  Useful nearby coastal landings remain possible when the area is not threatened.
+- Raises reserves and recalls distant raids when hostile troops or ships threaten
+  the core. Sudden loss of local buffer territory triggers emergency recovery.
+  Enemy transports are treated as potential invasions, not certain future inputs.
+- Favors core locations for new economic construction and defense/SAM coverage.
+  Patrol construction and interception prioritize core ports; healthy available
+  warships nearest the chosen threat are considered first. Damaged ships retain
+  the game's retreat/repair behavior.
+- If the original spawn is lost, the bot protects remaining owned assets instead
+  of blindly pursuing an empty enemy-held location. Center selection has
+  hysteresis so small building upgrades do not constantly move its objective.
+
+RoWorld troops are a **global bank**, not separate local garrisons. Gold is also
+global; the center uses building importance as an estimate of economic value.
+The bot cannot guarantee that a buffer is safe or clear: local scans are bounded,
+water bodies and intervening terrain matter, and opponents can change direction.
+It keeps the existing cost, alliance, fallout and incoming-strike checks.
 
 Version 1.5 adds a board review before choosing new military orders:
 
@@ -147,7 +175,11 @@ threats, enemy silo construction/readiness, own SAM counts, fallout tile count,
 and the latest attack forecast. Version 1.5 also records the board mode, nearby
 human pressure, alternative military candidates, spawn assessment, target owner
 IDs/types and a bounded five-second timeline of territory, reserves and incoming
-attacks. Territory changes do not identify which attacker caused every loss. Nothing is uploaded automatically.
+attacks. Version 1.6 adds `strategy.core`: center/home tiles, retained home
+ownership, anchor radii, estimated building importance, up to 32 protected
+building locations/types/levels, sampled buffer ownership, local incoming armies
+and naval threat counts. Timeline samples also record core risk and buffer share.
+Territory changes do not identify which attacker caused every loss. Nothing is uploaded automatically.
 Send that file after a completed match to investigate its decisions. It covers
 the current observer snapshot onward; a fresh snapshot or re-execution resets
 its history. It records orders sent, not server confirmation of success.
@@ -170,7 +202,7 @@ Incomplete, stale or corrupt observations prevent orders and request resync.
 Match changes invalidate earlier decisions. Terrain water components are built
 once per download with cooperative yields; strategy scans are bounded.
 
-**93 offline scenarios** cover policy, adapter, network, weapons and strategy behavior, plus UI
+**107 offline scenarios** cover policy, adapter, network, weapons, strategy and core behavior, plus UI
 start/stop/re-injection and standalone Luau compilation. Additional checks against
 the supplied game's original modules verify new naval/diplomacy command encoding,
 water connectivity, unit paths/health, traitor flags and warship prices. Nuclear checks also match
@@ -178,12 +210,16 @@ command encoding, missile/shot observations, all five construction/weapon prices
 trajectory coordinates and MIRV carrier/warhead interception constants. The game
 scripts and assets used for these private checks are not redistributed.
 
-Four paired three-minute development worlds also ran with the supplied game
-simulator. Both versions survived all four; the new version retained more troops
+During version 1.5 development, four paired three-minute worlds also ran with the supplied game
+simulator. Both versions survived all four; version 1.5 retained more troops
 in all four, but held less territory in three. These are small synthetic worlds
 against built-in country/tribe AI, not tests against humans or proof of a higher
 win rate. The full results and setup are in
 [the development comparison](./benchmarks/strategy_v1.5.json).
+
+A further three-minute simulator smoke test of v1.6 survived with ongoing
+expansion/construction. It is a synthetic country/tribe world and provides no
+human-opponent win-rate evidence.
 
 **This is a heuristic bot, not a neural model or a guaranteed winner.** Opponent
 intent and coalition intervention are estimates. The updated strategy's live
@@ -192,6 +228,7 @@ API can prevent operation; the panel reports connection failures.
 
 ## Development
 
+`core.lua` tracks owned building clusters, the home buffer and local threats;
 `strategy.lua` tracks campaigns, diplomacy grace periods and board conditions;
 `policy.lua` selects orders; `adapter.lua` revalidates the live observation;
 `client.lua` provides the button/reporting. `weapons.lua` shares nuclear
