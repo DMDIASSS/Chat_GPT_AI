@@ -21,7 +21,7 @@ def main():
     spec.loader.exec_module(build)
     source = build.source()
     assert (ROOT / "RoWorld_Bot.lua").read_text(encoding="utf8") == source, "Rebuild the standalone script"
-    for name in ("test_policy.lua", "test_adapter.lua"):
+    for name in ("test_policy.lua", "test_adapter.lua", "test_network.lua"):
         subprocess.run([args.luau, str(ROOT / "tests" / name)], check=True, timeout=30)
     compiled = subprocess.run([args.compiler, str(ROOT / "RoWorld_Bot.lua")], capture_output=True, text=True, timeout=30)
     assert compiled.returncode == 0, compiled.stderr

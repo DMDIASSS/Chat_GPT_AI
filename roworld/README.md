@@ -12,6 +12,13 @@ an external AI service, or a second simulation.
    JJSploit, and execute. It starts stopped.
 4. Press **Start bot**. The same button stops new orders. F6 also toggles it.
 
+**For the JJSploit access failure shown in your diagnostics, join multiplayer.**
+Version 1.1.0 has an independent multiplayer observer that does not need game
+module access, `getgc`, or callback inspection. The panel first waits for a
+complete server snapshot and terrain download, then can issue normal orders.
+Solo still needs the original live-client access route; the network fallback
+cannot observe a private local solo simulation.
+
 Extract the ZIP **anywhere**, such as Downloads. Pasting the complete script
 does not depend on where you extracted it. Only the optional `readfile` loader
 below needs the file in the executor workspace.
@@ -43,6 +50,12 @@ sent remain ordinary game attacks and continue until resolved or recalled.
 - Can launch affordable atom strikes at enemy structures after checking the
   surrounding area for your own or allied land.
 
+Those are the full live-client features. **The independent multiplayer fallback
+currently handles spawning, land expansion/combat, retreat, incoming alliances,
+and cities/factories/ports/defense posts.** Boats, SAMs, silos and offensive
+weapons are disabled on that route rather than relying on missing naval or
+weapon observations.
+
 The status distinguishes an **order sent** from waiting or defending. It does
 not claim that a sent order was accepted or that an attack succeeded. It follows
 the local owner's ID from the live session, including changes after a new match.
@@ -68,11 +81,21 @@ establish that it works. No executor binaries are included in this download.
 ## Compatibility and verification
 
 Adapted to the supplied place `137151641329864`, version **111**, whose client is
-named `AirfrontClient`. It reads the existing `Main.session` and `Main.ui.ctx`
+named `AirfrontClient`. The original route reads `Main.session` and `Main.ui.ctx`
 and calls `session:send_intent`, the same command path used by the game's UI.
 Solo uses the existing local command queue. Joined multiplayer clients use the
 existing network route; server validation still applies and hosting is not
 required by this adapter.
+
+The new fallback listens to `AirfrontNet.ToClient`, requests the ordinary resync
+for your existing match, and reads its snapshot/delta packets into a separate
+read-only state mirror. It downloads the current terrain from the game's map
+service and sends player orders through `AirfrontNet.ToServer`. It never creates
+a simulation or sends JOIN/LEAVE commands. It does not replace or modify game
+callbacks. Paused/stale/incomplete observations cannot issue gameplay orders;
+new snapshots, nation changes and match close invalidate earlier decisions.
+Only a bounded queue of updates is kept, and corruption/overflow requests a
+fresh snapshot. Decompression uses Roblox's `EncodingService`.
 
 This is a Lua strategy adaptation of the supplied **OpenFront Solo AggroBot**,
 not a byte-for-byte port of its browser code or bundled optional neural models.
@@ -83,15 +106,21 @@ are not needed or included. There is no Rocket League model in this bot.
 
 Offline tests cover strategy decisions, solo/joined-client routing, updated
 alliances/targets, reserves, stale state, pause/stop, and duplicate injection.
+Wire tests use synthetic packets encoded by the uploaded game's protocol;
+commands match its encoding byte-for-byte. An additional offline comparison
+checked mirror ownership, fallout, owner statistics, structures, attacks and
+construction prices against the original `GameState`/`Rules` modules.
 The standalone script is compiled with Luau. **A live JJSploit session and playing
 strength have not been verified here.** A changed game API or an executor that
-cannot access cached game modules can prevent operation; the panel reports the
+cannot expose the needed Roblox network/buffer APIs can prevent operation; the panel reports the
 problem rather than silently sending guessed commands.
 
 ## Development
 
 `policy.lua` contains strategy, `adapter.lua` reads and validates the live API,
-and `client.lua` contains the one-button UI. After changes, regenerate the file:
+and `client.lua` contains the one-button UI. `wire.lua`, `mirror.lua` and
+`network.lua` implement the independent multiplayer observer. After changes,
+regenerate the standalone file:
 
 ```sh
 python roworld/build.py

@@ -138,7 +138,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.0.2 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.1.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -149,6 +149,7 @@ function Adapter:diagnostics()
     for key in pairs(self.accessStats) do table.insert(keys, key) end
     table.sort(keys)
     for _, key in ipairs(keys) do table.insert(lines, key .. "=" .. tostring(self.accessStats[key])) end
+    if self.network then table.insert(lines,self.network:diagnostics()) end
     return table.concat(lines, "\n")
 end
 
@@ -189,11 +190,26 @@ function Adapter:discover()
     end
     local found = self:findCallbacks() or self:findLiveClient()
     if found then self.main, self.discoveryError = found, nil; return found end
+    if self.network then
+        self.networkActive=true
+        local main=self.network:poll()
+        if main then self.main,self.discoveryRoute,self.discoveryError=main,"multiplayer observer",nil;return main end
+        self.discoveryError=self.network.status
+        return nil
+    end
     self.discoveryError = "Client access blocked or not ready; see diagnostics in JJSploit workspace / F9"
     return nil
 end
 
 function Adapter:frame()
+    if self.networkActive then
+        local main=self.network:poll()
+        if main then self.main,self.discoveryRoute,self.discoveryError=main,"multiplayer observer",nil end
+        if not main or not main.session.state.loaded then
+            self.discoveryError=self.network.status
+            return nil,self.network.status
+        end
+    end
     local main = self:discover()
     if not main then return nil, self.discoveryError or "Waiting for the RoWorld client to load" end
     local session, ui = main.session, main.ui

@@ -1,5 +1,5 @@
--- RoWorld Bot 1.0.2 | paste this entire file into JJSploit.
--- No downloads, localhost bridge, or external service at runtime.
+-- RoWorld Bot 1.1.0 | paste this entire file into JJSploit.
+-- No external script downloads or localhost bridge.
 
 local Policy = (function()
 
@@ -478,7 +478,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.0.2 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.1.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -489,6 +489,7 @@ function Adapter:diagnostics()
     for key in pairs(self.accessStats) do table.insert(keys, key) end
     table.sort(keys)
     for _, key in ipairs(keys) do table.insert(lines, key .. "=" .. tostring(self.accessStats[key])) end
+    if self.network then table.insert(lines,self.network:diagnostics()) end
     return table.concat(lines, "\n")
 end
 
@@ -529,11 +530,26 @@ function Adapter:discover()
     end
     local found = self:findCallbacks() or self:findLiveClient()
     if found then self.main, self.discoveryError = found, nil; return found end
+    if self.network then
+        self.networkActive=true
+        local main=self.network:poll()
+        if main then self.main,self.discoveryRoute,self.discoveryError=main,"multiplayer observer",nil;return main end
+        self.discoveryError=self.network.status
+        return nil
+    end
     self.discoveryError = "Client access blocked or not ready; see diagnostics in JJSploit workspace / F9"
     return nil
 end
 
 function Adapter:frame()
+    if self.networkActive then
+        local main=self.network:poll()
+        if main then self.main,self.discoveryRoute,self.discoveryError=main,"multiplayer observer",nil end
+        if not main or not main.session.state.loaded then
+            self.discoveryError=self.network.status
+            return nil,self.network.status
+        end
+    end
     local main = self:discover()
     if not main then return nil, self.discoveryError or "Waiting for the RoWorld client to load" end
     local session, ui = main.session, main.ui
@@ -641,12 +657,538 @@ return Adapter
 
 end)()
 
+local Wire = (function()
+
+-- Independent reader for the observed RoWorld v2 client wire format.
+-- No ModuleScript require, memory inspection, or simulation is used here.
+local Wire = {}
+local MAX = 16777216
+local function reader(bytes, offset)
+    return {b=bytes, n=offset or 0, size=buffer.len(bytes)}
+end
+local function take(r,n)
+    assert(n >= 0 and r.n+n <= r.size,"Truncated RoWorld packet")
+    local offset=r.n; r.n+=n; return offset
+end
+local function byte(r) return buffer.readu8(r.b,take(r,1)) end
+local function var(r)
+    local value, scale=0,1
+    for _=1,8 do
+        local v=byte(r);value+=(v%128)*scale
+        if v<128 then return value end
+        scale*=128
+    end
+    error("Invalid RoWorld varint")
+end
+local function signed(n) return n%2==0 and n/2 or -(n+1)/2 end
+local function count(r, maximum)
+    local n=var(r);assert(n <= (maximum or MAX),"RoWorld collection too large");return n
+end
+local function text(r)
+    local n=count(r,r.size);return buffer.readstring(r.b,take(r,n),n)
+end
+local function opened(packet,decompress)
+    local r=reader(packet)
+    local envelope=byte(r)
+    if envelope==0 then return r end
+    assert(envelope==1,"Unknown RoWorld envelope")
+    local expected=count(r,128*1024*1024)
+    assert(type(decompress)=="function","Zstd decompression is unavailable")
+    local compressed=buffer.create(r.size-r.n);buffer.copy(compressed,0,r.b,r.n)
+    local result=decompress(compressed)
+    assert(buffer.len(result)==expected,"RoWorld decompressed length mismatch")
+    return reader(result)
+end
+local value
+value=function(r,depth)
+    assert(depth<=32,"RoWorld packet nesting too deep")
+    local tag=byte(r)
+    if tag>=16 then return tag-16 end
+    if tag==0 then return nil end
+    if tag==1 then return false end
+    if tag==2 then return true end
+    if tag==3 then return var(r) end
+    if tag==4 then return -var(r)-1 end
+    if tag==5 then return buffer.readf64(r.b,take(r,8)) end
+    if tag==6 then return text(r) end
+    if tag==12 then return {} end
+    if tag==10 then
+        local result={}
+        for _=1,count(r,r.size) do local key=text(r);result[key]=value(r,depth+1) end
+        return result
+    end
+    if tag==7 then
+        local result={};for i=1,count(r,r.size) do result[i]=value(r,depth+1) end;return result
+    end
+    if tag==8 then
+        local result,total={},0
+        for i=1,count(r,r.size) do total+=signed(var(r));result[i]=total end
+        return result
+    end
+    if tag==11 then
+        local n=count(r,r.size);local out=buffer.create(n);buffer.copy(out,0,r.b,take(r,n),n);return out
+    end
+    if tag==13 or tag==14 then
+        local width=tag==13 and byte(r) or nil
+        assert(width==nil or width==1 or width==2 or width==4,"Invalid RoWorld grid width")
+        local n=count(r);local out=width and buffer.create(n*width) or {};local written=0
+        while written<n do
+            local entry=var(r);if not width then entry=signed(entry) end
+            local run=count(r,n-written);assert(run>0,"Empty RoWorld run")
+            if width and entry==0 then -- newly allocated grid is already zeroed
+            elseif width==1 then buffer.fill(out,written,entry,run)
+            else
+                for i=written,written+run-1 do
+                    if width==2 then buffer.writeu16(out,i*2,entry)
+                    elseif width==4 then buffer.writeu32(out,i*4,entry)
+                    else out[i+1]=entry end
+                end
+            end
+            written+=run
+        end
+        return out
+    end
+    if tag==9 then
+        -- Paths are irrelevant to land decisions, but must be consumed exactly.
+        local n,width=count(r),var(r);assert(width>0 and n>0,"Invalid RoWorld path")
+        local out={var(r)};local codes=take(r,math.ceil((n-1)/2))
+        for i=1,n-1 do
+            local b=buffer.readu8(r.b,codes+(i-1)//2)
+            local code=i%2==1 and b%16 or b//16
+            if code==15 then out[i+1]=out[i]+signed(var(r))
+            else out[i+1]=out[i]+(code//3-1)*width+(code%3-1) end
+        end
+        return out
+    end
+    error("Unsupported RoWorld value tag "..tostring(tag))
+end
+local function tileList(r,base)
+    byte(r) -- wire storage hint; return a regular array for either representation
+    local n=count(r);local result,previous={},0
+    while #result<n do
+        local entry,run=var(r),count(r,n-#result);assert(run>0,"Empty RoWorld tile run")
+        for _=1,run do previous+=signed(var(r));table.insert(result,previous*base+entry) end
+    end
+    return result
+end
+function Wire.snapshot(packet,decompress)
+    local r=opened(packet,decompress);assert(byte(r)==2,"Expected RoWorld snapshot")
+    local result=value(r,0);assert(type(result)=="table" and r.n==r.size,"Invalid RoWorld snapshot")
+    return result
+end
+function Wire.delta(packet,tail,decompress)
+    local r=opened(packet,decompress);assert(byte(r)==1,"Expected RoWorld delta")
+    local flags,result=byte(r),{}
+    if bit32.band(flags,32)~=0 then result.t=var(r) end
+    if bit32.band(flags,1)~=0 then result.tiles=tileList(r,1024) end
+    if bit32.band(flags,2)~=0 then result.flags=tileList(r,256) end
+    if bit32.band(flags,4)~=0 then
+        byte(r);result.stats={};for i=1,count(r,r.size*2) do result.stats[i]=signed(var(r)) end
+    end
+    if bit32.band(flags,8)~=0 then
+        result.ev={};for i=1,count(r,r.size) do result.ev[i]=value(r,1) end
+    end
+    if bit32.band(flags,16)~=0 then for k,v in pairs(value(r,1)) do result[k]=v end end
+    assert(r.n==r.size,"Trailing RoWorld delta data")
+    if tail then
+        local tr=opened(tail,decompress);assert(byte(tr)==3,"Expected RoWorld event tail")
+        result.ev=result.ev or {}
+        for _=1,count(tr,tr.size) do
+            local index=var(tr);local event=value(tr,1)
+            table.insert(result.ev,math.clamp(index,1,#result.ev+1),event)
+        end
+        assert(tr.n==tr.size,"Trailing RoWorld tail data")
+    end
+    return result
+end
+function Wire.intent(intent)
+    local types={spawn=1,attack=2,boat=3,build=4,nuke=5,retreat=6,ally_reply=9}
+    local fields={"tile","target","attack_id","troops","uid"}
+    local out=buffer.create(128);local at=3
+    buffer.writeu8(out,1,4);buffer.writeu8(out,2,assert(types[intent.type],"Unsupported order"))
+    local function write(n)
+        repeat local b=n%128;n=math.floor(n/128);buffer.writeu8(out,at,b+(n>0 and 128 or 0));at+=1 until n==0
+    end
+    local mask=0
+    for i,key in ipairs(fields) do if intent[key]~=nil then mask+=2^(i-1) end end
+    if intent.ratio~=nil then mask+=32 end
+    if intent.kind~=nil then mask+=64 end
+    if intent.accept~=nil then mask+=128 end
+    buffer.writeu8(out,at,mask);at+=1
+    for _,key in ipairs(fields) do
+        local n=intent[key];if n~=nil then assert(n%1==0 and math.abs(n)<2147483647);write(n>=0 and n*2 or -n*2-1) end
+    end
+    if intent.ratio~=nil then assert(intent.ratio==intent.ratio);buffer.writef64(out,at,intent.ratio);at+=8 end
+    if intent.kind~=nil then assert(#intent.kind<=16);write(#intent.kind);buffer.writestring(out,at,intent.kind);at+=#intent.kind end
+    if intent.accept~=nil then buffer.writeu8(out,at,intent.accept and 1 or 0);at+=1 end
+    local result=buffer.create(at);buffer.copy(result,0,out,0,at);return result
+end
+return Wire
+
+
+end)()
+
+local Mirror = (function()
+
+-- Read-only multiplayer observations. This does not run or modify game physics.
+local Mirror={}
+local State={};State.__index=State
+local KINDS={city=0,port=1,factory=2,defense=3,sam=4,silo=5}
+local function adjacent(map,t,fn)
+    local x=t%map.W
+    if x>0 then fn(t-1) end;if x<map.W-1 then fn(t+1) end
+    if t>=map.W then fn(t-map.W) end;if t<map.N-map.W then fn(t+map.W) end
+end
+local function key(a,b) return math.min(a,b)*1024+math.max(a,b) end
+function State:tile_owner(t) assert(t>=0 and t<self.map.N);return buffer.readi32(self.owner,t*4) end
+function State:has_fallout(t) return bit32.band(buffer.readu8(self.flags,t),1)~=0 end
+function State:owner_name(id) return self.owners[id] and self.owners[id].name or "Unknown" end
+function State:are_allies(a,b)
+    if a==0 or b==0 or a==b then return false end
+    local x,y=self.owners[a],self.owners[b]
+    return self.alliances[key(a,b)]==true or (x and y and x.team>0 and x.team==y.team) or false
+end
+function State:has_request(a,b) return self.requests[a*1024+b]~=nil end
+function State:borders_tile(id,t)
+    local found=false;adjacent(self.map,t,function(n) if self:tile_owner(n)==id then found=true end end);return found
+end
+function State:recheck(t)
+    if self:tile_owner(t)~=self.local_owner then self.border[t]=nil;return end
+    local border=false;adjacent(self.map,t,function(n) if self:tile_owner(n)~=self.local_owner then border=true end end)
+    self.border[t]=border or nil
+end
+local function owner(row)
+    return {id=row[1],name=tostring(row[2]),kind=row[4] or 0,team=row[5] or 0,alive=row[6]==true,
+        troops=row[8] or 0,gold=row[9] or 0,max_troops=row[10] or 0,income=row[11] or 0,
+        spawn_tile=row[13] or -1,spawned=(row[13] or -1)>=0,label_tile=row[13] or -1,tiles=0}
+end
+local function structure(s,row,offset)
+    offset=offset or 0
+    local b={sid=row[offset+1],kind=row[offset+2],owner=row[offset+3],tile=row[offset+4],
+        level=row[offset+5] or 1,active_tick=row[offset+6] or 0}
+    s.structures[b.sid]=b;return b
+end
+local function attack(s,row,offset)
+    offset=offset or 0
+    s.attacks[row[offset+1]]={aid=row[offset+1],attacker=row[offset+2],target=row[offset+3],
+        troops=row[offset+4],anchor_tile=row[offset+5],retreating=row[offset+6]==true}
+end
+function Mirror.map(meta,raw,snapshot,yield)
+    yield=yield or function() end
+    local w,h=snapshot.map_w or meta.width,snapshot.map_h or meta.height
+    assert(type(w)=="number" and type(h)=="number" and w>0 and h>0 and w*h<=16777216,"Invalid snapshot dimensions")
+    assert(buffer.len(raw)==meta.width*meta.height,"Invalid terrain length")
+    local map={W=w,H=h,N=w*h,k_lin=(meta.k_lin or 1)*(meta.width/w)}
+    map.bytes=buffer.create(map.N)
+    local land,coast=buffer.create(map.N*4),buffer.create(map.N*4)
+    local lands,coasts=0,0
+    function map.dist2(a,b) return (a%w-b%w)^2+(a//w-b//w)^2 end
+    function map:is_contestable(t) return t>=0 and t<self.N and buffer.readu8(self.bytes,t)>=128 and buffer.readu8(self.bytes,t)~=159 end
+    function map:is_water(t) return t>=0 and t<self.N and buffer.readu8(self.bytes,t)<128 end
+    function map:is_coastal(t)
+        if not self:is_contestable(t) then return false end
+        local water=false;adjacent(self,t,function(n) if self:is_water(n) then water=true end end);return water
+    end
+    for t=0,map.N-1 do
+        local x,y=t%w,t//w
+        local source=math.min(meta.height-1,math.floor((y+.5)*meta.height/h))*meta.width+math.min(meta.width-1,math.floor((x+.5)*meta.width/w))
+        buffer.writeu8(map.bytes,t,buffer.readu8(raw,source))
+        if t%32768==0 then yield() end
+    end
+    for t=0,map.N-1 do
+        if map:is_contestable(t) then
+            buffer.writei32(land,lands*4,t);lands+=1
+            if map:is_coastal(t) then buffer.writei32(coast,coasts*4,t);coasts+=1 end
+        end
+        if t%32768==0 then yield() end
+    end
+    map.land_list,map.coast_list=buffer.create(lands*4),buffer.create(coasts*4)
+    buffer.copy(map.land_list,0,land,0,lands*4);buffer.copy(map.coast_list,0,coast,0,coasts*4)
+    return map
+end
+function Mirror.snapshot(data,map,me,yield)
+    assert(typeof(data.owner)=="buffer" and buffer.len(data.owner)==map.N*4,"Incomplete ownership snapshot")
+    assert(typeof(data.flags)=="buffer" and buffer.len(data.flags)==map.N,"Incomplete fallout snapshot")
+    local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},
+        alliances={},requests={},built={},border={},local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
+        rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=3}},State)
+    for _,row in ipairs(data.owners or {}) do s.owners[row[1]]=owner(row) end
+    for _,row in ipairs(data.structs or {}) do structure(s,row) end
+    for _,row in ipairs(data.attacks or {}) do attack(s,row) end
+    for _,row in ipairs(data.allies or {}) do s.alliances[key(row[1],row[2])]=true end
+    for _,row in ipairs(data.requests or {}) do s.requests[row[1]*1024+row[2]]=row[3] or s.tick end
+    for _,row in ipairs(data.built or {}) do
+        s.built[row[1]]={};for i=0,15 do s.built[row[1]][i]=row[i+2] or 0 end
+    end
+    for t=0,map.N-1 do
+        local id=s:tile_owner(t);local info=s.owners[id]
+        if info then info.tiles+=1;if info.label_tile<0 then info.label_tile=t end end
+        if id==me then s:recheck(t) end
+        if yield and t%32768==0 then yield() end
+    end
+    assert(s.owners[me]~=nil,"Snapshot has no local nation")
+    s.loaded=true;return s
+end
+local function built(s,id,kind)
+    s.built[id]=s.built[id] or {};s.built[id][kind]=(s.built[id][kind] or 0)+1
+end
+function Mirror.delta(s,d)
+    if d.t and d.t<=s.tick then return end
+    assert(type(d.t)=="number","Delta has no authoritative tick")
+    -- Reliable ordered RemoteEvents may coalesce multiple simulation ticks.
+    -- A larger tick increment is not evidence of missing ownership updates.
+    s.tick=d.t
+    for _,entry in ipairs(d.tiles or {}) do
+        local tile,id=entry//1024,entry%1024;assert(tile>=0 and tile<s.map.N,"Invalid ownership update")
+        local old=s:tile_owner(tile)
+        if old~=id then
+            if s.owners[old] then s.owners[old].tiles-=1 end
+            if s.owners[id] then s.owners[id].tiles+=1 end
+            buffer.writei32(s.owner,tile*4,id);s:recheck(tile);adjacent(s.map,tile,function(n) s:recheck(n) end)
+        end
+    end
+    for _,entry in ipairs(d.flags or {}) do
+        local tile=entry//256;assert(tile>=0 and tile<s.map.N);buffer.writeu8(s.flags,tile,entry%256)
+    end
+    for i=1,#(d.stats or {}),6 do
+        local row=d.stats;local info=s.owners[row[i]]
+        if info then info.troops=row[i+2];info.gold=row[i+3];info.max_troops=row[i+4];info.income=row[i+5] end
+    end
+    for _,e in ipairs(d.ev or {}) do
+        local kind,id=e[1],e[2]
+        if kind==0 then s.owners[id]={id=id,name=tostring(e[3]),kind=e[5],team=e[6] or 0,alive=true,spawned=false,spawn_tile=-1,label_tile=-1,tiles=0,troops=0,gold=0,max_troops=0}
+        elseif kind==1 and s.owners[id] then s.owners[id].alive=false
+        elseif kind==2 then s.phase=id
+        elseif kind==3 and s.owners[id] then local info=s.owners[id];info.spawned=true;info.spawn_tile=e[3];info.label_tile=e[3]
+        elseif kind==4 then local b=structure(s,e,1);built(s,b.owner,b.kind)
+        elseif kind==5 and s.structures[id] then s.structures[id].owner=e[3]
+        elseif kind==6 then s.structures[id]=nil
+        elseif kind==14 then attack(s,e,1)
+        elseif kind==15 then s.attacks[id]=nil
+        elseif kind==16 then s.requests[id*1024+e[3]]=e[4] or s.tick
+        elseif kind==17 then s.alliances[key(id,e[3])]=true;s.requests[id*1024+e[3]]=nil;s.requests[e[3]*1024+id]=nil
+        elseif kind==18 then s.alliances[key(id,e[3])]=nil
+        elseif kind==20 then s.phase=2
+        elseif kind==21 then s.requests[id*1024+e[3]]=nil
+        elseif kind==23 and s.structures[id] then
+            local b=s.structures[id];local added=e[3]-b.level
+            for _=1,math.max(0,added) do built(s,b.owner,b.kind) end
+            b.level,b.active_tick=e[3],e[4]
+        end
+    end
+end
+function Mirror.context(session)
+    local ctx={session=session,state=session.state}
+    function ctx:in_match() return self.session.connected and self.state.loaded end
+    local borders={border=session.state.border}
+    function borders:has_coast()
+        for tile in pairs(self.border) do if ctx.state.map:is_coastal(tile) then return true end end
+        return false
+    end
+    -- The fallback deliberately has no guessed sea-route or weapon model.
+    function borders:can_reach_by_sea(_) return false end
+    ctx.borders=borders
+    local rules={}
+    function rules:transports() return 0 end
+    function rules:cost(kind)
+        local s,id=ctx.state,ctx.state.local_owner;local k=KINDS[kind]
+        if k==nil then return math.huge end
+        local kinds=(kind=="port" or kind=="factory") and {1,2} or {k};local n=0
+        for _,wanted in ipairs(kinds) do
+            local levels=0;for _,b in pairs(s.structures) do if b.owner==id and b.kind==wanted then levels+=b.level end end
+            n+=math.min(levels,(s.built[id] or {})[wanted] or 0)
+        end
+        if k<=2 then return math.min(1000000,125000*2^math.min(n,4)) end
+        if k==3 then return math.min(250000,(n+1)*50000) end
+        if k==4 then return math.min(3000000,(n+1)*1500000) end
+        return 1000000
+    end
+    function rules:availability(kind)
+        -- SAM and silo are deferred because this fallback only reads land/economy.
+        local supported=kind=="city" or kind=="factory" or kind=="port" or kind=="defense"
+        local info=ctx.state.owners[ctx.state.local_owner]
+        return {ok=supported and info.alive and info.spawned and ctx.state.phase==1 and info.gold>=self:cost(kind)
+            and (kind~="port" or borders:has_coast()),cost=self:cost(kind)}
+    end
+    function rules:placement(kind,tile)
+        local s,id,map=ctx.state,ctx.state.local_owner,ctx.state.map
+        local result={ok=false,tile=tile}
+        if not self:availability(kind).ok or s:tile_owner(tile)~=id or not map:is_contestable(tile) then return result end
+        if kind=="port" and not map:is_coastal(tile) then return result end
+        for _,b in pairs(s.structures) do
+            if map.dist2(tile,b.tile)<s.rules.STRUCT_MIN_DIST^2 then
+                if b.owner==id and b.kind==KINDS[kind] and b.kind~=3 and b.active_tick<=s.tick then
+                    return {ok=true,tile=b.tile,upgrade=true}
+                end
+                return result
+            end
+        end
+        result.ok=true;return result
+    end
+    ctx.rules=rules;return ctx
+end
+return Mirror
+
+
+end)()
+
+local Network = (function()
+
+-- Independent observer of the player's existing multiplayer connection.
+local Network={};Network.__index=Network
+function Network.new(services,wire,mirror,now,spawn,cooperate,decompress)
+    return setmetatable({services=services,wire=wire,mirror=mirror,now=now,spawn=spawn,cooperate=cooperate,
+        decompress=decompress,queue={},generation=0,packets=0,lastRequest=-math.huge,lastPacket=0,
+        status="Join multiplayer; waiting for a server snapshot",destroyed=false,maps={}},Network)
+end
+function Network:invalidate(reason)
+    self.status=reason;self.error=reason
+    if self.session and self.session.state then self.session.state.loaded=false end
+    self.needsSnapshot=true
+end
+function Network:fetchMap(data)
+    local id=assert(data.map_id,"Snapshot has no map ID")
+    local base=id:match("^(.-)@%d+$") or id
+    local cache=self.maps[base]
+    if cache then return self.mirror.map(cache.meta,cache.raw,data,self.cooperate) end
+    local remote=self.root:FindFirstChild("GetMap")
+    assert(remote and remote:IsA("RemoteFunction"),"RoWorld map service unavailable")
+    local meta=remote:InvokeServer(base,0)
+    assert(type(meta)=="table" and typeof(meta.chunk)=="buffer","RoWorld map request returned no terrain")
+    assert(type(meta.zsize)=="number" and meta.zsize>0 and meta.zsize<=32*1024*1024,"Invalid map download size")
+    assert(type(meta.chunks)=="number" and meta.chunks>=1 and meta.chunks<=50,"Invalid map chunk count")
+    local zipped=buffer.create(meta.zsize);local offset=buffer.len(meta.chunk)
+    assert(offset<=meta.zsize);buffer.copy(zipped,0,meta.chunk)
+    for index=1,meta.chunks-1 do
+        assert(not self.destroyed,"Observer stopped")
+        local part=remote:InvokeServer(base,index)
+        assert(type(part)=="table" and typeof(part.chunk)=="buffer","Interrupted RoWorld map download")
+        local size=buffer.len(part.chunk);assert(offset+size<=meta.zsize,"Oversized map chunk")
+        buffer.copy(zipped,offset,part.chunk);offset+=size
+    end
+    assert(offset==meta.zsize,"Incomplete map download")
+    local raw=self.decompress(zipped)
+    self.maps[base]={meta=meta,raw=raw}
+    return self.mirror.map(meta,raw,data,self.cooperate)
+end
+function Network:process(row)
+    if row.op==21 then
+        self.status="Reading multiplayer snapshot and terrain..."
+        local data=self.wire.snapshot(row.body,self.decompress)
+        local map=self:fetchMap(data)
+        local state=self.mirror.snapshot(data,map,row.me,self.cooperate)
+        if self.destroyed or row.generation~=self.generation then return end
+        local observer=self
+        local session={mode=2,_sim=nil,state=state,connected=true}
+        function session:multiplayer_available() return self.connected and not observer.destroyed end
+        function session:send_intent(intent)
+            assert(self.state.loaded and self.connected and not observer.destroyed,"Observer is not synchronized")
+            observer.toServer:FireServer(4,observer.wire.intent(intent))
+        end
+        function session:note_activity()
+            if observer.now()-(observer.lastActivity or -math.huge)>=30 then
+                observer.lastActivity=observer.now();observer.toServer:FireServer(7)
+            end
+        end
+        self.session=session;self.main={session=session,ui={ctx=self.mirror.context(session)}}
+        self.needsSnapshot=false;self.closed=false;self.error=nil;self.status="Multiplayer snapshot synchronized"
+        self.lastUpdate=self.now()
+    elseif row.op==22 and self.session and self.session.state.loaded then
+        local delta=self.wire.delta(row.body,row.tail,self.decompress)
+        self.mirror.delta(self.session.state,delta)
+        self.lastUpdate=self.now()
+    end
+end
+function Network:receive(op,...)
+    if self.destroyed then return end
+    self.packets+=1;self.lastPacket=self.now()
+    if op==24 then
+        self.generation+=1;table.clear(self.queue)
+        self.closed=true;self:invalidate("Match closed; join a multiplayer match");return
+    end
+    if op==31 then
+        self.generation+=1;table.clear(self.queue)
+        self:invalidate("Your nation changed; waiting for a fresh snapshot");return
+    end
+    local row
+    if op==21 then
+        local me,packet=...
+        if type(me)~="number" or typeof(packet)~="buffer" then return end
+        self.generation+=1;table.clear(self.queue)
+        if self.session then self.session.state.loaded=false end
+        if me==0 then
+            self.needsSnapshot=false;self.status="Spectating; select your nation before starting autoplay";return
+        end
+        row={op=op,me=me,body=packet,generation=self.generation}
+    elseif op==22 then
+        local packet,tail=...
+        if typeof(packet)~="buffer" or (tail~=nil and typeof(tail)~="buffer") then return end
+        row={op=op,body=packet,tail=tail,generation=self.generation}
+    else return end
+    if #self.queue>=256 then
+        self.generation+=1;table.clear(self.queue);self:invalidate("Observer update queue overflow; resynchronizing");return
+    end
+    table.insert(self.queue,row)
+    if self.working then return end
+    self.working=true
+    self.spawn(function()
+        while not self.destroyed and #self.queue>0 do
+            local item=table.remove(self.queue,1)
+            if item.generation==self.generation then
+                local ok,err=pcall(function() self:process(item) end)
+                if not ok and item.generation==self.generation then
+                    self.generation+=1;table.clear(self.queue);self:invalidate("Network observer: "..tostring(err))
+                end
+            end
+        end
+        self.working=false
+    end)
+end
+function Network:poll()
+    if self.destroyed then return nil end
+    if not self.connection then
+        local replicated=self.services.ReplicatedStorage
+        local root=replicated and replicated:FindFirstChild("AirfrontNet")
+        local input=root and root:FindFirstChild("ToClient")
+        local output=root and root:FindFirstChild("ToServer")
+        if not input or not output then self.status="Waiting for RoWorld multiplayer remotes";return nil end
+        self.root,self.toServer=root,output
+        self.connection=input.OnClientEvent:Connect(function(...) self:receive(...) end)
+        self.needsSnapshot=true
+    end
+    if self.session and self.session.state.loaded and (self.now()-self.lastPacket>6 or
+        self.session.state.phase==1 and self.now()-(self.lastUpdate or self.lastPacket)>6) then
+        self:invalidate("Multiplayer updates stopped; resynchronizing")
+    end
+    if not self.closed and self.needsSnapshot and not self.working and self.now()-self.lastRequest>=10 then
+        self.lastRequest=self.now()
+        -- The game's normal resync operation for this client's existing match.
+        -- Never HELLO/JOIN/LEAVE, never switch queues or impersonate an owner.
+        local ok,err=pcall(function() self.toServer:FireServer(6) end)
+        if not ok then self:invalidate("Multiplayer resync request failed: "..tostring(err)) end
+    end
+    return self.main
+end
+function Network:diagnostics()
+    return "network_packets="..self.packets.."\nnetwork_status="..self.status.."\nnetwork_error="..tostring(self.error or "none")
+end
+function Network:destroy()
+    self.destroyed=true;self.generation+=1;table.clear(self.queue)
+    if self.connection then self.connection:Disconnect() end
+    if self.session then self.session.connected=false;self.session.state.loaded=false end
+end
+return Network
+
+
+end)()
+
 -- Policy and Adapter are embedded by build.py in the standalone script.
 local Services = {
     Players = game:GetService("Players"),
     CoreGui = game:GetService("CoreGui"),
     UserInputService = game:GetService("UserInputService"),
     RunService = game:GetService("RunService"),
+    ReplicatedStorage = game:GetService("ReplicatedStorage"),
 }
 local env = (type(getgenv) == "function" and getgenv()) or _G
 local previous = env.__RoWorldBot
@@ -712,6 +1254,9 @@ local adapter = Adapter.new(Services, require, nil, {
     getsenv = getsenv,
     getrenv = getrenv,
 })
+adapter.network = Network.new(Services,Wire,Mirror,os.clock,task.spawn,function() task.wait() end,function(bytes)
+    return game:GetService("EncodingService"):DecompressBuffer(bytes,Enum.CompressionAlgorithm.Zstd)
+end)
 local reported
 function api.diagnostics() return adapter:diagnostics() end
 local function reportAccessFailure()
@@ -739,6 +1284,7 @@ table.insert(api.connections, Services.UserInputService.InputBegan:Connect(funct
 end))
 function api.destroy()
     api.alive, api.enabled = false, false
+    adapter.network:destroy()
     for _, connection in ipairs(api.connections) do connection:Disconnect() end
     gui:Destroy()
     if env.__RoWorldBot == api then env.__RoWorldBot = nil end

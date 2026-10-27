@@ -4,6 +4,7 @@ local Services = {
     CoreGui = game:GetService("CoreGui"),
     UserInputService = game:GetService("UserInputService"),
     RunService = game:GetService("RunService"),
+    ReplicatedStorage = game:GetService("ReplicatedStorage"),
 }
 local env = (type(getgenv) == "function" and getgenv()) or _G
 local previous = env.__RoWorldBot
@@ -69,6 +70,9 @@ local adapter = Adapter.new(Services, require, nil, {
     getsenv = getsenv,
     getrenv = getrenv,
 })
+adapter.network = Network.new(Services,Wire,Mirror,os.clock,task.spawn,function() task.wait() end,function(bytes)
+    return game:GetService("EncodingService"):DecompressBuffer(bytes,Enum.CompressionAlgorithm.Zstd)
+end)
 local reported
 function api.diagnostics() return adapter:diagnostics() end
 local function reportAccessFailure()
@@ -96,6 +100,7 @@ table.insert(api.connections, Services.UserInputService.InputBegan:Connect(funct
 end))
 function api.destroy()
     api.alive, api.enabled = false, false
+    adapter.network:destroy()
     for _, connection in ipairs(api.connections) do connection:Disconnect() end
     gui:Destroy()
     if env.__RoWorldBot == api then env.__RoWorldBot = nil end
