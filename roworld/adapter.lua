@@ -1,6 +1,7 @@
 -- Adapter for the supplied RoWorld place, version 111 / Airfront client.
 -- Uses the existing live Main.session; never creates a second simulation.
 local Adapter = {}
+local Weapons = require("./weapons")
 Adapter.__index = Adapter
 
 function Adapter.new(services, requireModule, now, capabilities)
@@ -138,7 +139,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.3.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.4.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -284,6 +285,7 @@ function Adapter:send(action, frame)
             if not tileValid(live, intent.tile) or not rules:availability(intent.kind).ok then return false, "Building or weapon is not ready" end
             if not rules:placement(intent.kind, intent.tile).ok then return false, "Placement changed" end
             if kind=="build" and action.safety then
+                if Weapons.hazard(s,intent.tile,action.safety.margin) then return false,"Incoming strike threatens the construction site" end
                 local map=live.map;local x,y=intent.tile%map.W,intent.tile//map.W
                 local radius=math.ceil(action.safety.margin/(map.k_lin or 1))
                 for yy=math.max(0,y-radius),math.min(map.H-1,y+radius) do
@@ -298,27 +300,15 @@ function Adapter:send(action, frame)
                 end
             end
             if kind == "nuke" then
-                local target = s:tile_owner(intent.tile)
-                if target == 0 or target == me or s:are_allies(me, target) then return false, "Strike target changed" end
-                local radius = math.ceil(math.max((s.rules.NUKE_RADIUS or {})[0] or 0,
-                    (s.rules.NUKE_ALLIANCE_BREAK_FULL or 100) / (live.map.k_lin or 1)))
-                local x, y = intent.tile % live.map.W, intent.tile // live.map.W
-                for yy = math.max(0,y-radius), math.min(live.map.H-1,y+radius) do
-                    for xx = math.max(0,x-radius), math.min(live.map.W-1,x+radius) do
-                        if (xx-x)^2+(yy-y)^2 <= radius*radius then
-                            local owner = s:tile_owner(yy*live.map.W+xx)
-                            if owner == me or (owner > 0 and s:are_allies(me,owner)) then
-                                return false, "Friendly land entered the strike area"
-                            end
-                        end
-                    end
-                end
+                local allowed,reason=Weapons.canLaunch(s,me,intent.tile,intent.kind)
+                if not allowed then return false,reason end
             end
         elseif kind == "retreat" then
             local attack = s.attacks[intent.attack_id]
             if not attack or attack.attacker ~= me or attack.retreating then return false, "Attack already ended" end
         elseif kind == "ally_reply" then
             if not s:has_request(intent.target, me) then return false, "Alliance request expired" end
+            if intent.accept and not Weapons.allianceSafe(s,me,intent.target) then return false,"Our in-flight strike endangers this alliance" end
             local owner=s.owners[intent.target]
             if intent.accept and (not owner or not owner.alive or (owner.traitor_until or 0)>s.tick) then
                 return false,"Alliance partner is no longer reliable"
@@ -328,6 +318,7 @@ function Adapter:send(action, frame)
             if not owner or not owner.alive or intent.target==me then return false,"Diplomacy target changed" end
             if kind=="ally_request" and (s:are_allies(me,intent.target) or s:has_request(me,intent.target)
                 or (owner.traitor_until or 0)>s.tick) then return false,"Alliance request is no longer needed" end
+            if kind=="ally_request" and not Weapons.allianceSafe(s,me,intent.target) then return false,"Our in-flight strike endangers this alliance" end
             if kind=="ally_break" then
                 if not s:are_allies(me,intent.target) or (owner.traitor_until or 0)<=s.tick
                     or (live.info.team or 0)>0 and live.info.team==owner.team then return false,"Alliance cannot be safely ended" end

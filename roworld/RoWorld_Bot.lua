@@ -1,11 +1,167 @@
--- RoWorld Bot 1.3.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 1.4.0 | paste this entire file into JJSploit.
 -- No external script downloads or localhost bridge.
+
+local Weapons = (function()
+
+-- RoWorld weapon observations and conservative launch checks shared by both routes.
+local Weapons={}
+Weapons.kinds={atom=0,hydrogen=1,mirv=2}
+Weapons.costs={atom=750000,hydrogen=5000000,mirv=25000000}
+local function valid(s,t) return type(t)=="number" and t>=0 and t<s.map.N end
+local function friendly(s,me,id) return id==me or id>0 and s:are_allies(me,id) end
+function Weapons.cost(s,kind)
+    local base=Weapons.costs[kind]
+    return base and base+(kind=="mirv" and 15000000*(s.mirvs_launched or 0) or 0) or math.huge
+end
+function Weapons.ready(s,b,cooldown)
+    if (b.active_tick or 0)>s.tick or type(b.shots)~="table" then return false end
+    local busy=0
+    for _,stamp in ipairs(b.shots) do if stamp+cooldown>s.tick then busy+=1 end end
+    return busy<(b.level or 1)
+end
+function Weapons.launchers(s,me,tile)
+    local selected,distance={},nil
+    for _,b in pairs(s.structures) do
+        if b.owner==me and b.kind==5 and Weapons.ready(s,b,90) then
+            local d=math.abs(b.tile%s.map.W-tile%s.map.W)+math.abs(b.tile//s.map.W-tile//s.map.W)
+            if not distance or d<distance then selected={b};distance=d
+            elseif d==distance then table.insert(selected,b) end
+        end
+    end
+    return selected
+end
+function Weapons.radius(map,kind)
+    return (kind=="hydrogen" and 100 or kind=="mirv" and 1518 or 30)/(map.k_lin or 1)
+end
+function Weapons.blastSafe(s,me,tile,kind)
+    if not valid(s,tile) or not Weapons.kinds[kind] then return false end
+    local map=s.map;local radius=Weapons.radius(map,kind)
+    -- MIRV's future warhead locations are random. Require the full spread plus
+    -- warhead blast to be clear of friendlies, not only its center point.
+    local x,y=tile%map.W,tile//map.W;local r=math.ceil(radius)
+    for id,o in pairs(s.owners) do
+        if friendly(s,me,id) and valid(s,o.spawn_tile) and s:tile_owner(o.spawn_tile)==id
+            and map.dist2(tile,o.spawn_tile)<=radius*radius then return false end
+    end
+    for yy=math.max(0,y-r),math.min(map.H-1,y+r) do
+        for xx=math.max(0,x-r),math.min(map.W-1,x+r) do
+            if (xx-x)^2+(yy-y)^2<=radius*radius and friendly(s,me,s:tile_owner(yy*map.W+xx)) then return false end
+        end
+    end
+    return true
+end
+-- The game uses a curved 96-segment trajectory. This constructs the same shape
+-- for conservative coverage screening; it does not predict future player builds.
+function Weapons.arc(map,from,to)
+    local x,y=from%map.W+.5,from//map.W+.5
+    local dx,dy=to%map.W+.5-x,to//map.W+.5-y
+    local height=math.max(math.sqrt(dx*dx+dy*dy)/3,50/(map.k_lin or 1))
+    local y1,y2=math.clamp(y+dy/4-height,0,map.H-1),math.clamp(y+dy*3/4-height,0,map.H-1)
+    local points={}
+    for i=0,96 do
+        local t=i/96;local u=1-t
+        local px=u^3*x+3*u*u*t*(x+dx/4)+3*u*t*t*(x+dx*3/4)+t^3*(x+dx)
+        local py=u^3*y+3*u*u*t*y1+3*u*t*t*y2+t^3*(y+dy)
+        table.insert(points,{x=px,y=py})
+    end
+    return points
+end
+function Weapons.blocked(s,me,from,to,kind)
+    if kind=="mirv" then return false end -- carrier only; warheads remain interceptable
+    local map=s.map;local k=map.k_lin or 1;local arc
+    for _,b in pairs(s.structures) do
+        if b.kind==4 and not friendly(s,me,b.owner) then
+            -- Include construction and cooldown: it can finish/reload in flight.
+            local reach=(150-480/(math.max(1,b.level or 1)+5))/k
+            local near=300/k
+            if map.dist2(b.tile,from)<=near*near or map.dist2(b.tile,to)<=near*near then
+                arc=arc or Weapons.arc(map,from,to)
+                -- Expand by a segment length: no gap between sampled points.
+                for i,p in ipairs(arc) do
+                    local q=arc[math.min(i+1,#arc)]
+                    local padding=math.sqrt((q.x-p.x)^2+(q.y-p.y)^2)+2
+                    local t=math.clamp(math.floor(p.y),0,map.H-1)*map.W+math.clamp(math.floor(p.x),0,map.W-1)
+                    if (map.dist2(t,from)<=(150/k+padding)^2 or map.dist2(t,to)<=(150/k+padding)^2)
+                        and map.dist2(b.tile,t)<=(reach+padding)^2 then return true end
+                end
+            end
+        end
+    end
+    return false
+end
+function Weapons.canLaunch(s,me,tile,kind)
+    if Weapons.kinds[kind]==nil or not valid(s,tile) then return false,"Unsupported weapon or target" end
+    local id=s:tile_owner(tile)
+    if id==0 or friendly(s,me,id) then return false,"Target is no longer hostile" end
+    if s:has_fallout(tile) then return false,"Target is already a fallout zone" end
+    if not Weapons.blastSafe(s,me,tile,kind) then return false,"Friendly territory is inside the possible strike area" end
+    local launchers=Weapons.launchers(s,me,tile)
+    if #launchers==0 then return false,"No missile silo is ready" end
+    for _,b in ipairs(launchers) do
+        if Weapons.blocked(s,me,b.tile,tile,kind) then return false,"Observed SAM coverage threatens the launch route" end
+    end
+    return true
+end
+function Weapons.covered(s,me,tile,minimum)
+    local count=0
+    for _,b in pairs(s.structures) do
+        if b.kind==4 and friendly(s,me,b.owner) then
+            local radius=(150-480/(math.max(1,b.level or 1)+5))/(s.map.k_lin or 1)
+            if s.map.dist2(b.tile,tile)<=radius^2 then
+                count+=1;if count>=(minimum or 1) then return true end
+            end
+        end
+    end
+    return false
+end
+function Weapons.hazard(s,tile,margin,imminentSeconds)
+    local radii={[0]=30,[1]=100,[2]=1518,[3]=18,[4]=60,[5]=30,[6]=1.5,[7]=15,[8]=5}
+    for _,n in pairs(s.nukes) do
+        local radius=radii[n.kind]
+        local remaining=(n.launch_tick or s.tick)+(n.flight_ticks or math.huge)-s.tick
+        if radius and valid(s,n.to_tile) and (not imminentSeconds or remaining<=imminentSeconds*10) then
+            if s.map.dist2(tile,n.to_tile)<=((radius+(margin or 0))/(s.map.k_lin or 1))^2 then return true end
+        end
+    end
+    return false
+end
+function Weapons.threat(s,me)
+    local r={hostile_silos=0,building_silos=0,ready_silos=0,hostile_sams=0,own_sams=0,own_sams_building=0,missiles_in_flight=0}
+    for _,b in pairs(s.structures) do
+        if not friendly(s,me,b.owner) then
+            if b.kind==5 then
+                r.hostile_silos+=1
+                if (b.active_tick or 0)>s.tick then r.building_silos+=1
+                elseif Weapons.ready(s,b,90) then r.ready_silos+=1 end
+            elseif b.kind==4 then r.hostile_sams+=1 end
+        elseif b.owner==me and b.kind==4 then
+            r.own_sams+=1;if (b.active_tick or 0)>s.tick then r.own_sams_building+=1 end
+        end
+    end
+    for _ in pairs(s.nukes) do r.missiles_in_flight+=1 end
+    return r
+end
+function Weapons.allianceSafe(s,me,target)
+    local proxy=setmetatable({are_allies=function(_,a,b) return b==target or s:are_allies(a,b) end},{__index=s})
+    for _,n in pairs(s.nukes) do
+        if n.owner==me then
+            local kind=({[0]="atom",[1]="hydrogen",[2]="mirv",[3]="atom"})[n.kind]
+            if kind and not Weapons.blastSafe(proxy,me,n.to_tile,kind) then return false end
+        end
+    end
+    return true
+end
+return Weapons
+
+
+end)()
 
 local Policy = (function()
 
 -- RoWorld strategy adapted from Solo AggroBot's reserve / expansion approach.
 -- This module reads client observations and returns one ordinary game order.
 local Policy = {}
+
 Policy.__index = Policy
 
 local function neighbours(map, tile, visit)
@@ -323,7 +479,8 @@ function Policy:fronts(frame)
             neighbours(map, tile, function(t)
                 local id = s:tile_owner(t)
                 if id>0 and id~=me and friendly(s,me,id) then self.adjacentAllies[id]=true end
-                if not friendly(s, me, id) and map:is_contestable(t) and not s:has_fallout(t) then
+                if not friendly(s, me, id) and map:is_contestable(t) and not s:has_fallout(t)
+                    and not Weapons.hazard(s,t,0,3) then
                     local g = groups[id]
                     if not g then g = {id = id, tile = t, front = 0, tiles={},seen={}}; groups[id] = g end
                     if not g.seen[t] then
@@ -352,6 +509,7 @@ end
 
 function Policy:siteSafe(frame,tile,kind)
     local margin=(kind=="defense" or kind=="sam") and 8 or 18
+    if Weapons.hazard(frame.state,tile,margin) then return false,margin end
     local coastal=kind=="port"
     local key=tostring(tile)..":"..margin..":"..tostring(coastal)
     self.siteCache=self.siteCache or {}
@@ -388,7 +546,7 @@ function Policy:diplomacy(frame,groups,a)
     for id,o in pairs(s.owners) do
         if id~=frame.me and o.alive and s:has_request(id,frame.me) and not a.targets[id] then
             local hostile=((self.opponents[id] or {}).heat or 0)>.5
-            local accept=not hostile and (o.traitor_until or 0)<=s.tick
+            local accept=not hostile and (o.traitor_until or 0)<=s.tick and Weapons.allianceSafe(s,frame.me,id)
             return {intent={type="ally_reply",target=id,accept=accept},channel="diplomacy",cooldown=5,
                 label=(accept and "Accepting alliance with " or "Declining unreliable ally ")..o.name}
         end
@@ -415,6 +573,7 @@ function Policy:diplomacy(frame,groups,a)
             local o=s.owners[id]
             if id>0 and o and o.kind~=1 and not a.targets[id] and not friendly(s,frame.me,id)
                 and not s:has_request(frame.me,id) and (o.traitor_until or 0)<=s.tick
+                and Weapons.allianceSafe(s,frame.me,id)
                 and ((self.opponents[id] or {}).heat or 0)<.2 then
                 if not power or (o.troops or 0)>power then best,power=id,o.troops or 0 end
             end
@@ -485,11 +644,28 @@ function Policy:build(frame, sites, kind, counts)
                         score+=math.max(0,35-math.sqrt(frame.map.dist2(place.tile,attack.anchor_tile)))
                     end
                 end
+                if kind=="sam" then
+                    local level,oldRadius=1,0
+                    if place.upgrade then for _,b in pairs(frame.state.structures) do
+                        if b.owner==frame.me and b.kind==4 and b.tile==place.tile then
+                            level=(b.level or 1)+1
+                            oldRadius=(150-480/((b.level or 1)+5))/(frame.map.k_lin or 1)
+                        end
+                    end end
+                    local radius=(150-480/(level+5))/(frame.map.k_lin or 1)
+                    local protected=0
+                    for _,b in pairs(frame.state.structures) do
+                        if b.owner==frame.me and b.kind~=4 and frame.map.dist2(place.tile,b.tile)<=radius^2
+                            and (not place.upgrade or frame.map.dist2(place.tile,b.tile)>oldRadius^2)
+                            and not Weapons.covered(frame.state,frame.me,b.tile,self.desiredSAMCoverage) then protected+=b.kind==5 and 8 or 3 end
+                    end
+                    if protected==0 then score=-math.huge else score+=protected*30 end
+                end
             end
             if bestScore == nil or score > bestScore then best, bestScore = place, score end
         end
     end
-    if best then
+    if best and bestScore>-math.huge then
         return {intent = {type = "build", kind = kind, tile = best.tile}, channel = "build", cooldown = 6,
             safety={margin=(kind=="defense" or kind=="sam") and 8 or 18,coastal=kind=="port"},
             label = (best.upgrade and "Upgrading " or "Building ") .. kind}
@@ -508,16 +684,22 @@ function Policy:economy(frame, sites, armies)
         if valid(frame.map, n.to_tile) and frame.state:tile_owner(n.to_tile) == frame.me then incomingNuke = true end
     end
     local wanted = {}
-    if incomingNuke and (counts[4] or 0) < 2 then table.insert(wanted, "sam") end
+    local exposed=false;local enemySilo=false
+    local nuclearThreat=Weapons.threat(frame.state,frame.me)
+    self.desiredSAMCoverage=nuclearThreat.ready_silos>=2 and 2 or 1
+    for _,b in pairs(frame.state.structures) do
+        if b.owner==frame.me and b.kind~=4 and not Weapons.covered(frame.state,frame.me,b.tile,self.desiredSAMCoverage) then exposed=true end
+        if b.kind==5 and not friendly(frame.state,frame.me,b.owner) then enemySilo=true end
+    end
+    if exposed and (counts[4] or 0)<6 and (incomingNuke or enemySilo or city+factory>=3) then table.insert(wanted,"sam") end
     if armies.incoming > armies.home * .2 and (counts[3] or 0) < 3 then table.insert(wanted, "defense") end
     if city == 0 then table.insert(wanted, "city") end
     if city > 0 and factory == 0 then table.insert(wanted, "factory") end
     if city > 0 and port == 0 then table.insert(wanted, "port") end
     if armies.home >= (frame.info.max_troops or math.huge) * .75 and city < 6 then table.insert(wanted, "city") end
     if factory < math.max(1, math.ceil(city / 2)) then table.insert(wanted, "factory") end
-    if city >= 2 and factory > 0 and (frame.info.tiles or 0) > 500 then
-        if (counts[5] or 0) == 0 then table.insert(wanted, "silo") end
-        if (counts[4] or 0) == 0 then table.insert(wanted, "sam") end
+    if city >= 1 and factory > 0 and (frame.info.gold or 0)>=1750000 then
+        if (counts[5] or 0) == 0 then table.insert(wanted,"silo") end
     end
     if city < 6 and (frame.info.gold or 0) > frame.ctx.rules:cost("city") * 2 then table.insert(wanted, "city") end
     for _, kind in ipairs(wanted) do
@@ -527,36 +709,54 @@ function Policy:economy(frame, sites, armies)
     return nil
 end
 
-function Policy:blastSafe(frame, tile)
-    local map, s = frame.map, frame.state
-    -- Include the alliance-break radius, which is larger than atom damage.
-    local r = math.ceil(math.max((s.rules.NUKE_RADIUS or {})[0] or 0, (s.rules.NUKE_ALLIANCE_BREAK_FULL or 100) / (map.k_lin or 1)))
-    local x, y = tile % map.W, tile // map.W
-    for yy = math.max(0, y-r), math.min(map.H-1, y+r) do
-        for xx = math.max(0, x-r), math.min(map.W-1, x+r) do
-            if (xx-x)^2 + (yy-y)^2 <= r*r and friendly(s, frame.me, s:tile_owner(yy*map.W+xx)) then return false end
-        end
-    end
-    return true
+function Policy:blastSafe(frame,tile,kind)
+    return Weapons.blastSafe(frame.state,frame.me,tile,kind or "atom")
 end
 
 function Policy:strike(frame)
-    if not self:ready("nuke", frame.now) or not frame.ctx.rules:availability("atom").ok then return nil end
-    local cost = frame.ctx.rules:cost("atom")
-    if (frame.info.gold or 0) < cost * 1.5 then return nil end
-    local targets = {}
+    if not self:ready("nuke",frame.now) or not self:ready("weapon_scan",frame.now) then return nil end
+    self.cooldowns.weapon_scan=frame.now+4
+    local targets,best,bestScore={},nil,0
     for _, b in pairs(frame.state.structures) do
         if b.owner > 0 and not friendly(frame.state, frame.me, b.owner) then table.insert(targets, b) end
     end
-    table.sort(targets, function(a,b) return (a.level or 1) > (b.level or 1) end)
-    for i = 1, math.min(6, #targets) do
-        local target = targets[i]
-        if self:blastSafe(frame, target.tile) and frame.ctx.rules:placement("atom", target.tile).ok then
-            return {intent = {type = "nuke", kind = "atom", tile = target.tile}, channel = "nuke", cooldown = 15,
-                label = "Launching atom at " .. frame.state:owner_name(target.owner)}
+    local weights={[0]=250000,[1]=250000,[2]=250000,[3]=150000,[4]=1500000,[5]=1000000}
+    table.sort(targets,function(a,b) return (weights[a.kind] or 100000)*(a.level or 1)>(weights[b.kind] or 100000)*(b.level or 1) end)
+    for _,kind in ipairs({"atom","hydrogen","mirv"}) do
+        local rules=frame.ctx.rules;local cost=rules:cost(kind)
+        if rules:availability(kind).ok and (frame.info.gold or 0)>=cost+math.max(250000,cost*.15) then
+            for i=1,math.min(12,#targets) do
+                local target=targets[i];local duplicate=false
+                for _,n in pairs(frame.state.nukes) do
+                    local existingKind=({[0]="atom",[1]="hydrogen",[2]="mirv",[3]="atom"})[n.kind] or "atom"
+                    if n.owner==frame.me and (n.kind==2 and frame.state:tile_owner(n.to_tile)==target.owner
+                        or frame.map.dist2(target.tile,n.to_tile)<math.max(Weapons.radius(frame.map,kind),Weapons.radius(frame.map,existingKind))^2) then duplicate=true;break end
+                end
+                if not duplicate and rules:placement(kind,target.tile).ok then
+                    local radius=Weapons.radius(frame.map,kind);local value=0
+                    for _,b in pairs(frame.state.structures) do
+                        if b.owner>0 and not friendly(frame.state,frame.me,b.owner) and (kind~="mirv" or b.owner==target.owner)
+                            and frame.map.dist2(b.tile,target.tile)<=radius^2 then
+                            value+=(weights[b.kind] or 100000)*(b.level or 1)
+                        end
+                    end
+                    if kind=="mirv" then
+                        -- Warheads may be intercepted and land stochastically.
+                        -- Discount broad-area damage rather than promise immunity.
+                        value=value*.5
+                    end
+                    local score=value/cost
+                    if score>math.max(.8,bestScore) and Weapons.canLaunch(frame.state,frame.me,target.tile,kind) then
+                        bestScore=score
+                        best={intent={type="nuke",kind=kind,tile=target.tile},channel="nuke",cooldown=3,
+                            plan={weapon=kind,cost=cost,estimated_structure_value=value},
+                            label="Launching "..kind.." at "..frame.state:owner_name(target.owner)}
+                    end
+                end
+            end
         end
     end
-    return nil
+    return best
 end
 
 local function unitTile(s,u)
@@ -669,6 +869,8 @@ function Policy:decide(frame)
     if diplomatic then return diplomatic end
     local fleet=self:fleet(frame,a)
     if fleet then return fleet end
+    local strike=self:strike(frame)
+    if strike then return strike end
     local best, score
     if self:ready("attack", frame.now) and a.enemyActive < 2 then
         for id, g in pairs(groups) do
@@ -706,8 +908,6 @@ function Policy:decide(frame)
                 channel = "attack", cooldown = 2.5, label = "Expanding with a recruitment-aware troop budget"} end
         end
     end
-    local strike = self:strike(frame)
-    if strike then return strike end
     local boat = self:naval(frame, a)
     if boat then return boat end
     if a.enemyActive > 0 or a.neutralActive > 0 then return nil, "Watching the current attack; rebuilding troops" end
@@ -734,11 +934,12 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.3.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+    return {version="1.4.0",scope="Since the current observer snapshot; intent estimates are heuristic",
         recruitment_target=info and self:growthTarget(info) or 0,
         tick=self.state and self.state.tick or 0,alive=info and info.alive or false,
         land=info and info.tiles or 0,troops=info and info.troops or 0,metrics=self.metrics,
         gold=info and info.gold or 0,allies=allies,traitors=traitors,navy=navy,recent_orders=self.history or {},
+        nuclear_threat=self.state and Weapons.threat(self.state,self.me) or {},fallout_tiles=self.state and self.state.fallout_count or 0,
         last_action=self.lastAction,last_plan=self.lastPlan,recent_threats=threats}
 end
 
@@ -752,6 +953,7 @@ local Adapter = (function()
 -- Adapter for the supplied RoWorld place, version 111 / Airfront client.
 -- Uses the existing live Main.session; never creates a second simulation.
 local Adapter = {}
+
 Adapter.__index = Adapter
 
 function Adapter.new(services, requireModule, now, capabilities)
@@ -889,7 +1091,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.3.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.4.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -1035,6 +1237,7 @@ function Adapter:send(action, frame)
             if not tileValid(live, intent.tile) or not rules:availability(intent.kind).ok then return false, "Building or weapon is not ready" end
             if not rules:placement(intent.kind, intent.tile).ok then return false, "Placement changed" end
             if kind=="build" and action.safety then
+                if Weapons.hazard(s,intent.tile,action.safety.margin) then return false,"Incoming strike threatens the construction site" end
                 local map=live.map;local x,y=intent.tile%map.W,intent.tile//map.W
                 local radius=math.ceil(action.safety.margin/(map.k_lin or 1))
                 for yy=math.max(0,y-radius),math.min(map.H-1,y+radius) do
@@ -1049,27 +1252,15 @@ function Adapter:send(action, frame)
                 end
             end
             if kind == "nuke" then
-                local target = s:tile_owner(intent.tile)
-                if target == 0 or target == me or s:are_allies(me, target) then return false, "Strike target changed" end
-                local radius = math.ceil(math.max((s.rules.NUKE_RADIUS or {})[0] or 0,
-                    (s.rules.NUKE_ALLIANCE_BREAK_FULL or 100) / (live.map.k_lin or 1)))
-                local x, y = intent.tile % live.map.W, intent.tile // live.map.W
-                for yy = math.max(0,y-radius), math.min(live.map.H-1,y+radius) do
-                    for xx = math.max(0,x-radius), math.min(live.map.W-1,x+radius) do
-                        if (xx-x)^2+(yy-y)^2 <= radius*radius then
-                            local owner = s:tile_owner(yy*live.map.W+xx)
-                            if owner == me or (owner > 0 and s:are_allies(me,owner)) then
-                                return false, "Friendly land entered the strike area"
-                            end
-                        end
-                    end
-                end
+                local allowed,reason=Weapons.canLaunch(s,me,intent.tile,intent.kind)
+                if not allowed then return false,reason end
             end
         elseif kind == "retreat" then
             local attack = s.attacks[intent.attack_id]
             if not attack or attack.attacker ~= me or attack.retreating then return false, "Attack already ended" end
         elseif kind == "ally_reply" then
             if not s:has_request(intent.target, me) then return false, "Alliance request expired" end
+            if intent.accept and not Weapons.allianceSafe(s,me,intent.target) then return false,"Our in-flight strike endangers this alliance" end
             local owner=s.owners[intent.target]
             if intent.accept and (not owner or not owner.alive or (owner.traitor_until or 0)>s.tick) then
                 return false,"Alliance partner is no longer reliable"
@@ -1079,6 +1270,7 @@ function Adapter:send(action, frame)
             if not owner or not owner.alive or intent.target==me then return false,"Diplomacy target changed" end
             if kind=="ally_request" and (s:are_allies(me,intent.target) or s:has_request(me,intent.target)
                 or (owner.traitor_until or 0)>s.tick) then return false,"Alliance request is no longer needed" end
+            if kind=="ally_request" and not Weapons.allianceSafe(s,me,intent.target) then return false,"Our in-flight strike endangers this alliance" end
             if kind=="ally_break" then
                 if not s:are_allies(me,intent.target) or (owner.traitor_until or 0)<=s.tick
                     or (live.info.team or 0)>0 and live.info.team==owner.team then return false,"Alliance cannot be safely ended" end
@@ -1287,6 +1479,7 @@ local Mirror = (function()
 
 -- Read-only multiplayer observations. This does not run or modify game physics.
 local Mirror={}
+
 local State={};State.__index=State
 local KINDS={city=0,port=1,factory=2,defense=3,sam=4,silo=5}
 local function adjacent(map,t,fn)
@@ -1328,8 +1521,14 @@ end
 local function structure(s,row,offset)
     offset=offset or 0
     local b={sid=row[offset+1],kind=row[offset+2],owner=row[offset+3],tile=row[offset+4],
-        level=row[offset+5] or 1,active_tick=row[offset+6] or 0}
+        level=row[offset+5] or 1,active_tick=row[offset+6] or 0,shots=row[offset+7] or {}}
     s.structures[b.sid]=b;return b
+end
+local function nuke(s,row,offset)
+    offset=offset or 0
+    local n={uid=row[offset+1],kind=row[offset+2],owner=row[offset+3],from_tile=row[offset+4],
+        to_tile=row[offset+5],launch_tick=row[offset+6],flight_ticks=row[offset+7]}
+    s.nukes[n.uid]=n;return n
 end
 local function attack(s,row,offset)
     offset=offset or 0
@@ -1401,18 +1600,21 @@ function Mirror.snapshot(data,map,me,yield)
     assert(typeof(data.owner)=="buffer" and buffer.len(data.owner)==map.N*4,"Incomplete ownership snapshot")
     assert(typeof(data.flags)=="buffer" and buffer.len(data.flags)==map.N,"Incomplete fallout snapshot")
     local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},units={},
-        alliances={},requests={},built={},border={},local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
+        alliances={},requests={},built={},border={},fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
+        local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
         rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=10}},State)
     for _,row in ipairs(data.owners or {}) do s.owners[row[1]]=owner(row) end
     for _,row in ipairs(data.structs or {}) do structure(s,row) end
     for _,row in ipairs(data.attacks or {}) do attack(s,row) end
     for _,row in ipairs(data.units or {}) do unit(s,row) end
+    for _,row in ipairs(data.nukes or {}) do nuke(s,row) end
     for _,row in ipairs(data.allies or {}) do s.alliances[key(row[1],row[2])]=true end
     for _,row in ipairs(data.requests or {}) do s.requests[row[1]*1024+row[2]]=row[3] or s.tick end
     for _,row in ipairs(data.built or {}) do
         s.built[row[1]]={};for i=0,15 do s.built[row[1]][i]=row[i+2] or 0 end
     end
     for t=0,map.N-1 do
+        if s:has_fallout(t) then s.fallout_count+=1 end
         local id=s:tile_owner(t);local info=s.owners[id]
         if info then info.tiles+=1;if info.label_tile<0 then info.label_tile=t end end
         if id==me then s:recheck(t) end
@@ -1440,7 +1642,9 @@ function Mirror.delta(s,d)
         end
     end
     for _,entry in ipairs(d.flags or {}) do
-        local tile=entry//256;assert(tile>=0 and tile<s.map.N);buffer.writeu8(s.flags,tile,entry%256)
+        local tile=entry//256;assert(tile>=0 and tile<s.map.N)
+        local before=s:has_fallout(tile);buffer.writeu8(s.flags,tile,entry%256)
+        if before~=s:has_fallout(tile) then s.fallout_count+=before and -1 or 1 end
     end
     for i=1,#(d.stats or {}),6 do
         local row=d.stats;local info=s.owners[row[i]]
@@ -1458,6 +1662,8 @@ function Mirror.delta(s,d)
         elseif kind==9 then local u=unit(s,e,1);if u.kind==2 then built(s,u.owner,15) end
         elseif kind==10 and s.units[id] then s.units[id].path={e[3]};s.units[id].start_tick=s.tick
         elseif kind==11 then s.units[id]=nil
+        elseif kind==12 then local n=nuke(s,e,1);if n.kind==2 then s.mirvs_launched+=1 end
+        elseif kind==13 then s.nukes[id]=nil
         elseif kind==14 then attack(s,e,1)
         elseif kind==15 then s.attacks[id]=nil
         elseif kind==16 then s.requests[id*1024+e[3]]=e[4] or s.tick
@@ -1475,6 +1681,8 @@ function Mirror.delta(s,d)
         elseif kind==27 and s.units[id] then s.units[id].state=e[3];s.units[id].patrol_tile=e[4]
         elseif kind==28 and s.units[id] then
             local u=s.units[id];u.path=e[3];u.start_tick=e[4];u.ticks_per_tile_x100=e[5]
+        elseif kind==29 and s.nukes[e[3]] then s.nukes[e[3]].sam_sid=id
+        elseif kind==32 and s.structures[id] then s.structures[id].shots=e[3]
         end
     end
 end
@@ -1506,6 +1714,7 @@ function Mirror.context(session)
     end
     function rules:cost(kind)
         local s,id=ctx.state,ctx.state.local_owner;local k=KINDS[kind]
+        if Weapons.kinds[kind]~=nil then return Weapons.cost(s,kind) end
         if kind=="warship" then
             local count=0;for _,u in pairs(s.units) do if u.owner==id and u.kind==2 then count+=1 end end
             return math.min(1000000,(math.min(count,(s.built[id] or {})[15] or 0)+1)*250000)
@@ -1522,19 +1731,25 @@ function Mirror.context(session)
         return 1000000
     end
     function rules:availability(kind)
-        -- SAM and silo are deferred because this fallback only reads land/economy.
-        local supported=kind=="city" or kind=="factory" or kind=="port" or kind=="defense" or kind=="warship"
+        local supported=KINDS[kind]~=nil or kind=="warship" or Weapons.kinds[kind]~=nil
         local info=ctx.state.owners[ctx.state.local_owner]
+        local launcher=Weapons.kinds[kind]==nil or #Weapons.launchers(ctx.state,ctx.state.local_owner,0)>0
         local port=kind~="warship"
         if not port then for _,b in pairs(ctx.state.structures) do
             if b.owner==ctx.state.local_owner and b.kind==1 and b.active_tick<=ctx.state.tick then port=true;break end
         end end
         return {ok=supported and info.alive and info.spawned and ctx.state.phase==1 and info.gold>=self:cost(kind)
-            and port and (kind~="port" or borders:has_coast()),cost=self:cost(kind)}
+            and launcher and port and (kind~="port" or borders:has_coast()),cost=self:cost(kind)}
     end
     function rules:placement(kind,tile)
         local s,id,map=ctx.state,ctx.state.local_owner,ctx.state.map
         local result={ok=false,tile=tile}
+        if Weapons.kinds[kind]~=nil then
+            if not self:availability(kind).ok or tile<0 or tile>=map.N then return result end
+            local target=s:tile_owner(tile)
+            result.ok=target>0 and target~=id and not s:are_allies(id,target)
+            return result
+        end
         if kind=="warship" then
             if not self:availability(kind).ok or not map:is_water(tile) then return result end
             for _,b in pairs(s.structures) do

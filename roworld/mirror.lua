@@ -1,5 +1,6 @@
 -- Read-only multiplayer observations. This does not run or modify game physics.
 local Mirror={}
+local Weapons = require("./weapons")
 local State={};State.__index=State
 local KINDS={city=0,port=1,factory=2,defense=3,sam=4,silo=5}
 local function adjacent(map,t,fn)
@@ -41,8 +42,14 @@ end
 local function structure(s,row,offset)
     offset=offset or 0
     local b={sid=row[offset+1],kind=row[offset+2],owner=row[offset+3],tile=row[offset+4],
-        level=row[offset+5] or 1,active_tick=row[offset+6] or 0}
+        level=row[offset+5] or 1,active_tick=row[offset+6] or 0,shots=row[offset+7] or {}}
     s.structures[b.sid]=b;return b
+end
+local function nuke(s,row,offset)
+    offset=offset or 0
+    local n={uid=row[offset+1],kind=row[offset+2],owner=row[offset+3],from_tile=row[offset+4],
+        to_tile=row[offset+5],launch_tick=row[offset+6],flight_ticks=row[offset+7]}
+    s.nukes[n.uid]=n;return n
 end
 local function attack(s,row,offset)
     offset=offset or 0
@@ -114,18 +121,21 @@ function Mirror.snapshot(data,map,me,yield)
     assert(typeof(data.owner)=="buffer" and buffer.len(data.owner)==map.N*4,"Incomplete ownership snapshot")
     assert(typeof(data.flags)=="buffer" and buffer.len(data.flags)==map.N,"Incomplete fallout snapshot")
     local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},units={},
-        alliances={},requests={},built={},border={},local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
+        alliances={},requests={},built={},border={},fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
+        local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
         rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=10}},State)
     for _,row in ipairs(data.owners or {}) do s.owners[row[1]]=owner(row) end
     for _,row in ipairs(data.structs or {}) do structure(s,row) end
     for _,row in ipairs(data.attacks or {}) do attack(s,row) end
     for _,row in ipairs(data.units or {}) do unit(s,row) end
+    for _,row in ipairs(data.nukes or {}) do nuke(s,row) end
     for _,row in ipairs(data.allies or {}) do s.alliances[key(row[1],row[2])]=true end
     for _,row in ipairs(data.requests or {}) do s.requests[row[1]*1024+row[2]]=row[3] or s.tick end
     for _,row in ipairs(data.built or {}) do
         s.built[row[1]]={};for i=0,15 do s.built[row[1]][i]=row[i+2] or 0 end
     end
     for t=0,map.N-1 do
+        if s:has_fallout(t) then s.fallout_count+=1 end
         local id=s:tile_owner(t);local info=s.owners[id]
         if info then info.tiles+=1;if info.label_tile<0 then info.label_tile=t end end
         if id==me then s:recheck(t) end
@@ -153,7 +163,9 @@ function Mirror.delta(s,d)
         end
     end
     for _,entry in ipairs(d.flags or {}) do
-        local tile=entry//256;assert(tile>=0 and tile<s.map.N);buffer.writeu8(s.flags,tile,entry%256)
+        local tile=entry//256;assert(tile>=0 and tile<s.map.N)
+        local before=s:has_fallout(tile);buffer.writeu8(s.flags,tile,entry%256)
+        if before~=s:has_fallout(tile) then s.fallout_count+=before and -1 or 1 end
     end
     for i=1,#(d.stats or {}),6 do
         local row=d.stats;local info=s.owners[row[i]]
@@ -171,6 +183,8 @@ function Mirror.delta(s,d)
         elseif kind==9 then local u=unit(s,e,1);if u.kind==2 then built(s,u.owner,15) end
         elseif kind==10 and s.units[id] then s.units[id].path={e[3]};s.units[id].start_tick=s.tick
         elseif kind==11 then s.units[id]=nil
+        elseif kind==12 then local n=nuke(s,e,1);if n.kind==2 then s.mirvs_launched+=1 end
+        elseif kind==13 then s.nukes[id]=nil
         elseif kind==14 then attack(s,e,1)
         elseif kind==15 then s.attacks[id]=nil
         elseif kind==16 then s.requests[id*1024+e[3]]=e[4] or s.tick
@@ -188,6 +202,8 @@ function Mirror.delta(s,d)
         elseif kind==27 and s.units[id] then s.units[id].state=e[3];s.units[id].patrol_tile=e[4]
         elseif kind==28 and s.units[id] then
             local u=s.units[id];u.path=e[3];u.start_tick=e[4];u.ticks_per_tile_x100=e[5]
+        elseif kind==29 and s.nukes[e[3]] then s.nukes[e[3]].sam_sid=id
+        elseif kind==32 and s.structures[id] then s.structures[id].shots=e[3]
         end
     end
 end
@@ -219,6 +235,7 @@ function Mirror.context(session)
     end
     function rules:cost(kind)
         local s,id=ctx.state,ctx.state.local_owner;local k=KINDS[kind]
+        if Weapons.kinds[kind]~=nil then return Weapons.cost(s,kind) end
         if kind=="warship" then
             local count=0;for _,u in pairs(s.units) do if u.owner==id and u.kind==2 then count+=1 end end
             return math.min(1000000,(math.min(count,(s.built[id] or {})[15] or 0)+1)*250000)
@@ -235,19 +252,25 @@ function Mirror.context(session)
         return 1000000
     end
     function rules:availability(kind)
-        -- SAM and silo are deferred because this fallback only reads land/economy.
-        local supported=kind=="city" or kind=="factory" or kind=="port" or kind=="defense" or kind=="warship"
+        local supported=KINDS[kind]~=nil or kind=="warship" or Weapons.kinds[kind]~=nil
         local info=ctx.state.owners[ctx.state.local_owner]
+        local launcher=Weapons.kinds[kind]==nil or #Weapons.launchers(ctx.state,ctx.state.local_owner,0)>0
         local port=kind~="warship"
         if not port then for _,b in pairs(ctx.state.structures) do
             if b.owner==ctx.state.local_owner and b.kind==1 and b.active_tick<=ctx.state.tick then port=true;break end
         end end
         return {ok=supported and info.alive and info.spawned and ctx.state.phase==1 and info.gold>=self:cost(kind)
-            and port and (kind~="port" or borders:has_coast()),cost=self:cost(kind)}
+            and launcher and port and (kind~="port" or borders:has_coast()),cost=self:cost(kind)}
     end
     function rules:placement(kind,tile)
         local s,id,map=ctx.state,ctx.state.local_owner,ctx.state.map
         local result={ok=false,tile=tile}
+        if Weapons.kinds[kind]~=nil then
+            if not self:availability(kind).ok or tile<0 or tile>=map.N then return result end
+            local target=s:tile_owner(tile)
+            result.ok=target>0 and target~=id and not s:are_allies(id,target)
+            return result
+        end
         if kind=="warship" then
             if not self:availability(kind).ok or not map:is_water(tile) then return result end
             for _,b in pairs(s.structures) do

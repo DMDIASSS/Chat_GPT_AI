@@ -1,6 +1,7 @@
 -- RoWorld strategy adapted from Solo AggroBot's reserve / expansion approach.
 -- This module reads client observations and returns one ordinary game order.
 local Policy = {}
+local Weapons = require("./weapons")
 Policy.__index = Policy
 
 local function neighbours(map, tile, visit)
@@ -318,7 +319,8 @@ function Policy:fronts(frame)
             neighbours(map, tile, function(t)
                 local id = s:tile_owner(t)
                 if id>0 and id~=me and friendly(s,me,id) then self.adjacentAllies[id]=true end
-                if not friendly(s, me, id) and map:is_contestable(t) and not s:has_fallout(t) then
+                if not friendly(s, me, id) and map:is_contestable(t) and not s:has_fallout(t)
+                    and not Weapons.hazard(s,t,0,3) then
                     local g = groups[id]
                     if not g then g = {id = id, tile = t, front = 0, tiles={},seen={}}; groups[id] = g end
                     if not g.seen[t] then
@@ -347,6 +349,7 @@ end
 
 function Policy:siteSafe(frame,tile,kind)
     local margin=(kind=="defense" or kind=="sam") and 8 or 18
+    if Weapons.hazard(frame.state,tile,margin) then return false,margin end
     local coastal=kind=="port"
     local key=tostring(tile)..":"..margin..":"..tostring(coastal)
     self.siteCache=self.siteCache or {}
@@ -383,7 +386,7 @@ function Policy:diplomacy(frame,groups,a)
     for id,o in pairs(s.owners) do
         if id~=frame.me and o.alive and s:has_request(id,frame.me) and not a.targets[id] then
             local hostile=((self.opponents[id] or {}).heat or 0)>.5
-            local accept=not hostile and (o.traitor_until or 0)<=s.tick
+            local accept=not hostile and (o.traitor_until or 0)<=s.tick and Weapons.allianceSafe(s,frame.me,id)
             return {intent={type="ally_reply",target=id,accept=accept},channel="diplomacy",cooldown=5,
                 label=(accept and "Accepting alliance with " or "Declining unreliable ally ")..o.name}
         end
@@ -410,6 +413,7 @@ function Policy:diplomacy(frame,groups,a)
             local o=s.owners[id]
             if id>0 and o and o.kind~=1 and not a.targets[id] and not friendly(s,frame.me,id)
                 and not s:has_request(frame.me,id) and (o.traitor_until or 0)<=s.tick
+                and Weapons.allianceSafe(s,frame.me,id)
                 and ((self.opponents[id] or {}).heat or 0)<.2 then
                 if not power or (o.troops or 0)>power then best,power=id,o.troops or 0 end
             end
@@ -480,11 +484,28 @@ function Policy:build(frame, sites, kind, counts)
                         score+=math.max(0,35-math.sqrt(frame.map.dist2(place.tile,attack.anchor_tile)))
                     end
                 end
+                if kind=="sam" then
+                    local level,oldRadius=1,0
+                    if place.upgrade then for _,b in pairs(frame.state.structures) do
+                        if b.owner==frame.me and b.kind==4 and b.tile==place.tile then
+                            level=(b.level or 1)+1
+                            oldRadius=(150-480/((b.level or 1)+5))/(frame.map.k_lin or 1)
+                        end
+                    end end
+                    local radius=(150-480/(level+5))/(frame.map.k_lin or 1)
+                    local protected=0
+                    for _,b in pairs(frame.state.structures) do
+                        if b.owner==frame.me and b.kind~=4 and frame.map.dist2(place.tile,b.tile)<=radius^2
+                            and (not place.upgrade or frame.map.dist2(place.tile,b.tile)>oldRadius^2)
+                            and not Weapons.covered(frame.state,frame.me,b.tile,self.desiredSAMCoverage) then protected+=b.kind==5 and 8 or 3 end
+                    end
+                    if protected==0 then score=-math.huge else score+=protected*30 end
+                end
             end
             if bestScore == nil or score > bestScore then best, bestScore = place, score end
         end
     end
-    if best then
+    if best and bestScore>-math.huge then
         return {intent = {type = "build", kind = kind, tile = best.tile}, channel = "build", cooldown = 6,
             safety={margin=(kind=="defense" or kind=="sam") and 8 or 18,coastal=kind=="port"},
             label = (best.upgrade and "Upgrading " or "Building ") .. kind}
@@ -503,16 +524,22 @@ function Policy:economy(frame, sites, armies)
         if valid(frame.map, n.to_tile) and frame.state:tile_owner(n.to_tile) == frame.me then incomingNuke = true end
     end
     local wanted = {}
-    if incomingNuke and (counts[4] or 0) < 2 then table.insert(wanted, "sam") end
+    local exposed=false;local enemySilo=false
+    local nuclearThreat=Weapons.threat(frame.state,frame.me)
+    self.desiredSAMCoverage=nuclearThreat.ready_silos>=2 and 2 or 1
+    for _,b in pairs(frame.state.structures) do
+        if b.owner==frame.me and b.kind~=4 and not Weapons.covered(frame.state,frame.me,b.tile,self.desiredSAMCoverage) then exposed=true end
+        if b.kind==5 and not friendly(frame.state,frame.me,b.owner) then enemySilo=true end
+    end
+    if exposed and (counts[4] or 0)<6 and (incomingNuke or enemySilo or city+factory>=3) then table.insert(wanted,"sam") end
     if armies.incoming > armies.home * .2 and (counts[3] or 0) < 3 then table.insert(wanted, "defense") end
     if city == 0 then table.insert(wanted, "city") end
     if city > 0 and factory == 0 then table.insert(wanted, "factory") end
     if city > 0 and port == 0 then table.insert(wanted, "port") end
     if armies.home >= (frame.info.max_troops or math.huge) * .75 and city < 6 then table.insert(wanted, "city") end
     if factory < math.max(1, math.ceil(city / 2)) then table.insert(wanted, "factory") end
-    if city >= 2 and factory > 0 and (frame.info.tiles or 0) > 500 then
-        if (counts[5] or 0) == 0 then table.insert(wanted, "silo") end
-        if (counts[4] or 0) == 0 then table.insert(wanted, "sam") end
+    if city >= 1 and factory > 0 and (frame.info.gold or 0)>=1750000 then
+        if (counts[5] or 0) == 0 then table.insert(wanted,"silo") end
     end
     if city < 6 and (frame.info.gold or 0) > frame.ctx.rules:cost("city") * 2 then table.insert(wanted, "city") end
     for _, kind in ipairs(wanted) do
@@ -522,36 +549,54 @@ function Policy:economy(frame, sites, armies)
     return nil
 end
 
-function Policy:blastSafe(frame, tile)
-    local map, s = frame.map, frame.state
-    -- Include the alliance-break radius, which is larger than atom damage.
-    local r = math.ceil(math.max((s.rules.NUKE_RADIUS or {})[0] or 0, (s.rules.NUKE_ALLIANCE_BREAK_FULL or 100) / (map.k_lin or 1)))
-    local x, y = tile % map.W, tile // map.W
-    for yy = math.max(0, y-r), math.min(map.H-1, y+r) do
-        for xx = math.max(0, x-r), math.min(map.W-1, x+r) do
-            if (xx-x)^2 + (yy-y)^2 <= r*r and friendly(s, frame.me, s:tile_owner(yy*map.W+xx)) then return false end
-        end
-    end
-    return true
+function Policy:blastSafe(frame,tile,kind)
+    return Weapons.blastSafe(frame.state,frame.me,tile,kind or "atom")
 end
 
 function Policy:strike(frame)
-    if not self:ready("nuke", frame.now) or not frame.ctx.rules:availability("atom").ok then return nil end
-    local cost = frame.ctx.rules:cost("atom")
-    if (frame.info.gold or 0) < cost * 1.5 then return nil end
-    local targets = {}
+    if not self:ready("nuke",frame.now) or not self:ready("weapon_scan",frame.now) then return nil end
+    self.cooldowns.weapon_scan=frame.now+4
+    local targets,best,bestScore={},nil,0
     for _, b in pairs(frame.state.structures) do
         if b.owner > 0 and not friendly(frame.state, frame.me, b.owner) then table.insert(targets, b) end
     end
-    table.sort(targets, function(a,b) return (a.level or 1) > (b.level or 1) end)
-    for i = 1, math.min(6, #targets) do
-        local target = targets[i]
-        if self:blastSafe(frame, target.tile) and frame.ctx.rules:placement("atom", target.tile).ok then
-            return {intent = {type = "nuke", kind = "atom", tile = target.tile}, channel = "nuke", cooldown = 15,
-                label = "Launching atom at " .. frame.state:owner_name(target.owner)}
+    local weights={[0]=250000,[1]=250000,[2]=250000,[3]=150000,[4]=1500000,[5]=1000000}
+    table.sort(targets,function(a,b) return (weights[a.kind] or 100000)*(a.level or 1)>(weights[b.kind] or 100000)*(b.level or 1) end)
+    for _,kind in ipairs({"atom","hydrogen","mirv"}) do
+        local rules=frame.ctx.rules;local cost=rules:cost(kind)
+        if rules:availability(kind).ok and (frame.info.gold or 0)>=cost+math.max(250000,cost*.15) then
+            for i=1,math.min(12,#targets) do
+                local target=targets[i];local duplicate=false
+                for _,n in pairs(frame.state.nukes) do
+                    local existingKind=({[0]="atom",[1]="hydrogen",[2]="mirv",[3]="atom"})[n.kind] or "atom"
+                    if n.owner==frame.me and (n.kind==2 and frame.state:tile_owner(n.to_tile)==target.owner
+                        or frame.map.dist2(target.tile,n.to_tile)<math.max(Weapons.radius(frame.map,kind),Weapons.radius(frame.map,existingKind))^2) then duplicate=true;break end
+                end
+                if not duplicate and rules:placement(kind,target.tile).ok then
+                    local radius=Weapons.radius(frame.map,kind);local value=0
+                    for _,b in pairs(frame.state.structures) do
+                        if b.owner>0 and not friendly(frame.state,frame.me,b.owner) and (kind~="mirv" or b.owner==target.owner)
+                            and frame.map.dist2(b.tile,target.tile)<=radius^2 then
+                            value+=(weights[b.kind] or 100000)*(b.level or 1)
+                        end
+                    end
+                    if kind=="mirv" then
+                        -- Warheads may be intercepted and land stochastically.
+                        -- Discount broad-area damage rather than promise immunity.
+                        value=value*.5
+                    end
+                    local score=value/cost
+                    if score>math.max(.8,bestScore) and Weapons.canLaunch(frame.state,frame.me,target.tile,kind) then
+                        bestScore=score
+                        best={intent={type="nuke",kind=kind,tile=target.tile},channel="nuke",cooldown=3,
+                            plan={weapon=kind,cost=cost,estimated_structure_value=value},
+                            label="Launching "..kind.." at "..frame.state:owner_name(target.owner)}
+                    end
+                end
+            end
         end
     end
-    return nil
+    return best
 end
 
 local function unitTile(s,u)
@@ -664,6 +709,8 @@ function Policy:decide(frame)
     if diplomatic then return diplomatic end
     local fleet=self:fleet(frame,a)
     if fleet then return fleet end
+    local strike=self:strike(frame)
+    if strike then return strike end
     local best, score
     if self:ready("attack", frame.now) and a.enemyActive < 2 then
         for id, g in pairs(groups) do
@@ -701,8 +748,6 @@ function Policy:decide(frame)
                 channel = "attack", cooldown = 2.5, label = "Expanding with a recruitment-aware troop budget"} end
         end
     end
-    local strike = self:strike(frame)
-    if strike then return strike end
     local boat = self:naval(frame, a)
     if boat then return boat end
     if a.enemyActive > 0 or a.neutralActive > 0 then return nil, "Watching the current attack; rebuilding troops" end
@@ -729,11 +774,12 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.3.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+    return {version="1.4.0",scope="Since the current observer snapshot; intent estimates are heuristic",
         recruitment_target=info and self:growthTarget(info) or 0,
         tick=self.state and self.state.tick or 0,alive=info and info.alive or false,
         land=info and info.tiles or 0,troops=info and info.troops or 0,metrics=self.metrics,
         gold=info and info.gold or 0,allies=allies,traitors=traitors,navy=navy,recent_orders=self.history or {},
+        nuclear_threat=self.state and Weapons.threat(self.state,self.me) or {},fallout_tiles=self.state and self.state.fallout_count or 0,
         last_action=self.lastAction,last_plan=self.lastPlan,recent_threats=threats}
 end
 
