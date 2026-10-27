@@ -88,7 +88,7 @@ value=function(r,depth)
         return out
     end
     if tag==9 then
-        -- Paths are irrelevant to land decisions, but must be consumed exactly.
+        -- Decode the compressed paths used by the naval observer.
         local n,width=count(r),var(r);assert(width>0 and n>0,"Invalid RoWorld path")
         local out={var(r)};local codes=take(r,math.ceil((n-1)/2))
         for i=1,n-1 do
@@ -141,7 +141,7 @@ function Wire.delta(packet,tail,decompress)
     return result
 end
 function Wire.intent(intent)
-    local types={spawn=1,attack=2,boat=3,build=4,nuke=5,retreat=6,ally_reply=9}
+    local types={spawn=1,attack=2,boat=3,build=4,nuke=5,retreat=6,move_warship=7,ally_request=8,ally_reply=9,ally_break=10}
     local fields={"tile","target","attack_id","troops","uid"}
     local out=buffer.create(128);local at=3
     buffer.writeu8(out,1,4);buffer.writeu8(out,2,assert(types[intent.type],"Unsupported order"))

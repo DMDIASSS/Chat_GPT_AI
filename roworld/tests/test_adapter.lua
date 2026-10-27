@@ -188,4 +188,38 @@ test("atom order is cancelled if friendly territory entered its area", function(
     local order = {intent = {type = "nuke",kind = "atom",tile = 12*32+9}}
     assert(not a:send(order,view)); assert(#f.session.sent == 0)
 end)
+test("changed attack funds cancel an underfunded forecast",function()
+    local f=fixture();local a=adapter(f);local view=assert(a:frame())
+    local order=attack(12*32+9);order.plan={amount=20000}
+    assert(not a:send(order,view));assert(#f.session.sent==0)
+end)
+test("construction is cancelled when the land setback disappears",function()
+    local f=fixture();f.info.gold=1000000
+    for t=0,f.map.N-1 do f.set(t,1) end
+    local a=adapter(f);local view=assert(a:frame());local t=f.info.label_tile
+    f.set(t+2,2)
+    assert(not a:send({intent={type="build",kind="city",tile=t},safety={margin=18,coastal=false}},view))
+    assert(#f.session.sent==0)
+end)
+test("diplomacy rechecks traitors, teams and newly dangerous betrayal",function()
+    local f=fixture();local a=adapter(f);local view=assert(a:frame())
+    f.state.requests[2049]=1;f.state.owners[2].traitor_until=100
+    assert(not a:send({intent={type="ally_reply",target=2,accept=true}},view))
+    f.state.allied[1026]=true
+    assert(not a:send({intent={type="ally_break",target=2}},view))
+    f.info.troops=1000000;f.state.owners[2].troops=100
+    assert(a:send({intent={type="ally_break",target=2}},view))
+end)
+test("warship movement never takes over a damaged or retreating ship",function()
+    local f=fixture();local a=adapter(f);local view=assert(a:frame())
+    local t=0;f.map.water[t]=true
+    function f.map:is_water(tile) return self.water[tile]==true end
+    f.state.units={[7]={owner=1,kind=2,state=1,hp=1000,max_hp=1000}}
+    local order={intent={type="move_warship",uid=7,tile=t}}
+    assert(not a:send(order,view))
+    f.state.units[7].state=0;f.state.units[7].hp=200
+    assert(not a:send(order,view))
+    f.state.units[7].hp=1000
+    assert(a:send(order,view))
+end)
 print("ADAPTER TESTS",tests)

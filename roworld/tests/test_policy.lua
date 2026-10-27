@@ -16,9 +16,10 @@ test("expands with bounded troop commitment and cooldown", function()
     f.now += 3
     assert(p:decide(f))
 end)
-test("attacks a weaker bordering enemy, never an ally", function()
+test("attacks an affordable bordering enemy when neutral growth is blocked, never an ally", function()
     local f, p = fixture(), Policy.new()
     f.set(12*32+9,2); f.refresh()
+    for t=0,f.map.N-1 do if f.state:tile_owner(t)==0 then f.state.flags[t]=true end end
     local a = assert(p:decide(f))
     assert(f.state:tile_owner(a.intent.tile) == 2)
     f.state.allied[1026] = true
@@ -37,12 +38,74 @@ test("recalls outgoing troops under a large incoming attack", function()
 end)
 test("builds a city then a factory using observed construction", function()
     local f, p = fixture(), Policy.new()
+    for y=1,22 do for x=1,24 do f.set(y*32+x,1) end end
+    f.refresh()
     f.info.gold = 50000
     local a = assert(p:decide(f)); assert(a.intent.type == "build" and a.intent.kind == "city")
     p:sent(a,f.now)
     f.state.structures[1] = {owner = 1, kind = 0, tile = a.intent.tile, level = 1, active_tick = 100}
     f.now += 7
     local b = assert(p:decide(f)); assert(b.intent.type == "build" and b.intent.kind == "factory")
+end)
+test("economic buildings wait for an interior and ports keep a land setback",function()
+    local f,p=fixture(),Policy.new();f.info.gold=1000000
+    assert(not p:build(f,{8*32+2},"city",{}))
+    for y=1,22 do for x=1,24 do f.set(y*32+x,1) end end
+    local center=12*32+12
+    assert(p:build(f,{center},"city",{}))
+    f.set(center+1,2);p.siteCache={}
+    assert(not p:build(f,{center},"city",{}))
+    f.set(center+1,0);f.map.water[center+1]=true;p.siteCache={}
+    assert(not p:siteSafe(f,center,"city"))
+    assert(p:siteSafe(f,center,"port"))
+end)
+test("threat memory counts distinct attacks rather than guessing from spending",function()
+    local f,p=fixture(),Policy.new();p:reset(f);p:observe(f)
+    f.state.tick+=1;f.state.owners[2].troops=100;p:observe(f)
+    assert(p.opponents[2].heat==0)
+    f.state.attacks[9]={attacker=2,target=1,troops=50};f.state.tick+=1;p:observe(f)
+    assert(p.opponents[2].heat==1)
+    f.state.tick+=1;p:observe(f);assert(p.opponents[2].heat<=1)
+    local r=p:report();assert(r.recent_threats[1].nation==2 and r.metrics.orders==0)
+end)
+test("forecast charges more for a defended front",function()
+    local f,p=fixture(),Policy.new();p:reset(f);p:observe(f)
+    local g={id=2,tile=12*32+9,front=1}
+    local mag=p:frontCost(f,g)
+    f.state.structures[3]={owner=2,kind=3,tile=g.tile,active_tick=0}
+    assert(p:frontCost(f,g)>mag)
+end)
+test("a target's nearby allies count as counterattack risk",function()
+    local f,p=fixture(),Policy.new();p:reset(f)
+    f.state.owners[3]={alive=true,troops=200000,name="Coalition"};f.state.allied[2*1024+3]=true
+    assert(p:coalitionPressure(f,2,{[3]={}})==70000)
+    f.state.allied[1*1024+3]=true
+    assert(p:coalitionPressure(f,2,{[3]={}})==0)
+end)
+test("does not start a second enemy war while an attack is running",function()
+    local f,p=fixture(),Policy.new();f.set(12*32+9,2);f.refresh()
+    f.state.owners[3]={alive=true,troops=100,name="Other"}
+    f.state.attacks[5]={aid=5,attacker=1,target=3,troops=2000}
+    local a=p:decide(f)
+    assert(not a or a.intent.type~="attack" or f.state:tile_owner(a.intent.tile)~=2)
+end)
+test("traitor requests are declined and betrayal never breaks team alliances",function()
+    local f,p=fixture(),Policy.new();p:reset(f)
+    f.state.requests[2*1024+1]=f.state.tick;f.state.owners[2].traitor_until=100
+    local a=p:diplomacy(f,{},p:armies(f,{}));assert(a.intent.type=="ally_reply" and not a.intent.accept)
+    f.state.requests={};f.state.allied[1026]=true;f.info.team=1;f.state.owners[2].team=1
+    f.info.troops=1000000;p.adjacentAllies={[2]=true}
+    assert(not p:diplomacy(f,{},p:armies(f,{})))
+    f.state.owners[2].team=0
+    assert(p:diplomacy(f,{},p:armies(f,{})).intent.type=="ally_break")
+end)
+test("spawn scoring prefers flat open land away from human starts",function()
+    local f,p=fixture(),Policy.new();f.state.owners[2].kind=2
+    for t=0,f.map.N-1 do f.set(t,0) end
+    local near=12*32+16;local far=12*32+3
+    assert(p:spawnScore(f,far)>p:spawnScore(f,near))
+    local before=p:spawnScore(f,far);f.map.terrain=buffer.create(f.map.N);buffer.fill(f.map.terrain,0,4)
+    assert(p:spawnScore(f,far)<before)
 end)
 test("chooses an unclaimed spawn without treating an eliminated owner as respawnable", function()
     local f, p = fixture(), Policy.new()

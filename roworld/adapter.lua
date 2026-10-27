@@ -138,7 +138,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.1.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.2.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -276,9 +276,26 @@ function Adapter:send(action, frame)
             local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.35)
             intent.ratio = math.min(tonumber(intent.ratio) or 0, .55, math.max(0, troops-reserve) / math.max(1, troops))
             if intent.ratio ~= intent.ratio or intent.ratio <= 0 or troops * intent.ratio < 100 then return false, "Holding troop reserves" end
+            if action.plan and action.plan.amount and troops*intent.ratio<action.plan.amount*.9 then
+                return false,"Troop budget changed; recalculating the attack"
+            end
         elseif kind == "build" or kind == "nuke" then
             if not tileValid(live, intent.tile) or not rules:availability(intent.kind).ok then return false, "Building or weapon is not ready" end
             if not rules:placement(intent.kind, intent.tile).ok then return false, "Placement changed" end
+            if kind=="build" and action.safety then
+                local map=live.map;local x,y=intent.tile%map.W,intent.tile//map.W
+                local radius=math.ceil(action.safety.margin/(map.k_lin or 1))
+                for yy=math.max(0,y-radius),math.min(map.H-1,y+radius) do
+                    for xx=math.max(0,x-radius),math.min(map.W-1,x+radius) do
+                        if (xx-x)^2+(yy-y)^2<=radius*radius then
+                            local t=yy*map.W+xx
+                            if s:has_fallout(t) or s:tile_owner(t)~=me and (map:is_contestable(t) or not action.safety.coastal) then
+                                return false,"Border moved too close to the construction site"
+                            end
+                        end
+                    end
+                end
+            end
             if kind == "nuke" then
                 local target = s:tile_owner(intent.tile)
                 if target == 0 or target == me or s:are_allies(me, target) then return false, "Strike target changed" end
@@ -301,6 +318,32 @@ function Adapter:send(action, frame)
             if not attack or attack.attacker ~= me or attack.retreating then return false, "Attack already ended" end
         elseif kind == "ally_reply" then
             if not s:has_request(intent.target, me) then return false, "Alliance request expired" end
+            local owner=s.owners[intent.target]
+            if intent.accept and (not owner or not owner.alive or (owner.traitor_until or 0)>s.tick) then
+                return false,"Alliance partner is no longer reliable"
+            end
+        elseif kind=="ally_request" or kind=="ally_break" then
+            local owner=s.owners[intent.target]
+            if not owner or not owner.alive or intent.target==me then return false,"Diplomacy target changed" end
+            if kind=="ally_request" and (s:are_allies(me,intent.target) or s:has_request(me,intent.target)
+                or (owner.traitor_until or 0)>s.tick) then return false,"Alliance request is no longer needed" end
+            if kind=="ally_break" then
+                if not s:are_allies(me,intent.target) or (owner.traitor_until or 0)<=s.tick
+                    or (live.info.team or 0)>0 and live.info.team==owner.team then return false,"Alliance cannot be safely ended" end
+                local exposure=owner.troops or 0
+                for id,o in pairs(s.owners) do
+                    if id~=me and id~=intent.target and o.alive and not s:are_allies(me,id) then exposure+=o.troops or 0 end
+                end
+                if (live.info.troops or 0)<=math.max(50000,exposure*4) then return false,"Betrayal would leave too little defensive margin" end
+                for _,a in pairs(s.attacks) do
+                    if not a.retreating and (a.target==me or a.attacker==me and a.target>0) then return false,"Cannot betray during an active war" end
+                end
+            end
+        elseif kind=="move_warship" then
+            local u=(s.units or {})[intent.uid]
+            if not u or u.owner~=me or u.kind~=2 or u.state~=0 or not tileValid(live,intent.tile)
+                or type(live.map.is_water)~="function" or not live.map:is_water(intent.tile) then return false,"Warship order is no longer valid" end
+            if u.max_hp>0 and u.hp<u.max_hp*.8 then return false,"Letting the warship retreat and repair" end
         else
             return false, "Unsupported order type: " .. tostring(kind)
         end

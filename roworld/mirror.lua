@@ -28,7 +28,15 @@ end
 local function owner(row)
     return {id=row[1],name=tostring(row[2]),kind=row[4] or 0,team=row[5] or 0,alive=row[6]==true,
         troops=row[8] or 0,gold=row[9] or 0,max_troops=row[10] or 0,income=row[11] or 0,
-        spawn_tile=row[13] or -1,spawned=(row[13] or -1)>=0,label_tile=row[13] or -1,tiles=0}
+        traitor_until=row[12] or 0,spawn_tile=row[13] or -1,spawned=(row[13] or -1)>=0,label_tile=row[13] or -1,tiles=0}
+end
+local function unit(s,row,offset)
+    offset=offset or 0
+    local u={uid=row[offset+1],kind=row[offset+2],owner=row[offset+3],path=row[offset+4] or {},
+        start_tick=row[offset+5] or 0,ticks_per_tile_x100=row[offset+6] or 100,troops=row[offset+7] or 0,
+        hp=row[offset+8] or 0,max_hp=row[offset+9] or 0,veterancy=row[offset+10] or 0,
+        state=row[offset+11] or 0,patrol_tile=row[offset+12] or -1}
+    s.units[u.uid]=u;return u
 end
 local function structure(s,row,offset)
     offset=offset or 0
@@ -72,17 +80,46 @@ function Mirror.map(meta,raw,snapshot,yield)
     end
     map.land_list,map.coast_list=buffer.create(lands*4),buffer.create(coasts*4)
     buffer.copy(map.land_list,0,land,0,lands*4);buffer.copy(map.coast_list,0,coast,0,coasts*4)
+    -- Four-neighbour water components, computed once per terrain download.
+    -- Match the game's left/right/up/down coastal-body convention.
+    map.water_body=buffer.create(map.N*4)
+    local queue=buffer.create(map.N*4);local body,work=0,0
+    for t=0,map.N-1 do
+        if map:is_water(t) and buffer.readu32(map.water_body,t*4)==0 then
+            body+=1;local head,tail=0,1
+            buffer.writeu32(queue,0,t);buffer.writeu32(map.water_body,t*4,body)
+            while head<tail do
+                local p=buffer.readu32(queue,head*4);head+=1
+                adjacent(map,p,function(n)
+                    if map:is_water(n) and buffer.readu32(map.water_body,n*4)==0 then
+                        buffer.writeu32(map.water_body,n*4,body);buffer.writeu32(queue,tail*4,n);tail+=1
+                    end
+                end)
+                work+=1;if work%32768==0 then yield() end
+            end
+        end
+        if t%32768==0 then yield() end
+    end
+    function map:water_body_of(t)
+        return t>=0 and t<self.N and buffer.readu32(self.water_body,t*4) or 0
+    end
+    function map:coast_body_of(t)
+        local found=0
+        adjacent(self,t,function(n) if found==0 then found=self:water_body_of(n) end end)
+        return found
+    end
     return map
 end
 function Mirror.snapshot(data,map,me,yield)
     assert(typeof(data.owner)=="buffer" and buffer.len(data.owner)==map.N*4,"Incomplete ownership snapshot")
     assert(typeof(data.flags)=="buffer" and buffer.len(data.flags)==map.N,"Incomplete fallout snapshot")
-    local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},
+    local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},units={},
         alliances={},requests={},built={},border={},local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
-        rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=3}},State)
+        rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=10}},State)
     for _,row in ipairs(data.owners or {}) do s.owners[row[1]]=owner(row) end
     for _,row in ipairs(data.structs or {}) do structure(s,row) end
     for _,row in ipairs(data.attacks or {}) do attack(s,row) end
+    for _,row in ipairs(data.units or {}) do unit(s,row) end
     for _,row in ipairs(data.allies or {}) do s.alliances[key(row[1],row[2])]=true end
     for _,row in ipairs(data.requests or {}) do s.requests[row[1]*1024+row[2]]=row[3] or s.tick end
     for _,row in ipairs(data.built or {}) do
@@ -131,6 +168,9 @@ function Mirror.delta(s,d)
         elseif kind==4 then local b=structure(s,e,1);built(s,b.owner,b.kind)
         elseif kind==5 and s.structures[id] then s.structures[id].owner=e[3]
         elseif kind==6 then s.structures[id]=nil
+        elseif kind==9 then local u=unit(s,e,1);if u.kind==2 then built(s,u.owner,15) end
+        elseif kind==10 and s.units[id] then s.units[id].path={e[3]};s.units[id].start_tick=s.tick
+        elseif kind==11 then s.units[id]=nil
         elseif kind==14 then attack(s,e,1)
         elseif kind==15 then s.attacks[id]=nil
         elseif kind==16 then s.requests[id*1024+e[3]]=e[4] or s.tick
@@ -138,10 +178,16 @@ function Mirror.delta(s,d)
         elseif kind==18 then s.alliances[key(id,e[3])]=nil
         elseif kind==20 then s.phase=2
         elseif kind==21 then s.requests[id*1024+e[3]]=nil
+        elseif kind==22 and s.owners[id] then s.owners[id].traitor_until=e[3]
         elseif kind==23 and s.structures[id] then
             local b=s.structures[id];local added=e[3]-b.level
             for _=1,math.max(0,added) do built(s,b.owner,b.kind) end
             b.level,b.active_tick=e[3],e[4]
+        elseif kind==25 and s.units[id] then s.units[id].hp=e[3];s.units[id].max_hp=e[4]
+        elseif kind==26 and s.units[id] then s.units[id].veterancy=e[3]
+        elseif kind==27 and s.units[id] then s.units[id].state=e[3];s.units[id].patrol_tile=e[4]
+        elseif kind==28 and s.units[id] then
+            local u=s.units[id];u.path=e[3];u.start_tick=e[4];u.ticks_per_tile_x100=e[5]
         end
     end
 end
@@ -153,13 +199,30 @@ function Mirror.context(session)
         for tile in pairs(self.border) do if ctx.state.map:is_coastal(tile) then return true end end
         return false
     end
-    -- The fallback deliberately has no guessed sea-route or weapon model.
-    function borders:can_reach_by_sea(_) return false end
+    function borders:can_reach_by_sea(tile)
+        local map=ctx.state.map
+        if not map:is_coastal(tile) then return false end
+        local body=map:coast_body_of(tile)
+        if self.bodyTick~=ctx.state.tick then
+            self.bodyTick=ctx.state.tick;self.bodies={}
+            for t in pairs(self.border) do
+                if map:is_coastal(t) then self.bodies[map:coast_body_of(t)]=true end
+            end
+        end
+        return body>0 and self.bodies[body]==true
+    end
     ctx.borders=borders
     local rules={}
-    function rules:transports() return 0 end
+    function rules:transports()
+        local count=0;for _,u in pairs(ctx.state.units) do if u.owner==ctx.state.local_owner and u.kind==0 then count+=1 end end
+        return count
+    end
     function rules:cost(kind)
         local s,id=ctx.state,ctx.state.local_owner;local k=KINDS[kind]
+        if kind=="warship" then
+            local count=0;for _,u in pairs(s.units) do if u.owner==id and u.kind==2 then count+=1 end end
+            return math.min(1000000,(math.min(count,(s.built[id] or {})[15] or 0)+1)*250000)
+        end
         if k==nil then return math.huge end
         local kinds=(kind=="port" or kind=="factory") and {1,2} or {k};local n=0
         for _,wanted in ipairs(kinds) do
@@ -173,14 +236,26 @@ function Mirror.context(session)
     end
     function rules:availability(kind)
         -- SAM and silo are deferred because this fallback only reads land/economy.
-        local supported=kind=="city" or kind=="factory" or kind=="port" or kind=="defense"
+        local supported=kind=="city" or kind=="factory" or kind=="port" or kind=="defense" or kind=="warship"
         local info=ctx.state.owners[ctx.state.local_owner]
+        local port=kind~="warship"
+        if not port then for _,b in pairs(ctx.state.structures) do
+            if b.owner==ctx.state.local_owner and b.kind==1 and b.active_tick<=ctx.state.tick then port=true;break end
+        end end
         return {ok=supported and info.alive and info.spawned and ctx.state.phase==1 and info.gold>=self:cost(kind)
-            and (kind~="port" or borders:has_coast()),cost=self:cost(kind)}
+            and port and (kind~="port" or borders:has_coast()),cost=self:cost(kind)}
     end
     function rules:placement(kind,tile)
         local s,id,map=ctx.state,ctx.state.local_owner,ctx.state.map
         local result={ok=false,tile=tile}
+        if kind=="warship" then
+            if not self:availability(kind).ok or not map:is_water(tile) then return result end
+            for _,b in pairs(s.structures) do
+                if b.owner==id and b.kind==1 and b.active_tick<=s.tick
+                    and map:coast_body_of(b.tile)==map:water_body_of(tile) then result.ok=true;return result end
+            end
+            return result
+        end
         if not self:availability(kind).ok or s:tile_owner(tile)~=id or not map:is_contestable(tile) then return result end
         if kind=="port" and not map:is_coastal(tile) then return result end
         for _,b in pairs(s.structures) do

@@ -60,7 +60,7 @@ test("scaled terrain uses the same cell centers as the game map resampler",funct
     local scaled=Mirror.map({width=8,height=4,k_lin=1},raw,{map_w=4,map_h=2})
     assert(scaled.k_lin==2 and not scaled:is_contestable(1) and scaled:is_contestable(0))
 end)
-test("land-only fallback retains reserves and uses observed construction prices",function()
+test("fallback retains reserves and uses observed construction prices",function()
     local s=Mirror.snapshot(decoded(),map(),1)
     local session={state=s,connected=true}
     local ctx=Mirror.context(session)
@@ -69,6 +69,49 @@ test("land-only fallback retains reserves and uses observed construction prices"
     local a=assert(Policy.new():decide({state=s,map=s.map,me=1,info=s.owners[1],ctx=ctx,now=10}))
     assert(a.intent.type=="attack" or a.intent.type=="build")
     if a.intent.type=="attack" then assert(a.intent.ratio<=.55) end
+end)
+
+test("naval observer tracks unit paths, health, removal and warship prices",function()
+    local s=Mirror.snapshot(decoded(),map(),1)
+    local ctx=Mirror.context({state=s,connected=true})
+    local water=12*32+20;local port=water-1
+    s.structures[40]={sid=40,owner=1,kind=1,tile=port,level=1,active_tick=0}
+    assert(ctx.rules:availability("warship").ok and ctx.rules:cost("warship")==250000)
+    assert(ctx.rules:placement("warship",water).ok)
+    Mirror.delta(s,{t=11,ev={{9,90,2,1,{water},11,100,0,1000,1000,0,0,water},
+        {9,91,0,1,{water},11,100,3000}}})
+    assert(s.units[90].kind==2 and ctx.rules:cost("warship")==500000 and ctx.rules:transports()==1)
+    Mirror.delta(s,{t=12,ev={{25,90,600,1000},{27,90,1,water},{28,90,{water,water+32},12,100},{22,2,400}}})
+    assert(s.units[90].hp==600 and s.units[90].state==1 and #s.units[90].path==2)
+    assert(s.owners[2].traitor_until==400)
+    Mirror.delta(s,{t=13,ev={{11,90},{11,91}}})
+    assert(not s.units[90] and ctx.rules:transports()==0 and ctx.rules:cost("warship")==250000)
+end)
+test("sea access distinguishes disconnected lakes and updates after losing a coast",function()
+    local data=decoded();local raw=buffer.create(768);buffer.fill(raw,0,128)
+    for y=0,23 do buffer.writeu8(raw,y*32+1,0);buffer.writeu8(raw,y*32+20,0) end
+    local m=Mirror.map({width=32,height=24,k_lin=2},raw,data)
+    local s=Mirror.snapshot(data,m,1);local ctx=Mirror.context({state=s,connected=true})
+    assert(ctx.borders:can_reach_by_sea(12*32+2))
+    assert(not ctx.borders:can_reach_by_sea(12*32+19))
+    for t=0,m.N-1 do if s:tile_owner(t)==1 then buffer.writei32(s.owner,t*4,0) end end
+    table.clear(s.border);s.tick+=1
+    assert(not ctx.borders:can_reach_by_sea(12*32+2))
+end)
+test("multiplayer policy builds and redirects warships without interrupting repair",function()
+    local m=map();local s=Mirror.snapshot(decoded(),m,1);local ctx=Mirror.context({state=s,connected=true})
+    local water=12*32+20;local port=water-1
+    s.structures[40]={sid=40,owner=1,kind=1,tile=port,level=1,active_tick=0}
+    local f={state=s,map=m,me=1,info=s.owners[1],ctx=ctx,now=10};local p=Policy.new()
+    local a=assert(p:fleet(f,{}));assert(a.intent.kind=="warship" and a.intent.tile==water)
+    s.units[7]={uid=7,kind=2,owner=1,path={water},state=0,hp=1000,max_hp=1000,patrol_tile=water-32*10}
+    s.units[8]={uid=8,kind=0,owner=2,path={water+32},start_tick=s.tick,ticks_per_tile_x100=100}
+    s.owners[1].gold=0
+    local b=assert(p:fleet(f,{}));assert(b.intent.type=="move_warship" and b.intent.uid==7)
+    s.units[7].state=1
+    assert(not p:fleet(f,{}))
+    s.units[7].state=0;s.alliances[1026]=true
+    assert(not p:fleet(f,{}))
 end)
 
 local function harness()

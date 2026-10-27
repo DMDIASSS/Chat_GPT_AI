@@ -1,133 +1,112 @@
-# RoWorld bot
+# RoWorld bot 1.2.0
 
-One **Start bot / Stop bot** button and a status line describing its current
-decision. Runs inside Roblox through JJSploit, without Python, localhost HTTP,
-an external AI service, or a second simulation.
+One **Start bot / Stop bot** button, a decision status line, and F6 to toggle.
+Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
+No training, Python, localhost bridge or external AI service is needed to play.
 
-## Run
+## Install / update
 
-1. Download [the standalone script](./RoWorld_Bot.lua) using GitHub's **Raw / Download raw file** button.
-2. Join **RoWorld World PvP** and enter the solo or multiplayer match you want.
-3. Open `RoWorld_Bot.lua` in a text editor, copy **all its contents** into
-   JJSploit, and execute. It starts stopped.
-4. Press **Start bot**. The same button stops new orders. F6 also toggles it.
+1. Extract the ZIP anywhere, such as Downloads.
+2. Open `roworld/RoWorld_Bot.lua` in a text editor and copy **the whole file**.
+3. Join a **multiplayer** RoWorld match, paste it into JJSploit, and execute.
+4. Press **Start bot**. Re-executing replaces the previous panel and stops its loop.
 
-**For the JJSploit access failure shown in your diagnostics, join multiplayer.**
-Version 1.1.0 has an independent multiplayer observer that does not need game
-module access, `getgc`, or callback inspection. The panel first waits for a
-complete server snapshot and terrain download, then can issue normal orders.
-Solo still needs the original live-client access route; the network fallback
-cannot observe a private local solo simulation.
+Start before choosing your territory to let the bot choose a spawn. It cannot
+relocate a nation that has already spawned. It does not choose queues or buy shop
+items. Stopping prevents new orders; already launched attacks continue normally.
 
-Extract the ZIP **anywhere**, such as Downloads. Pasting the complete script
-does not depend on where you extracted it. Only the optional `readfile` loader
-below needs the file in the executor workspace.
+The optional `readfile` loader needs `RoWorld_Bot.lua` directly in your executor
+workspace. On the supplied PC that is
+`C:\Users\almas\AppData\Roaming\jjsploit\workspace`. Replace the old file there,
+then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
+or HTTP functions and does not depend on the extraction location.
 
-You can instead put `RoWorld_Bot.lua` directly in your JJSploit workspace
-(`C:\Users\almas\AppData\Roaming\jjsploit\workspace` on your PC) and execute:
+## Strategy
 
-```lua
-local run, err = loadstring(readfile("RoWorld_Bot.lua"))
-assert(run, err)
-run()
-```
+- Scores 160 spawn candidates for flat unclaimed land, distance from established
+  players, nearby weak tribes, and some water access. This is a bounded search,
+  not proof of a globally optimal spawn.
+- Preserves recruitment and defensive reserves while expanding. Tracks actual
+  attacks and troop spending over time; spending alone is not treated as proof
+  of hostile intent.
+- Compares terrain and defense-post costs under several counterattack assumptions.
+  Counts nearby allies of a target as possible additional opposition and avoids
+  opening another enemy war while a land attack against a different enemy runs.
+- Uses current alliances and teams when choosing targets. Accepts suitable
+  requests, declines marked traitors, and can request a safer frontier alliance.
+  Betraying a marked traitor requires an exceptionally large defensive margin:
+  breaking any alliance also marks **you** as a traitor and weakens your defense.
+  Team alliances are never deliberately broken.
+- Requires an owned-land setback around construction sites: **18 map distance
+  units** for economic buildings, **8** for defense/SAM sites. Ports permit water
+  inside this radius but still require a land setback. The bot waits if there is
+  no safe site and rechecks the setback immediately before sending an order.
+- Builds cities, factories, ports and defenses when affordable. Uses warships
+  for coastal patrol/interception, tracks ship counts and health, and leaves
+  damaged or retreating ships to the game's repair logic.
+- Uses connected-water observations for transport landings and warship patrols;
+  avoids destinations near observed hostile warships. Enemy actions and fleet
+  movement can still change after an order is sent.
 
-That file loader needs `readfile` and `loadstring`; pasting the complete script
-does not need executor file or HTTP functions. Re-executing replaces the old
-panel and stops its decision loop. Stopping prevents new orders; attacks already
-sent remain ordinary game attacks and continue until resolved or recalled.
+The independent multiplayer observer now supports naval units, boats, warship
+construction/movement and diplomacy as well as land/economy orders. SAMs, silos
+and offensive weapons remain disabled on that route because their full state
+is not mirrored. The original live-client route can additionally use those
+weapons where its placement and friendly-fire checks permit them.
 
-## What it does
+## Match report
 
-- Chooses an unclaimed starting position if you have not spawned.
-- Expands into clean neutral land while retaining a troop reserve.
-- Compares bordering armies and attacks weaker nonallied neighbours.
-- Holds troops when threatened and recalls outgoing attacks during heavy pressure.
-- Builds cities, factories, ports, defense posts, SAMs and a missile silo when
-  the observed resources, available space and game rules permit them.
-- Accepts incoming alliance requests when it is not attacking that nation.
-- Attempts reachable coastal landings when land expansion stalls.
-- Can launch affordable atom strikes at enemy structures after checking the
-  surrounding area for your own or allied land.
+When executor `writefile` is available, the bot saves **`RoWorld_Match_Report.json`**
+in the JJSploit workspace every 30 seconds, when stopped, and on an observed
+match end/elimination. It includes current troops/gold/land, peak land, order
+counts, the last 64 orders, alliances, traitor flags, fleet counts, observed
+threats and the latest attack forecast. Nothing is uploaded automatically.
+Send that file after a completed match to investigate its decisions. It covers
+the current observer snapshot onward; a fresh snapshot or re-execution resets
+its history. It records orders sent, not server confirmation of success.
 
-Those are the full live-client features. **The independent multiplayer fallback
-currently handles spawning, land expansion/combat, retreat, incoming alliances,
-and cities/factories/ports/defense posts.** Boats, SAMs, silos and offensive
-weapons are disabled on that route rather than relying on missing naval or
-weapon observations.
-
-The status distinguishes an **order sent** from waiting or defending. It does
-not claim that a sent order was accepted or that an attack succeeded. It follows
-the local owner's ID from the live session, including changes after a new match.
-It waits in menus, while spectating, while loading, on a paused solo game, or
-when game ticks stop updating. It does not choose queues or buy shop items.
-
-If client access is blocked, version 1.0.2 tries requiring the game module at
-ordinary client thread identity (restoring the prior identity afterward), then
-looks for the already-running client tables when `getgc(true)` is available.
-It never boots a second client. Access failures automatically write
-`RoWorld_Diagnostics.txt` to the JJSploit workspace if `writefile` is available,
-and also print the same capability/error report to F9. The report records
-capabilities and access errors, not game state or session tokens. No additional place files are needed
-for the module-permission error; that diagnostic is useful if both routes fail.
-Version 1.0.2 also tries the original client environment's `require`, reads
-existing input/heartbeat callback upvalues, and supports executors whose
-`getgc(true)` returns functions without tables. It never invokes or replaces
-those callbacks. Diagnostics include the actual identity returned after setting
-it, the GC table/function counts, and available upvalue/connection APIs. These
-fallbacks need real executor support; having a function name alone does not
-establish that it works. No executor binaries are included in this download.
+If file writing is unavailable, the same report is returned by
+`getgenv().__RoWorldBot.report()`. Access failures also print diagnostics in F9
+and try to save `RoWorld_Diagnostics.txt` in the executor workspace.
 
 ## Compatibility and verification
 
-Adapted to the supplied place `137151641329864`, version **111**, whose client is
-named `AirfrontClient`. The original route reads `Main.session` and `Main.ui.ctx`
-and calls `session:send_intent`, the same command path used by the game's UI.
-Solo uses the existing local command queue. Joined multiplayer clients use the
-existing network route; server validation still applies and hosting is not
-required by this adapter.
+The original route reuses the game's running `Main.session` / `Main.ui.ctx`.
+When JJSploit blocks module access, an independent observer listens to the
+existing multiplayer `AirfrontNet` snapshot/delta stream, requests the normal
+resync, downloads terrain, and sends ordinary own-nation orders. It does not
+start another simulation, replace callbacks, impersonate another nation, or
+send JOIN/LEAVE commands. Solo needs working live-client access; the independent
+observer cannot read a private local solo simulation.
 
-The new fallback listens to `AirfrontNet.ToClient`, requests the ordinary resync
-for your existing match, and reads its snapshot/delta packets into a separate
-read-only state mirror. It downloads the current terrain from the game's map
-service and sends player orders through `AirfrontNet.ToServer`. It never creates
-a simulation or sends JOIN/LEAVE commands. It does not replace or modify game
-callbacks. Paused/stale/incomplete observations cannot issue gameplay orders;
-new snapshots, nation changes and match close invalidate earlier decisions.
-Only a bounded queue of updates is kept, and corruption/overflow requests a
-fresh snapshot. Decompression uses Roblox's `EncodingService`.
+Incomplete, stale or corrupt observations prevent orders and request resync.
+Match changes invalidate earlier decisions. Terrain water components are built
+once per download with cooperative yields; strategy scans are bounded.
 
-This is a Lua strategy adaptation of the supplied **OpenFront Solo AggroBot**,
-not a byte-for-byte port of its browser code or bundled optional neural models.
-The source JS's DOM, EventBus and OpenFront object APIs do not exist in Roblox.
-RoWorld-specific state, ownership, terrain, placements and prices are used here.
-Browser screenshots, ads, payments, hCaptcha and other unrelated uploaded assets
-are not needed or included. There is no Rocket League model in this bot.
+**54 offline scenarios** cover policy, adapter and network behavior, plus UI
+start/stop/re-injection and standalone Luau compilation. Additional checks against
+the supplied game's original modules verify new naval/diplomacy command encoding,
+water connectivity, unit paths/health, traitor flags and warship prices. The game
+scripts and assets used for these private checks are not redistributed.
 
-Offline tests cover strategy decisions, solo/joined-client routing, updated
-alliances/targets, reserves, stale state, pause/stop, and duplicate injection.
-Wire tests use synthetic packets encoded by the uploaded game's protocol;
-commands match its encoding byte-for-byte. An additional offline comparison
-checked mirror ownership, fallout, owner statistics, structures, attacks and
-construction prices against the original `GameState`/`Rules` modules.
-The standalone script is compiled with Luau. **A live JJSploit session and playing
-strength have not been verified here.** A changed game API or an executor that
-cannot expose the needed Roblox network/buffer APIs can prevent operation; the panel reports the
-problem rather than silently sending guessed commands.
+**This is a heuristic bot, not a neural model or a guaranteed winner.** Opponent
+intent and coalition intervention are estimates. The updated strategy's live
+playing strength has not been verified here. A changed game protocol or executor
+API can prevent operation; the panel reports connection failures.
 
 ## Development
 
-`policy.lua` contains strategy, `adapter.lua` reads and validates the live API,
-and `client.lua` contains the one-button UI. `wire.lua`, `mirror.lua` and
-`network.lua` implement the independent multiplayer observer. After changes,
-regenerate the standalone file:
+`policy.lua` selects orders; `adapter.lua` revalidates the live observation;
+`client.lua` provides the button/reporting. `wire.lua`, `mirror.lua` and
+`network.lua` implement the independent read-only multiplayer observer.
 
 ```sh
 python roworld/build.py
 python roworld/tests/run.py --luau /path/to/luau --compiler /path/to/luau-compile
 ```
 
-Credit: [OpenFront Solo AggroBot on Greasy Fork](https://greasyfork.org/en/scripts/599445)
-(supplied userscript declares the MIT license). The provided RoWorld scripts
-were inspected to establish the adapter API; game code and assets are not
-redistributed in this folder.
+Strategy reference: [OpenFront Solo AggroBot](https://greasyfork.org/en/scripts/599445)
+(the supplied userscript declares MIT). This is an independent Luau adaptation,
+not its browser DOM/EventBus code or optional neural models. No executor binary,
+game assets, payment/ad scripts, private diagnostics or Rocket League models are
+included.

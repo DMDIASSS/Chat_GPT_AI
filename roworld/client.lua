@@ -84,13 +84,29 @@ local function reportAccessFailure()
     warn(report)
 end
 local policy = Policy.new()
+local lastReport=-math.huge
+local endReported=false
+local reportState
+function api.report() return policy:report() end
+local function saveMatchReport(force,reason)
+    if type(writefile)~="function" or not policy.state then return end
+    if not force and os.clock()-lastReport<30 then return end
+    lastReport=os.clock()
+    local ok,encoded=pcall(function()
+        local report=policy:report();report.saved_reason=reason
+        return game:GetService("HttpService"):JSONEncode(report)
+    end)
+    if ok then pcall(writefile,"RoWorld_Match_Report.json",encoded) end
+end
 local lastCommand, lastCommandAt = "", -math.huge
 local function toggle()
     api.enabled = not api.enabled
     if api.enabled then
         policy = Policy.new()
+        endReported=false
         repaint("Connecting to your RoWorld match...")
     else
+        saveMatchReport(true,"stopped by user")
         repaint("Stopped - no new orders; existing game attacks continue")
     end
 end
@@ -139,6 +155,13 @@ task.spawn(function()
             if ok then
                 reportAccessFailure()
                 repaint(message)
+                if policy.state~=reportState then
+                    reportState=policy.state;endReported=false;lastReport=-math.huge
+                end
+                local info=policy.state and policy.state.owners[policy.me]
+                local ended=info and (not info.alive or policy.state.phase==2 or adapter.network.closed)
+                saveMatchReport(ended and not endReported,ended and "match ended" or "periodic")
+                if ended then endReported=true end
             else
                 api.enabled = false
                 repaint("Stopped after an error: " .. tostring(message))
