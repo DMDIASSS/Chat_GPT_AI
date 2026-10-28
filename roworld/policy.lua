@@ -1104,11 +1104,12 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="2.2.0",missile_alerts=self.missileAlerts or {},missile_alert_history=self.missileHistory or {},cooperation=self.cooperation.status,
+    return {version="2.3.0",missile_alerts=self.missileAlerts or {},missile_alert_history=self.missileHistory or {},cooperation=self.cooperation.status,
         atlas=self.atlas and self.atlas:report(self.strategy and self.strategy.lastNow or 0) or {},
         planner=self.planner and self.planner.report or {},
         campaigns=self.strategy and self.strategy:campaignReport() or {},
         campaign_history=self.strategy and self.strategy.campaignHistory or {},
+        ally_warning_history=self.strategy and self.strategy.allyWarningHistory or {},
         opponent_profiles=self.state and self.profiles:report({state=self.state,me=self.me}) or {},
         opponent_observations=self.recorder and self.recorder:report() or {},
         runtime=self.runtime or {},last_waiting=self.lastWaiting,scope="Since the current observer snapshot; intent estimates are heuristic",

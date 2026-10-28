@@ -1,4 +1,4 @@
--- RoWorld Bot 2.2.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 2.3.0 | paste this entire file into JJSploit.
 -- No external script downloads or localhost bridge.
 
 local Weapons = (function()
@@ -683,7 +683,7 @@ function Planner:update(frame,b,a,groups,atlas,profiles)
  b.expansion_budget=b.permit_expansion and math.min(a.available,a.home*.12) or 0
  local rows={
   {kind='defend',score=acute and 30+incoming/math.max(1,a.home)*10 or core.at_risk and 7 or 1,reason=acute and 'Active invasion or recent losses' or 'Protect exposed core'},
-  {kind='invest',score=7+(a.home/math.max(1,frame.info.max_troops or a.home)>.75 and 3 or 0),reason='Improve productive capacity and recruitment'},
+  {kind='invest',score=7+((b.ally_reserve or 0)>0 and 3 or 0)+(a.home/math.max(1,frame.info.max_troops or a.home)>.75 and 3 or 0),reason='Improve productive capacity and recruitment'},
   {kind='expand',score=(opportunity and 9 or 2)+waitingCost-(acute and 30 or 0),reason='Compare safe growth against the cost of waiting'},
   {kind='negotiate',score=(b.overextended and 12 or 4)+(core.at_risk and 2 or 0),reason='Reduce a visible strategic threat'},
   {kind='relocate',score=b.escape and 40 or 0,reason=b.relocation_reason or 'Preserve a viable replacement base'},
@@ -793,7 +793,7 @@ local Strategy={};Strategy.__index=Strategy
 function Strategy.new(frame,profiles)
     local owners={};for sid,b in pairs(frame.state.structures) do owners[sid]=b.owner end
     local allies={};for id in pairs(frame.state.owners) do if frame.state:are_allies(frame.me,id) then allies[id]=true end end
-    return setmetatable({campaigns={},campaignHistory={},peace={},structures=owners,timeline={},recoverUntil=0,board={},core=Core.new(),
+    return setmetatable({campaigns={},campaignHistory={},allyWarnings={},allyWarningHistory={},peace={},structures=owners,timeline={},recoverUntil=0,board={},core=Core.new(),
         profiles=profiles or Profiles.new(),allies=allies,relationships={},distrust={},asked={},allianceSeq=frame.state.alliance_seq or 0},Strategy)
 end
 function Strategy:trustworthy(frame,id) return frame.now>=(self.distrust[id] or 0) end
@@ -817,7 +817,7 @@ function Strategy:sent(action,s,me,now)
     if (kind=='attack' or kind=='boat') and target>0 then
         local c=self.campaigns[target]
         if not c or now-(c.lastSent or now)>60 then
-            c={started=now,lastProgress=now,sends=0,spent=0,captures=0,lastTiles=(s.owners[target] or {}).tiles}
+            c={started=now,lastProgress=now,sends=0,spent=0,captures=0,lastTiles=(s.owners[target] or {}).tiles,initialEnemyLand=(s.owners[target] or {}).tiles,initialHome=s.owners[me].troops or 0}
             self.campaigns[target]=c
         end
         if not c.objective then
@@ -887,10 +887,11 @@ function Strategy:observe(frame)
                 if objective.tile and s:tile_owner(objective.tile)==frame.me and not c.foothold then
                     c.foothold=true;c.lastProgress=frame.now
                 end
-                if c.foothold and (frame.info.tiles or 0)>=(c.progressLand or objective.initial_land)+10 then
+                if c.foothold and c.lastTiles and enemy.tiles and enemy.tiles<c.lastTiles and (frame.info.tiles or 0)>=(c.progressLand or objective.initial_land)+10 then
                     c.lastProgress=frame.now;c.progressLand=frame.info.tiles
                 end
-                if not objective.sid and objective.kind~='defeat_tribe' and objective.kind~='eliminate_country' and c.foothold and (frame.info.tiles or 0)>=objective.initial_land+objective.land_goal then objective.status='complete' end
+                if not objective.sid and objective.kind~='defeat_tribe' and objective.kind~='eliminate_country' and c.foothold and frame.now-c.started>=8 and (frame.info.tiles or 0)>=objective.initial_land+objective.land_goal
+                    and (enemy.kind~=0 or c.initialEnemyLand and enemy.tiles and enemy.tiles<=c.initialEnemyLand*.75) then objective.status='complete' end
             end
             c.lastTiles=enemy.tiles
         end
@@ -914,8 +915,9 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
         end
     end
     local b={human_neighbours=0,country_neighbours=0,largest_human=0,pressure=0,
-        incoming=a.incoming,committed=0,leaders={},candidates={},mode='develop',unreliable_ally_pressure=0}
+        incoming=a.incoming,committed=0,leaders={},candidates={},mode='develop',unreliable_ally_pressure=0,ally_warnings={},ally_reserve=0}
     local core=self.core.summary
+    for id in pairs(allies or {}) do near[id]=true end
     b.core=core
     local pressures={}
     b.naval_pressure=0
@@ -930,6 +932,18 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
                 local estimate=self.profiles:assessment(frame,id)
                 local weight=o.kind==2 and .5+estimate.confidence*math.max(0,estimate.attack_fraction-.5)*.3 or o.kind==0 and .28 or .1
                 table.insert(pressures,bank*weight)
+            elseif near[id] and s:are_allies(frame.me,id) and o.kind==2 and (o.troops or 0)>home*1.5
+                and not ((frame.info.team or 0)>0 and frame.info.team==o.team) then
+                local ratio=(o.troops or 0)/math.max(1,home)
+                local row={nation=id,home_ratio=ratio,land_ratio=(o.tiles or 0)/math.max(1,frame.info.tiles or 0),
+                    tick=s.tick,reason='Neighboring treaty ally has a substantially larger bank; intent unknown'}
+                table.insert(b.ally_warnings,row)
+                b.ally_reserve=math.max(b.ally_reserve,home*(ratio>=2 and .6 or .45))
+                local old=self.allyWarnings[id]
+                if not old or frame.now-old.at>=30 or ratio>old.ratio*1.25 then
+                    table.insert(self.allyWarningHistory,row);if #self.allyWarningHistory>32 then table.remove(self.allyWarningHistory,1) end
+                    self.allyWarnings[id]={at=frame.now,ratio=ratio}
+                end
             elseif (allies or {})[id] and o.kind==0 and (o.troops or 0)>home*3 then
                 -- Country alliances can be broken when their partner becomes
                 -- much weaker; an alliance is not a permanent defensive wall.
@@ -950,7 +964,7 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
         end
     end
     local retained=math.min(home*.9,b.pressure+b.unreliable_ally_pressure+b.naval_pressure)
-    a.reserve=math.min(home,math.max(a.reserve,retained,a.incoming*1.5))
+    a.reserve=math.min(home,math.max(a.reserve,retained,b.ally_reserve,a.incoming*1.5))
     if core.at_risk then
         a.reserve=math.min(home,math.max(a.reserve,home*.65,core.incoming*1.8,
             math.min(home*.9,core.threat_pressure)))
@@ -984,12 +998,23 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
     table.sort(b.leaders,function(x,y) return x.land>y.land end)
     while #b.leaders>5 do table.remove(b.leaders) end
     self.board=b
+    for id,c in pairs(self.campaigns) do
+        if c.objective and (c.objective.kind=='secure_corridor' or c.objective.kind=='capture_asset')
+            and (a.targets[id] or 0)>0 and not (c.pauseUntil and frame.now<c.pauseUntil)
+            and frame.now-c.started<90 then
+            local q=self:conquest(frame,id,a)
+            if q and q.finish then
+                c.objective.kind='eliminate_country';c.objective.status='active'
+                c.objective.promotion_reason=q.finish_reason;c.deadline=math.min(c.started+90,frame.now+45)
+            end
+        end
+    end
     if not self.lastSample or frame.now-self.lastSample>=5 then
         self.lastSample=frame.now
         table.insert(self.timeline,{at=frame.now,tick=s.tick,land=frame.info.tiles or 0,troops=home,
             capacity=frame.info.max_troops or 0,gold=frame.info.gold or 0,incoming=a.incoming,
             committed=b.committed,reserve=a.reserve,mode=b.mode,human_neighbours=b.human_neighbours,
-            core_tile=core.center_tile,core_at_risk=core.at_risk,core_owned_fraction=core.owned_fraction})
+            ally_warning_count=#b.ally_warnings,ally_reserve=b.ally_reserve,core_tile=core.center_tile,core_at_risk=core.at_risk,core_owned_fraction=core.owned_fraction})
         if #self.timeline>120 then table.remove(self.timeline,1) end
     end
     return b
@@ -1072,11 +1097,12 @@ function Strategy:conquest(frame,id,a)
  local gold=math.max(0,o.gold or 0);local active=(a.targets or {})[id] or 0
  local bank=math.max(1,o.troops or 0);local force=(a.available or 0)+active
  local small=type(o.tiles)=='number' and o.tiles>0 and o.tiles<=math.max(300,(frame.info.tiles or 0)*.8)
+ local clearance=self.core.fronts[id]~=nil and self.core.summary.needs_buffer==true
  local finish=small and a.home+active>=bank*2.5 and force>=bank*1.8
-  and a.incoming==0 and not self.board.recover and (buildings>0 or gold>=50000 or ((self.campaigns[id] or {}).captures or 0)>0)
+  and a.incoming==0 and not self.board.recover and (clearance or buildings>0 or gold>=50000 or ((self.campaigns[id] or {}).captures or 0)>0)
  local score=math.min(6,value*.35)+math.min(5,math.log(1+gold/50000)*1.5)
   -math.min(4,defenses*.4)-math.min(4,bank/math.max(1,a.home)*8)
- return {nation=id,finish=finish,expected_conquest_gold=gold,useful_asset_value=value,buildings=buildings,
+ return {nation=id,finish=finish,finish_reason=clearance and 'Clear a local expansion corridor' or 'Assets and current treasury',expected_conquest_gold=gold,useful_asset_value=value,buildings=buildings,
   defense_levels=defenses,asset_levels=assets,remaining_land=o.tiles,score=score,
   scope='Current public treasury; reward requires credited elimination and can change before capture'}
 end
@@ -2446,11 +2472,12 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="2.2.0",missile_alerts=self.missileAlerts or {},missile_alert_history=self.missileHistory or {},cooperation=self.cooperation.status,
+    return {version="2.3.0",missile_alerts=self.missileAlerts or {},missile_alert_history=self.missileHistory or {},cooperation=self.cooperation.status,
         atlas=self.atlas and self.atlas:report(self.strategy and self.strategy.lastNow or 0) or {},
         planner=self.planner and self.planner.report or {},
         campaigns=self.strategy and self.strategy:campaignReport() or {},
         campaign_history=self.strategy and self.strategy.campaignHistory or {},
+        ally_warning_history=self.strategy and self.strategy.allyWarningHistory or {},
         opponent_profiles=self.state and self.profiles:report({state=self.state,me=self.me}) or {},
         opponent_observations=self.recorder and self.recorder:report() or {},
         runtime=self.runtime or {},last_waiting=self.lastWaiting,scope="Since the current observer snapshot; intent estimates are heuristic",
@@ -2615,7 +2642,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 2.2.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 2.3.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -3533,7 +3560,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 2.2.0 | live strategy"
+title.Text = "RoWorld 2.3.0 | live strategy"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -3603,6 +3630,7 @@ local function repaint(message)
     button.Text = api.enabled and "Stop bot" or "Start bot"
     button.BackgroundColor3 = api.enabled and Color3.fromRGB(166, 58, 65) or Color3.fromRGB(33, 133, 99)
     local alert=env.__RoWorldBot and env.__RoWorldBot.missileWarning
+    if not alert and env.__RoWorldBot then alert=env.__RoWorldBot.allyWarning end
     if alert then message=alert.."\n"..(message or '') end
     status.Text = message or "Stopped - press Start bot (F6 also toggles)"
 end
@@ -3728,7 +3756,7 @@ local lastCommand, lastCommandAt = "", -math.huge
 local evaluatedState,evaluatedTick,evaluatedAt
 local function toggle()
     api.enabled = not api.enabled
-    api.missileWarning=nil
+    api.missileWarning=nil;api.allyWarning=nil
     if api.enabled then
         policy = Policy.new(profiles)
         runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
@@ -3781,6 +3809,8 @@ task.spawn(function()
                 runtime.friend_lookup=friendLookup
                 local alert=(policy.missileAlerts or {})[1]
                 api.missileWarning=alert and string.format("MISSILE ALERT: %s | %.1fs | %d own assets",alert.hits_us and 'our territory' or 'allied assets',alert.eta_seconds,alert.own_assets) or nil
+                local neighbor=policy.strategy and (policy.strategy.board.ally_warnings or {})[1]
+                api.allyWarning=neighbor and string.format('Alliance risk: neighbor has %.1fx our home troops',neighbor.home_ratio) or nil
                 policy.runtime=runtime
                 policy.lastWaiting=action and action.label or waiting
                 if not api.enabled or not api.alive then return end

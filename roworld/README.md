@@ -1,4 +1,4 @@
-# RoWorld bot 2.2.0
+# RoWorld bot 2.3.0
 
 A **Start bot / Stop bot** button, live strategy dashboard, **Save match report**, **Help Roblox friends: ON/OFF**, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
@@ -22,6 +22,30 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 2.3 addresses the early betrayal loss:
+
+- A corridor cannot complete after only a one-to-three-second gain. It requires
+  at least eight seconds, retained own land and (for countries) at least a 25%
+  decrease from that country's initial territory. Unrelated own expansion no
+  longer resets campaign progress unless the target also loses territory.
+- An active affordable country corridor or asset raid may be promoted to an
+  elimination objective without resetting money/troop spending or adding an
+  unlimited fresh deadline. Cheap local countries obstructing the core buffer
+  may qualify for clearance even without a treasury; their estimated gold reward
+  remains zero. Army, invasion, reserve and budget checks still apply.
+- A neighboring treaty ally with more than 1.5x our home bank produces a visible
+  warning, recorded history and a bounded reserve adjustment (45%, or 60% at 2x).
+  The planner increases the value of productive investment. This is uncertainty
+  management, not proof of hostile intent: it does not break the alliance, declare
+  war or enter recovery solely because an ally is strong. Permanent teammates
+  and balanced or distant allies are exempt.
+
+188 offline scenarios plus dashboard/lifecycle/compilation passed. Both original
+country-AI smoke seeds survived; land was similar/slightly lower, with larger home
+banks. These worlds do not replay the human betrayal or prove the supplied loss
+would have been prevented. The report includes `ally_warning_history` and current
+warnings/reserves in the strategic board.
 
 Version 2.2 prioritizes valuable country conquests and adds visible missile alerts:
 

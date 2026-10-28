@@ -139,7 +139,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 2.2.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 2.3.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end

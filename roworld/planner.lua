@@ -30,7 +30,7 @@ function Planner:update(frame,b,a,groups,atlas,profiles)
  b.expansion_budget=b.permit_expansion and math.min(a.available,a.home*.12) or 0
  local rows={
   {kind='defend',score=acute and 30+incoming/math.max(1,a.home)*10 or core.at_risk and 7 or 1,reason=acute and 'Active invasion or recent losses' or 'Protect exposed core'},
-  {kind='invest',score=7+(a.home/math.max(1,frame.info.max_troops or a.home)>.75 and 3 or 0),reason='Improve productive capacity and recruitment'},
+  {kind='invest',score=7+((b.ally_reserve or 0)>0 and 3 or 0)+(a.home/math.max(1,frame.info.max_troops or a.home)>.75 and 3 or 0),reason='Improve productive capacity and recruitment'},
   {kind='expand',score=(opportunity and 9 or 2)+waitingCost-(acute and 30 or 0),reason='Compare safe growth against the cost of waiting'},
   {kind='negotiate',score=(b.overextended and 12 or 4)+(core.at_risk and 2 or 0),reason='Reduce a visible strategic threat'},
   {kind='relocate',score=b.escape and 40 or 0,reason=b.relocation_reason or 'Preserve a viable replacement base'},

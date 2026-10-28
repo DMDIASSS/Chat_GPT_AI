@@ -37,7 +37,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 2.2.0 | live strategy"
+title.Text = "RoWorld 2.3.0 | live strategy"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -107,6 +107,7 @@ local function repaint(message)
     button.Text = api.enabled and "Stop bot" or "Start bot"
     button.BackgroundColor3 = api.enabled and Color3.fromRGB(166, 58, 65) or Color3.fromRGB(33, 133, 99)
     local alert=env.__RoWorldBot and env.__RoWorldBot.missileWarning
+    if not alert and env.__RoWorldBot then alert=env.__RoWorldBot.allyWarning end
     if alert then message=alert.."\n"..(message or '') end
     status.Text = message or "Stopped - press Start bot (F6 also toggles)"
 end
@@ -232,7 +233,7 @@ local lastCommand, lastCommandAt = "", -math.huge
 local evaluatedState,evaluatedTick,evaluatedAt
 local function toggle()
     api.enabled = not api.enabled
-    api.missileWarning=nil
+    api.missileWarning=nil;api.allyWarning=nil
     if api.enabled then
         policy = Policy.new(profiles)
         runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
@@ -285,6 +286,8 @@ task.spawn(function()
                 runtime.friend_lookup=friendLookup
                 local alert=(policy.missileAlerts or {})[1]
                 api.missileWarning=alert and string.format("MISSILE ALERT: %s | %.1fs | %d own assets",alert.hits_us and 'our territory' or 'allied assets',alert.eta_seconds,alert.own_assets) or nil
+                local neighbor=policy.strategy and (policy.strategy.board.ally_warnings or {})[1]
+                api.allyWarning=neighbor and string.format('Alliance risk: neighbor has %.1fx our home troops',neighbor.home_ratio) or nil
                 policy.runtime=runtime
                 policy.lastWaiting=action and action.label or waiting
                 if not api.enabled or not api.alive then return end
