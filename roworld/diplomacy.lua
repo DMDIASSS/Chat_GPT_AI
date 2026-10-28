@@ -25,6 +25,8 @@ function Diplomacy.evaluate(policy,frame,id,a,groups,mode)
  if near then add(2,'shared frontier can be stabilized') end
  add(math.min(3,math.log(1+ratio)*2),'relative army strength')
  if s:are_allies(frame.me,id) then add(1,'existing relationship') end
+ local profile=policy.profiles and policy.profiles:assessment(frame,id)
+ if profile and profile.betrayal_penalty>0 then add(-profile.betrayal_penalty,'persistent observed betrayal history; display-name identity uncertain across matches') end
  if heat>.2 then add(-math.min(6,heat*3),'recent observed aggression') end
  local enemies={};local shared=false;local direct=false
  for _,attack in pairs(s.attacks) do

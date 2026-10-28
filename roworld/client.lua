@@ -37,7 +37,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 1.9.0 | live strategy"
+title.Text = "RoWorld 2.0.0 | live strategy"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -119,8 +119,23 @@ local function reportAccessFailure()
     if type(writefile) == "function" then pcall(writefile, "RoWorld_Diagnostics.txt", report) end
     warn(report)
 end
-local policy = Policy.new()
-local runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0}
+local savedProfiles
+local profileSource="new memory"
+if previous and type(previous.profiles)=='function' then
+    local ok,data=pcall(previous.profiles);if ok then savedProfiles=data;profileSource="previous instance memory" end
+end
+if not savedProfiles and type(readfile)=='function' then
+    local ok,data=pcall(function()
+        local text=readfile('RoWorld_Opponent_Profiles.json')
+        if #text>262144 then return nil end
+        return game:GetService('HttpService'):JSONDecode(text)
+    end)
+    if ok then savedProfiles=data;if data then profileSource="local JSON" end end
+end
+local profiles=Profiles.new(savedProfiles)
+function api.profiles() return profiles:export() end
+local policy = Policy.new(profiles)
+local runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
 local function updateStats()
     local info=policy.state and policy.state.owners[policy.me]
     if not info then return end
@@ -129,7 +144,7 @@ local function updateStats()
     stats.Text=string.format("%s | Tick %d | Land %d | Troops %.0f / %.0f\nGold %.0f | Income %.0f | Incoming %.0f\n%s | Decision %.1f ms | Blocked %d\n%s",
         info.alive and (b.mode or 'observing') or 'eliminated',policy.state.tick or 0,info.tiles or 0,info.troops or 0,info.max_troops or 0,
         info.gold or 0,info.income or 0,b.incoming or 0,
-        b.core and b.core.at_risk and 'Core at risk' or 'Core stable',runtime.last_decision_ms,runtime.blocked_orders,
+        b.planner and ('Plan: '..b.planner.objective) or 'Observing strategy',runtime.last_decision_ms,runtime.blocked_orders,
         eco.saving_for and ('Saving for '..eco.saving_for) or b.relocation_reason or 'Public-state observations; future orders unknown')
 end
 local lastReport=-math.huge
@@ -141,6 +156,10 @@ local function saveMatchReport(force,reason)
     if type(writefile)~="function" then return false,"Executor file writing unavailable" end
     if not policy.state then return false,"No match observed yet" end
     if not force and os.clock()-lastReport<30 then return false end
+    local profileSaved,profileError=pcall(function()
+        writefile('RoWorld_Opponent_Profiles.json',game:GetService('HttpService'):JSONEncode(profiles:export()))
+    end)
+    runtime.profile_write_error=not profileSaved and tostring(profileError) or nil
     lastReport=os.clock()
     local ok,encoded=pcall(function()
         local report=policy:report();report.saved_reason=reason
@@ -164,8 +183,8 @@ local evaluatedState,evaluatedTick,evaluatedAt
 local function toggle()
     api.enabled = not api.enabled
     if api.enabled then
-        policy = Policy.new()
-        runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0}
+        policy = Policy.new(profiles)
+        runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
         evaluatedState,evaluatedTick,evaluatedAt=nil,nil,nil
         endReported=false;reportTag=nil
         repaint("Connecting to your RoWorld match...")

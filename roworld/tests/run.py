@@ -21,7 +21,7 @@ def main():
     spec.loader.exec_module(build)
     source = build.source()
     assert (ROOT / "RoWorld_Bot.lua").read_text(encoding="utf8") == source, "Rebuild the standalone script"
-    for name in ("test_policy.lua", "test_adapter.lua", "test_network.lua", "test_weapons.lua", "test_strategy.lua", "test_core.lua", "test_recovery.lua", "test_diplomacy.lua", "test_adaptation.lua"):
+    for name in ("test_policy.lua", "test_adapter.lua", "test_network.lua", "test_weapons.lua", "test_strategy.lua", "test_core.lua", "test_recovery.lua", "test_diplomacy.lua", "test_adaptation.lua", "test_planning.lua"):
         subprocess.run([args.luau, str(ROOT / "tests" / name)], check=True, timeout=30)
     compiled = subprocess.run([args.compiler, str(ROOT / "RoWorld_Bot.lua")], capture_output=True, text=True, timeout=30)
     assert compiled.returncode == 0, compiled.stderr
@@ -51,11 +51,12 @@ client.children.Main = module
 for _ = 1,18 do step() end
 assert(#world.session.sent > 0 and world.session.sent[1].type == "attack")
 local files={}
-services.HttpService={JSONEncode=function(_,report) assert(report.version=="1.9.0" and report.runtime.decisions>0);return "report-json" end}
+services.HttpService={JSONEncode=function(_,report) assert((report.version=="2.0.0" and report.runtime.decisions>0) or (report.version==1 and report.records));return "report-json" end}
 writefile=function(name,body) files[name]=body end
 export.Activated:Fire();assert(files["RoWorld_Match_Report.json"]=="report-json")
 local archived=false;for name in pairs(files) do if name:find("RoWorld_Match_Report_123456_") then archived=true end end
 assert(archived and label.Text:find("Saved RoWorld_Match_Report"))
+assert(files["RoWorld_Opponent_Profiles.json"] and first.profiles().version==1)
 toggle.Activated:Fire()
 local count = #world.session.sent
 for _ = 1,6 do step() end
@@ -64,7 +65,7 @@ assert(#world.session.sent == count and not first.enabled)
     after = r'''
 local second = assert(env.__RoWorldBot)
 assert(second ~= first and not first.alive and not first.enabled)
-assert(second.alive and not second.enabled)
+assert(second.alive and not second.enabled and second.profiles().version==1)
 for _, c in ipairs(first.connections) do assert(not c.active) end
 step()
 second.destroy(); step()

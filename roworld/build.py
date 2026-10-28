@@ -5,11 +5,16 @@ ROOT = Path(__file__).resolve().parent
 
 
 def source():
-    parts = ["-- RoWorld Bot 1.9.0 | paste this entire file into JJSploit.\n"
+    parts = ["-- RoWorld Bot 2.0.0 | paste this entire file into JJSploit.\n"
              "-- No external script downloads or localhost bridge.\n"]
-    for name in ("Weapons", "Core", "Strategy", "Diplomacy", "Recorder", "Policy", "Adapter", "Wire", "Mirror", "Network"):
+    modules = ("Weapons", "Core", "Atlas", "Profiles", "Planner", "Investment", "Strategy",
+               "Diplomacy", "Recorder", "Policy", "Adapter", "Wire", "Mirror", "Network")
+    for name in modules:
         parts.append(f"local {name} = (function()\n")
-        parts.append((ROOT / (name.lower() + ".lua")).read_text(encoding="utf8").replace('local Weapons = require("./weapons")', '').replace('local Strategy = require("./strategy")', '').replace('local Core = require("./core")', '').replace('local Diplomacy = require("./diplomacy")', '').replace('local Recorder = require("./recorder")', ''))
+        module = (ROOT / (name.lower() + ".lua")).read_text(encoding="utf8")
+        for dependency in modules:
+            module = module.replace(f'local {dependency} = require("./{dependency.lower()}")', '')
+        parts.append(module)
         parts.append("\nend)()\n")
     parts.append((ROOT / "client.lua").read_text(encoding="utf8"))
     return "\n".join(parts)

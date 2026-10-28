@@ -36,8 +36,9 @@ test("recalls outgoing troops under a large incoming attack", function()
     local idle, text = p:decide(f)
     assert(idle == nil and text:find("Defending"))
 end)
-test("builds a city then a factory using observed construction", function()
+test("builds a city then a connected factory using observed construction", function()
     local f, p = fixture(), Policy.new()
+    f.map.k_lin=4 -- Enough full-scale interior space for distinct productive sites.
     for y=1,22 do for x=1,24 do f.set(y*32+x,1) end end
     f.refresh()
     f.info.gold = 50000

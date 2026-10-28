@@ -1,4 +1,4 @@
--- RoWorld Bot 1.9.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 2.0.0 | paste this entire file into JJSploit.
 -- No external script downloads or localhost bridge.
 
 local Weapons = (function()
@@ -343,16 +343,365 @@ return Core
 
 end)()
 
+local Atlas = (function()
+
+-- Incremental topology of a frozen public ownership snapshot. Never authorizes orders.
+local Atlas={};Atlas.__index=Atlas
+local VALUE={[0]=8,[1]=7,[2]=8,[3]=2,[4]=4,[5]=6}
+local function adjacent(m,t,fn)
+ local x=t%m.W
+ if x>0 then fn(t-1) end;if x<m.W-1 then fn(t+1) end
+ if t>=m.W then fn(t-m.W) end;if t<m.N-m.W then fn(t+m.W) end
+end
+function Atlas.new() return setmetatable({summary={ready=false,components={},relations={}}},Atlas) end
+function Atlas:update(frame,budget)
+ if self.lastTick==frame.state.tick then return end
+ self.lastTick=frame.state.tick
+ local m,s=frame.map,frame.state
+ budget=math.clamp(budget or 16384,1,65536)
+ local w=self.work
+ if not w then
+  if self.finishedAt and frame.now-self.finishedAt<5 then return end
+  if typeof(s.owner)~='buffer' or buffer.len(s.owner)~=m.N*4 then return end
+  local owner=buffer.create(m.N*4);buffer.copy(owner,0,s.owner)
+  w={owner=owner,labels=buffer.create(m.N*4),queue=buffer.create(m.N*4),scan=0,head=0,tail=0,
+   components={},relations={},tick=s.tick,at=frame.now,me=frame.me,structures={}}
+  for _,b in pairs(s.structures) do table.insert(w.structures,{owner=b.owner,kind=b.kind,tile=b.tile,level=b.level or 1}) end
+  self.work=w
+ end
+ local function id(t) return buffer.readi32(w.owner,t*4) end
+ local function edge(a,b)
+  if a<=0 or b<=0 or a==b then return end
+  w.relations[a]=w.relations[a] or {};w.relations[b]=w.relations[b] or {}
+  w.relations[a][b]=(w.relations[a][b] or 0)+1;w.relations[b][a]=(w.relations[b][a] or 0)+1
+ end
+ for _=1,budget do
+  if w.head<w.tail then
+   local t=buffer.readu32(w.queue,w.head*4);w.head+=1
+   local c=w.components[#w.components];c.land+=1
+   adjacent(m,t,function(n)
+    local other=id(n)
+    if other==w.me then
+     if buffer.readu32(w.labels,n*4)==0 then
+      buffer.writeu32(w.labels,n*4,#w.components);buffer.writeu32(w.queue,w.tail*4,n);w.tail+=1
+     end
+    elseif m:is_contestable(n) then
+     c.border+=1;c.neighbours[tostring(other)]=(c.neighbours[tostring(other)] or 0)+1
+     if other==0 and #c.neutral_frontier<12 then table.insert(c.neutral_frontier,n) end
+    elseif type(m.is_water)=='function' and m:is_water(n) or m.water and m.water[n] then c.coast+=1 end
+   end)
+  elseif w.scan<m.N then
+   local t=w.scan;w.scan+=1;local other=id(t)
+   if other>0 then
+    if t%m.W<m.W-1 then edge(other,id(t+1)) end
+    if t<m.N-m.W then edge(other,id(t+m.W)) end
+   end
+   if other==w.me and buffer.readu32(w.labels,t*4)==0 then
+    table.insert(w.components,{id=#w.components+1,tile=t,land=0,asset_value=0,buildings=0,coast=0,border=0,neighbours={},neutral_frontier={}})
+    buffer.writeu32(w.labels,t*4,#w.components);w.head=0;w.tail=1;buffer.writeu32(w.queue,0,t)
+   end
+  else
+   local ownLand=0;for _,c in ipairs(w.components) do ownLand+=c.land end
+   for _,b in ipairs(w.structures) do
+    if b.owner==w.me and b.tile>=0 and b.tile<m.N then
+     local c=w.components[buffer.readu32(w.labels,b.tile*4)]
+     if c then c.buildings+=1;c.asset_value+=(VALUE[b.kind] or 1)*b.level end
+    end
+   end
+   local main
+   for _,c in ipairs(w.components) do
+    c.share=c.land/math.max(1,ownLand)
+    if not main or c.asset_value+c.land*.01>main.asset_value+main.land*.01 then main=c end
+   end
+   self.labels=w.labels;self.components=w.components;self.finishedAt=frame.now
+   local rows=table.clone(w.components);table.sort(rows,function(a,b) return a.land>b.land end)
+   while #rows>32 do table.remove(rows) end
+   local relations={}
+   for a,neighbors in pairs(w.relations) do
+    local row={nation=a,neighbours={}}
+    for b,length in pairs(neighbors) do table.insert(row.neighbours,{nation=b,edges=length}) end
+    table.sort(row.neighbours,function(x,y) return x.edges>y.edges end)
+    table.insert(relations,row)
+   end
+   table.sort(relations,function(a,b) return a.nation<b.nation end)
+   self.summary={ready=true,snapshot_tick=w.tick,snapshot_at=w.at,completed_at=frame.now,own_land=ownLand,
+    component_count=#w.components,components=rows,main_component=main and main.id,relations=relations,
+    scope='Frozen public ownership; topology may be stale. Neutral frontier is sampled; component connectivity is exact for this snapshot.'}
+   self.work=nil;return
+  end
+ end
+end
+function Atlas:component(frame,tile)
+ if not self.labels or not tile or tile<0 or tile>=frame.map.N or frame.now-(self.summary.snapshot_at or 0)>30
+  or frame.state:tile_owner(tile)~=frame.me then return nil end
+ return self.components[buffer.readu32(self.labels,tile*4)]
+end
+function Atlas:siteRisk(frame,tile)
+ local c=self:component(frame,tile);local exposure=0;local m=frame.map
+ -- Short exact probes complement component boundaries; not an unseen attack forecast.
+ local x,y=tile%m.W,tile//m.W;local radius=math.max(1,math.ceil(24/(m.k_lin or 1)))
+ for _,d in ipairs({{1,0},{-1,0},{0,1},{0,-1},{1,1},{-1,-1},{1,-1},{-1,1}}) do
+  for step=1,radius do
+   local xx,yy=x+d[1]*step,y+d[2]*step
+   if xx<0 or yy<0 or xx>=m.W or yy>=m.H then break end
+   local id=frame.state:tile_owner(yy*m.W+xx)
+   if id>0 and id~=frame.me and not frame.state:are_allies(frame.me,id) then exposure+=1-step/(radius+1);break end
+  end
+ end
+ return math.clamp(exposure/4+(c and c.id~=self.summary.main_component and c.share<.15 and .25 or 0),0,1)
+end
+function Atlas:report(now)
+ local row=table.clone(self.summary);row.age_seconds=row.snapshot_at and math.max(0,now-row.snapshot_at) or nil
+ row.scanning=self.work~=nil;return row
+end
+return Atlas
+
+
+end)()
+
+local Profiles = (function()
+
+-- Bounded evidence, not mind-reading. Cross-match names are weak identities.
+local Profiles={};Profiles.__index=Profiles
+local function number(v,limit) return type(v)=='number' and v==v and math.clamp(v,0,limit) or 0 end
+local function key(o)
+ if not o or o.kind~=2 or type(o.name)~='string' or #o.name==0 or #o.name>80 then return nil end
+ return o.name
+end
+function Profiles.new(saved)
+ local self=setmetatable({records={},session={},seen={},history={},clock=0},Profiles)
+ if type(saved)=='table' and saved.version==1 and type(saved.records)=='table' then
+  for i,r in ipairs(saved.records) do
+   if i>128 then break end
+   if type(r)=='table' and type(r.name)=='string' and #r.name>0 and #r.name<=80 then
+    self.clock=math.max(self.clock,number(r.touch,1000000000))
+    self.records[r.name]={name=r.name,betrayals=number(r.betrayals,100),attacks=number(r.attacks,100000),
+     touch=number(r.touch,1000000000),attack_fraction=number(r.attack_fraction,1),naval=number(r.naval,100000),observations=number(r.observations,100000)}
+   end
+  end
+ end
+ return self
+end
+function Profiles:start(frame)
+ if self.matchState==frame.state and self.me==frame.me then return end
+ self.session={};self.seen={};self.units={};self.matchState=frame.state;self.me=frame.me;self.history={};self.lastTick=nil
+end
+function Profiles:record(o)
+ local name=key(o);if not name then return nil end
+ local r=self.records[name]
+ if not r then
+  local count=0;for _ in pairs(self.records) do count+=1 end
+  if count>=128 then
+   local oldest
+   for name,row in pairs(self.records) do if not oldest or (row.touch or 0)<(self.records[oldest].touch or 0) then oldest=name end end
+   if oldest then self.records[oldest]=nil end
+  end
+  r={name=name,betrayals=0,attacks=0,attack_fraction=0,naval=0,observations=0};self.records[name]=r
+ end
+ self.clock+=1;r.touch=self.clock
+ return r
+end
+function Profiles:betrayed(frame,id)
+ local r=self:record(frame.state.owners[id]);if r then r.betrayals+=1 end
+ self.session[id]=self.session[id] or {};self.session[id].name=key(frame.state.owners[id]);self.session[id].betrayals=(self.session[id].betrayals or 0)+1
+end
+function Profiles:observe(frame)
+ if self.matchState~=frame.state or self.me~=frame.me then self:start(frame) end
+ local live={}
+ for aid,a in pairs(frame.state.attacks) do
+  live[aid]=true
+  if a.attacker~=frame.me and not self.seen[aid] and not a.retreating then
+   local o=frame.state.owners[a.attacker];local r=self:record(o)
+   if r then
+    local fraction=math.clamp((a.troops or 0)/math.max(1,(a.troops or 0)+(o.troops or 0)),0,1)
+    r.attack_fraction=r.attacks==0 and fraction or r.attack_fraction*.8+fraction*.2;r.attacks+=1
+    local m=self.session[a.attacker] or {attacks=0};m.attacks=(m.attacks or 0)+1
+    m.name=key(o);m.against_us=(m.against_us or 0)+(a.target==frame.me and 1 or 0);self.session[a.attacker]=m
+   end
+  end
+ end
+ self.seen=live
+ if not self.lastTick or frame.state.tick-self.lastTick>=100 then
+  self.lastTick=frame.state.tick
+  for id,o in pairs(frame.state.owners) do
+   local r=id~=frame.me and o.alive and self:record(o)
+   if r then r.observations+=1 end
+  end
+  local units={}
+  for uid,u in pairs(frame.state.units or {}) do
+   units[uid]=true
+   if u.owner~=frame.me and u.kind==2 and not self.units[uid] then local r=self:record(frame.state.owners[u.owner]);if r then r.naval+=1 end end
+  end
+  self.units=units
+ end
+end
+function Profiles:assessment(frame,id)
+ local name=key(frame.state.owners[id]);local r=self.records[name];local m=self.session[id] or {}
+ if m.name~=name then m={} end
+ return {nation=id,identity='display name; cross-match identity uncertain',observed_attacks=r and r.attacks or 0,
+  attack_fraction=r and r.attack_fraction or 0,naval_observations=r and r.naval or 0,
+  betrayal_penalty=math.min(8,(m.betrayals or 0)*5+math.min(2,r and r.betrayals or 0)),
+  confidence=r and math.min(1,r.attacks/10) or 0,against_us=m.against_us or 0}
+end
+function Profiles:export()
+ local rows={};for _,r in pairs(self.records) do table.insert(rows,table.clone(r)) end
+ table.sort(rows,function(a,b) return a.name<b.name end)
+ return {version=1,scope='Local bounded observations, keyed by ambiguous display name; no automatic upload',records=rows}
+end
+function Profiles:report(frame)
+ local rows={};for id,o in pairs(frame.state.owners) do if id~=frame.me and o.kind==2 then table.insert(rows,self:assessment(frame,id)) end end
+ table.sort(rows,function(a,b) return a.nation<b.nation end);return rows
+end
+return Profiles
+
+
+end)()
+
+local Planner = (function()
+
+-- Compare strategic alternatives; scores are transparent heuristics, not simulated futures.
+local Planner={};Planner.__index=Planner
+function Planner.new() return setmetatable({history={}},Planner) end
+function Planner:update(frame,b,a,groups,atlas,profiles)
+ local land=frame.info.tiles or 0
+ if not self.checkpoint or land>self.checkpoint*1.03+10 then self.checkpoint=land;self.progressAt=frame.now end
+ if land<(self.checkpoint or land)*.8 then self.checkpoint=land;self.progressAt=frame.now end
+ local stalled=math.max(0,frame.now-(self.progressAt or frame.now))
+ local core=b.core or {};local incoming=math.max(a.incoming or 0,core.incoming or 0)
+ local acute=b.recover or core.critical or incoming>a.home*.15
+ local opportunity=groups[0]~=nil
+ for id,g in pairs(groups) do
+  local o=frame.state.owners[id]
+  if id>0 and o and (o.kind==1 or o.kind==0) and (o.troops or 0)<a.available*.4 then opportunity=true end
+ end
+ local rivalGrowth=0
+ for _,row in ipairs(b.leaders or {}) do
+  local o=frame.state.owners[row.nation]
+  if o and not frame.state:are_allies(frame.me,row.nation) then
+   local old=(self.leaders or {})[row.nation]
+   if old and frame.now-old.at>=10 then rivalGrowth=math.max(rivalGrowth,(row.land-old.land)/math.max(1,old.land)) end
+  end
+ end
+ if not self.leaderAt or frame.now-self.leaderAt>=30 then
+  self.leaders={};for _,row in ipairs(b.leaders or {}) do self.leaders[row.nation]={land=row.land,at=frame.now} end
+  self.leaderAt=frame.now
+ end
+ local waitingCost=math.min(10,stalled/15)+math.min(5,math.max(0,rivalGrowth)*10)
+ b.permit_expansion=not acute and stalled>=30 and a.available>=a.home*.075 and (b.committed or 0)==0
+ b.expansion_budget=b.permit_expansion and math.min(a.available,a.home*.12) or 0
+ local rows={
+  {kind='defend',score=acute and 30+incoming/math.max(1,a.home)*10 or core.at_risk and 7 or 1,reason=acute and 'Active invasion or recent losses' or 'Protect exposed core'},
+  {kind='invest',score=7+(a.home/math.max(1,frame.info.max_troops or a.home)>.75 and 3 or 0),reason='Improve productive capacity and recruitment'},
+  {kind='expand',score=(opportunity and 9 or 2)+waitingCost-(acute and 30 or 0),reason='Compare safe growth against the cost of waiting'},
+  {kind='negotiate',score=(b.overextended and 12 or 4)+(core.at_risk and 2 or 0),reason='Reduce a visible strategic threat'},
+  {kind='relocate',score=b.escape and 40 or 0,reason=b.relocation_reason or 'Preserve a viable replacement base'},
+ }
+ table.sort(rows,function(x,y) if x.score==y.score then return x.kind<y.kind end;return x.score>y.score end)
+ local selected=rows[1]
+ if self.selected and not acute and not b.escape then
+  for _,row in ipairs(rows) do if row.kind==self.selected and row.score>=selected.score-1.5 then selected=row end end
+ end
+ if self.selected~=selected.kind then
+  table.insert(self.history,{tick=frame.state.tick,objective=selected.kind,reason=selected.reason})
+  if #self.history>32 then table.remove(self.history,1) end
+ end
+ self.selected=selected.kind
+ self.report={objective=selected.kind,reason=selected.reason,alternatives=rows,stalled_seconds=stalled,
+  waiting_cost=waitingCost,limited_expansion=b.permit_expansion,expansion_budget=b.expansion_budget,
+  scope='Heuristic alternatives; all orders retain independent legality and reserve checks',history=self.history}
+ b.planner=self.report
+end
+function Planner:choose(frame,actions)
+ local ranked={};local best,bestScore
+ for _,a in ipairs(actions) do
+  local t=a.intent.type;local kind=a.objective or (t=='build' and 'invest' or t=='ally_request' and 'negotiate'
+   or t=='ally_reply' and 'negotiate' or t=='ally_extend' and 'negotiate' or t=='move_warship' and 'defend' or 'expand')
+  if a.escape then kind='relocate' end
+  if t=='build' and (a.intent.kind=='sam' or a.intent.kind=='defense' or a.intent.kind=='warship') then kind='defend' end
+  if t=='nuke' then kind='defend' end
+  local score=0
+  for _,row in ipairs(self.report and self.report.alternatives or {}) do if row.kind==kind then score=row.score end end
+  if a.investment then score+=a.investment.score*.75 end
+  if a.plan and a.plan.utility then score+=math.clamp(a.plan.utility,-5,10) end
+  if t=='ally_reply' then score+=25 elseif t=='ally_extend' then score+=8 end
+  if a.objective=='expand' and a.intent.type=='attack' and frame.state:tile_owner(a.intent.tile)==0 then score+=2 end
+  table.insert(ranked,{kind=kind,type=t,score=score,label=a.label})
+  if not bestScore or score>bestScore then best,bestScore=a,score end
+ end
+ table.sort(ranked,function(a,b) return a.score>b.score end)
+ if self.report then self.report.actions=ranked;self.report.chosen=best and best.label or 'No safe legal action available' end
+ return best
+end
+return Planner
+
+
+end)()
+
+local Investment = (function()
+
+-- Marginal benefit and exposure estimates. Production returns are proxies, not guaranteed cashflows.
+local Investment={}
+local function growth(h,cap) return math.max(0,(h^.73/4+10)*(1-h/math.max(1,cap))*10) end
+function Investment.evaluate(policy,frame,kind,place,counts,levels)
+ local cost=frame.ctx.rules:cost(kind);local info=frame.info;local cap=math.max(1,info.max_troops or 1)
+ local risk=policy.riskCache and policy.riskCache[place.tile]
+ if risk==nil then
+  risk=policy.atlas and policy.atlas:siteRisk(frame,place.tile) or 0
+  if policy.riskCache then policy.riskCache[place.tile]=risk end
+ end
+ local benefit,reason,proxy=0,'',nil
+ if kind=='city' then
+  local delta=growth(info.troops or 0,cap+250000)-growth(info.troops or 0,cap)
+  benefit=4+math.min(12,delta/50)+((counts[0] or 0)==0 and 12 or 0)
+  if (counts[2] or 0)==0 and (counts[0] or 0)>0 then benefit-=7 end
+  reason='250K marginal capacity and growth at the current bank'
+ elseif kind=='factory' then
+  local link=policy:incomeLink(frame,place.tile,kind)
+  benefit=link>0 and 15+math.min(6,link/5) or 2
+  if (counts[2] or 0)==0 and (counts[0] or 0)>0 and link>0 then benefit+=10 end
+  if (levels[0] or 0)>math.max(1,levels[2] or 0)*3 then benefit+=5 end
+  proxy=link>0 and 2500 or nil;reason='Observed potential land-production link; actual routing is not guaranteed'
+ elseif kind=='port' then
+  local partners=0
+  for _,b in pairs(frame.state.structures) do
+   if b.kind==1 and b.owner~=frame.me and b.owner>0 and frame.state:are_allies(frame.me,b.owner)
+    and type(frame.map.coast_body_of)=='function' and frame.map:coast_body_of(place.tile)>0
+    and frame.map:coast_body_of(place.tile)==frame.map:coast_body_of(b.tile) then partners+=1 end
+  end
+  benefit=8+math.min(12,partners*3)+((counts[1] or 0)==0 and 8 or 0)
+  proxy=partners>0 and 1000*math.min(4,partners) or nil;reason='Coastal access and visible allied trade partners'
+ elseif kind=='sam' then benefit=35;reason='Coverage of exposed productive assets'
+ elseif kind=='defense' then benefit=16;reason='Cover an observed threatened core'
+ elseif kind=='silo' then benefit=5;reason='Future counterstrike option after production investment'
+ end
+ local priceFactor=125000/math.max(125000,cost)
+ local score=benefit*priceFactor*(1-risk*.75)
+ if kind=='sam' then score=40*(1-risk*.5) end
+ if place.upgrade and kind=='city' then
+  local level=1
+  for _,b in pairs(frame.state.structures) do if b.owner==frame.me and b.kind==0 and b.tile==place.tile then level=b.level or 1 end end
+  score/=1+(level-1)*.12
+  reason..='; concentrated city levels increase asset-loss exposure'
+ end
+ return {kind=kind,cost=cost,score=score,risk=risk,upgrade=place.upgrade==true,
+  estimated_payback_seconds=proxy and cost/proxy or nil,return_is_proxy=true,reason=reason}
+end
+return Investment
+
+
+end)()
+
 local Strategy = (function()
 
 -- Strategic memory for the observed board; no hidden player inputs are assumed.
 local Strategy={};Strategy.__index=Strategy
 
-function Strategy.new(frame)
+
+function Strategy.new(frame,profiles)
     local owners={};for sid,b in pairs(frame.state.structures) do owners[sid]=b.owner end
     local allies={};for id in pairs(frame.state.owners) do if frame.state:are_allies(frame.me,id) then allies[id]=true end end
-    return setmetatable({campaigns={},peace={},structures=owners,timeline={},recoverUntil=0,board={},core=Core.new(),
-        allies=allies,relationships={},distrust={},asked={},allianceSeq=frame.state.alliance_seq or 0},Strategy)
+    return setmetatable({campaigns={},campaignHistory={},peace={},structures=owners,timeline={},recoverUntil=0,board={},core=Core.new(),
+        profiles=profiles or Profiles.new(),allies=allies,relationships={},distrust={},asked={},allianceSeq=frame.state.alliance_seq or 0},Strategy)
 end
 function Strategy:trustworthy(frame,id) return frame.now>=(self.distrust[id] or 0) end
 function Strategy:canAsk(frame,id) return self:trustworthy(frame,id) and frame.now>=(self.asked[id] or 0) end
@@ -361,6 +710,7 @@ function Strategy:allianceEnded(frame,id,confirmed,reason)
     if #self.relationships>32 then table.remove(self.relationships,1) end
     if confirmed then
         self.distrust[id]=frame.now+180;self.peace[id]=nil
+        self.profiles:betrayed(frame,id)
         if self.core.fronts[id] or (self.adjacentAllies or {})[id] then self.recoverUntil=frame.now+12 end
     end
 end
@@ -377,12 +727,18 @@ function Strategy:sent(action,s,me,now)
             c={started=now,lastProgress=now,sends=0,spent=0,captures=0,lastTiles=(s.owners[target] or {}).tiles}
             self.campaigns[target]=c
         end
+        if not c.objective then
+            local plan=action.plan or {};c.objective={kind=plan.objective_sid and 'capture_asset' or (s.owners[target] or {}).kind==1 and 'defeat_tribe' or 'secure_corridor',
+                sid=plan.objective_sid,tile=action.intent.tile,status='active',started_tick=s.tick,
+                initial_land=s.owners[me].tiles or 0,land_goal=math.max(100,math.floor((s.owners[me].tiles or 0)*.15))}
+            c.budget=math.max((s.owners[me].troops or 0)*.35,(s.owners[me].troops or 0)*(action.intent.ratio or 0)*1.5);c.deadline=now+45
+        end
         c.lastSent=now;c.sends+=1;c.spent+=(s.owners[me].troops or 0)*(action.intent.ratio or 0)
     elseif kind=='retreat' then
         local attack=s.attacks[action.intent.attack_id]
         if attack and attack.target>0 then
             local c=self.campaigns[attack.target]
-            if c then c.pauseUntil=now+25 end
+            if c then c.pauseUntil=now+25;self:logCampaign(attack.target,c,action.label or "retreat") end
         end
     end
 end
@@ -416,9 +772,32 @@ function Strategy:observe(frame)
     for sid in pairs(self.structures) do if not s.structures[sid] then self.structures[sid]=nil end end
     for id,c in pairs(self.campaigns) do
         local enemy=s.owners[id]
-        if not enemy or not enemy.alive then self.campaigns[id]=nil
+        if not enemy or not enemy.alive then self:logCampaign(id,c,"target no longer alive");self.campaigns[id]=nil
         else
-            if c.lastTiles and enemy.tiles and enemy.tiles<c.lastTiles then c.lastProgress=frame.now end
+            -- Another player taking enemy land is not evidence that our campaign works.
+            local objective=c.objective
+            if objective then
+                local asset=objective.sid and s.structures[objective.sid]
+                if asset and asset.owner==frame.me then
+                    if not objective.captured_at then objective.captured_at=frame.now;c.lastProgress=frame.now end
+                    local secure,total=0,0;local map=frame.map;local r=math.max(1,math.ceil(8/(map.k_lin or 1)))
+                    for _,d in ipairs({{1,0},{-1,0},{0,1},{0,-1}}) do
+                        local x,y=asset.tile%map.W+d[1]*r,asset.tile//map.W+d[2]*r
+                        if x>=0 and y>=0 and x<map.W and y<map.H then
+                            total+=1;if s:tile_owner(y*map.W+x)==frame.me then secure+=1 end
+                        end
+                    end
+                    if secure>=math.max(1,total*.75) or frame.now-objective.captured_at>=8 then objective.status='complete' end
+                end
+                if objective.sid and (not asset or asset.owner~=frame.me and asset.owner~=id) then objective.status='lost' end
+                if objective.tile and s:tile_owner(objective.tile)==frame.me and not c.foothold then
+                    c.foothold=true;c.lastProgress=frame.now
+                end
+                if c.foothold and (frame.info.tiles or 0)>=(c.progressLand or objective.initial_land)+10 then
+                    c.lastProgress=frame.now;c.progressLand=frame.info.tiles
+                end
+                if not objective.sid and objective.kind~='defeat_tribe' and c.foothold and (frame.info.tiles or 0)>=objective.initial_land+objective.land_goal then objective.status='complete' end
+            end
             c.lastTiles=enemy.tiles
         end
     end
@@ -430,10 +809,16 @@ function Strategy.countryCounter(amount,bank)
     return bank*math.clamp(amount*1.25/math.max(bank,1),.05,.4)
 end
 function Strategy:updateBoard(frame,groups,a,fronts,allies)
+    self.lastNow=frame.now
     self.adjacentAllies=allies or {}
     local s,home=frame.state,a.home
     local near={};for id in pairs(groups) do near[id]=true end
     for id,m in pairs(fronts or {}) do if frame.now-m.at<=8 then near[id]=true end end
+    if self.atlas and self.atlas.summary.ready and frame.now-self.atlas.summary.snapshot_at<30 then
+        for _,row in ipairs(self.atlas.summary.relations) do
+            if row.nation==frame.me then for _,n in ipairs(row.neighbours) do near[n.nation]=true end end
+        end
+    end
     local b={human_neighbours=0,country_neighbours=0,largest_human=0,pressure=0,
         incoming=a.incoming,committed=0,leaders={},candidates={},mode='develop',unreliable_ally_pressure=0}
     local core=self.core.summary
@@ -448,7 +833,9 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
                 if o.kind==2 then
                     b.human_neighbours+=1;b.largest_human=math.max(b.largest_human,bank)
                 elseif o.kind==0 then b.country_neighbours+=1 end
-                table.insert(pressures,bank*(o.kind==2 and .5 or o.kind==0 and .28 or .1))
+                local estimate=self.profiles:assessment(frame,id)
+                local weight=o.kind==2 and .5+estimate.confidence*math.max(0,estimate.attack_fraction-.5)*.3 or o.kind==0 and .28 or .1
+                table.insert(pressures,bank*weight)
             elseif (allies or {})[id] and o.kind==0 and (o.troops or 0)>home*3 then
                 -- Country alliances can be broken when their partner becomes
                 -- much weaker; an alliance is not a permanent defensive wall.
@@ -518,13 +905,16 @@ function Strategy:canTarget(frame,id,a)
     if not o or friendly(s,frame.me,id) then return false end
     if frame.now<(self.peace[id] or 0) or s:has_request(frame.me,id) then return false end
     if a.incoming>a.home*.2 then return false end
-    if (self.core.summary.at_risk or self.core.summary.needs_buffer) and not self.core.fronts[id] then return false end
+    if (self.core.summary.at_risk or self.core.summary.needs_buffer) and not self.core.fronts[id]
+        and not (b.permit_expansion and o.kind~=2) then return false end
     if b.recover or b.overextended and o.kind~=1 then return false end
     local c=self.campaigns[id]
     if c and frame.now-(c.lastSent or c.started)>45 and not (a.targets or {})[id] then
         self.campaigns[id]=nil;c=nil
     end
     if c then
+        if c.objective and c.objective.status~='active' then return false end
+        if c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline then return false end
         if frame.now<(c.pauseUntil or 0) then return false end
         if frame.now-(c.lastSent or -math.huge)<(o.kind==2 and 7 or o.kind==0 and 4.5 or 3) then return false end
         if c.sends>=3 and frame.now-c.lastProgress>8 then return false end
@@ -587,7 +977,10 @@ function Strategy:review(frame,a)
             local o=frame.state.owners[attack.target] or {};local c=self.campaigns[attack.target]
             local why
             local core=self.core.summary
-            if (core.at_risk or core.needs_buffer) and away then
+            if c and c.objective and c.objective.status=='complete' then why='Campaign objective secured; banking the gain'
+            elseif c and c.objective and c.objective.status=='lost' then why='Campaign asset is gone; reassessing'
+            elseif c and (c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline) then why='Campaign budget or time limit reached'
+            elseif (core.at_risk or core.needs_buffer) and away and not self.board.permit_expansion then
                 why='Recalling a distant raid to protect the home and economic center'
             elseif friendly(frame.state,frame.me,attack.target) then why='Recalling troops after an alliance changed'
             elseif self.board.recover or a.incoming>a.home*.5 then why='Recalling the largest raid to defend the whole territory'
@@ -598,13 +991,28 @@ function Strategy:review(frame,a)
             elseif c and o.kind==2 and c.spent>a.home*.35 and frame.now-c.started>7 then why='Limiting exposure against a human player'
             end
             if why and (not priority or (attack.troops or 0)>priority) then best,priority,reason=attack,attack.troops or 0,why end
-        elseif (self.board.recover or (self.core.summary.at_risk or self.core.summary.needs_buffer) and away)
+        elseif (self.board.recover or (self.core.summary.at_risk or self.core.summary.needs_buffer) and away and not self.board.permit_expansion)
             and (not priority or (attack.troops or 0)>priority) then
             best,priority,reason=attack,attack.troops or 0,'Recalling distant expansion to secure home and core buildings'
         end
     end
     if best then return {intent={type='retreat',attack_id=best.aid},channel='retreat',
         cooldown=(self.core.summary.critical or a.incoming>a.home*.5) and .6 or 3,label=reason} end
+end
+function Strategy:logCampaign(id,c,reason)
+ table.insert(self.campaignHistory,{nation=id,objective=c.objective and table.clone(c.objective),spent=c.spent,budget=c.budget,
+  sends=c.sends,captures=c.captures,reason=reason})
+ if #self.campaignHistory>32 then table.remove(self.campaignHistory,1) end
+end
+function Strategy:campaignReport()
+ local rows={}
+ for id,c in pairs(self.campaigns) do
+  table.insert(rows,{nation=id,objective=c.objective,budget=c.budget,spent=c.spent,sends=c.sends,captures=c.captures,
+   last_progress=c.lastProgress,deadline=c.deadline,pause_until=c.pauseUntil})
+ end
+ table.sort(rows,function(a,b) return (a.last_progress or 0)>(b.last_progress or 0) end)
+ while #rows>32 do table.remove(rows) end
+ return rows
 end
 return Strategy
 
@@ -640,6 +1048,8 @@ function Diplomacy.evaluate(policy,frame,id,a,groups,mode)
  if near then add(2,'shared frontier can be stabilized') end
  add(math.min(3,math.log(1+ratio)*2),'relative army strength')
  if s:are_allies(frame.me,id) then add(1,'existing relationship') end
+ local profile=policy.profiles and policy.profiles:assessment(frame,id)
+ if profile and profile.betrayal_penalty>0 then add(-profile.betrayal_penalty,'persistent observed betrayal history; display-name identity uncertain across matches') end
  if heat>.2 then add(-math.min(6,heat*3),'recent observed aggression') end
  local enemies={};local shared=false;local direct=false
  for _,attack in pairs(s.attacks) do
@@ -809,6 +1219,10 @@ local Policy = {}
 
 
 
+
+
+
+
 Policy.__index = Policy
 
 local function neighbours(map, tile, visit)
@@ -827,8 +1241,8 @@ local function friendly(s, me, other)
     return other == me or (other > 0 and s:are_allies(me, other))
 end
 
-function Policy.new()
-    return setmetatable({state = nil, me = nil, cooldowns = {}, seed = 739391,
+function Policy.new(profiles)
+    return setmetatable({profiles=profiles or Profiles.new(),state = nil, me = nil, cooldowns = {}, seed = 739391,
         cursor = nil, border = nil, lastAction = "Idle", opponents = {}, attacksSeen = {},
         metrics = {orders=0,attack=0,build=0,retreat=0,spawn=0}, frontsSeen={}}, Policy)
 end
@@ -869,7 +1283,10 @@ function Policy:reset(frame)
     self.opponents,self.attacksSeen,self.frontsSeen={},{},{}
     self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={};self.spatialTick=nil;self.defenseBuilds={}
     self.spawnPlan=nil
-    self.strategy=Strategy.new(frame)
+    self.profiles:start(frame)
+    self.atlas=Atlas.new();self.planner=Planner.new()
+    self.strategy=Strategy.new(frame,self.profiles)
+    self.strategy.atlas=self.atlas
     self.recorder=Recorder.new(frame)
     self.metrics={orders=0,attack=0,build=0,retreat=0,spawn=0,peakLand=frame.info.tiles or 0,initialLand=frame.info.tiles or 0}
 end
@@ -928,7 +1345,12 @@ function Policy:enemyPlan(frame,g,a,groups)
     local wanted=math.max(250,(enemy.troops or 0)*1.4-(a.targets[g.id] or 0)*.5)
     local ceiling,reserve=self:attackAmount(frame,a,wanted,false)
     if not ceiling then return nil end
+    if self.strategy and self.strategy.board.permit_expansion and not self.strategy.core.fronts[g.id] then
+        ceiling=math.min(ceiling,math.floor(a.home*.12))
+    end
     if enemy.kind==2 then ceiling=math.min(ceiling,math.floor(a.home*.15)) end
+    local campaign=self.strategy and self.strategy.campaigns[g.id]
+    if campaign and campaign.budget then ceiling=math.min(ceiling,math.floor(math.max(0,campaign.budget-campaign.spent))) end
     local coalition=self:coalitionPressure(frame,g.id,groups)
     local best
     for _,fraction in ipairs({.65,.85,1}) do
@@ -988,6 +1410,7 @@ function Policy:observe(frame)
     end
     self.attacksSeen=live
     if self.strategy then self.strategy:observe(frame) end
+    self.profiles:observe(frame)
     if self.recorder then self.recorder:observe(frame) end
     self.metrics.peakLand=math.max(self.metrics.peakLand or 0,frame.info.tiles or 0)
 end
@@ -1163,7 +1586,7 @@ function Policy:fronts(frame)
     if self.border ~= border then self.border, self.cursor = border, nil end
     if self.cursor ~= nil and border[self.cursor] == nil then self.cursor = nil end
     local groups, sites, seen = {}, {}, {}
-    self.siteCache={};self.adjacentAllies={}
+    self.siteCache={};self.linkCache={};self.riskCache={};self.adjacentAllies={}
     local function site(tile,interior)
         if valid(map, tile) and s:tile_owner(tile) == me and not seen[tile] then
             seen[tile] = true
@@ -1223,6 +1646,18 @@ function Policy:fronts(frame)
                         if #g.tiles>12 then table.remove(g.tiles) end
                     end
                     if self.strategy:corePriority(frame,t)>self.strategy:corePriority(frame,g.tile) then g.tile=t end
+                end
+            end
+        end
+    end
+    if self.atlas and self.atlas.summary.ready and frame.now-self.atlas.summary.snapshot_at<30 then
+        for _,c in ipairs(self.atlas.summary.components) do
+            site(c.tile,true)
+            for _,t in ipairs(c.neutral_frontier) do
+                if s:tile_owner(t)==0 and s:borders_tile(me,t) and not s:has_fallout(t) and not Weapons.hazard(s,t,0,3) then
+                    local g=groups[0]
+                    if not g then g={id=0,tile=t,front=0,tiles={},seen={}};groups[0]=g end
+                    if not g.seen[t] then g.seen[t]=true;g.front+=1;if #g.tiles<12 then table.insert(g.tiles,t) end end
                 end
             end
         end
@@ -1363,6 +1798,8 @@ end
 
 function Policy:incomeLink(frame,tile,kind)
     if kind~='factory' and kind~='city' then return 0 end
+    local cacheKey=kind..':'..tile
+    if self.linkCache and self.linkCache[cacheKey]~=nil then return self.linkCache[cacheKey] end
     local s,map=frame.state,frame.map;local best=0
     for _,b in pairs(s.structures) do
         local partner=kind=='factory' and (b.kind==0 or b.kind==1) or kind=='city' and b.kind==2
@@ -1378,6 +1815,7 @@ function Policy:incomeLink(frame,tile,kind)
             if clear then best=math.max(best,30-distance*.1) end
         end
     end
+    if self.linkCache then self.linkCache[cacheKey]=best end
     return best
 end
 function Policy:build(frame, sites, kind, counts)
@@ -1394,11 +1832,14 @@ function Policy:build(frame, sites, kind, counts)
     local rules = frame.ctx.rules
     local availability = rules:availability(kind)
     if not availability.ok then return nil end
-    local best, bestScore
+    local levels={}
+    for _,b in pairs(frame.state.structures) do if b.owner==frame.me then levels[b.kind]=(levels[b.kind] or 0)+(b.level or 1) end end
+    local best, bestScore,bestInvestment
     for i = 1, math.min(320, #sites) do
         local place = rules:placement(kind, sites[i])
         if place.ok and valid(frame.map, place.tile) and self:siteSafe(frame,place.tile,kind) then
-            local score = place.upgrade and -10 or 10
+            local investment=Investment.evaluate(self,frame,kind,place,counts or {},levels)
+            local score = (place.upgrade and -10 or 10)+investment.score*3
             score+=self:incomeLink(frame,place.tile,kind)
             if self.strategy then score+=self.strategy.core:buildScore(frame,place.tile,kind) end
             local center = frame.info.label_tile
@@ -1431,11 +1872,11 @@ function Policy:build(frame, sites, kind, counts)
                     if protected==0 then score=-math.huge else score+=protected*30 end
                 end
             end
-            if bestScore == nil or score > bestScore then best, bestScore = place, score end
+            if bestScore == nil or score > bestScore then best, bestScore,bestInvestment = place, score,investment end
         end
     end
     if best and bestScore>-math.huge then
-        return {intent = {type = "build", kind = kind, tile = best.tile}, channel = "build", cooldown = 6,
+        return {investment=bestInvestment,intent = {type = "build", kind = kind, tile = best.tile}, channel = "build", cooldown = 6,
             safety={margin=(kind=="defense" or kind=="sam") and 8 or 18,coastal=kind=="port"},
             label = (best.upgrade and "Upgrading " or "Building ") .. kind}
     end
@@ -1448,6 +1889,8 @@ function Policy:economy(frame, sites, armies)
         if b.owner == frame.me then counts[b.kind] = (counts[b.kind] or 0) + 1 end
     end
     local city, factory, port = counts[0] or 0, counts[2] or 0, counts[1] or 0
+    local levels={};for _,b in pairs(frame.state.structures) do if b.owner==frame.me then levels[b.kind]=(levels[b.kind] or 0)+(b.level or 1) end end
+    local cityLevels=levels[0] or 0
     local incomingNuke = false
     for _, n in pairs(frame.state.nukes) do
         if valid(frame.map, n.to_tile) and frame.state:tile_owner(n.to_tile) == frame.me then incomingNuke = true end
@@ -1464,7 +1907,7 @@ function Policy:economy(frame, sites, armies)
     -- Do not continually buy cheaper upgrades while an uncovered productive core
     -- is saving for air defense. Imminent land defense is handled separately above.
     local saveSAM=exposed and nuclearThreat.ready_silos>0 and city+factory>=3 and factory>0 and (counts[4] or 0)<6
-        and not (self.strategy and self.strategy.core.summary.at_risk) and armies.incoming<armies.home*.15
+        and not (self.strategy and self.strategy.board.recover) and armies.incoming<armies.home*.15
     -- Protect the first city budget instead of spending every 50K on posts.
     if city==0 then table.insert(wanted,"city") end
     local coreRisk=self.strategy and self.strategy.core.summary.at_risk
@@ -1472,14 +1915,14 @@ function Policy:economy(frame, sites, armies)
         and (counts[3] or 0) < 3 then table.insert(wanted, "defense") end
     if city > 0 and factory == 0 then table.insert(wanted, "factory") end
     if city > 0 and port == 0 then table.insert(wanted, "port") end
-    if armies.home >= (frame.info.max_troops or math.huge) * .75 and city < 6 then table.insert(wanted, "city") end
-    if factory < math.max(1, math.ceil(city / 2)) then table.insert(wanted, "factory") end
-    if factory>0 and factory<math.min(4,math.max(1,math.ceil(city*.75))) then table.insert(wanted,'factory') end
-    if city>1 and port>0 and port<math.min(3,math.ceil(city/2)) then table.insert(wanted,'port') end
+    if armies.home >= (frame.info.max_troops or math.huge) * .75 then table.insert(wanted, "city") end
+    if factory < math.min(12,math.max(1, math.ceil(cityLevels / 3))) then table.insert(wanted, "factory") end
+    if factory>0 and factory<math.min(12,math.max(1,math.ceil(cityLevels/3))) then table.insert(wanted,'factory') end
+    if city>1 and port>0 and port<math.min(12,math.ceil(cityLevels/4)) then table.insert(wanted,'port') end
     if city >= 1 and factory > 0 and (frame.info.gold or 0)>=1750000 then
         if (counts[5] or 0) == 0 then table.insert(wanted,"silo") end
     end
-    if city < 6 and (frame.info.gold or 0) > frame.ctx.rules:cost("city") * 2 then table.insert(wanted, "city") end
+    if (frame.info.gold or 0) > frame.ctx.rules:cost("city") * 2 then table.insert(wanted, "city") end
     self.economyPlan={reported_income=frame.info.income or 0,cities=city,factories=factory,ports=port,
         reserve=factory==0 and frame.ctx.rules:cost('factory') or port==0 and type(frame.ctx.borders.has_coast)=='function'
             and frame.ctx.borders:has_coast() and frame.ctx.rules:cost('port') or 0}
@@ -1492,11 +1935,19 @@ function Policy:economy(frame, sites, armies)
         self.economyPlan.reserve=frame.ctx.rules:cost('sam')
         self.economyPlan.saving_for='sam'
     end
+    local candidates,seen,best={},{},nil
     for _, kind in ipairs(wanted) do
+        if seen[kind] then continue end;seen[kind]=true
         if saveSAM and kind~='sam' then continue end
         local action = self:build(frame, sites, kind, counts)
-        if action then self.economyPlan.next_kind=kind;return action end
+        if action then
+            table.insert(candidates,action.investment)
+            if not best or action.investment.score>best.investment.score then best=action end
+        end
     end
+    table.sort(candidates,function(a,b) return a.score>b.score end)
+    self.economyPlan.candidates=candidates
+    if best then self.economyPlan.next_kind=best.intent.kind;return best end
     return nil
 end
 
@@ -1643,14 +2094,15 @@ end
 
 function Policy:naval(frame, armies,survival)
     local escape=survival or self.strategy and self.strategy.board.escape
+    local limited=self.strategy and self.strategy.board.permit_expansion
     if escape and frame.ctx.rules:transports()>0 then return nil end
-    if self.strategy and (self.strategy.board.mode~="develop" and not escape or (armies.enemyActive or 0)>0) then return nil end
+    if self.strategy and (self.strategy.board.mode~="develop" and not escape and not limited or (armies.enemyActive or 0)>0) then return nil end
     if self.strategy then
         local core=self.strategy.core.summary
-        if core.at_risk and not escape then return nil end
+        if core.at_risk and not escape and not limited then return nil end
     end
     if survival then armies=table.clone(armies);armies.reserve=armies.home*.9;armies.available=armies.home*.1 end
-    if armies.incoming > 0 and not survival or not self:ready("boat", frame.now) or armies.available < armies.home * (escape and .05 or .12) then return nil end
+    if armies.incoming > 0 and not survival or not self:ready("boat", frame.now) or armies.available < armies.home * ((escape or limited) and .05 or .12) then return nil end
     -- One expedition at a time; do not fan out three unprotected beachheads.
     if frame.ctx.rules:transports() > 0 then return nil end
     local chosen, score
@@ -1670,8 +2122,9 @@ function Policy:naval(frame, armies,survival)
                 -- A weak bank alone is not a profitable distant human invasion.
                 weak=weak and pressure>=.6 and asset and armies.home>(owner.troops or 0)*3
             end
-            if self.strategy and not escape and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 then weak=false end
+            if self.strategy and not escape and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 and not limited then weak=false end
             if target>0 and self.strategy and not self.strategy:canTarget(frame,target,armies) then weak=false end
+            if limited and owner and owner.kind==2 then weak=false end
             if target>0 and (armies.enemyActive or 0)>0 and not (armies.targets or {})[target] then weak=false end
             if weak and not friendly(frame.state, frame.me, target) and frame.ctx.borders:can_reach_by_sea(tile) then
                 local destination=self:landingScore(frame,tile,armies,escape)
@@ -1692,8 +2145,10 @@ function Policy:naval(frame, armies,survival)
         local wanted=owner and math.max(250,(owner.troops or 0)*1.6) or math.max(100,armies.home-self:growthTarget(frame.info))
         local amount,reserve=self:attackAmount(frame,armies,wanted,owner==nil)
         if escape and amount then amount=math.min(amount,math.floor(armies.home*.1)) end
+        if limited and amount then amount=math.min(amount,math.floor(armies.home*.12)) end
+        if amount and amount<math.max(100,math.ceil(armies.home*.01)) then amount=nil end
         if amount then return {intent = {type = "boat", tile = chosen, ratio = amount/armies.home},escape=escape,survival=survival,
-            reserve = reserve, plan={amount=amount},channel = "boat", cooldown = escape and 30 or 12,
+            reserve = reserve, objective="expand",plan={amount=amount,objective_tile=chosen},channel = "boat", cooldown = escape and 30 or 12,
             label = escape and "Establishing a small neutral foothold outside a trapped core" or "Sending a coastal landing"} end
     end
     return nil
@@ -1709,9 +2164,11 @@ function Policy:decide(frame)
     if not self.spatialTick or frame.state.tick-self.spatialTick>=2 then
         self.strategy:updateCore(frame);self.spatialTick=frame.state.tick
     end
+    self.atlas:update(frame)
     local groups, sites = self:fronts(frame)
     local a = self:armies(frame, groups)
     local board=self.strategy:updateBoard(frame,groups,a,self.frontsSeen,self.adjacentAllies)
+    self.planner:update(frame,board,a,groups,self.atlas,self.profiles)
     if self:ready("retreat",frame.now) then
         local reassess=self.strategy:review(frame,a)
         if reassess then return reassess end
@@ -1739,14 +2196,15 @@ function Policy:decide(frame)
     end
     -- Economy / defensive construction has its own cooldown and never drains
     -- the troop reserve. Observed structures (including construction) are used.
-    local build = self:economy(frame, sites, a)
-    if build then return build end
+    local actions={}
+    local function offer(action) if action then table.insert(actions,action) end end
+    offer(self:economy(frame, sites, a))
     local diplomatic=self:diplomacy(frame,groups,a)
-    if diplomatic then return diplomatic end
+    offer(diplomatic)
     local fleet=self:fleet(frame,a)
-    if fleet then return fleet end
+    offer(fleet)
     local strike=self:strike(frame)
-    if strike then return strike end
+    offer(strike)
     local best, score,currentBest,currentScore
     if self:ready("attack", frame.now) and a.enemyActive < 2 then
         for id, g in pairs(groups) do
@@ -1762,6 +2220,7 @@ function Policy:decide(frame)
                     plan.objective_sid=sid;plan.asset_opportunity=asset
                     local value=self.strategy:utility(frame,proposal,plan,a)
                     table.insert(board.candidates,{nation=id,kind=enemy.kind,score=value,amount=plan.amount,asset_opportunity=asset})
+                    plan.utility=value
                     if (enemy.traitor_until or 0)>frame.state.tick then value+=.5 end
                     if score == nil or value > score then
                         best, score = {intent = {type = "attack", tile = tile, ratio = plan.amount / a.home},
@@ -1791,23 +2250,25 @@ function Policy:decide(frame)
         best,score=currentBest,currentScore
     end
     local neutral = groups[0]
-    local neutralScore=neutral and 5+math.min(2,math.log(1+neutral.front))+self.strategy:corePriority(frame,neutral.tile) or -math.huge
-    if best and (not neutral or a.neutralActive>0 or score>neutralScore) then return best end
-    if board.recover or a.incoming > a.home*.25 then return nil,"Defending - holding reserves and reassessing the whole board" end
+    if best then best.objective='expand';offer(best) end
+    if board.recover or a.incoming > a.home*.25 then
+        return self.planner:choose(frame,actions),"Defending - holding reserves and reassessing the whole board"
+    end
     if neutral and self:ready("attack", frame.now) and a.available > 200 and a.enemyActive == 0 then
         local surplus=math.max(0,a.home-self:growthTarget(frame.info))
         if a.neutralActive == 0 or surplus>a.home*.08 and (a.targets[0] or 0)<surplus*.5 then
             local amount,reserve=self:attackAmount(frame,a,0,true)
-            if amount then return {intent = {type = "attack", tile = neutral.tile, ratio = amount / a.home},
-                reserve = reserve,plan={amount=amount,growth_target=self:growthTarget(frame.info)},
+            if amount then offer({objective="expand",intent = {type = "attack", tile = neutral.tile, ratio = amount / a.home},
+                reserve = reserve,plan={amount=amount,growth_target=self:growthTarget(frame.info),utility=5+math.min(2,math.log(1+neutral.front))+self.strategy:corePriority(frame,neutral.tile)},
                 channel = "attack", cooldown = 2.5,
                 label = self.strategy:corePriority(frame,neutral.tile)>0 and "Clearing a territory buffer around home and core buildings"
-                    or "Expanding with a recruitment-aware troop budget"} end
+                    or "Expanding with a recruitment-aware troop budget"}) end
         end
     end
-    if best then return best end
     local boat = self:naval(frame, a)
-    if boat then return boat end
+    offer(boat)
+    local chosen=self.planner:choose(frame,actions)
+    if chosen then return chosen end
     if a.enemyActive > 0 or a.neutralActive > 0 then return nil, "Watching the current attack; rebuilding troops" end
     return nil, "Recruiting troops and saving for the next move"
 end
@@ -1832,7 +2293,12 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.9.0",
+    return {version="2.0.0",
+        atlas=self.atlas and self.atlas:report(self.strategy and self.strategy.lastNow or 0) or {},
+        planner=self.planner and self.planner.report or {},
+        campaigns=self.strategy and self.strategy:campaignReport() or {},
+        campaign_history=self.strategy and self.strategy.campaignHistory or {},
+        opponent_profiles=self.state and self.profiles:report({state=self.state,me=self.me}) or {},
         opponent_observations=self.recorder and self.recorder:report() or {},
         runtime=self.runtime or {},last_waiting=self.lastWaiting,scope="Since the current observer snapshot; intent estimates are heuristic",
         diplomacy_candidates=self.diplomacyScores or {},
@@ -1996,7 +2462,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.9.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 2.0.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -2904,7 +3370,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 1.9.0 | live strategy"
+title.Text = "RoWorld 2.0.0 | live strategy"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -2986,8 +3452,23 @@ local function reportAccessFailure()
     if type(writefile) == "function" then pcall(writefile, "RoWorld_Diagnostics.txt", report) end
     warn(report)
 end
-local policy = Policy.new()
-local runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0}
+local savedProfiles
+local profileSource="new memory"
+if previous and type(previous.profiles)=='function' then
+    local ok,data=pcall(previous.profiles);if ok then savedProfiles=data;profileSource="previous instance memory" end
+end
+if not savedProfiles and type(readfile)=='function' then
+    local ok,data=pcall(function()
+        local text=readfile('RoWorld_Opponent_Profiles.json')
+        if #text>262144 then return nil end
+        return game:GetService('HttpService'):JSONDecode(text)
+    end)
+    if ok then savedProfiles=data;if data then profileSource="local JSON" end end
+end
+local profiles=Profiles.new(savedProfiles)
+function api.profiles() return profiles:export() end
+local policy = Policy.new(profiles)
+local runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
 local function updateStats()
     local info=policy.state and policy.state.owners[policy.me]
     if not info then return end
@@ -2996,7 +3477,7 @@ local function updateStats()
     stats.Text=string.format("%s | Tick %d | Land %d | Troops %.0f / %.0f\nGold %.0f | Income %.0f | Incoming %.0f\n%s | Decision %.1f ms | Blocked %d\n%s",
         info.alive and (b.mode or 'observing') or 'eliminated',policy.state.tick or 0,info.tiles or 0,info.troops or 0,info.max_troops or 0,
         info.gold or 0,info.income or 0,b.incoming or 0,
-        b.core and b.core.at_risk and 'Core at risk' or 'Core stable',runtime.last_decision_ms,runtime.blocked_orders,
+        b.planner and ('Plan: '..b.planner.objective) or 'Observing strategy',runtime.last_decision_ms,runtime.blocked_orders,
         eco.saving_for and ('Saving for '..eco.saving_for) or b.relocation_reason or 'Public-state observations; future orders unknown')
 end
 local lastReport=-math.huge
@@ -3008,6 +3489,10 @@ local function saveMatchReport(force,reason)
     if type(writefile)~="function" then return false,"Executor file writing unavailable" end
     if not policy.state then return false,"No match observed yet" end
     if not force and os.clock()-lastReport<30 then return false end
+    local profileSaved,profileError=pcall(function()
+        writefile('RoWorld_Opponent_Profiles.json',game:GetService('HttpService'):JSONEncode(profiles:export()))
+    end)
+    runtime.profile_write_error=not profileSaved and tostring(profileError) or nil
     lastReport=os.clock()
     local ok,encoded=pcall(function()
         local report=policy:report();report.saved_reason=reason
@@ -3031,8 +3516,8 @@ local evaluatedState,evaluatedTick,evaluatedAt
 local function toggle()
     api.enabled = not api.enabled
     if api.enabled then
-        policy = Policy.new()
-        runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0}
+        policy = Policy.new(profiles)
+        runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
         evaluatedState,evaluatedTick,evaluatedAt=nil,nil,nil
         endReported=false;reportTag=nil
         repaint("Connecting to your RoWorld match...")

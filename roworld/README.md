@@ -1,4 +1,4 @@
-# RoWorld bot 1.9.0
+# RoWorld bot 2.0.0
 
 A **Start bot / Stop bot** button, live strategy dashboard, **Save match report**, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
@@ -22,6 +22,32 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 2.0 integrates all five proposed planning extensions:
+
+1. **Strategic map:** incremental connected holdings, economic centers, exposure,
+   public neighbor graph and sampled growth frontiers, with explicit snapshot age.
+2. **Strategic planner:** compares defense, investment, expansion, negotiation and
+   relocation; prolonged quiet guard mode can consider small reserve-safe growth.
+3. **Investment evaluator:** compares marginal recruitment, productive links,
+   price and exposure; city levels drive production targets and concentration risk.
+4. **Campaign objectives:** asset capture/consolidation, corridors and tribe
+   elimination, with spending/time limits, progress checks and recorded exits.
+5. **Opponent profiles:** observed attacks, naval sightings and lasting betrayal
+   penalties; bounded local JSON persistence when file functions are available.
+
+The dashboard shows the current strategic objective. Reports now include
+`atlas`, `planner`, `campaigns`, `campaign_history`, `opponent_profiles` and ranked
+investment candidates. Profiles are stored in `RoWorld_Opponent_Profiles.json`
+in the executor workspace; keep that file when updating. Cross-match identities
+are based on ambiguous display names, not verified accounts.
+
+See [PLANNING.md](PLANNING.md) for behavior, resource limits, persistence details
+and the complete verification scope. **161 offline scenarios passed.** In four
+paired nine-minute country-AI simulations, the new version finished with more
+land in three seeds and a larger average building base, but often expanded more
+slowly in the three-minute checks. This does not establish a live win rate.
+Complete comparisons are in [the benchmark](benchmarks/planning_v2.0.json).
 
 Version 1.9 addresses the supplied loss. See [the analysis](LOSS_ANALYSIS_v1.8.md)
 for evidence, limitations and the learning path.

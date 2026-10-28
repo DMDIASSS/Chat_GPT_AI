@@ -1,11 +1,12 @@
 -- Strategic memory for the observed board; no hidden player inputs are assumed.
 local Strategy={};Strategy.__index=Strategy
 local Core = require("./core")
-function Strategy.new(frame)
+local Profiles = require("./profiles")
+function Strategy.new(frame,profiles)
     local owners={};for sid,b in pairs(frame.state.structures) do owners[sid]=b.owner end
     local allies={};for id in pairs(frame.state.owners) do if frame.state:are_allies(frame.me,id) then allies[id]=true end end
-    return setmetatable({campaigns={},peace={},structures=owners,timeline={},recoverUntil=0,board={},core=Core.new(),
-        allies=allies,relationships={},distrust={},asked={},allianceSeq=frame.state.alliance_seq or 0},Strategy)
+    return setmetatable({campaigns={},campaignHistory={},peace={},structures=owners,timeline={},recoverUntil=0,board={},core=Core.new(),
+        profiles=profiles or Profiles.new(),allies=allies,relationships={},distrust={},asked={},allianceSeq=frame.state.alliance_seq or 0},Strategy)
 end
 function Strategy:trustworthy(frame,id) return frame.now>=(self.distrust[id] or 0) end
 function Strategy:canAsk(frame,id) return self:trustworthy(frame,id) and frame.now>=(self.asked[id] or 0) end
@@ -14,6 +15,7 @@ function Strategy:allianceEnded(frame,id,confirmed,reason)
     if #self.relationships>32 then table.remove(self.relationships,1) end
     if confirmed then
         self.distrust[id]=frame.now+180;self.peace[id]=nil
+        self.profiles:betrayed(frame,id)
         if self.core.fronts[id] or (self.adjacentAllies or {})[id] then self.recoverUntil=frame.now+12 end
     end
 end
@@ -30,12 +32,18 @@ function Strategy:sent(action,s,me,now)
             c={started=now,lastProgress=now,sends=0,spent=0,captures=0,lastTiles=(s.owners[target] or {}).tiles}
             self.campaigns[target]=c
         end
+        if not c.objective then
+            local plan=action.plan or {};c.objective={kind=plan.objective_sid and 'capture_asset' or (s.owners[target] or {}).kind==1 and 'defeat_tribe' or 'secure_corridor',
+                sid=plan.objective_sid,tile=action.intent.tile,status='active',started_tick=s.tick,
+                initial_land=s.owners[me].tiles or 0,land_goal=math.max(100,math.floor((s.owners[me].tiles or 0)*.15))}
+            c.budget=math.max((s.owners[me].troops or 0)*.35,(s.owners[me].troops or 0)*(action.intent.ratio or 0)*1.5);c.deadline=now+45
+        end
         c.lastSent=now;c.sends+=1;c.spent+=(s.owners[me].troops or 0)*(action.intent.ratio or 0)
     elseif kind=='retreat' then
         local attack=s.attacks[action.intent.attack_id]
         if attack and attack.target>0 then
             local c=self.campaigns[attack.target]
-            if c then c.pauseUntil=now+25 end
+            if c then c.pauseUntil=now+25;self:logCampaign(attack.target,c,action.label or "retreat") end
         end
     end
 end
@@ -69,9 +77,32 @@ function Strategy:observe(frame)
     for sid in pairs(self.structures) do if not s.structures[sid] then self.structures[sid]=nil end end
     for id,c in pairs(self.campaigns) do
         local enemy=s.owners[id]
-        if not enemy or not enemy.alive then self.campaigns[id]=nil
+        if not enemy or not enemy.alive then self:logCampaign(id,c,"target no longer alive");self.campaigns[id]=nil
         else
-            if c.lastTiles and enemy.tiles and enemy.tiles<c.lastTiles then c.lastProgress=frame.now end
+            -- Another player taking enemy land is not evidence that our campaign works.
+            local objective=c.objective
+            if objective then
+                local asset=objective.sid and s.structures[objective.sid]
+                if asset and asset.owner==frame.me then
+                    if not objective.captured_at then objective.captured_at=frame.now;c.lastProgress=frame.now end
+                    local secure,total=0,0;local map=frame.map;local r=math.max(1,math.ceil(8/(map.k_lin or 1)))
+                    for _,d in ipairs({{1,0},{-1,0},{0,1},{0,-1}}) do
+                        local x,y=asset.tile%map.W+d[1]*r,asset.tile//map.W+d[2]*r
+                        if x>=0 and y>=0 and x<map.W and y<map.H then
+                            total+=1;if s:tile_owner(y*map.W+x)==frame.me then secure+=1 end
+                        end
+                    end
+                    if secure>=math.max(1,total*.75) or frame.now-objective.captured_at>=8 then objective.status='complete' end
+                end
+                if objective.sid and (not asset or asset.owner~=frame.me and asset.owner~=id) then objective.status='lost' end
+                if objective.tile and s:tile_owner(objective.tile)==frame.me and not c.foothold then
+                    c.foothold=true;c.lastProgress=frame.now
+                end
+                if c.foothold and (frame.info.tiles or 0)>=(c.progressLand or objective.initial_land)+10 then
+                    c.lastProgress=frame.now;c.progressLand=frame.info.tiles
+                end
+                if not objective.sid and objective.kind~='defeat_tribe' and c.foothold and (frame.info.tiles or 0)>=objective.initial_land+objective.land_goal then objective.status='complete' end
+            end
             c.lastTiles=enemy.tiles
         end
     end
@@ -83,10 +114,16 @@ function Strategy.countryCounter(amount,bank)
     return bank*math.clamp(amount*1.25/math.max(bank,1),.05,.4)
 end
 function Strategy:updateBoard(frame,groups,a,fronts,allies)
+    self.lastNow=frame.now
     self.adjacentAllies=allies or {}
     local s,home=frame.state,a.home
     local near={};for id in pairs(groups) do near[id]=true end
     for id,m in pairs(fronts or {}) do if frame.now-m.at<=8 then near[id]=true end end
+    if self.atlas and self.atlas.summary.ready and frame.now-self.atlas.summary.snapshot_at<30 then
+        for _,row in ipairs(self.atlas.summary.relations) do
+            if row.nation==frame.me then for _,n in ipairs(row.neighbours) do near[n.nation]=true end end
+        end
+    end
     local b={human_neighbours=0,country_neighbours=0,largest_human=0,pressure=0,
         incoming=a.incoming,committed=0,leaders={},candidates={},mode='develop',unreliable_ally_pressure=0}
     local core=self.core.summary
@@ -101,7 +138,9 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
                 if o.kind==2 then
                     b.human_neighbours+=1;b.largest_human=math.max(b.largest_human,bank)
                 elseif o.kind==0 then b.country_neighbours+=1 end
-                table.insert(pressures,bank*(o.kind==2 and .5 or o.kind==0 and .28 or .1))
+                local estimate=self.profiles:assessment(frame,id)
+                local weight=o.kind==2 and .5+estimate.confidence*math.max(0,estimate.attack_fraction-.5)*.3 or o.kind==0 and .28 or .1
+                table.insert(pressures,bank*weight)
             elseif (allies or {})[id] and o.kind==0 and (o.troops or 0)>home*3 then
                 -- Country alliances can be broken when their partner becomes
                 -- much weaker; an alliance is not a permanent defensive wall.
@@ -171,13 +210,16 @@ function Strategy:canTarget(frame,id,a)
     if not o or friendly(s,frame.me,id) then return false end
     if frame.now<(self.peace[id] or 0) or s:has_request(frame.me,id) then return false end
     if a.incoming>a.home*.2 then return false end
-    if (self.core.summary.at_risk or self.core.summary.needs_buffer) and not self.core.fronts[id] then return false end
+    if (self.core.summary.at_risk or self.core.summary.needs_buffer) and not self.core.fronts[id]
+        and not (b.permit_expansion and o.kind~=2) then return false end
     if b.recover or b.overextended and o.kind~=1 then return false end
     local c=self.campaigns[id]
     if c and frame.now-(c.lastSent or c.started)>45 and not (a.targets or {})[id] then
         self.campaigns[id]=nil;c=nil
     end
     if c then
+        if c.objective and c.objective.status~='active' then return false end
+        if c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline then return false end
         if frame.now<(c.pauseUntil or 0) then return false end
         if frame.now-(c.lastSent or -math.huge)<(o.kind==2 and 7 or o.kind==0 and 4.5 or 3) then return false end
         if c.sends>=3 and frame.now-c.lastProgress>8 then return false end
@@ -240,7 +282,10 @@ function Strategy:review(frame,a)
             local o=frame.state.owners[attack.target] or {};local c=self.campaigns[attack.target]
             local why
             local core=self.core.summary
-            if (core.at_risk or core.needs_buffer) and away then
+            if c and c.objective and c.objective.status=='complete' then why='Campaign objective secured; banking the gain'
+            elseif c and c.objective and c.objective.status=='lost' then why='Campaign asset is gone; reassessing'
+            elseif c and (c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline) then why='Campaign budget or time limit reached'
+            elseif (core.at_risk or core.needs_buffer) and away and not self.board.permit_expansion then
                 why='Recalling a distant raid to protect the home and economic center'
             elseif friendly(frame.state,frame.me,attack.target) then why='Recalling troops after an alliance changed'
             elseif self.board.recover or a.incoming>a.home*.5 then why='Recalling the largest raid to defend the whole territory'
@@ -251,12 +296,27 @@ function Strategy:review(frame,a)
             elseif c and o.kind==2 and c.spent>a.home*.35 and frame.now-c.started>7 then why='Limiting exposure against a human player'
             end
             if why and (not priority or (attack.troops or 0)>priority) then best,priority,reason=attack,attack.troops or 0,why end
-        elseif (self.board.recover or (self.core.summary.at_risk or self.core.summary.needs_buffer) and away)
+        elseif (self.board.recover or (self.core.summary.at_risk or self.core.summary.needs_buffer) and away and not self.board.permit_expansion)
             and (not priority or (attack.troops or 0)>priority) then
             best,priority,reason=attack,attack.troops or 0,'Recalling distant expansion to secure home and core buildings'
         end
     end
     if best then return {intent={type='retreat',attack_id=best.aid},channel='retreat',
         cooldown=(self.core.summary.critical or a.incoming>a.home*.5) and .6 or 3,label=reason} end
+end
+function Strategy:logCampaign(id,c,reason)
+ table.insert(self.campaignHistory,{nation=id,objective=c.objective and table.clone(c.objective),spent=c.spent,budget=c.budget,
+  sends=c.sends,captures=c.captures,reason=reason})
+ if #self.campaignHistory>32 then table.remove(self.campaignHistory,1) end
+end
+function Strategy:campaignReport()
+ local rows={}
+ for id,c in pairs(self.campaigns) do
+  table.insert(rows,{nation=id,objective=c.objective,budget=c.budget,spent=c.spent,sends=c.sends,captures=c.captures,
+   last_progress=c.lastProgress,deadline=c.deadline,pause_until=c.pauseUntil})
+ end
+ table.sort(rows,function(a,b) return (a.last_progress or 0)>(b.last_progress or 0) end)
+ while #rows>32 do table.remove(rows) end
+ return rows
 end
 return Strategy
