@@ -134,10 +134,22 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
     for _,row in ipairs(self.timeline) do if frame.now-row.at<20 then peak=math.max(peak,row.land) end end
     if peak>=50 and (frame.info.tiles or 0)<peak*.88 then self.recoverUntil=frame.now+15 end
     b.recover=frame.now<self.recoverUntil or a.incoming>home*.35 or core.critical==true
-    local stranded=core.center_tile and (core.clearable_tiles or 0)==0 and (core.friendly_fraction or 1)<.15
+    -- A few neutral frontier samples do not make a destroyed economic core viable.
+    -- Require sustained failure to recover rather than waiting for zero clearable tiles.
+    local land=frame.info.tiles or 0
+    if not self.recoveryHigh or land>self.recoveryHigh then self.recoveryHigh=land;self.lastRecoveryProgress=frame.now end
+    if not self.recoveryCheckpoint or land<self.recoveryCheckpoint*.8 then self.recoveryCheckpoint=land end
+    if land>=self.recoveryCheckpoint*1.1+20 then
+        self.recoveryCheckpoint=land;self.lastRecoveryProgress=frame.now
+    end
+    local ruined=(core.owned_fraction or 1)<.15 and (core.protected_building_count or 0)==0
+        and land<math.max(500,self.recoveryHigh*.1)
+        and frame.now-(self.lastRecoveryProgress or frame.now)>=20
+    local stranded=core.center_tile and ((core.clearable_tiles or 0)==0 and (core.friendly_fraction or 1)<.15 or ruined)
         and a.incoming==0 and (core.naval_incoming or 0)==0 and b.committed==0
     if stranded then self.strandedSince=self.strandedSince or frame.now else self.strandedSince=nil end
     b.escape=self.strandedSince~=nil and frame.now-self.strandedSince>=20
+    b.relocation_reason=b.escape and (ruined and 'Economic core lost; local recovery has stalled' or 'No usable local expansion') or nil
     b.overextended=b.human_neighbours>0 and b.largest_human>home*1.4
     if b.recover then b.mode='recover' elseif core.at_risk or b.overextended or a.incoming>home*.15 then b.mode='guard' end
     if b.escape then b.mode='relocate';a.reserve=math.max(a.reserve,home*.75);a.available=math.max(0,home-a.reserve) end

@@ -21,7 +21,7 @@ def main():
     spec.loader.exec_module(build)
     source = build.source()
     assert (ROOT / "RoWorld_Bot.lua").read_text(encoding="utf8") == source, "Rebuild the standalone script"
-    for name in ("test_policy.lua", "test_adapter.lua", "test_network.lua", "test_weapons.lua", "test_strategy.lua", "test_core.lua", "test_recovery.lua", "test_diplomacy.lua"):
+    for name in ("test_policy.lua", "test_adapter.lua", "test_network.lua", "test_weapons.lua", "test_strategy.lua", "test_core.lua", "test_recovery.lua", "test_diplomacy.lua", "test_adaptation.lua"):
         subprocess.run([args.luau, str(ROOT / "tests" / name)], check=True, timeout=30)
     compiled = subprocess.run([args.compiler, str(ROOT / "RoWorld_Bot.lua")], capture_output=True, text=True, timeout=30)
     assert compiled.returncode == 0, compiled.stderr
@@ -29,12 +29,13 @@ def main():
     assertions = r'''
 local first = assert(env.__RoWorldBot)
 assert(first.alive and not first.enabled)
-local toggle, label, buttons = nil, nil, 0
+local toggle, label, export, buttons = nil, nil, nil, 0
 for _, obj in ipairs(created) do
-    if obj.ClassName == "TextButton" then buttons += 1; toggle = obj end
+    if obj.ClassName == "TextButton" then buttons += 1;if obj.Name == "Toggle" then toggle = obj else export = obj end end
     if obj.ClassName == "TextLabel" and obj.Name == "Status" then label = obj end
 end
-assert(buttons == 1 and toggle.Text == "Start bot")
+assert(buttons == 2 and toggle.Text == "Start bot")
+export.Activated:Fire(); assert(label.Text:find("Executor file writing unavailable"))
 step(); assert(not first.enabled and #warnings == 0)
 toggle.Activated:Fire(); step()
 assert(first.enabled and label.Text:find("Waiting for the RoWorld client"))
@@ -49,6 +50,12 @@ scripts.children.AirfrontClient = client
 client.children.Main = module
 for _ = 1,18 do step() end
 assert(#world.session.sent > 0 and world.session.sent[1].type == "attack")
+local files={}
+services.HttpService={JSONEncode=function(_,report) assert(report.version=="1.9.0" and report.runtime.decisions>0);return "report-json" end}
+writefile=function(name,body) files[name]=body end
+export.Activated:Fire();assert(files["RoWorld_Match_Report.json"]=="report-json")
+local archived=false;for name in pairs(files) do if name:find("RoWorld_Match_Report_123456_") then archived=true end end
+assert(archived and label.Text:find("Saved RoWorld_Match_Report"))
 toggle.Activated:Fire()
 local count = #world.session.sent
 for _ = 1,6 do step() end
@@ -62,7 +69,7 @@ for _, c in ipairs(first.connections) do assert(not c.active) end
 step()
 second.destroy(); step()
 assert(env.__RoWorldBot == nil and not second.alive and #warnings == 0)
-print("PASS", "single button, waiting status, stop, hotkey and reinjection teardown")
+print("PASS", "dashboard, waiting status, stop, hotkey and reinjection teardown")
 '''
     with tempfile.TemporaryDirectory() as directory:
         test = Path(directory) / "client_test.luau"

@@ -1,6 +1,6 @@
-# RoWorld bot 1.8.0
+# RoWorld bot 1.9.0
 
-One **Start bot / Stop bot** button, a decision status line, and F6 to toggle.
+A **Start bot / Stop bot** button, live strategy dashboard, **Save match report**, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
 No training, Python, localhost bridge or external AI service is needed to play.
 
@@ -12,7 +12,7 @@ No training, Python, localhost bridge or external AI service is needed to play.
 4. Press **Start bot**. Re-executing replaces the previous panel and stops its loop.
 
 Start before choosing your territory to let the bot choose a spawn. It cannot
-relocate a nation that has already spawned. It does not choose queues or buy shop
+relocate a nation after active play begins; during the countdown it can reselect its spawn. It does not choose queues or buy shop
 items. Stopping prevents new orders; already launched attacks continue normally.
 
 The optional `readfile` loader needs `RoWorld_Bot.lua` directly in your executor
@@ -22,6 +22,34 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 1.9 addresses the supplied loss. See [the analysis](LOSS_ANALYSIS_v1.8.md)
+for evidence, limitations and the learning path.
+
+- Emergency defense uses the same three-post limit as routine decisions, plus a
+  rolling three-purchase/minute budget to prevent endless replacement spending.
+- Quiet productive cores save for SAM coverage against ready hostile silos.
+- Distant human landings need a useful visible asset and substantial third-party
+  pressure; only one expedition can be at sea. Escape scoring avoids dominant
+  human centers and favors neutral expansion room.
+- A destroyed economic core can trigger relocation despite residual 'clearable'
+  tiles. Fresh recovery growth resets the stall timer.
+- Public opponent summaries/events and bounded early/recent samples support
+  future analysis. They are not exact action labels, hidden intent or an already
+  trained neural network.
+- The dashboard shows economy, incoming troops, core risk, savings and measured
+  policy decision time. That time excludes networking, UI rendering and report
+  writing. Reports also include blocked-order counts/reason and runtime errors.
+- **Save match report** writes `RoWorld_Match_Report.json` and a timestamped
+  archive `RoWorld_Match_Report_<timestamp>_<clock>.json` in the executor workspace.
+  Stop, match end and reinjection also archive the current report when file
+  writing works. Periodic saves update the latest file every 30 seconds.
+  Save a report immediately after an important incident if possible. Nothing is
+  uploaded automatically. Each fresh Start begins a new observation session.
+
+139 offline scenarios plus dashboard export/lifecycle and compilation passed.
+Live competitive improvement is **not verified**. No server exploits, money
+creation or automatic-win mechanism is included.
 
 Version 1.8 expands diplomacy and emergency responses:
 

@@ -30,7 +30,8 @@ local UDim2 = {new = function(...) return {...} end,fromOffset = function(...) r
 local UDim = {new = function(...) return {...} end}
 local Color3 = {fromRGB = function(...) return {...} end}
 local Enum = {Font = {Gotham = 1,GothamBold = 2}, ZIndexBehavior = {Sibling = 1},TextXAlignment = {Left = 1},KeyCode = {F6 = 6}}
-local os = {clock = function() return now end}
+local os = {clock = function() return now end,time = function() return 123456 end}
+local writefile
 local getgenv = function() return env end
 local warnings = {}
 local warn = function(message) table.insert(warnings,message) end

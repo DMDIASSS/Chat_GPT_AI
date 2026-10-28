@@ -1,4 +1,4 @@
--- RoWorld Bot 1.8.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 1.9.0 | paste this entire file into JJSploit.
 -- No external script downloads or localhost bridge.
 
 local Weapons = (function()
@@ -481,10 +481,22 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
     for _,row in ipairs(self.timeline) do if frame.now-row.at<20 then peak=math.max(peak,row.land) end end
     if peak>=50 and (frame.info.tiles or 0)<peak*.88 then self.recoverUntil=frame.now+15 end
     b.recover=frame.now<self.recoverUntil or a.incoming>home*.35 or core.critical==true
-    local stranded=core.center_tile and (core.clearable_tiles or 0)==0 and (core.friendly_fraction or 1)<.15
+    -- A few neutral frontier samples do not make a destroyed economic core viable.
+    -- Require sustained failure to recover rather than waiting for zero clearable tiles.
+    local land=frame.info.tiles or 0
+    if not self.recoveryHigh or land>self.recoveryHigh then self.recoveryHigh=land;self.lastRecoveryProgress=frame.now end
+    if not self.recoveryCheckpoint or land<self.recoveryCheckpoint*.8 then self.recoveryCheckpoint=land end
+    if land>=self.recoveryCheckpoint*1.1+20 then
+        self.recoveryCheckpoint=land;self.lastRecoveryProgress=frame.now
+    end
+    local ruined=(core.owned_fraction or 1)<.15 and (core.protected_building_count or 0)==0
+        and land<math.max(500,self.recoveryHigh*.1)
+        and frame.now-(self.lastRecoveryProgress or frame.now)>=20
+    local stranded=core.center_tile and ((core.clearable_tiles or 0)==0 and (core.friendly_fraction or 1)<.15 or ruined)
         and a.incoming==0 and (core.naval_incoming or 0)==0 and b.committed==0
     if stranded then self.strandedSince=self.strandedSince or frame.now else self.strandedSince=nil end
     b.escape=self.strandedSince~=nil and frame.now-self.strandedSince>=20
+    b.relocation_reason=b.escape and (ruined and 'Economic core lost; local recovery has stalled' or 'No usable local expansion') or nil
     b.overextended=b.human_neighbours>0 and b.largest_human>home*1.4
     if b.recover then b.mode='recover' elseif core.at_risk or b.overextended or a.incoming>home*.15 then b.mode='guard' end
     if b.escape then b.mode='relocate';a.reserve=math.max(a.reserve,home*.75);a.available=math.max(0,home-a.reserve) end
@@ -686,11 +698,114 @@ return Diplomacy
 
 end)()
 
+local Recorder = (function()
+
+-- Bounded public-state telemetry. Observations are not reconstructed player inputs.
+local Recorder={};Recorder.__index=Recorder
+function Recorder.new(frame)
+    local self=setmetatable({start_tick=frame.state.tick,me=frame.me,players={},samples={},events={},
+        structures={},attacks={},nukes={},initialized=false,events_dropped=0,samples_dropped=0},Recorder)
+    return self
+end
+function Recorder:event(row)
+    table.insert(self.events,row)
+    if #self.events>256 then table.remove(self.events,1);self.events_dropped+=1 end
+end
+function Recorder:observe(frame)
+    local s=frame.state
+    -- At most once per game second; no extra requests or full terrain scans.
+    if self.lastTick and s.tick-self.lastTick<10 then return end
+    self.lastTick=s.tick
+    local counts={}
+    for sid,b in pairs(s.structures) do
+        counts[b.owner]=counts[b.owner] or {}
+        local c=counts[b.owner];local kind=tostring(b.kind);c[kind]=(c[kind] or 0)+1
+        local old=self.structures[sid]
+        if self.initialized and (self.players[b.owner] or (s.owners[b.owner] or {}).kind==2 or b.owner==frame.me)
+            and (not old or old.owner~=b.owner or old.level~=(b.level or 1)) then
+            self:event({tick=s.tick,type=not old and 'structure_observed' or old.owner~=b.owner and 'structure_capture' or 'structure_upgrade',
+                nation=b.owner,previous_owner=old and old.owner,sid=sid,kind=b.kind,tile=b.tile,level=b.level or 1})
+        end
+        self.structures[sid]={owner=b.owner,level=b.level or 1}
+    end
+    for sid,old in pairs(self.structures) do
+        if not s.structures[sid] then
+            if self.players[old.owner] then self:event({tick=s.tick,type='structure_removed',nation=old.owner,sid=sid}) end
+            self.structures[sid]=nil
+        end
+    end
+    for id,o in pairs(s.owners) do
+        if o.kind==2 or id==frame.me then
+            local p=self.players[id]
+            if not p then
+                p={nation=id,name=o.name,first_tick=s.tick,first_land=o.tiles or 0,peak_land=0,observed_attacks=0,observed_missiles=0}
+                self.players[id]=p
+            end
+            p.land=o.tiles or 0;p.peak_land=math.max(p.peak_land,p.land);p.troops=o.troops or 0
+            p.gold=o.gold or 0;p.income=o.income or 0;p.alive=o.alive;p.buildings=counts[id] or {}
+            p.committed=0;p.incoming=0
+        end
+    end
+    local attacks={}
+    for aid,a in pairs(s.attacks) do
+        attacks[aid]=true
+        if not a.retreating then
+            local attacker,target=self.players[a.attacker],self.players[a.target]
+            if attacker then attacker.committed+=(a.troops or 0) end
+            if target then target.incoming+=(a.troops or 0) end
+        end
+        if self.initialized and not self.attacks[aid] and not a.retreating and (self.players[a.attacker] or a.target==frame.me) then
+            local p=self.players[a.attacker];if p then p.observed_attacks+=1 end
+            self:event({tick=s.tick,type='attack_observed',nation=a.attacker,target=a.target,troops=a.troops,anchor=a.anchor_tile})
+        end
+    end
+    self.attacks=attacks
+    local nukes={}
+    for nid,n in pairs(s.nukes) do
+        nukes[nid]=true
+        if self.initialized and not self.nukes[nid] then
+            local p=self.players[n.owner];if p then p.observed_missiles+=1 end
+            self:event({tick=s.tick,type='missile_observed',nation=n.owner,kind=n.kind,tile=n.to_tile})
+        end
+    end
+    self.nukes=nukes
+    if not self.sampleTick or s.tick-self.sampleTick>=100 then
+        self.sampleTick=s.tick
+        local ranked={}
+        for id,p in pairs(self.players) do
+            if p.alive and id~=frame.me then table.insert(ranked,p) end
+        end
+        table.sort(ranked,function(a,b) return a.land>b.land end)
+        local rows={}
+        local function add(p)
+            if p then table.insert(rows,{nation=p.nation,land=p.land,troops=p.troops,gold=p.gold,income=p.income,committed=p.committed,incoming=p.incoming,buildings=table.clone(p.buildings)}) end
+        end
+        add(self.players[frame.me])
+        for i=1,math.min(12,#ranked) do add(ranked[i]) end
+        table.insert(self.samples,{tick=s.tick,players=rows})
+        -- Preserve first ten minutes plus the latest twenty minutes.
+        if #self.samples>180 then table.remove(self.samples,61);self.samples_dropped+=1 end
+    end
+    self.initialized=true
+end
+function Recorder:report()
+    local players={};for _,p in pairs(self.players) do table.insert(players,p) end
+    table.sort(players,function(a,b) return a.peak_land>b.peak_land end)
+    return {scope='Public snapshots since start; observed events may miss actions between samples. Not training labels or proof of intent.',
+        start_tick=self.start_tick,players=players,samples=self.samples,events=self.events,
+        samples_dropped=self.samples_dropped,events_dropped=self.events_dropped,sample_interval_ticks=100,event_scan_interval_ticks=10}
+end
+return Recorder
+
+
+end)()
+
 local Policy = (function()
 
 -- RoWorld strategy adapted from Solo AggroBot's reserve / expansion approach.
 -- This module reads client observations and returns one ordinary game order.
 local Policy = {}
+
 
 
 
@@ -733,6 +848,9 @@ function Policy:sent(action, now)
     self.metrics.orders+=1
     local kind=action.intent.type;self.metrics[kind]=(self.metrics[kind] or 0)+1
     self.lastPlan=action.plan
+    if kind=='build' and action.intent.kind=='defense' then
+        self.defenseBuilds=self.defenseBuilds or {};table.insert(self.defenseBuilds,now)
+    end
     if self.strategy then self.strategy:sent(action,self.state,self.me,now) end
     if action.escape and self.strategy then self.strategy.core.relocation={tile=action.intent.tile,untilTime=now+300} end
     self.history=self.history or {}
@@ -749,9 +867,10 @@ function Policy:reset(frame)
     self.cursor, self.border = nil, nil
     self.cooldowns = {}
     self.opponents,self.attacksSeen,self.frontsSeen={},{},{}
-    self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={};self.spatialTick=nil
+    self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={};self.spatialTick=nil;self.defenseBuilds={}
     self.spawnPlan=nil
     self.strategy=Strategy.new(frame)
+    self.recorder=Recorder.new(frame)
     self.metrics={orders=0,attack=0,build=0,retreat=0,spawn=0,peakLand=frame.info.tiles or 0,initialLand=frame.info.tiles or 0}
 end
 
@@ -869,6 +988,7 @@ function Policy:observe(frame)
     end
     self.attacksSeen=live
     if self.strategy then self.strategy:observe(frame) end
+    if self.recorder then self.recorder:observe(frame) end
     self.metrics.peakLand=math.max(self.metrics.peakLand or 0,frame.info.tiles or 0)
 end
 
@@ -1262,6 +1382,15 @@ function Policy:incomeLink(frame,tile,kind)
 end
 function Policy:build(frame, sites, kind, counts)
     if not self:ready("build", frame.now) then return nil end
+    -- Apply the limit here too: emergency decisions call build directly.
+    if kind=="defense" then
+        local posts=0
+        for _,b in pairs(frame.state.structures) do if b.owner==frame.me and b.kind==3 then posts+=1 end end
+        local recent={}
+        for _,at in ipairs(self.defenseBuilds or {}) do if frame.now-at<60 then table.insert(recent,at) end end
+        self.defenseBuilds=recent
+        if posts>=3 or #recent>=3 then return nil end
+    end
     local rules = frame.ctx.rules
     local availability = rules:availability(kind)
     if not availability.ok then return nil end
@@ -1332,6 +1461,10 @@ function Policy:economy(frame, sites, armies)
         if b.kind==5 and not friendly(frame.state,frame.me,b.owner) then enemySilo=true end
     end
     if exposed and (counts[4] or 0)<6 and (incomingNuke or enemySilo or city+factory>=3) then table.insert(wanted,"sam") end
+    -- Do not continually buy cheaper upgrades while an uncovered productive core
+    -- is saving for air defense. Imminent land defense is handled separately above.
+    local saveSAM=exposed and nuclearThreat.ready_silos>0 and city+factory>=3 and factory>0 and (counts[4] or 0)<6
+        and not (self.strategy and self.strategy.core.summary.at_risk) and armies.incoming<armies.home*.15
     -- Protect the first city budget instead of spending every 50K on posts.
     if city==0 then table.insert(wanted,"city") end
     local coreRisk=self.strategy and self.strategy.core.summary.at_risk
@@ -1355,7 +1488,12 @@ function Policy:economy(frame, sites, armies)
         if u.owner==frame.me and u.kind==1 then self.economyPlan.trade_ships+=1 end
         if u.owner==frame.me and u.kind==3 then self.economyPlan.cargo_units+=1 end
     end
+    if saveSAM then
+        self.economyPlan.reserve=frame.ctx.rules:cost('sam')
+        self.economyPlan.saving_for='sam'
+    end
     for _, kind in ipairs(wanted) do
+        if saveSAM and kind~='sam' then continue end
         local action = self:build(frame, sites, kind, counts)
         if action then self.economyPlan.next_kind=kind;return action end
     end
@@ -1477,6 +1615,32 @@ function Policy:fleet(frame,armies)
     return nil
 end
 
+-- Score only observed destination safety. This is not a prediction of intent.
+function Policy:landingScore(frame,tile,armies,escape)
+    local score=0
+    local radius=120/(frame.map.k_lin or 1)
+    for id,o in pairs(frame.state.owners) do
+        if id~=frame.me and o.alive and o.kind==2 and not friendly(frame.state,frame.me,id) then
+            local center=o.label_tile or o.spawn_tile
+            if valid(frame.map,center) then
+                local d=math.sqrt(frame.map.dist2(tile,center))
+                if d<radius then
+                    local danger=(1-d/radius)*math.min(4,(o.troops or 0)/math.max(1,armies.home))
+                    score-=danger*30
+                    if escape and danger>.6 then return nil end
+                end
+            end
+        end
+    end
+    -- Favor room to expand, instead of a one-tile beach beside a larger player.
+    for _,delta in ipairs({-4,4,-4*frame.map.W,4*frame.map.W,-8,8,-8*frame.map.W,8*frame.map.W}) do
+        local t=tile+delta
+        if valid(frame.map,t) and frame.map.dist2(tile,t)<=64 and frame.map:is_contestable(t)
+            and frame.state:tile_owner(t)==0 and not frame.state:has_fallout(t) then score+=2 end
+    end
+    return score
+end
+
 function Policy:naval(frame, armies,survival)
     local escape=survival or self.strategy and self.strategy.board.escape
     if escape and frame.ctx.rules:transports()>0 then return nil end
@@ -1487,7 +1651,8 @@ function Policy:naval(frame, armies,survival)
     end
     if survival then armies=table.clone(armies);armies.reserve=armies.home*.9;armies.available=armies.home*.1 end
     if armies.incoming > 0 and not survival or not self:ready("boat", frame.now) or armies.available < armies.home * (escape and .05 or .12) then return nil end
-    if frame.ctx.rules:transports() >= (frame.state.rules.MAX_BOATS_PLAYER or 3) then return nil end
+    -- One expedition at a time; do not fan out three unprotected beachheads.
+    if frame.ctx.rules:transports() > 0 then return nil end
     local chosen, score
     for _ = 1, 120 do
         local tile = self:landSample(frame.map, "coast_list")
@@ -1496,12 +1661,22 @@ function Policy:naval(frame, armies,survival)
             local owner = frame.state.owners[target]
             local weak = target == 0 or (owner and owner.alive and (owner.troops or 0) < armies.available * .2)
             if escape then weak=target==0 end
+            if owner and owner.kind==2 and not escape then
+                local pressure=self:opportunity(frame,target)
+                local asset=false
+                for _,b in pairs(frame.state.structures) do
+                    if b.owner==target and frame.map.dist2(tile,b.tile)<(35/(frame.map.k_lin or 1))^2 then asset=true;break end
+                end
+                -- A weak bank alone is not a profitable distant human invasion.
+                weak=weak and pressure>=.6 and asset and armies.home>(owner.troops or 0)*3
+            end
             if self.strategy and not escape and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 then weak=false end
             if target>0 and self.strategy and not self.strategy:canTarget(frame,target,armies) then weak=false end
             if target>0 and (armies.enemyActive or 0)>0 and not (armies.targets or {})[target] then weak=false end
             if weak and not friendly(frame.state, frame.me, target) and frame.ctx.borders:can_reach_by_sea(tile) then
-                local value = target == 0 and 10 or 20
-                local safe=true
+                local destination=self:landingScore(frame,tile,armies,escape)
+                local value = (target == 0 and 10 or 20)+(destination or 0)
+                local safe=destination~=nil
                 for _,u in pairs(frame.state.units or {}) do
                     local t=unitTile(frame.state,u)
                     if u.kind==2 and not friendly(frame.state,frame.me,u.owner) and valid(frame.map,t)
@@ -1657,7 +1832,9 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.8.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+    return {version="1.9.0",
+        opponent_observations=self.recorder and self.recorder:report() or {},
+        runtime=self.runtime or {},last_waiting=self.lastWaiting,scope="Since the current observer snapshot; intent estimates are heuristic",
         diplomacy_candidates=self.diplomacyScores or {},
         nominal_runtime={poll_hz=10,core_scan_max_hz=5,order_max_hz=5},
         alliance_history=self.strategy and self.strategy.relationships or {},income=info and info.income or 0,
@@ -1819,7 +1996,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 1.8.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 1.9.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -2711,18 +2888,29 @@ local parent = type(gethui) == "function" and gethui() or Services.CoreGui
 local attached = pcall(function() gui.Parent = parent end)
 if not attached then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
 local panel = Instance.new("Frame")
-panel.Size = UDim2.fromOffset(330, 116)
-panel.Position = UDim2.new(1, -346, 0, 60)
+panel.Size = UDim2.fromOffset(410, 278)
+panel.Position = UDim2.new(1, -426, 0, 60)
 panel.BackgroundColor3 = Color3.fromRGB(20, 29, 42)
 panel.BorderSizePixel = 0
 panel.Parent = gui
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 10)
 corner.Parent = panel
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Size = UDim2.new(1, -24, 0, 22)
+title.Position = UDim2.fromOffset(12, 8)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+title.TextColor3 = Color3.fromRGB(221, 231, 242)
+title.Text = "RoWorld 1.9.0 | live strategy"
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = panel
 local button = Instance.new("TextButton")
 button.Name = "Toggle"
 button.Size = UDim2.new(1, -24, 0, 40)
-button.Position = UDim2.fromOffset(12, 10)
+button.Position = UDim2.fromOffset(12, 36)
 button.Font = Enum.Font.GothamBold
 button.TextSize = 17
 button.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -2733,7 +2921,7 @@ buttonCorner.Parent = button
 local status = Instance.new("TextLabel")
 status.Name = "Status"
 status.Size = UDim2.new(1, -24, 0, 51)
-status.Position = UDim2.fromOffset(12, 56)
+status.Position = UDim2.fromOffset(12, 82)
 status.BackgroundTransparency = 1
 status.Font = Enum.Font.Gotham
 status.TextSize = 13
@@ -2741,6 +2929,31 @@ status.TextColor3 = Color3.fromRGB(221, 231, 242)
 status.TextWrapped = true
 status.TextXAlignment = Enum.TextXAlignment.Left
 status.Parent = panel
+
+local stats = Instance.new("TextLabel")
+stats.Name = "Stats"
+stats.Size = UDim2.new(1, -24, 0, 88)
+stats.Position = UDim2.fromOffset(12, 136)
+stats.BackgroundTransparency = 1
+stats.Font = Enum.Font.Gotham
+stats.TextSize = 12
+stats.TextColor3 = Color3.fromRGB(176, 206, 225)
+stats.TextWrapped = true
+stats.TextXAlignment = Enum.TextXAlignment.Left
+stats.Text = "Waiting for observed match statistics"
+stats.Parent = panel
+local export = Instance.new("TextButton")
+export.Name = "ExportReport"
+export.Size = UDim2.new(1, -24, 0, 32)
+export.Position = UDim2.fromOffset(12, 234)
+export.Font = Enum.Font.GothamBold
+export.TextSize = 13
+export.TextColor3 = Color3.fromRGB(255, 255, 255)
+export.BackgroundColor3 = Color3.fromRGB(48, 76, 102)
+export.BorderSizePixel = 0
+export.Text = "Save match report"
+export.Parent = panel
+local exportCorner = corner:Clone();exportCorner.Parent = export
 
 local function repaint(message)
     if not api.alive then return end
@@ -2774,27 +2987,54 @@ local function reportAccessFailure()
     warn(report)
 end
 local policy = Policy.new()
+local runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0}
+local function updateStats()
+    local info=policy.state and policy.state.owners[policy.me]
+    if not info then return end
+    local b=policy.strategy and policy.strategy.board or {}
+    local eco=policy.economyPlan or {}
+    stats.Text=string.format("%s | Tick %d | Land %d | Troops %.0f / %.0f\nGold %.0f | Income %.0f | Incoming %.0f\n%s | Decision %.1f ms | Blocked %d\n%s",
+        info.alive and (b.mode or 'observing') or 'eliminated',policy.state.tick or 0,info.tiles or 0,info.troops or 0,info.max_troops or 0,
+        info.gold or 0,info.income or 0,b.incoming or 0,
+        b.core and b.core.at_risk and 'Core at risk' or 'Core stable',runtime.last_decision_ms,runtime.blocked_orders,
+        eco.saving_for and ('Saving for '..eco.saving_for) or b.relocation_reason or 'Public-state observations; future orders unknown')
+end
 local lastReport=-math.huge
 local endReported=false
 local reportState
+local reportTag
 function api.report() return policy:report() end
 local function saveMatchReport(force,reason)
-    if type(writefile)~="function" or not policy.state then return end
-    if not force and os.clock()-lastReport<30 then return end
+    if type(writefile)~="function" then return false,"Executor file writing unavailable" end
+    if not policy.state then return false,"No match observed yet" end
+    if not force and os.clock()-lastReport<30 then return false end
     lastReport=os.clock()
     local ok,encoded=pcall(function()
         local report=policy:report();report.saved_reason=reason
         return game:GetService("HttpService"):JSONEncode(report)
     end)
-    if ok then pcall(writefile,"RoWorld_Match_Report.json",encoded) end
+    if not ok then return false,tostring(encoded) end
+    local saved,err=pcall(writefile,"RoWorld_Match_Report.json",encoded)
+    if saved and force then
+        reportTag=reportTag or (tostring(os.time()).."_"..tostring(math.floor(os.clock()*1000)))
+        local archived,archiveError=pcall(writefile,"RoWorld_Match_Report_"..reportTag..".json",encoded)
+        if not archived then return false,"Latest report saved; archive failed: "..tostring(archiveError) end
+    end
+    return saved,saved and "Saved RoWorld_Match_Report.json in executor workspace" or tostring(err)
 end
+table.insert(api.connections,export.Activated:Connect(function()
+    local _,message=saveMatchReport(true,"manual export")
+    repaint(message)
+end))
 local lastCommand, lastCommandAt = "", -math.huge
 local evaluatedState,evaluatedTick,evaluatedAt
 local function toggle()
     api.enabled = not api.enabled
     if api.enabled then
         policy = Policy.new()
-        endReported=false
+        runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0}
+        evaluatedState,evaluatedTick,evaluatedAt=nil,nil,nil
+        endReported=false;reportTag=nil
         repaint("Connecting to your RoWorld match...")
     else
         saveMatchReport(true,"stopped by user")
@@ -2806,6 +3046,7 @@ table.insert(api.connections, Services.UserInputService.InputBegan:Connect(funct
     if not consumed and input.KeyCode == Enum.KeyCode.F6 then toggle() end
 end))
 function api.destroy()
+    saveMatchReport(true,"script replaced or closed")
     api.alive, api.enabled = false, false
     adapter.network:destroy()
     for _, connection in ipairs(api.connections) do connection:Disconnect() end
@@ -2824,13 +3065,20 @@ task.spawn(function()
                 if not api.enabled or not api.alive then return end
                 if not frame then return reason end
                 if evaluatedState==frame.state and evaluatedTick==frame.state.tick and frame.now-(evaluatedAt or 0)<.5 then
-                    return 'Watching for a fresh game update'
+                    runtime.skipped+=1
+                    return policy.lastWaiting or 'Watching for a fresh game update'
                 end
                 evaluatedState,evaluatedTick,evaluatedAt=frame.state,frame.state.tick,frame.now
                 -- The normal client sends a rate-limited activity heartbeat
                 -- from user input. Keep that same heartbeat while autoplay is on.
                 if type(frame.session.note_activity) == "function" then frame.session:note_activity() end
+                local started=os.clock()
                 local action, waiting = policy:decide(frame)
+                local ms=(os.clock()-started)*1000
+                runtime.decisions+=1;runtime.last_decision_ms=ms
+                runtime.mean_decision_ms+=(ms-runtime.mean_decision_ms)/runtime.decisions
+                policy.runtime=runtime
+                policy.lastWaiting=action and action.label or waiting
                 if not api.enabled or not api.alive then return end
                 if action then
                     local sent, blocked = adapter:send(action, frame)
@@ -2839,6 +3087,8 @@ task.spawn(function()
                         lastCommand, lastCommandAt = action.label, os.clock()
                         return "Order sent: " .. action.label
                     else
+                        runtime.blocked_orders+=1;runtime.last_blocked_reason=tostring(blocked)
+                        policy.lastWaiting=blocked
                         return blocked
                     end
                 else
@@ -2850,8 +3100,9 @@ task.spawn(function()
             if ok then
                 reportAccessFailure()
                 repaint(message)
+                updateStats()
                 if policy.state~=reportState then
-                    reportState=policy.state;endReported=false;lastReport=-math.huge
+                    reportState=policy.state;endReported=false;lastReport=-math.huge;reportTag=nil
                 end
                 local info=policy.state and policy.state.owners[policy.me]
                 local ended=info and (not info.alive or policy.state.phase==2 or adapter.network.closed)
@@ -2859,6 +3110,8 @@ task.spawn(function()
                 if ended then endReported=true end
             else
                 api.enabled = false
+                runtime.last_error=tostring(message);policy.runtime=runtime
+                saveMatchReport(true,"runtime error")
                 repaint("Stopped after an error: " .. tostring(message))
                 warn("[RoWorldBot] " .. tostring(message))
             end

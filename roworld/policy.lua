@@ -4,6 +4,7 @@ local Policy = {}
 local Weapons = require("./weapons")
 local Strategy = require("./strategy")
 local Diplomacy = require("./diplomacy")
+local Recorder = require("./recorder")
 Policy.__index = Policy
 
 local function neighbours(map, tile, visit)
@@ -43,6 +44,9 @@ function Policy:sent(action, now)
     self.metrics.orders+=1
     local kind=action.intent.type;self.metrics[kind]=(self.metrics[kind] or 0)+1
     self.lastPlan=action.plan
+    if kind=='build' and action.intent.kind=='defense' then
+        self.defenseBuilds=self.defenseBuilds or {};table.insert(self.defenseBuilds,now)
+    end
     if self.strategy then self.strategy:sent(action,self.state,self.me,now) end
     if action.escape and self.strategy then self.strategy.core.relocation={tile=action.intent.tile,untilTime=now+300} end
     self.history=self.history or {}
@@ -59,9 +63,10 @@ function Policy:reset(frame)
     self.cursor, self.border = nil, nil
     self.cooldowns = {}
     self.opponents,self.attacksSeen,self.frontsSeen={},{},{}
-    self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={};self.spatialTick=nil
+    self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={};self.spatialTick=nil;self.defenseBuilds={}
     self.spawnPlan=nil
     self.strategy=Strategy.new(frame)
+    self.recorder=Recorder.new(frame)
     self.metrics={orders=0,attack=0,build=0,retreat=0,spawn=0,peakLand=frame.info.tiles or 0,initialLand=frame.info.tiles or 0}
 end
 
@@ -179,6 +184,7 @@ function Policy:observe(frame)
     end
     self.attacksSeen=live
     if self.strategy then self.strategy:observe(frame) end
+    if self.recorder then self.recorder:observe(frame) end
     self.metrics.peakLand=math.max(self.metrics.peakLand or 0,frame.info.tiles or 0)
 end
 
@@ -572,6 +578,15 @@ function Policy:incomeLink(frame,tile,kind)
 end
 function Policy:build(frame, sites, kind, counts)
     if not self:ready("build", frame.now) then return nil end
+    -- Apply the limit here too: emergency decisions call build directly.
+    if kind=="defense" then
+        local posts=0
+        for _,b in pairs(frame.state.structures) do if b.owner==frame.me and b.kind==3 then posts+=1 end end
+        local recent={}
+        for _,at in ipairs(self.defenseBuilds or {}) do if frame.now-at<60 then table.insert(recent,at) end end
+        self.defenseBuilds=recent
+        if posts>=3 or #recent>=3 then return nil end
+    end
     local rules = frame.ctx.rules
     local availability = rules:availability(kind)
     if not availability.ok then return nil end
@@ -642,6 +657,10 @@ function Policy:economy(frame, sites, armies)
         if b.kind==5 and not friendly(frame.state,frame.me,b.owner) then enemySilo=true end
     end
     if exposed and (counts[4] or 0)<6 and (incomingNuke or enemySilo or city+factory>=3) then table.insert(wanted,"sam") end
+    -- Do not continually buy cheaper upgrades while an uncovered productive core
+    -- is saving for air defense. Imminent land defense is handled separately above.
+    local saveSAM=exposed and nuclearThreat.ready_silos>0 and city+factory>=3 and factory>0 and (counts[4] or 0)<6
+        and not (self.strategy and self.strategy.core.summary.at_risk) and armies.incoming<armies.home*.15
     -- Protect the first city budget instead of spending every 50K on posts.
     if city==0 then table.insert(wanted,"city") end
     local coreRisk=self.strategy and self.strategy.core.summary.at_risk
@@ -665,7 +684,12 @@ function Policy:economy(frame, sites, armies)
         if u.owner==frame.me and u.kind==1 then self.economyPlan.trade_ships+=1 end
         if u.owner==frame.me and u.kind==3 then self.economyPlan.cargo_units+=1 end
     end
+    if saveSAM then
+        self.economyPlan.reserve=frame.ctx.rules:cost('sam')
+        self.economyPlan.saving_for='sam'
+    end
     for _, kind in ipairs(wanted) do
+        if saveSAM and kind~='sam' then continue end
         local action = self:build(frame, sites, kind, counts)
         if action then self.economyPlan.next_kind=kind;return action end
     end
@@ -787,6 +811,32 @@ function Policy:fleet(frame,armies)
     return nil
 end
 
+-- Score only observed destination safety. This is not a prediction of intent.
+function Policy:landingScore(frame,tile,armies,escape)
+    local score=0
+    local radius=120/(frame.map.k_lin or 1)
+    for id,o in pairs(frame.state.owners) do
+        if id~=frame.me and o.alive and o.kind==2 and not friendly(frame.state,frame.me,id) then
+            local center=o.label_tile or o.spawn_tile
+            if valid(frame.map,center) then
+                local d=math.sqrt(frame.map.dist2(tile,center))
+                if d<radius then
+                    local danger=(1-d/radius)*math.min(4,(o.troops or 0)/math.max(1,armies.home))
+                    score-=danger*30
+                    if escape and danger>.6 then return nil end
+                end
+            end
+        end
+    end
+    -- Favor room to expand, instead of a one-tile beach beside a larger player.
+    for _,delta in ipairs({-4,4,-4*frame.map.W,4*frame.map.W,-8,8,-8*frame.map.W,8*frame.map.W}) do
+        local t=tile+delta
+        if valid(frame.map,t) and frame.map.dist2(tile,t)<=64 and frame.map:is_contestable(t)
+            and frame.state:tile_owner(t)==0 and not frame.state:has_fallout(t) then score+=2 end
+    end
+    return score
+end
+
 function Policy:naval(frame, armies,survival)
     local escape=survival or self.strategy and self.strategy.board.escape
     if escape and frame.ctx.rules:transports()>0 then return nil end
@@ -797,7 +847,8 @@ function Policy:naval(frame, armies,survival)
     end
     if survival then armies=table.clone(armies);armies.reserve=armies.home*.9;armies.available=armies.home*.1 end
     if armies.incoming > 0 and not survival or not self:ready("boat", frame.now) or armies.available < armies.home * (escape and .05 or .12) then return nil end
-    if frame.ctx.rules:transports() >= (frame.state.rules.MAX_BOATS_PLAYER or 3) then return nil end
+    -- One expedition at a time; do not fan out three unprotected beachheads.
+    if frame.ctx.rules:transports() > 0 then return nil end
     local chosen, score
     for _ = 1, 120 do
         local tile = self:landSample(frame.map, "coast_list")
@@ -806,12 +857,22 @@ function Policy:naval(frame, armies,survival)
             local owner = frame.state.owners[target]
             local weak = target == 0 or (owner and owner.alive and (owner.troops or 0) < armies.available * .2)
             if escape then weak=target==0 end
+            if owner and owner.kind==2 and not escape then
+                local pressure=self:opportunity(frame,target)
+                local asset=false
+                for _,b in pairs(frame.state.structures) do
+                    if b.owner==target and frame.map.dist2(tile,b.tile)<(35/(frame.map.k_lin or 1))^2 then asset=true;break end
+                end
+                -- A weak bank alone is not a profitable distant human invasion.
+                weak=weak and pressure>=.6 and asset and armies.home>(owner.troops or 0)*3
+            end
             if self.strategy and not escape and self.strategy.core.summary.needs_buffer and self.strategy:corePriority(frame,tile)==0 then weak=false end
             if target>0 and self.strategy and not self.strategy:canTarget(frame,target,armies) then weak=false end
             if target>0 and (armies.enemyActive or 0)>0 and not (armies.targets or {})[target] then weak=false end
             if weak and not friendly(frame.state, frame.me, target) and frame.ctx.borders:can_reach_by_sea(tile) then
-                local value = target == 0 and 10 or 20
-                local safe=true
+                local destination=self:landingScore(frame,tile,armies,escape)
+                local value = (target == 0 and 10 or 20)+(destination or 0)
+                local safe=destination~=nil
                 for _,u in pairs(frame.state.units or {}) do
                     local t=unitTile(frame.state,u)
                     if u.kind==2 and not friendly(frame.state,frame.me,u.owner) and valid(frame.map,t)
@@ -967,7 +1028,9 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="1.8.0",scope="Since the current observer snapshot; intent estimates are heuristic",
+    return {version="1.9.0",
+        opponent_observations=self.recorder and self.recorder:report() or {},
+        runtime=self.runtime or {},last_waiting=self.lastWaiting,scope="Since the current observer snapshot; intent estimates are heuristic",
         diplomacy_candidates=self.diplomacyScores or {},
         nominal_runtime={poll_hz=10,core_scan_max_hz=5,order_max_hz=5},
         alliance_history=self.strategy and self.strategy.relationships or {},income=info and info.income or 0,
