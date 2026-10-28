@@ -53,7 +53,7 @@ client.children.Main = module
 for _ = 1,18 do step() end
 assert(#world.session.sent > 0 and world.session.sent[1].type == "attack")
 local files={}
-services.HttpService={JSONEncode=function(_,report) assert((report.version=="2.3.0" and report.runtime.decisions>0) or (report.version==1 and report.records));return "report-json" end}
+services.HttpService={JSONEncode=function(_,report) assert((report.version=="2.4.0" and report.runtime.decisions>0) or (report.version==1 and report.records));return "report-json" end}
 writefile=function(name,body) files[name]=body end
 export.Activated:Fire();assert(files["RoWorld_Match_Report.json"]=="report-json")
 local archived=false;for name in pairs(files) do if name:find("RoWorld_Match_Report_123456_") then archived=true end end

@@ -39,6 +39,7 @@ function Strategy:sent(action,s,me,now)
             c.budget=math.max((s.owners[me].troops or 0)*.35,(s.owners[me].troops or 0)*(action.intent.ratio or 0)*1.5);c.deadline=now+45
             if plan.conquest and plan.conquest.finish then c.budget=math.max(c.budget,(s.owners[me].troops or 0)*.55);c.deadline=now+90 end
         end
+        if (action.plan or {}).defensive_counter then c.defensive_counter=true;c.deadline=math.min(c.deadline or now+30,now+30) end
         c.lastSent=now;c.sends+=1;c.spent+=(s.owners[me].troops or 0)*(action.intent.ratio or 0)
     elseif kind=='retreat' then
         local attack=s.attacks[action.intent.attack_id]
@@ -338,6 +339,15 @@ function Strategy:review(frame,a)
         local away=known and not self.core:isSite(frame.map,attack.anchor_tile) or not known and self.core.summary.at_risk
         if attack.target>0 then
             local o=frame.state.owners[attack.target] or {};local c=self.campaigns[attack.target]
+            local liveAttacker=false
+            for _,incoming in pairs(frame.state.attacks) do
+                if incoming.attacker==attack.target and incoming.target==frame.me and not incoming.retreating then liveAttacker=true end
+            end
+            local keepCounter=c and c.defensive_counter and liveAttacker and not friendly(frame.state,frame.me,attack.target)
+                and not (self.cooperation and self.cooperation:isFriend(attack.target)) and not frame.state:has_request(frame.me,attack.target)
+                and a.home>=math.max(math.ceil((frame.info.max_troops or 0)*.42),a.incoming*1.5)
+                and not self.core.summary.critical and frame.now-c.lastSent<8 and frame.now<(c.deadline or 0)
+            if keepCounter then continue end
             local why
             local core=self.core.summary
             if c and c.objective and c.objective.kind=='eliminate_country' and not (self:conquest(frame,attack.target,a) or {}).finish then why='Conquest no longer affordable; reassessing'

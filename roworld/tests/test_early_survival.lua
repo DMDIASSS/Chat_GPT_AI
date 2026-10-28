@@ -43,4 +43,32 @@ test('same-team and balanced allies do not cause treaty dominance warnings',func
  f.info.team=0;f.state.owners[2].team=0;f.state.owners[2].troops=50000
  assert(#s:updateBoard(f,{},army(),{}, {[2]=true}).ally_warnings==0)
 end)
+test('reckless attacker receives a proportional response above the 42 percent capacity floor',function()
+ local f=fixture();local Policy=require('../policy');local p=Policy.new();f.info.max_troops=100000
+ f.state.owners[2].kind=2;f.state.owners[2].max_troops=10000;f.set(393,2);p:reset(f)
+ f.state.attacks[3]={attacker=2,target=1,troops=4000};p:observe(f)
+ local a=army();a.incoming=4000
+ local order=assert(p:reactiveCounter(f,a,{[2]={id=2,tile=393,front=5,tiles={393}}}))
+ assert(a.home-order.plan.amount>=42000 and order.plan.amount<=8000)
+ p:sent(order,f.now);assert(not p:reactiveCounter(f,a,{[2]={id=2,tile=393,front=5,tiles={393}}}))
+end)
+test('counterattack holds below floor or against an overwhelming incoming army',function()
+ local f=fixture();local p=require('../policy').new();p:reset(f);p:observe(f)
+ f.state.attacks[3]={attacker=2,target=1,troops=50000};f.info.max_troops=200000
+ local a=army();a.incoming=50000
+ assert(not p:reactiveCounter(f,a,{[2]={id=2,tile=393,front=5,tiles={393}}}))
+end)
+test('an already funded counterattack is not fed duplicate troops',function()
+ local f=fixture();local p=require('../policy').new();p:reset(f);p:observe(f)
+ f.state.attacks[3]={attacker=2,target=1,troops=4000}
+ local a=army();a.incoming=4000;a.targets[2]=30000
+ assert(not p:reactiveCounter(f,a,{[2]={id=2,tile=393,front=5,tiles={393}}}))
+end)
+test('send-time capacity growth cancels a response that would violate its floor',function()
+ local f=fixture();local p=require('../policy').new();p:reset(f);p:observe(f)
+ f.set(393,2);f.state.attacks[3]={attacker=2,target=1,troops=4000}
+ local a=require('../adapter').new({},function() error('reuse') end,function() return f.now end);a.main=f.main
+ f.info.max_troops=200000
+ assert(not a:send({intent={type='attack',tile=393,ratio=.1},plan={defensive_counter=true,amount=5000}},assert(a:frame())))
+end)
 print('EARLY SURVIVAL TESTS',n)

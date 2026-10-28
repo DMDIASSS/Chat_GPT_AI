@@ -139,7 +139,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 2.3.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 2.4.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -276,6 +276,12 @@ function Adapter:send(action, frame)
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end
             end
             local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.5)
+            if (action.plan or {}).defensive_counter then
+                local active=false
+                for _,a in pairs(s.attacks) do if a.attacker==target and a.target==me and not a.retreating then active=true end end
+                if not active then return false,'Attacker stopped; reassessing counterattack' end
+                reserve=math.max(reserve,math.ceil((live.info.max_troops or 0)*.42))
+            end
             if action.survival then
                 if kind~='boat' or target~=0 or incoming<=troops*1.25 or rules:transports()>0 then
                     return false,'Survival expedition conditions changed'

@@ -1,4 +1,4 @@
-# RoWorld bot 2.3.0
+# RoWorld bot 2.4.0
 
 A **Start bot / Stop bot** button, live strategy dashboard, **Save match report**, **Help Roblox friends: ON/OFF**, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
@@ -22,6 +22,27 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 2.4 adds reactive counterattacks against overcommitted attackers:
+
+- A live bordering attacker is eligible when its observed army attacking us is
+  over 1.5x its remaining home bank. Allies, protected friends and pending peace
+  proposals are excluded; this is a visible overcommitment test, not intent detection.
+- Reassesses at most once per second. Amounts scale with the target bank and
+  estimated recruitment, subtracting our troops already attacking that target.
+- Each counter order retains at least **ceil(42% of current troop capacity)**,
+  the existing strategic reserve and 1.5x observed incoming threats, whichever is
+  largest. It can retain more than 42% when proportionate reinforcement requires
+  less or defensive risk requires more. Game minimum order size still applies.
+- Requires a viable forecast and enough spare troops; holds below the floor or
+  during a critical core emergency. The floor and active attacker are rechecked
+  immediately before sending. Valid counter campaigns get a short continuation
+  window to avoid immediate recall/relaunch churn, with a bounded deadline.
+
+192 offline scenarios, dashboard/lifecycle and compilation passed. This controls
+our counterattack spending; it cannot prevent combat losses from reducing the
+bank below 42%, create missing troops, or promise that retaliation wins. Other
+ordinary expansion retains its existing recruitment-aware budgets.
 
 Version 2.3 addresses the early betrayal loss:
 

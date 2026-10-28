@@ -963,6 +963,44 @@ function Policy:naval(frame, armies,survival)
     return nil
 end
 
+-- Reactive land response: keep a literal 42% capacity floor and a larger threat reserve.
+function Policy:reactiveCounter(frame,a,groups)
+    if not self:ready('counterattack',frame.now) or self.strategy.core.summary.critical then return nil end
+    local floor=math.ceil(math.max(0,frame.info.max_troops or 0)*.42)
+    local reserve=math.max(floor,a.reserve or 0,(a.incoming or 0)*1.5,(self.strategy.core.summary.incoming or 0)*1.5)
+    local spare=math.floor(a.home-reserve);local minimum=math.max(100,math.ceil(a.home*.01))
+    if spare<minimum then return nil end
+    local attackers={}
+    for _,attack in pairs(frame.state.attacks) do
+        if attack.target==frame.me and not attack.retreating then attackers[attack.attacker]=(attackers[attack.attacker] or 0)+(attack.troops or 0) end
+    end
+    local best,score
+    for id,committed in pairs(attackers) do
+        local o=frame.state.owners[id];local g=groups[id]
+        if o and o.alive and g and not frame.state:are_allies(frame.me,id) and not self.cooperation:isFriend(id)
+            and not frame.state:has_request(frame.me,id) and committed>math.max(1,o.troops or 0)*1.5
+            and not frame.state:has_fallout(g.tile) then
+            local need=math.ceil(math.max(0,(o.troops or 0)*1.5+recruitment(o,3)-(a.targets[id] or 0)))
+            -- Do not repeatedly feed a response which already has enough troops.
+            if need>0 then
+                need=math.max(need,minimum)
+                local amount=math.min(spare,need)
+                local plan=self:forecast(frame,g,a,amount)
+                if amount>=minimum and amount>=need*.8 and plan.risk<a.home*.03 then
+                    local value=committed/math.max(1,o.troops or 0)
+                    if not score or value>score then
+                        plan.amount=amount;plan.capacity_floor=floor;plan.defensive_counter=true
+                        best={intent={type='attack',tile=g.tile,ratio=amount/a.home},reserve=reserve,
+                            plan=plan,channel='counterattack',cooldown=1,
+                            label='Countering an overcommitted attacker while retaining at least 42% capacity'};score=value
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
 function Policy:decide(frame)
     if self.state ~= frame.state or self.me ~= frame.me then self:reset(frame) end
     self.cooperation:update(frame)
@@ -989,6 +1027,8 @@ function Policy:decide(frame)
                 label = "Recalling troops to defend"}
         end
     end
+    local reactive=self:reactiveCounter(frame,a,groups)
+    if reactive then return reactive end
     if a.incoming>a.home*.5 then
         board.emergency=true
         local peace=self:diplomacy(frame,groups,a)
@@ -1104,7 +1144,7 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="2.3.0",missile_alerts=self.missileAlerts or {},missile_alert_history=self.missileHistory or {},cooperation=self.cooperation.status,
+    return {version="2.4.0",counterattack_capacity_floor=0.42,missile_alerts=self.missileAlerts or {},missile_alert_history=self.missileHistory or {},cooperation=self.cooperation.status,
         atlas=self.atlas and self.atlas:report(self.strategy and self.strategy.lastNow or 0) or {},
         planner=self.planner and self.planner.report or {},
         campaigns=self.strategy and self.strategy:campaignReport() or {},
