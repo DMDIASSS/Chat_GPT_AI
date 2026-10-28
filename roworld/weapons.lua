@@ -4,6 +4,7 @@ Weapons.kinds={atom=0,hydrogen=1,mirv=2}
 Weapons.costs={atom=750000,hydrogen=5000000,mirv=25000000}
 local function valid(s,t) return type(t)=="number" and t>=0 and t<s.map.N end
 local function friendly(s,me,id) return id==me or id>0 and s:are_allies(me,id) end
+local function protected(s,me,id) return friendly(s,me,id) or (s.bot_friend_guard or {})[id]==true end
 function Weapons.cost(s,kind)
     local base=Weapons.costs[kind]
     return base and base+(kind=="mirv" and 15000000*(s.mirvs_launched or 0) or 0) or math.huge
@@ -35,12 +36,12 @@ function Weapons.blastSafe(s,me,tile,kind)
     -- warhead blast to be clear of friendlies, not only its center point.
     local x,y=tile%map.W,tile//map.W;local r=math.ceil(radius)
     for id,o in pairs(s.owners) do
-        if friendly(s,me,id) and valid(s,o.spawn_tile) and s:tile_owner(o.spawn_tile)==id
+        if protected(s,me,id) and valid(s,o.spawn_tile) and s:tile_owner(o.spawn_tile)==id
             and map.dist2(tile,o.spawn_tile)<=radius*radius then return false end
     end
     for yy=math.max(0,y-r),math.min(map.H-1,y+r) do
         for xx=math.max(0,x-r),math.min(map.W-1,x+r) do
-            if (xx-x)^2+(yy-y)^2<=radius*radius and friendly(s,me,s:tile_owner(yy*map.W+xx)) then return false end
+            if (xx-x)^2+(yy-y)^2<=radius*radius and protected(s,me,s:tile_owner(yy*map.W+xx)) then return false end
         end
     end
     return true

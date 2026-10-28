@@ -22,6 +22,7 @@ function Diplomacy.evaluate(policy,frame,id,a,groups,mode)
  local score=kind==2 and 4 or kind==0 and .5 or -3
  local function add(value,reason) score+=value;table.insert(reasons,reason) end
  table.insert(reasons,kind==2 and 'human partnership preferred' or kind==0 and 'country partnership needs concrete benefits' or 'tribe has limited strategic value')
+ if policy.cooperation and policy.cooperation:isFriend(id) then add(12,'Roblox friend matched in live roster; cooperation enabled') end
  if near then add(2,'shared frontier can be stabilized') end
  add(math.min(3,math.log(1+ratio)*2),'relative army strength')
  if s:are_allies(frame.me,id) then add(1,'existing relationship') end

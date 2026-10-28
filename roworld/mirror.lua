@@ -133,7 +133,7 @@ function Mirror.snapshot(data,map,me,yield)
     local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},units={},
         alliances={},alliance_expires={},alliance_ext={},playing_since=data.playing_since or -1,
         requests={},built={},border={},alliance_events={},alliance_seq=0,fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
-        local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
+        team_names=type(data.teams)=="table" and table.clone(data.teams) or {},local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
         rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=10}},State)
     for _,row in ipairs(data.owners or {}) do s.owners[row[1]]=owner(row) end
     for _,row in ipairs(data.structs or {}) do structure(s,row) end

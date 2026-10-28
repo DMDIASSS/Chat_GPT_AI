@@ -139,7 +139,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 2.0.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 2.1.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -265,7 +265,7 @@ function Adapter:send(action, frame)
                 return false, "Target is no longer claimable"
             end
             local target = s:tile_owner(intent.tile)
-            if target == me or (target > 0 and s:are_allies(me, target)) then return false, "Target is now friendly" end
+            if target == me or (target > 0 and (s:are_allies(me, target) or (s.bot_friend_guard or {})[target])) then return false, "Target is now friendly" end
             if target>0 and s:has_request(me,target) then return false,"Waiting for our alliance proposal before attacking" end
             if kind == "attack" and not s:borders_tile(me, intent.tile) then return false, "Target no longer borders your land" end
             if kind == "boat" and (not live.map:is_coastal(intent.tile) or not live.ctx.borders:can_reach_by_sea(intent.tile)
@@ -310,6 +310,16 @@ function Adapter:send(action, frame)
                 local allowed,reason=Weapons.canLaunch(s,me,intent.tile,intent.kind)
                 if not allowed then return false,reason end
             end
+        elseif kind=='donate' then
+            local owner=s.owners[intent.target]
+            if not owner or not owner.alive or intent.target==me or not s:are_allies(me,intent.target) then return false,'Support partner is no longer allied' end
+            local incoming=0
+            for _,a in pairs(s.attacks) do if a.target==me and not a.retreating then incoming+=a.troops or 0 end end
+            local home=math.max(0,live.info.troops or 0)
+            local reserve=math.max(action.reserve or 0,home*.65,incoming*1.5)
+            if incoming>0 or type(intent.troops)~='number' or intent.troops~=intent.troops or intent.troops==math.huge then return false,'Holding support during an invasion or invalid budget' end
+            intent.troops=math.floor(math.min(intent.troops,home*.08,math.max(0,home-reserve),math.max(0,(owner.max_troops or 0)-(owner.troops or 0))))
+            if intent.troops<100 then return false,'No safe troop support budget' end
         elseif kind == "retreat" then
             local attack = s.attacks[intent.attack_id]
             if not attack or attack.attacker ~= me or attack.retreating then return false, "Attack already ended" end

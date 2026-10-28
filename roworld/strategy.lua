@@ -207,7 +207,7 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
 end
 function Strategy:canTarget(frame,id,a)
     local s=frame.state;local o=s.owners[id];local b=self.board
-    if not o or friendly(s,frame.me,id) then return false end
+    if not o or friendly(s,frame.me,id) or self.cooperation and self.cooperation:isFriend(id) then return false end
     if frame.now<(self.peace[id] or 0) or s:has_request(frame.me,id) then return false end
     if a.incoming>a.home*.2 then return false end
     if (self.core.summary.at_risk or self.core.summary.needs_buffer) and not self.core.fronts[id]
@@ -229,6 +229,7 @@ function Strategy:canTarget(frame,id,a)
     return true
 end
 function Strategy:nuclearTarget(frame,id)
+    if self.cooperation and self.cooperation:isFriend(id) then return false end
     if frame.now<(self.peace[id] or 0) or frame.state:has_request(frame.me,id) then return false end
     local o=frame.state.owners[id]
     if self.core.summary.at_risk and not self.core.fronts[id] then
@@ -287,6 +288,7 @@ function Strategy:review(frame,a)
             elseif c and (c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline) then why='Campaign budget or time limit reached'
             elseif (core.at_risk or core.needs_buffer) and away and not self.board.permit_expansion then
                 why='Recalling a distant raid to protect the home and economic center'
+            elseif self.cooperation and self.cooperation:isFriend(attack.target) then why='Recalling troops from a Roblox friend'
             elseif friendly(frame.state,frame.me,attack.target) then why='Recalling troops after an alliance changed'
             elseif self.board.recover or a.incoming>a.home*.5 then why='Recalling the largest raid to defend the whole territory'
             elseif c and c.captures>0 and o.kind==0 and ((self.board.human_neighbours or 0)>0

@@ -62,6 +62,7 @@ function Planner:choose(frame,actions)
   for _,row in ipairs(self.report and self.report.alternatives or {}) do if row.kind==kind then score=row.score end end
   if a.investment then score+=a.investment.score*.75 end
   if a.plan and a.plan.utility then score+=math.clamp(a.plan.utility,-5,10) end
+  if t=='donate' then score+=5+math.min(18,((a.plan or {}).support_urgency or 0)*5) end
   if t=='ally_reply' then score+=25 elseif t=='ally_extend' then score+=8 end
   if a.objective=='expand' and a.intent.type=='attack' and frame.state:tile_owner(a.intent.tile)==0 then score+=2 end
   table.insert(ranked,{kind=kind,type=t,score=score,label=a.label})

@@ -1,6 +1,6 @@
-# RoWorld bot 2.0.0
+# RoWorld bot 2.1.0
 
-A **Start bot / Stop bot** button, live strategy dashboard, **Save match report**, and F6 to toggle.
+A **Start bot / Stop bot** button, live strategy dashboard, **Save match report**, **Help Roblox friends: ON/OFF**, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
 No training, Python, localhost bridge or external AI service is needed to play.
 
@@ -22,6 +22,40 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 2.1 adds team detection and optional Roblox-friend cooperation:
+
+- Detects any number of teams from snapshot team names and observed team IDs.
+  The dashboard shows team count and your team; a partial observed roster is
+  reported as potentially incomplete. Matching positive team IDs remain allies.
+- **Help Roblox friends** defaults ON and can be switched OFF at any time. Its
+  setting survives reinjection in the same client session. New Roblox sessions
+  start ON. Turning it off removes friend-specific protection and priority; it
+  does not break existing alliances or disable normal teammate support.
+- Uses the live Roblox player roster and friendship API (asynchronous API with
+  legacy fallback). Friendship checks are cached for 60 seconds and the roster
+  refreshed about every 15 seconds, outside the decision loop.
+- The game sends display names rather than account IDs for nations. Only unique
+  live player/nation name matches are used; duplicates are skipped. The Roblox
+  friendship is checked by UserId, but the nation binding is an inference, not
+  authenticated account ownership. API failures and unmatched/renamed players
+  receive no friend priority. Reports expose this limitation and lookup status.
+- Eligible friends receive alliance acceptance/offer/renewal priority. New land,
+  boat and missile attacks avoid them; existing land campaigns are recalled and
+  missile blast checks protect their land. Already launched missiles or boats
+  cannot necessarily be cancelled. Friends on opposing teams receive no special
+  treatment, preserving the game's team rules.
+- Actual allies who are eligible friends or teammates can receive limited troop
+  support when threatened or depleted. No support is sent while we have an
+  incoming land invasion or a core invasion/recovery warning. Each send is at
+  most 8% of our home bank, with a 45-second policy cooldown and further reserve,
+  recipient capacity and alliance checks immediately before sending. The bot
+  cannot control whether another player reciprocates.
+
+173 offline behavior scenarios plus dashboard/toggle/export/reinjection and
+compilation passed. Donation encoding also matched the supplied original game
+protocol. Live friendship lookup and cooperative strength remain unverified.
+No account friend requests, chat messages or external messages are sent.
 
 Version 2.0 integrates all five proposed planning extensions:
 

@@ -9,6 +9,7 @@ local Atlas = require("./atlas")
 local Profiles = require("./profiles")
 local Planner = require("./planner")
 local Investment = require("./investment")
+local Cooperation = require("./cooperation")
 Policy.__index = Policy
 
 local function neighbours(map, tile, visit)
@@ -28,7 +29,7 @@ local function friendly(s, me, other)
 end
 
 function Policy.new(profiles)
-    return setmetatable({profiles=profiles or Profiles.new(),state = nil, me = nil, cooldowns = {}, seed = 739391,
+    return setmetatable({cooperation=Cooperation.new(),profiles=profiles or Profiles.new(),state = nil, me = nil, cooldowns = {}, seed = 739391,
         cursor = nil, border = nil, lastAction = "Idle", opponents = {}, attacksSeen = {},
         metrics = {orders=0,attack=0,build=0,retreat=0,spawn=0}, frontsSeen={}}, Policy)
 end
@@ -73,6 +74,7 @@ function Policy:reset(frame)
     self.atlas=Atlas.new();self.planner=Planner.new()
     self.strategy=Strategy.new(frame,self.profiles)
     self.strategy.atlas=self.atlas
+    self.strategy.cooperation=self.cooperation
     self.recorder=Recorder.new(frame)
     self.metrics={orders=0,attack=0,build=0,retreat=0,spawn=0,peakLand=frame.info.tiles or 0,initialLand=frame.info.tiles or 0}
 end
@@ -514,7 +516,7 @@ function Policy:diplomacy(frame,groups,a)
     end
     for id,o in pairs(s.owners) do
         local sameTeam=(frame.info.team or 0)>0 and frame.info.team==o.team
-        if id~=frame.me and o.alive and friendly(s,frame.me,id) and not sameTeam and (o.traitor_until or 0)>s.tick
+        if id~=frame.me and o.alive and friendly(s,frame.me,id) and not sameTeam and not self.cooperation:isFriend(id) and (o.traitor_until or 0)>s.tick
             and a.enemyActive==0 and a.incoming==0 and (self.adjacentAllies or {})[id] then
             -- Breaking even an unreliable alliance marks US for 30 seconds.
             -- Only permit it with a very large bank covering all nearby enemies.
@@ -912,6 +914,7 @@ function Policy:naval(frame, armies,survival)
             if target>0 and self.strategy and not self.strategy:canTarget(frame,target,armies) then weak=false end
             if limited and owner and owner.kind==2 then weak=false end
             if target>0 and (armies.enemyActive or 0)>0 and not (armies.targets or {})[target] then weak=false end
+            if self.cooperation:isFriend(target) then weak=false end
             if weak and not friendly(frame.state, frame.me, target) and frame.ctx.borders:can_reach_by_sea(tile) then
                 local destination=self:landingScore(frame,tile,armies,escape)
                 local value = (target == 0 and 10 or 20)+(destination or 0)
@@ -942,6 +945,7 @@ end
 
 function Policy:decide(frame)
     if self.state ~= frame.state or self.me ~= frame.me then self:reset(frame) end
+    self.cooperation:update(frame)
     self:observe(frame)
     if not frame.info.alive then return nil, "Eliminated - waiting for the next match" end
     if not frame.info.spawned then return self:spawn(frame) end
@@ -987,6 +991,7 @@ function Policy:decide(frame)
     offer(self:economy(frame, sites, a))
     local diplomatic=self:diplomacy(frame,groups,a)
     offer(diplomatic)
+    if not board.recover and (board.core.incoming or 0)==0 then offer(self.cooperation:aid(frame,a,self:ready("support",frame.now))) end
     local fleet=self:fleet(frame,a)
     offer(fleet)
     local strike=self:strike(frame)
@@ -1079,7 +1084,7 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="2.0.0",
+    return {version="2.1.0",cooperation=self.cooperation.status,
         atlas=self.atlas and self.atlas:report(self.strategy and self.strategy.lastNow or 0) or {},
         planner=self.planner and self.planner.report or {},
         campaigns=self.strategy and self.strategy:campaignReport() or {},

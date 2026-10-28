@@ -141,7 +141,7 @@ function Wire.delta(packet,tail,decompress)
     return result
 end
 function Wire.intent(intent)
-    local types={spawn=1,attack=2,boat=3,build=4,nuke=5,retreat=6,move_warship=7,ally_request=8,ally_reply=9,ally_break=10,ally_extend=12}
+    local types={spawn=1,attack=2,boat=3,build=4,nuke=5,retreat=6,move_warship=7,ally_request=8,ally_reply=9,ally_break=10,donate=11,ally_extend=12}
     local fields={"tile","target","attack_id","troops","uid"}
     local out=buffer.create(128);local at=3
     buffer.writeu8(out,1,4);buffer.writeu8(out,2,assert(types[intent.type],"Unsupported order"))

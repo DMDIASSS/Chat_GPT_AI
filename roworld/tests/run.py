@@ -21,7 +21,7 @@ def main():
     spec.loader.exec_module(build)
     source = build.source()
     assert (ROOT / "RoWorld_Bot.lua").read_text(encoding="utf8") == source, "Rebuild the standalone script"
-    for name in ("test_policy.lua", "test_adapter.lua", "test_network.lua", "test_weapons.lua", "test_strategy.lua", "test_core.lua", "test_recovery.lua", "test_diplomacy.lua", "test_adaptation.lua", "test_planning.lua"):
+    for name in ("test_policy.lua", "test_adapter.lua", "test_network.lua", "test_weapons.lua", "test_strategy.lua", "test_core.lua", "test_recovery.lua", "test_diplomacy.lua", "test_adaptation.lua", "test_planning.lua", "test_cooperation.lua"):
         subprocess.run([args.luau, str(ROOT / "tests" / name)], check=True, timeout=30)
     compiled = subprocess.run([args.compiler, str(ROOT / "RoWorld_Bot.lua")], capture_output=True, text=True, timeout=30)
     assert compiled.returncode == 0, compiled.stderr
@@ -29,12 +29,14 @@ def main():
     assertions = r'''
 local first = assert(env.__RoWorldBot)
 assert(first.alive and not first.enabled)
-local toggle, label, export, buttons = nil, nil, nil, 0
+local toggle, label, export, friendsToggle, buttons = nil, nil, nil, nil, 0
 for _, obj in ipairs(created) do
-    if obj.ClassName == "TextButton" then buttons += 1;if obj.Name == "Toggle" then toggle = obj else export = obj end end
+    if obj.ClassName == "TextButton" then buttons += 1;if obj.Name == "Toggle" then toggle = obj elseif obj.Name == "ExportReport" then export = obj elseif obj.Name == "FriendsToggle" then friendsToggle=obj end end
     if obj.ClassName == "TextLabel" and obj.Name == "Status" then label = obj end
 end
-assert(buttons == 2 and toggle.Text == "Start bot")
+assert(buttons == 3 and toggle.Text == "Start bot" and first.helpFriends)
+friendsToggle.Activated:Fire(); assert(not first.helpFriends and friendsToggle.Text:find("OFF"))
+friendsToggle.Activated:Fire(); assert(first.helpFriends)
 export.Activated:Fire(); assert(label.Text:find("Executor file writing unavailable"))
 step(); assert(not first.enabled and #warnings == 0)
 toggle.Activated:Fire(); step()
@@ -51,7 +53,7 @@ client.children.Main = module
 for _ = 1,18 do step() end
 assert(#world.session.sent > 0 and world.session.sent[1].type == "attack")
 local files={}
-services.HttpService={JSONEncode=function(_,report) assert((report.version=="2.0.0" and report.runtime.decisions>0) or (report.version==1 and report.records));return "report-json" end}
+services.HttpService={JSONEncode=function(_,report) assert((report.version=="2.1.0" and report.runtime.decisions>0) or (report.version==1 and report.records));return "report-json" end}
 writefile=function(name,body) files[name]=body end
 export.Activated:Fire();assert(files["RoWorld_Match_Report.json"]=="report-json")
 local archived=false;for name in pairs(files) do if name:find("RoWorld_Match_Report_123456_") then archived=true end end

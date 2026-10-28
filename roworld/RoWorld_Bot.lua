@@ -1,4 +1,4 @@
--- RoWorld Bot 2.0.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 2.1.0 | paste this entire file into JJSploit.
 -- No external script downloads or localhost bridge.
 
 local Weapons = (function()
@@ -9,6 +9,7 @@ Weapons.kinds={atom=0,hydrogen=1,mirv=2}
 Weapons.costs={atom=750000,hydrogen=5000000,mirv=25000000}
 local function valid(s,t) return type(t)=="number" and t>=0 and t<s.map.N end
 local function friendly(s,me,id) return id==me or id>0 and s:are_allies(me,id) end
+local function protected(s,me,id) return friendly(s,me,id) or (s.bot_friend_guard or {})[id]==true end
 function Weapons.cost(s,kind)
     local base=Weapons.costs[kind]
     return base and base+(kind=="mirv" and 15000000*(s.mirvs_launched or 0) or 0) or math.huge
@@ -40,12 +41,12 @@ function Weapons.blastSafe(s,me,tile,kind)
     -- warhead blast to be clear of friendlies, not only its center point.
     local x,y=tile%map.W,tile//map.W;local r=math.ceil(radius)
     for id,o in pairs(s.owners) do
-        if friendly(s,me,id) and valid(s,o.spawn_tile) and s:tile_owner(o.spawn_tile)==id
+        if protected(s,me,id) and valid(s,o.spawn_tile) and s:tile_owner(o.spawn_tile)==id
             and map.dist2(tile,o.spawn_tile)<=radius*radius then return false end
     end
     for yy=math.max(0,y-r),math.min(map.H-1,y+r) do
         for xx=math.max(0,x-r),math.min(map.W-1,x+r) do
-            if (xx-x)^2+(yy-y)^2<=radius*radius and friendly(s,me,s:tile_owner(yy*map.W+xx)) then return false end
+            if (xx-x)^2+(yy-y)^2<=radius*radius and protected(s,me,s:tile_owner(yy*map.W+xx)) then return false end
         end
     end
     return true
@@ -153,6 +154,65 @@ function Weapons.allianceSafe(s,me,target)
     return true
 end
 return Weapons
+
+
+end)()
+
+local Cooperation = (function()
+
+-- Team membership comes from the game. Friendship comes from Roblox's live roster.
+local Cooperation={};Cooperation.__index=Cooperation
+function Cooperation.new() return setmetatable({enabled=true,roster={},status={}},Cooperation) end
+function Cooperation:setRoster(rows) self.roster=rows or {} end
+function Cooperation:update(frame)
+ local s=frame.state;local teams={};local count=0
+ for _,o in pairs(s.owners) do if (o.team or 0)>0 and not teams[o.team] then teams[o.team]=true;count+=1 end end
+ local names=s.team_names or {};local declared=#names
+ self.teamMode=declared>0 or count>0;self.ownTeam=frame.info.team or 0
+ local ownerNames={};for _,o in pairs(s.owners) do if o.kind==2 and o.alive then ownerNames[o.name]=(ownerNames[o.name] or 0)+1 end end
+ local players={}
+ for _,p in ipairs(self.roster) do
+  local name=p.display_name
+  if name and p.user_id and p.user_id>0 then
+   if players[name]~=nil then players[name]=false else players[name]=p end
+  end
+ end
+ self.friends={};local rows={}
+ for id,o in pairs(s.owners) do
+  local player=players[o.name]
+  if id~=frame.me and o.alive and o.kind==2 and ownerNames[o.name]==1 and player and player.is_friend==true then
+   local opposing=self.teamMode and self.ownTeam>0 and (o.team or 0)~=self.ownTeam
+   if self.enabled and not opposing then self.friends[id]=true end
+   table.insert(rows,{nation=id,user_id=player.user_id,opposing_team=opposing,help_enabled=self.enabled and not opposing,
+    binding='unique live display-name match; nation ownership is not account-ID authenticated'})
+  end
+ end
+ table.sort(rows,function(a,b) return a.nation<b.nation end)
+ s.bot_friend_guard=self.friends
+ self.status={mode=self.teamMode and 'teams' or 'free_for_all',team_count=math.max(declared,count),
+  count_source=declared>0 and 'snapshot team names' or 'observed team IDs; may be incomplete',own_team=self.ownTeam,
+  friends_enabled=self.enabled,friends=rows}
+end
+function Cooperation:isFriend(id) return self.enabled and (self.friends or {})[id]==true end
+function Cooperation:aid(frame,a,ready)
+ if not ready or a.incoming>0 or (a.available or 0)<a.home*.1 then return nil end
+ local best,urgency,amount
+ for id,o in pairs(frame.state.owners) do
+  local teammate=self.ownTeam>0 and o.team==self.ownTeam
+  if id~=frame.me and o.alive and (teammate or self:isFriend(id)) and frame.state:are_allies(frame.me,id) then
+   local incoming=0
+   for _,attack in pairs(frame.state.attacks) do if attack.target==id and not attack.retreating then incoming+=attack.troops or 0 end end
+   local cap=math.max(1,o.max_troops or 0);local need=math.max(0,incoming*1.2-(o.troops or 0))
+   if (o.troops or 0)<cap*.3 and a.home>(frame.info.max_troops or math.huge)*.6 then need=math.max(need,cap*.4-(o.troops or 0)) end
+   local send=math.floor(math.min(need,a.home*.08,a.available*.5,math.max(0,cap-(o.troops or 0))))
+   local score=incoming/math.max(1,o.troops or 0)+(self:isFriend(id) and .5 or 0)
+   if send>=100 and (not urgency or score>urgency) then best,urgency,amount=id,score,send end
+  end
+ end
+ if best then return {intent={type='donate',target=best,troops=amount},reserve=a.reserve,objective='defend',channel='support',cooldown=45,
+  label='Sending limited troop support to '..frame.state:owner_name(best),plan={amount=amount,cooperative_support=true,support_urgency=urgency}} end
+end
+return Cooperation
 
 
 end)()
@@ -623,6 +683,7 @@ function Planner:choose(frame,actions)
   for _,row in ipairs(self.report and self.report.alternatives or {}) do if row.kind==kind then score=row.score end end
   if a.investment then score+=a.investment.score*.75 end
   if a.plan and a.plan.utility then score+=math.clamp(a.plan.utility,-5,10) end
+  if t=='donate' then score+=5+math.min(18,((a.plan or {}).support_urgency or 0)*5) end
   if t=='ally_reply' then score+=25 elseif t=='ally_extend' then score+=8 end
   if a.objective=='expand' and a.intent.type=='attack' and frame.state:tile_owner(a.intent.tile)==0 then score+=2 end
   table.insert(ranked,{kind=kind,type=t,score=score,label=a.label})
@@ -902,7 +963,7 @@ function Strategy:updateBoard(frame,groups,a,fronts,allies)
 end
 function Strategy:canTarget(frame,id,a)
     local s=frame.state;local o=s.owners[id];local b=self.board
-    if not o or friendly(s,frame.me,id) then return false end
+    if not o or friendly(s,frame.me,id) or self.cooperation and self.cooperation:isFriend(id) then return false end
     if frame.now<(self.peace[id] or 0) or s:has_request(frame.me,id) then return false end
     if a.incoming>a.home*.2 then return false end
     if (self.core.summary.at_risk or self.core.summary.needs_buffer) and not self.core.fronts[id]
@@ -924,6 +985,7 @@ function Strategy:canTarget(frame,id,a)
     return true
 end
 function Strategy:nuclearTarget(frame,id)
+    if self.cooperation and self.cooperation:isFriend(id) then return false end
     if frame.now<(self.peace[id] or 0) or frame.state:has_request(frame.me,id) then return false end
     local o=frame.state.owners[id]
     if self.core.summary.at_risk and not self.core.fronts[id] then
@@ -982,6 +1044,7 @@ function Strategy:review(frame,a)
             elseif c and (c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline) then why='Campaign budget or time limit reached'
             elseif (core.at_risk or core.needs_buffer) and away and not self.board.permit_expansion then
                 why='Recalling a distant raid to protect the home and economic center'
+            elseif self.cooperation and self.cooperation:isFriend(attack.target) then why='Recalling troops from a Roblox friend'
             elseif friendly(frame.state,frame.me,attack.target) then why='Recalling troops after an alliance changed'
             elseif self.board.recover or a.incoming>a.home*.5 then why='Recalling the largest raid to defend the whole territory'
             elseif c and c.captures>0 and o.kind==0 and ((self.board.human_neighbours or 0)>0
@@ -1045,6 +1108,7 @@ function Diplomacy.evaluate(policy,frame,id,a,groups,mode)
  local score=kind==2 and 4 or kind==0 and .5 or -3
  local function add(value,reason) score+=value;table.insert(reasons,reason) end
  table.insert(reasons,kind==2 and 'human partnership preferred' or kind==0 and 'country partnership needs concrete benefits' or 'tribe has limited strategic value')
+ if policy.cooperation and policy.cooperation:isFriend(id) then add(12,'Roblox friend matched in live roster; cooperation enabled') end
  if near then add(2,'shared frontier can be stabilized') end
  add(math.min(3,math.log(1+ratio)*2),'relative army strength')
  if s:are_allies(frame.me,id) then add(1,'existing relationship') end
@@ -1223,6 +1287,7 @@ local Policy = {}
 
 
 
+
 Policy.__index = Policy
 
 local function neighbours(map, tile, visit)
@@ -1242,7 +1307,7 @@ local function friendly(s, me, other)
 end
 
 function Policy.new(profiles)
-    return setmetatable({profiles=profiles or Profiles.new(),state = nil, me = nil, cooldowns = {}, seed = 739391,
+    return setmetatable({cooperation=Cooperation.new(),profiles=profiles or Profiles.new(),state = nil, me = nil, cooldowns = {}, seed = 739391,
         cursor = nil, border = nil, lastAction = "Idle", opponents = {}, attacksSeen = {},
         metrics = {orders=0,attack=0,build=0,retreat=0,spawn=0}, frontsSeen={}}, Policy)
 end
@@ -1287,6 +1352,7 @@ function Policy:reset(frame)
     self.atlas=Atlas.new();self.planner=Planner.new()
     self.strategy=Strategy.new(frame,self.profiles)
     self.strategy.atlas=self.atlas
+    self.strategy.cooperation=self.cooperation
     self.recorder=Recorder.new(frame)
     self.metrics={orders=0,attack=0,build=0,retreat=0,spawn=0,peakLand=frame.info.tiles or 0,initialLand=frame.info.tiles or 0}
 end
@@ -1728,7 +1794,7 @@ function Policy:diplomacy(frame,groups,a)
     end
     for id,o in pairs(s.owners) do
         local sameTeam=(frame.info.team or 0)>0 and frame.info.team==o.team
-        if id~=frame.me and o.alive and friendly(s,frame.me,id) and not sameTeam and (o.traitor_until or 0)>s.tick
+        if id~=frame.me and o.alive and friendly(s,frame.me,id) and not sameTeam and not self.cooperation:isFriend(id) and (o.traitor_until or 0)>s.tick
             and a.enemyActive==0 and a.incoming==0 and (self.adjacentAllies or {})[id] then
             -- Breaking even an unreliable alliance marks US for 30 seconds.
             -- Only permit it with a very large bank covering all nearby enemies.
@@ -2126,6 +2192,7 @@ function Policy:naval(frame, armies,survival)
             if target>0 and self.strategy and not self.strategy:canTarget(frame,target,armies) then weak=false end
             if limited and owner and owner.kind==2 then weak=false end
             if target>0 and (armies.enemyActive or 0)>0 and not (armies.targets or {})[target] then weak=false end
+            if self.cooperation:isFriend(target) then weak=false end
             if weak and not friendly(frame.state, frame.me, target) and frame.ctx.borders:can_reach_by_sea(tile) then
                 local destination=self:landingScore(frame,tile,armies,escape)
                 local value = (target == 0 and 10 or 20)+(destination or 0)
@@ -2156,6 +2223,7 @@ end
 
 function Policy:decide(frame)
     if self.state ~= frame.state or self.me ~= frame.me then self:reset(frame) end
+    self.cooperation:update(frame)
     self:observe(frame)
     if not frame.info.alive then return nil, "Eliminated - waiting for the next match" end
     if not frame.info.spawned then return self:spawn(frame) end
@@ -2201,6 +2269,7 @@ function Policy:decide(frame)
     offer(self:economy(frame, sites, a))
     local diplomatic=self:diplomacy(frame,groups,a)
     offer(diplomatic)
+    if not board.recover and (board.core.incoming or 0)==0 then offer(self.cooperation:aid(frame,a,self:ready("support",frame.now))) end
     local fleet=self:fleet(frame,a)
     offer(fleet)
     local strike=self:strike(frame)
@@ -2293,7 +2362,7 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="2.0.0",
+    return {version="2.1.0",cooperation=self.cooperation.status,
         atlas=self.atlas and self.atlas:report(self.strategy and self.strategy.lastNow or 0) or {},
         planner=self.planner and self.planner.report or {},
         campaigns=self.strategy and self.strategy:campaignReport() or {},
@@ -2462,7 +2531,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 2.0.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 2.1.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -2588,7 +2657,7 @@ function Adapter:send(action, frame)
                 return false, "Target is no longer claimable"
             end
             local target = s:tile_owner(intent.tile)
-            if target == me or (target > 0 and s:are_allies(me, target)) then return false, "Target is now friendly" end
+            if target == me or (target > 0 and (s:are_allies(me, target) or (s.bot_friend_guard or {})[target])) then return false, "Target is now friendly" end
             if target>0 and s:has_request(me,target) then return false,"Waiting for our alliance proposal before attacking" end
             if kind == "attack" and not s:borders_tile(me, intent.tile) then return false, "Target no longer borders your land" end
             if kind == "boat" and (not live.map:is_coastal(intent.tile) or not live.ctx.borders:can_reach_by_sea(intent.tile)
@@ -2633,6 +2702,16 @@ function Adapter:send(action, frame)
                 local allowed,reason=Weapons.canLaunch(s,me,intent.tile,intent.kind)
                 if not allowed then return false,reason end
             end
+        elseif kind=='donate' then
+            local owner=s.owners[intent.target]
+            if not owner or not owner.alive or intent.target==me or not s:are_allies(me,intent.target) then return false,'Support partner is no longer allied' end
+            local incoming=0
+            for _,a in pairs(s.attacks) do if a.target==me and not a.retreating then incoming+=a.troops or 0 end end
+            local home=math.max(0,live.info.troops or 0)
+            local reserve=math.max(action.reserve or 0,home*.65,incoming*1.5)
+            if incoming>0 or type(intent.troops)~='number' or intent.troops~=intent.troops or intent.troops==math.huge then return false,'Holding support during an invasion or invalid budget' end
+            intent.troops=math.floor(math.min(intent.troops,home*.08,math.max(0,home-reserve),math.max(0,(owner.max_troops or 0)-(owner.troops or 0))))
+            if intent.troops<100 then return false,'No safe troop support budget' end
         elseif kind == "retreat" then
             local attack = s.attacks[intent.attack_id]
             if not attack or attack.attacker ~= me or attack.retreating then return false, "Attack already ended" end
@@ -2832,7 +2911,7 @@ function Wire.delta(packet,tail,decompress)
     return result
 end
 function Wire.intent(intent)
-    local types={spawn=1,attack=2,boat=3,build=4,nuke=5,retreat=6,move_warship=7,ally_request=8,ally_reply=9,ally_break=10,ally_extend=12}
+    local types={spawn=1,attack=2,boat=3,build=4,nuke=5,retreat=6,move_warship=7,ally_request=8,ally_reply=9,ally_break=10,donate=11,ally_extend=12}
     local fields={"tile","target","attack_id","troops","uid"}
     local out=buffer.create(128);local at=3
     buffer.writeu8(out,1,4);buffer.writeu8(out,2,assert(types[intent.type],"Unsupported order"))
@@ -2995,7 +3074,7 @@ function Mirror.snapshot(data,map,me,yield)
     local s=setmetatable({map=map,owner=data.owner,flags=data.flags,owners={},structures={},attacks={},nukes={},units={},
         alliances={},alliance_expires={},alliance_ext={},playing_since=data.playing_since or -1,
         requests={},built={},border={},alliance_events={},alliance_seq=0,fallout_count=0,mirvs_launched=data.mirvs_launched or 0,
-        local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
+        team_names=type(data.teams)=="table" and table.clone(data.teams) or {},local_owner=me,tick=data.t or 0,phase=data.phase or 0,loaded=false,
         rules={STRUCT_MIN_DIST=15/map.k_lin,MAX_BOATS_PLAYER=10}},State)
     for _,row in ipairs(data.owners or {}) do s.owners[row[1]]=owner(row) end
     for _,row in ipairs(data.structs or {}) do structure(s,row) end
@@ -3354,7 +3433,7 @@ local parent = type(gethui) == "function" and gethui() or Services.CoreGui
 local attached = pcall(function() gui.Parent = parent end)
 if not attached then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
 local panel = Instance.new("Frame")
-panel.Size = UDim2.fromOffset(410, 278)
+panel.Size = UDim2.fromOffset(410, 318)
 panel.Position = UDim2.new(1, -426, 0, 60)
 panel.BackgroundColor3 = Color3.fromRGB(20, 29, 42)
 panel.BorderSizePixel = 0
@@ -3370,7 +3449,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 2.0.0 | live strategy"
+title.Text = "RoWorld 2.1.0 | live strategy"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -3421,6 +3500,20 @@ export.Text = "Save match report"
 export.Parent = panel
 local exportCorner = corner:Clone();exportCorner.Parent = export
 
+local friendsButton=Instance.new("TextButton")
+friendsButton.Name="FriendsToggle"
+friendsButton.Size=UDim2.new(1,-24,0,30)
+friendsButton.Position=UDim2.fromOffset(12,274)
+friendsButton.Font=Enum.Font.GothamBold
+friendsButton.TextSize=13
+friendsButton.TextColor3=Color3.fromRGB(255,255,255)
+friendsButton.BackgroundColor3=Color3.fromRGB(48,76,102)
+friendsButton.BorderSizePixel=0
+friendsButton.Parent=panel
+local friendsCorner=corner:Clone();friendsCorner.Parent=friendsButton
+api.helpFriends=not previous or previous.helpFriends~=false
+local function paintFriends() friendsButton.Text="Help Roblox friends: "..(api.helpFriends and "ON" or "OFF") end
+paintFriends()
 local function repaint(message)
     if not api.alive then return end
     button.Text = api.enabled and "Stop bot" or "Start bot"
@@ -3468,6 +3561,40 @@ end
 local profiles=Profiles.new(savedProfiles)
 function api.profiles() return profiles:export() end
 local policy = Policy.new(profiles)
+local roster,friendCache={},{}
+local friendLookup={status="waiting for Roblox roster"}
+local function refreshRoster()
+    if type(Services.Players.GetPlayers)~='function' then friendLookup.status='Roblox roster API unavailable';return end
+    local ok,players=pcall(function() return Services.Players:GetPlayers() end)
+    if not ok then friendLookup.status='Roblox roster lookup failed';return end
+    friendLookup.status='live roster checked'
+    local rows={}
+    for _,player in ipairs(players) do
+        if not api.alive then return end
+        if player~=Services.Players.LocalPlayer then
+            local uid=player.UserId
+            if type(uid)~='number' or uid<=0 then continue end
+            local cached=friendCache[uid]
+            if not cached or os.clock()-cached.at>=60 then
+                local success,value=pcall(function() return Services.Players.LocalPlayer:IsFriendsWithAsync(uid) end)
+                if not success then success,value=pcall(function() return Services.Players.LocalPlayer:IsFriendsWith(uid) end) end
+                cached={at=os.clock(),friend=success and value==true};friendCache[uid]=cached
+                if not success then friendLookup.status='Friendship API failed; unverified players receive no friend priority' end
+            end
+            table.insert(rows,{user_id=uid,display_name=player.DisplayName~='' and player.DisplayName or player.Name,is_friend=cached.friend})
+        end
+    end
+    roster=rows
+end
+-- Friendship lookup may yield; keep it outside the decision loop and adapter identity.
+task.spawn(function()
+    while api.alive do refreshRoster();task.wait(15) end
+end)
+table.insert(api.connections,friendsButton.Activated:Connect(function()
+    api.helpFriends=not api.helpFriends;policy.cooperation.enabled=api.helpFriends
+    if policy.state then policy.cooperation:update({state=policy.state,me=policy.me,info=policy.state.owners[policy.me]}) end
+    paintFriends()
+end))
 local runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
 local function updateStats()
     local info=policy.state and policy.state.owners[policy.me]
@@ -3478,7 +3605,7 @@ local function updateStats()
         info.alive and (b.mode or 'observing') or 'eliminated',policy.state.tick or 0,info.tiles or 0,info.troops or 0,info.max_troops or 0,
         info.gold or 0,info.income or 0,b.incoming or 0,
         b.planner and ('Plan: '..b.planner.objective) or 'Observing strategy',runtime.last_decision_ms,runtime.blocked_orders,
-        eco.saving_for and ('Saving for '..eco.saving_for) or b.relocation_reason or 'Public-state observations; future orders unknown')
+        (policy.cooperation.status.mode=='teams' and ('Teams: '..policy.cooperation.status.team_count..' | Your team: '..policy.cooperation.status.own_team) or 'Free for all')..' | Friends matched: '..#(policy.cooperation.status.friends or {}))
 end
 local lastReport=-math.huge
 local endReported=false
@@ -3558,10 +3685,13 @@ task.spawn(function()
                 -- from user input. Keep that same heartbeat while autoplay is on.
                 if type(frame.session.note_activity) == "function" then frame.session:note_activity() end
                 local started=os.clock()
+                policy.cooperation.enabled=api.helpFriends
+                policy.cooperation:setRoster(roster)
                 local action, waiting = policy:decide(frame)
                 local ms=(os.clock()-started)*1000
                 runtime.decisions+=1;runtime.last_decision_ms=ms
                 runtime.mean_decision_ms+=(ms-runtime.mean_decision_ms)/runtime.decisions
+                runtime.friend_lookup=friendLookup
                 policy.runtime=runtime
                 policy.lastWaiting=action and action.label or waiting
                 if not api.enabled or not api.alive then return end

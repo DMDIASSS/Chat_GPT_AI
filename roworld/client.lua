@@ -21,7 +21,7 @@ local parent = type(gethui) == "function" and gethui() or Services.CoreGui
 local attached = pcall(function() gui.Parent = parent end)
 if not attached then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
 local panel = Instance.new("Frame")
-panel.Size = UDim2.fromOffset(410, 278)
+panel.Size = UDim2.fromOffset(410, 318)
 panel.Position = UDim2.new(1, -426, 0, 60)
 panel.BackgroundColor3 = Color3.fromRGB(20, 29, 42)
 panel.BorderSizePixel = 0
@@ -37,7 +37,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 2.0.0 | live strategy"
+title.Text = "RoWorld 2.1.0 | live strategy"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -88,6 +88,20 @@ export.Text = "Save match report"
 export.Parent = panel
 local exportCorner = corner:Clone();exportCorner.Parent = export
 
+local friendsButton=Instance.new("TextButton")
+friendsButton.Name="FriendsToggle"
+friendsButton.Size=UDim2.new(1,-24,0,30)
+friendsButton.Position=UDim2.fromOffset(12,274)
+friendsButton.Font=Enum.Font.GothamBold
+friendsButton.TextSize=13
+friendsButton.TextColor3=Color3.fromRGB(255,255,255)
+friendsButton.BackgroundColor3=Color3.fromRGB(48,76,102)
+friendsButton.BorderSizePixel=0
+friendsButton.Parent=panel
+local friendsCorner=corner:Clone();friendsCorner.Parent=friendsButton
+api.helpFriends=not previous or previous.helpFriends~=false
+local function paintFriends() friendsButton.Text="Help Roblox friends: "..(api.helpFriends and "ON" or "OFF") end
+paintFriends()
 local function repaint(message)
     if not api.alive then return end
     button.Text = api.enabled and "Stop bot" or "Start bot"
@@ -135,6 +149,40 @@ end
 local profiles=Profiles.new(savedProfiles)
 function api.profiles() return profiles:export() end
 local policy = Policy.new(profiles)
+local roster,friendCache={},{}
+local friendLookup={status="waiting for Roblox roster"}
+local function refreshRoster()
+    if type(Services.Players.GetPlayers)~='function' then friendLookup.status='Roblox roster API unavailable';return end
+    local ok,players=pcall(function() return Services.Players:GetPlayers() end)
+    if not ok then friendLookup.status='Roblox roster lookup failed';return end
+    friendLookup.status='live roster checked'
+    local rows={}
+    for _,player in ipairs(players) do
+        if not api.alive then return end
+        if player~=Services.Players.LocalPlayer then
+            local uid=player.UserId
+            if type(uid)~='number' or uid<=0 then continue end
+            local cached=friendCache[uid]
+            if not cached or os.clock()-cached.at>=60 then
+                local success,value=pcall(function() return Services.Players.LocalPlayer:IsFriendsWithAsync(uid) end)
+                if not success then success,value=pcall(function() return Services.Players.LocalPlayer:IsFriendsWith(uid) end) end
+                cached={at=os.clock(),friend=success and value==true};friendCache[uid]=cached
+                if not success then friendLookup.status='Friendship API failed; unverified players receive no friend priority' end
+            end
+            table.insert(rows,{user_id=uid,display_name=player.DisplayName~='' and player.DisplayName or player.Name,is_friend=cached.friend})
+        end
+    end
+    roster=rows
+end
+-- Friendship lookup may yield; keep it outside the decision loop and adapter identity.
+task.spawn(function()
+    while api.alive do refreshRoster();task.wait(15) end
+end)
+table.insert(api.connections,friendsButton.Activated:Connect(function()
+    api.helpFriends=not api.helpFriends;policy.cooperation.enabled=api.helpFriends
+    if policy.state then policy.cooperation:update({state=policy.state,me=policy.me,info=policy.state.owners[policy.me]}) end
+    paintFriends()
+end))
 local runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
 local function updateStats()
     local info=policy.state and policy.state.owners[policy.me]
@@ -145,7 +193,7 @@ local function updateStats()
         info.alive and (b.mode or 'observing') or 'eliminated',policy.state.tick or 0,info.tiles or 0,info.troops or 0,info.max_troops or 0,
         info.gold or 0,info.income or 0,b.incoming or 0,
         b.planner and ('Plan: '..b.planner.objective) or 'Observing strategy',runtime.last_decision_ms,runtime.blocked_orders,
-        eco.saving_for and ('Saving for '..eco.saving_for) or b.relocation_reason or 'Public-state observations; future orders unknown')
+        (policy.cooperation.status.mode=='teams' and ('Teams: '..policy.cooperation.status.team_count..' | Your team: '..policy.cooperation.status.own_team) or 'Free for all')..' | Friends matched: '..#(policy.cooperation.status.friends or {}))
 end
 local lastReport=-math.huge
 local endReported=false
@@ -225,10 +273,13 @@ task.spawn(function()
                 -- from user input. Keep that same heartbeat while autoplay is on.
                 if type(frame.session.note_activity) == "function" then frame.session:note_activity() end
                 local started=os.clock()
+                policy.cooperation.enabled=api.helpFriends
+                policy.cooperation:setRoster(roster)
                 local action, waiting = policy:decide(frame)
                 local ms=(os.clock()-started)*1000
                 runtime.decisions+=1;runtime.last_decision_ms=ms
                 runtime.mean_decision_ms+=(ms-runtime.mean_decision_ms)/runtime.decisions
+                runtime.friend_lookup=friendLookup
                 policy.runtime=runtime
                 policy.lastWaiting=action and action.label or waiting
                 if not api.enabled or not api.alive then return end
