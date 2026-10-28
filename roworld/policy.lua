@@ -69,7 +69,7 @@ function Policy:reset(frame)
     self.cooldowns = {}
     self.opponents,self.attacksSeen,self.frontsSeen={},{},{}
     self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={};self.spatialTick=nil;self.defenseBuilds={}
-    self.spawnPlan=nil
+    self.spawnPlan=nil;self.missileAlerts={};self.missileHistory={};self.missilesSeen={};self.alertTick=nil
     self.profiles:start(frame)
     self.atlas=Atlas.new();self.planner=Planner.new()
     self.strategy=Strategy.new(frame,self.profiles)
@@ -130,12 +130,18 @@ function Policy:enemyPlan(frame,g,a,groups)
     local enemy=frame.state.owners[g.id]
     if self.strategy and not self.strategy:canTarget(frame,g.id,a) then return nil end
     local pressure,third,outgoing=self:opportunity(frame,g.id)
+    local conquest=self.strategy and self.strategy:conquest(frame,g.id,a)
     local wanted=math.max(250,(enemy.troops or 0)*1.4-(a.targets[g.id] or 0)*.5)
+    if conquest and conquest.finish then
+        wanted=math.ceil(math.max(0,(enemy.troops or 0)*1.8+recruitment(enemy,4)-(a.targets[g.id] or 0)))
+        if wanted<math.max(100,a.home*.01) and (a.targets[g.id] or 0)>0 then return nil end
+    end
     local ceiling,reserve=self:attackAmount(frame,a,wanted,false)
     if not ceiling then return nil end
     if self.strategy and self.strategy.board.permit_expansion and not self.strategy.core.fronts[g.id] then
         ceiling=math.min(ceiling,math.floor(a.home*.12))
     end
+    if conquest and conquest.finish then ceiling=math.min(ceiling,math.floor(a.home*.4)) end
     if enemy.kind==2 then ceiling=math.min(ceiling,math.floor(a.home*.15)) end
     local campaign=self.strategy and self.strategy.campaigns[g.id]
     if campaign and campaign.budget then ceiling=math.min(ceiling,math.floor(math.max(0,campaign.budget-campaign.spent))) end
@@ -152,7 +158,9 @@ function Policy:enemyPlan(frame,g,a,groups)
             end
             plan.risk+=math.max(0,coalition+a.incoming-(a.home-amount))
             local viable=(amount>=wanted or plan.score>0 and plan.land>=3) and plan.risk<a.home*.05
+            if conquest and conquest.finish and amount<ceiling then viable=false end
             if viable then
+                plan.conquest=conquest
                 -- Preference is bounded: being attacked is an opportunity,
                 -- not evidence that an enemy's remaining army has disappeared.
                 plan.selection_score=plan.score+pressure*12
@@ -197,6 +205,17 @@ function Policy:observe(frame)
         end
     end
     self.attacksSeen=live
+    if not self.alertTick or tick-self.alertTick>=2 then
+        self.alertTick=tick;self.missileAlerts=Weapons.alerts(frame.state,frame.me)
+        for _,alert in ipairs(self.missileAlerts) do
+            if not self.missilesSeen[alert.uid] then
+                local row=table.clone(alert);row.observed_tick=tick;table.insert(self.missileHistory,row)
+                if #self.missileHistory>32 then table.remove(self.missileHistory,1) end
+            end
+            self.missilesSeen[alert.uid]=true
+        end
+        for uid in pairs(self.missilesSeen) do if not frame.state.nukes[uid] then self.missilesSeen[uid]=nil end end
+    end
     if self.strategy then self.strategy:observe(frame) end
     self.profiles:observe(frame)
     if self.recorder then self.recorder:observe(frame) end
@@ -683,6 +702,7 @@ function Policy:economy(frame, sites, armies)
     for _, n in pairs(frame.state.nukes) do
         if valid(frame.map, n.to_tile) and frame.state:tile_owner(n.to_tile) == frame.me then incomingNuke = true end
     end
+    for _,alert in ipairs(self.missileAlerts or {}) do if alert.hits_us then incomingNuke=true end end
     local wanted = {}
     local exposed=false;local enemySilo=false
     local nuclearThreat=Weapons.threat(frame.state,frame.me)
@@ -1010,13 +1030,13 @@ function Policy:decide(frame)
                     if plan then
                     plan.objective_sid=sid;plan.asset_opportunity=asset
                     local value=self.strategy:utility(frame,proposal,plan,a)
-                    table.insert(board.candidates,{nation=id,kind=enemy.kind,score=value,amount=plan.amount,asset_opportunity=asset})
+                    table.insert(board.candidates,{nation=id,kind=enemy.kind,score=value,amount=plan.amount,asset_opportunity=asset,conquest=plan.conquest})
                     plan.utility=value
                     if (enemy.traitor_until or 0)>frame.state.tick then value+=.5 end
                     if score == nil or value > score then
                         best, score = {intent = {type = "attack", tile = tile, ratio = plan.amount / a.home},
                             reserve = plan.reserve, plan=plan, channel = "attack", cooldown = 2.5,
-                            label = "Attacking " .. enemy.name}, value
+                            label = (plan.conquest and plan.conquest.finish and "Finishing country for assets and conquest gold: " or "Attacking ") .. enemy.name}, value
                     end
                     if a.targets[id] and (not currentScore or value>currentScore) then
                         currentBest,currentScore={intent={type="attack",tile=tile,ratio=plan.amount/a.home},
@@ -1084,7 +1104,7 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="2.1.0",cooperation=self.cooperation.status,
+    return {version="2.2.0",missile_alerts=self.missileAlerts or {},missile_alert_history=self.missileHistory or {},cooperation=self.cooperation.status,
         atlas=self.atlas and self.atlas:report(self.strategy and self.strategy.lastNow or 0) or {},
         planner=self.planner and self.planner.report or {},
         campaigns=self.strategy and self.strategy:campaignReport() or {},

@@ -138,6 +138,38 @@ function Weapons.threat(s,me)
     for _ in pairs(s.nukes) do r.missiles_in_flight+=1 end
     return r
 end
+-- Alerts use observed impact points and conservative blast radii, not launch intent.
+function Weapons.alerts(s,me)
+ local rows={};local radii={[0]=30,[1]=100,[2]=1518,[3]=18,[4]=60,[5]=30,[6]=1.5,[7]=15,[8]=5}
+ for uid,n in pairs(s.nukes) do
+  local radius=radii[n.kind]
+  if radius and n.owner~=me and valid(s,n.to_tile) then
+   local r=radius/(s.map.k_lin or 1);local assets=0;local allied=0
+   for _,b in pairs(s.structures) do
+    if s.map.dist2(b.tile,n.to_tile)<=r*r then
+     if b.owner==me then assets+=1 elseif s:are_allies(me,b.owner) then allied+=1 end
+    end
+   end
+   local hit=s:tile_owner(n.to_tile)==me or assets>0
+   -- Supplement exact asset checks with bounded probes for unbuilt owned land.
+   local x,y=n.to_tile%s.map.W,n.to_tile//s.map.W
+   for _,d in ipairs({{1,0},{-1,0},{0,1},{0,-1},{1,1},{-1,-1},{1,-1},{-1,1}}) do
+    for _,fraction in ipairs({.25,.5,.75}) do
+     local xx,yy=math.floor(x+d[1]*r*fraction),math.floor(y+d[2]*r*fraction)
+     if xx>=0 and yy>=0 and xx<s.map.W and yy<s.map.H and s:tile_owner(yy*s.map.W+xx)==me then hit=true end
+    end
+   end
+   if hit or allied>0 then
+    table.insert(rows,{uid=uid,owner=n.owner,kind=n.kind,target_tile=n.to_tile,hits_us=hit,own_assets=assets,allied_assets=allied,
+     eta_seconds=math.max(0,((n.launch_tick or s.tick)+(n.flight_ticks or 0)-s.tick)/10),
+     coverage_at_target=Weapons.covered(s,me,n.to_tile,1),scope='Observed flight; interception and blast outcomes uncertain; unbuilt land probes may miss narrow holdings'})
+   end
+  end
+ end
+ table.sort(rows,function(a,b) if a.hits_us~=b.hits_us then return a.hits_us end;return a.eta_seconds<b.eta_seconds end)
+ while #rows>16 do table.remove(rows) end
+ return rows
+end
 function Weapons.allianceSafe(s,me,target)
     local proxy=setmetatable({are_allies=function(_,a,b) return b==target or s:are_allies(a,b) end},{__index=s})
     for _,n in pairs(s.nukes) do

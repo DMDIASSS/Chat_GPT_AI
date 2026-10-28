@@ -33,10 +33,11 @@ function Strategy:sent(action,s,me,now)
             self.campaigns[target]=c
         end
         if not c.objective then
-            local plan=action.plan or {};c.objective={kind=plan.objective_sid and 'capture_asset' or (s.owners[target] or {}).kind==1 and 'defeat_tribe' or 'secure_corridor',
+            local plan=action.plan or {};c.objective={kind=plan.conquest and plan.conquest.finish and 'eliminate_country' or plan.objective_sid and 'capture_asset' or (s.owners[target] or {}).kind==1 and 'defeat_tribe' or 'secure_corridor',
                 sid=plan.objective_sid,tile=action.intent.tile,status='active',started_tick=s.tick,
                 initial_land=s.owners[me].tiles or 0,land_goal=math.max(100,math.floor((s.owners[me].tiles or 0)*.15))}
             c.budget=math.max((s.owners[me].troops or 0)*.35,(s.owners[me].troops or 0)*(action.intent.ratio or 0)*1.5);c.deadline=now+45
+            if plan.conquest and plan.conquest.finish then c.budget=math.max(c.budget,(s.owners[me].troops or 0)*.55);c.deadline=now+90 end
         end
         c.lastSent=now;c.sends+=1;c.spent+=(s.owners[me].troops or 0)*(action.intent.ratio or 0)
     elseif kind=='retreat' then
@@ -83,7 +84,7 @@ function Strategy:observe(frame)
             local objective=c.objective
             if objective then
                 local asset=objective.sid and s.structures[objective.sid]
-                if asset and asset.owner==frame.me then
+                if asset and asset.owner==frame.me and objective.kind~='eliminate_country' then
                     if not objective.captured_at then objective.captured_at=frame.now;c.lastProgress=frame.now end
                     local secure,total=0,0;local map=frame.map;local r=math.max(1,math.ceil(8/(map.k_lin or 1)))
                     for _,d in ipairs({{1,0},{-1,0},{0,1},{0,-1}}) do
@@ -94,14 +95,14 @@ function Strategy:observe(frame)
                     end
                     if secure>=math.max(1,total*.75) or frame.now-objective.captured_at>=8 then objective.status='complete' end
                 end
-                if objective.sid and (not asset or asset.owner~=frame.me and asset.owner~=id) then objective.status='lost' end
+                if objective.kind~='eliminate_country' and objective.sid and (not asset or asset.owner~=frame.me and asset.owner~=id) then objective.status='lost' end
                 if objective.tile and s:tile_owner(objective.tile)==frame.me and not c.foothold then
                     c.foothold=true;c.lastProgress=frame.now
                 end
                 if c.foothold and (frame.info.tiles or 0)>=(c.progressLand or objective.initial_land)+10 then
                     c.lastProgress=frame.now;c.progressLand=frame.info.tiles
                 end
-                if not objective.sid and objective.kind~='defeat_tribe' and c.foothold and (frame.info.tiles or 0)>=objective.initial_land+objective.land_goal then objective.status='complete' end
+                if not objective.sid and objective.kind~='defeat_tribe' and objective.kind~='eliminate_country' and c.foothold and (frame.info.tiles or 0)>=objective.initial_land+objective.land_goal then objective.status='complete' end
             end
             c.lastTiles=enemy.tiles
         end
@@ -221,7 +222,7 @@ function Strategy:canTarget(frame,id,a)
         if c.objective and c.objective.status~='active' then return false end
         if c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline then return false end
         if frame.now<(c.pauseUntil or 0) then return false end
-        if frame.now-(c.lastSent or -math.huge)<(o.kind==2 and 7 or o.kind==0 and 4.5 or 3) then return false end
+        if frame.now-(c.lastSent or -math.huge)<(o.kind==2 and 7 or o.kind==0 and (c.objective and c.objective.kind=='eliminate_country' and 3 or 4.5) or 3) then return false end
         if c.sends>=3 and frame.now-c.lastProgress>8 then return false end
         if o.kind==2 and c.spent>a.home*.35 then return false end
     end
@@ -263,6 +264,34 @@ function Strategy:assetOpportunity(frame,g)
     end
     return best,tile,sid
 end
+-- Reward is paid only on credited elimination; the current treasury can change.
+function Strategy:conquest(frame,id,a)
+ local o=frame.state.owners[id]
+ if not o or o.kind~=0 or not o.alive then return nil end
+ local value,buildings,defenses=0,0,0
+ local ours,assets={},{}
+ for _,b in pairs(frame.state.structures) do if b.owner==frame.me then ours[b.kind]=true end end
+ local weights={[0]=4,[1]=5,[2]=6,[3]=0,[4]=4,[5]=3}
+ for _,b in pairs(frame.state.structures) do
+  if b.owner==id then
+   local ready=(b.active_tick or 0)<=frame.state.tick
+   local need=(b.kind==0 or b.kind==1 or b.kind==2) and not ours[b.kind] and 1.5 or 1
+   value+=(weights[b.kind] or 1)*(b.level or 1)*(ready and 1 or .5)*need;buildings+=1
+   assets[tostring(b.kind)]=(assets[tostring(b.kind)] or 0)+(b.level or 1)
+   if b.kind==3 then defenses+=(b.level or 1) end
+  end
+ end
+ local gold=math.max(0,o.gold or 0);local active=(a.targets or {})[id] or 0
+ local bank=math.max(1,o.troops or 0);local force=(a.available or 0)+active
+ local small=type(o.tiles)=='number' and o.tiles>0 and o.tiles<=math.max(300,(frame.info.tiles or 0)*.8)
+ local finish=small and a.home+active>=bank*2.5 and force>=bank*1.8
+  and a.incoming==0 and not self.board.recover and (buildings>0 or gold>=50000 or ((self.campaigns[id] or {}).captures or 0)>0)
+ local score=math.min(6,value*.35)+math.min(5,math.log(1+gold/50000)*1.5)
+  -math.min(4,defenses*.4)-math.min(4,bank/math.max(1,a.home)*8)
+ return {nation=id,finish=finish,expected_conquest_gold=gold,useful_asset_value=value,buildings=buildings,
+  defense_levels=defenses,asset_levels=assets,remaining_land=o.tiles,score=score,
+  scope='Current public treasury; reward requires credited elimination and can change before capture'}
+end
 function Strategy:utility(frame,g,plan,a)
     local o=frame.state.owners[g.id];local asset=self:assetOpportunity(frame,g)
     local c=self.campaigns[g.id]
@@ -272,6 +301,8 @@ function Strategy:utility(frame,g,plan,a)
         -math.min(4,(c and c.sends or 0)*.6)-math.max(0,(self.board.human_neighbours or 0)-1)*1.5
     value+=math.clamp(plan.score/200,-1,1)
     value+=self:corePriority(frame,g.tile)
+    local conquest=plan.conquest or self:conquest(frame,g.id,a)
+    if conquest then value+=conquest.score+(conquest.finish and 3 or 0) end
     return value
 end
 function Strategy:review(frame,a)
@@ -283,7 +314,8 @@ function Strategy:review(frame,a)
             local o=frame.state.owners[attack.target] or {};local c=self.campaigns[attack.target]
             local why
             local core=self.core.summary
-            if c and c.objective and c.objective.status=='complete' then why='Campaign objective secured; banking the gain'
+            if c and c.objective and c.objective.kind=='eliminate_country' and not (self:conquest(frame,attack.target,a) or {}).finish then why='Conquest no longer affordable; reassessing'
+            elseif c and c.objective and c.objective.status=='complete' then why='Campaign objective secured; banking the gain'
             elseif c and c.objective and c.objective.status=='lost' then why='Campaign asset is gone; reassessing'
             elseif c and (c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline) then why='Campaign budget or time limit reached'
             elseif (core.at_risk or core.needs_buffer) and away and not self.board.permit_expansion then
@@ -291,7 +323,7 @@ function Strategy:review(frame,a)
             elseif self.cooperation and self.cooperation:isFriend(attack.target) then why='Recalling troops from a Roblox friend'
             elseif friendly(frame.state,frame.me,attack.target) then why='Recalling troops after an alliance changed'
             elseif self.board.recover or a.incoming>a.home*.5 then why='Recalling the largest raid to defend the whole territory'
-            elseif c and c.captures>0 and o.kind==0 and ((self.board.human_neighbours or 0)>0
+            elseif c and c.captures>0 and o.kind==0 and (not c.objective or c.objective.kind~='eliminate_country') and ((self.board.human_neighbours or 0)>0
                 or self.board.mode=='guard' or c.sends>=3 or frame.now-c.lastProgress>6) then
                 why='Secured a country building; banking the gain and reassessing'
             elseif c and c.sends>=3 and frame.now-c.lastProgress>10 then why='Ending a stalled campaign; reassessing other fronts'

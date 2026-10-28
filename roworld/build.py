@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parent
 
 
 def source():
-    parts = ["-- RoWorld Bot 2.1.0 | paste this entire file into JJSploit.\n"
+    parts = ["-- RoWorld Bot 2.2.0 | paste this entire file into JJSploit.\n"
              "-- No external script downloads or localhost bridge.\n"]
     modules = ("Weapons", "Cooperation", "Core", "Atlas", "Profiles", "Planner", "Investment", "Strategy",
                "Diplomacy", "Recorder", "Policy", "Adapter", "Wire", "Mirror", "Network")

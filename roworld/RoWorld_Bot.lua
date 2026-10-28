@@ -1,4 +1,4 @@
--- RoWorld Bot 2.1.0 | paste this entire file into JJSploit.
+-- RoWorld Bot 2.2.0 | paste this entire file into JJSploit.
 -- No external script downloads or localhost bridge.
 
 local Weapons = (function()
@@ -142,6 +142,38 @@ function Weapons.threat(s,me)
     end
     for _ in pairs(s.nukes) do r.missiles_in_flight+=1 end
     return r
+end
+-- Alerts use observed impact points and conservative blast radii, not launch intent.
+function Weapons.alerts(s,me)
+ local rows={};local radii={[0]=30,[1]=100,[2]=1518,[3]=18,[4]=60,[5]=30,[6]=1.5,[7]=15,[8]=5}
+ for uid,n in pairs(s.nukes) do
+  local radius=radii[n.kind]
+  if radius and n.owner~=me and valid(s,n.to_tile) then
+   local r=radius/(s.map.k_lin or 1);local assets=0;local allied=0
+   for _,b in pairs(s.structures) do
+    if s.map.dist2(b.tile,n.to_tile)<=r*r then
+     if b.owner==me then assets+=1 elseif s:are_allies(me,b.owner) then allied+=1 end
+    end
+   end
+   local hit=s:tile_owner(n.to_tile)==me or assets>0
+   -- Supplement exact asset checks with bounded probes for unbuilt owned land.
+   local x,y=n.to_tile%s.map.W,n.to_tile//s.map.W
+   for _,d in ipairs({{1,0},{-1,0},{0,1},{0,-1},{1,1},{-1,-1},{1,-1},{-1,1}}) do
+    for _,fraction in ipairs({.25,.5,.75}) do
+     local xx,yy=math.floor(x+d[1]*r*fraction),math.floor(y+d[2]*r*fraction)
+     if xx>=0 and yy>=0 and xx<s.map.W and yy<s.map.H and s:tile_owner(yy*s.map.W+xx)==me then hit=true end
+    end
+   end
+   if hit or allied>0 then
+    table.insert(rows,{uid=uid,owner=n.owner,kind=n.kind,target_tile=n.to_tile,hits_us=hit,own_assets=assets,allied_assets=allied,
+     eta_seconds=math.max(0,((n.launch_tick or s.tick)+(n.flight_ticks or 0)-s.tick)/10),
+     coverage_at_target=Weapons.covered(s,me,n.to_tile,1),scope='Observed flight; interception and blast outcomes uncertain; unbuilt land probes may miss narrow holdings'})
+   end
+  end
+ end
+ table.sort(rows,function(a,b) if a.hits_us~=b.hits_us then return a.hits_us end;return a.eta_seconds<b.eta_seconds end)
+ while #rows>16 do table.remove(rows) end
+ return rows
 end
 function Weapons.allianceSafe(s,me,target)
     local proxy=setmetatable({are_allies=function(_,a,b) return b==target or s:are_allies(a,b) end},{__index=s})
@@ -789,10 +821,11 @@ function Strategy:sent(action,s,me,now)
             self.campaigns[target]=c
         end
         if not c.objective then
-            local plan=action.plan or {};c.objective={kind=plan.objective_sid and 'capture_asset' or (s.owners[target] or {}).kind==1 and 'defeat_tribe' or 'secure_corridor',
+            local plan=action.plan or {};c.objective={kind=plan.conquest and plan.conquest.finish and 'eliminate_country' or plan.objective_sid and 'capture_asset' or (s.owners[target] or {}).kind==1 and 'defeat_tribe' or 'secure_corridor',
                 sid=plan.objective_sid,tile=action.intent.tile,status='active',started_tick=s.tick,
                 initial_land=s.owners[me].tiles or 0,land_goal=math.max(100,math.floor((s.owners[me].tiles or 0)*.15))}
             c.budget=math.max((s.owners[me].troops or 0)*.35,(s.owners[me].troops or 0)*(action.intent.ratio or 0)*1.5);c.deadline=now+45
+            if plan.conquest and plan.conquest.finish then c.budget=math.max(c.budget,(s.owners[me].troops or 0)*.55);c.deadline=now+90 end
         end
         c.lastSent=now;c.sends+=1;c.spent+=(s.owners[me].troops or 0)*(action.intent.ratio or 0)
     elseif kind=='retreat' then
@@ -839,7 +872,7 @@ function Strategy:observe(frame)
             local objective=c.objective
             if objective then
                 local asset=objective.sid and s.structures[objective.sid]
-                if asset and asset.owner==frame.me then
+                if asset and asset.owner==frame.me and objective.kind~='eliminate_country' then
                     if not objective.captured_at then objective.captured_at=frame.now;c.lastProgress=frame.now end
                     local secure,total=0,0;local map=frame.map;local r=math.max(1,math.ceil(8/(map.k_lin or 1)))
                     for _,d in ipairs({{1,0},{-1,0},{0,1},{0,-1}}) do
@@ -850,14 +883,14 @@ function Strategy:observe(frame)
                     end
                     if secure>=math.max(1,total*.75) or frame.now-objective.captured_at>=8 then objective.status='complete' end
                 end
-                if objective.sid and (not asset or asset.owner~=frame.me and asset.owner~=id) then objective.status='lost' end
+                if objective.kind~='eliminate_country' and objective.sid and (not asset or asset.owner~=frame.me and asset.owner~=id) then objective.status='lost' end
                 if objective.tile and s:tile_owner(objective.tile)==frame.me and not c.foothold then
                     c.foothold=true;c.lastProgress=frame.now
                 end
                 if c.foothold and (frame.info.tiles or 0)>=(c.progressLand or objective.initial_land)+10 then
                     c.lastProgress=frame.now;c.progressLand=frame.info.tiles
                 end
-                if not objective.sid and objective.kind~='defeat_tribe' and c.foothold and (frame.info.tiles or 0)>=objective.initial_land+objective.land_goal then objective.status='complete' end
+                if not objective.sid and objective.kind~='defeat_tribe' and objective.kind~='eliminate_country' and c.foothold and (frame.info.tiles or 0)>=objective.initial_land+objective.land_goal then objective.status='complete' end
             end
             c.lastTiles=enemy.tiles
         end
@@ -977,7 +1010,7 @@ function Strategy:canTarget(frame,id,a)
         if c.objective and c.objective.status~='active' then return false end
         if c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline then return false end
         if frame.now<(c.pauseUntil or 0) then return false end
-        if frame.now-(c.lastSent or -math.huge)<(o.kind==2 and 7 or o.kind==0 and 4.5 or 3) then return false end
+        if frame.now-(c.lastSent or -math.huge)<(o.kind==2 and 7 or o.kind==0 and (c.objective and c.objective.kind=='eliminate_country' and 3 or 4.5) or 3) then return false end
         if c.sends>=3 and frame.now-c.lastProgress>8 then return false end
         if o.kind==2 and c.spent>a.home*.35 then return false end
     end
@@ -1019,6 +1052,34 @@ function Strategy:assetOpportunity(frame,g)
     end
     return best,tile,sid
 end
+-- Reward is paid only on credited elimination; the current treasury can change.
+function Strategy:conquest(frame,id,a)
+ local o=frame.state.owners[id]
+ if not o or o.kind~=0 or not o.alive then return nil end
+ local value,buildings,defenses=0,0,0
+ local ours,assets={},{}
+ for _,b in pairs(frame.state.structures) do if b.owner==frame.me then ours[b.kind]=true end end
+ local weights={[0]=4,[1]=5,[2]=6,[3]=0,[4]=4,[5]=3}
+ for _,b in pairs(frame.state.structures) do
+  if b.owner==id then
+   local ready=(b.active_tick or 0)<=frame.state.tick
+   local need=(b.kind==0 or b.kind==1 or b.kind==2) and not ours[b.kind] and 1.5 or 1
+   value+=(weights[b.kind] or 1)*(b.level or 1)*(ready and 1 or .5)*need;buildings+=1
+   assets[tostring(b.kind)]=(assets[tostring(b.kind)] or 0)+(b.level or 1)
+   if b.kind==3 then defenses+=(b.level or 1) end
+  end
+ end
+ local gold=math.max(0,o.gold or 0);local active=(a.targets or {})[id] or 0
+ local bank=math.max(1,o.troops or 0);local force=(a.available or 0)+active
+ local small=type(o.tiles)=='number' and o.tiles>0 and o.tiles<=math.max(300,(frame.info.tiles or 0)*.8)
+ local finish=small and a.home+active>=bank*2.5 and force>=bank*1.8
+  and a.incoming==0 and not self.board.recover and (buildings>0 or gold>=50000 or ((self.campaigns[id] or {}).captures or 0)>0)
+ local score=math.min(6,value*.35)+math.min(5,math.log(1+gold/50000)*1.5)
+  -math.min(4,defenses*.4)-math.min(4,bank/math.max(1,a.home)*8)
+ return {nation=id,finish=finish,expected_conquest_gold=gold,useful_asset_value=value,buildings=buildings,
+  defense_levels=defenses,asset_levels=assets,remaining_land=o.tiles,score=score,
+  scope='Current public treasury; reward requires credited elimination and can change before capture'}
+end
 function Strategy:utility(frame,g,plan,a)
     local o=frame.state.owners[g.id];local asset=self:assetOpportunity(frame,g)
     local c=self.campaigns[g.id]
@@ -1028,6 +1089,8 @@ function Strategy:utility(frame,g,plan,a)
         -math.min(4,(c and c.sends or 0)*.6)-math.max(0,(self.board.human_neighbours or 0)-1)*1.5
     value+=math.clamp(plan.score/200,-1,1)
     value+=self:corePriority(frame,g.tile)
+    local conquest=plan.conquest or self:conquest(frame,g.id,a)
+    if conquest then value+=conquest.score+(conquest.finish and 3 or 0) end
     return value
 end
 function Strategy:review(frame,a)
@@ -1039,7 +1102,8 @@ function Strategy:review(frame,a)
             local o=frame.state.owners[attack.target] or {};local c=self.campaigns[attack.target]
             local why
             local core=self.core.summary
-            if c and c.objective and c.objective.status=='complete' then why='Campaign objective secured; banking the gain'
+            if c and c.objective and c.objective.kind=='eliminate_country' and not (self:conquest(frame,attack.target,a) or {}).finish then why='Conquest no longer affordable; reassessing'
+            elseif c and c.objective and c.objective.status=='complete' then why='Campaign objective secured; banking the gain'
             elseif c and c.objective and c.objective.status=='lost' then why='Campaign asset is gone; reassessing'
             elseif c and (c.budget and c.spent>=c.budget or c.deadline and frame.now>c.deadline) then why='Campaign budget or time limit reached'
             elseif (core.at_risk or core.needs_buffer) and away and not self.board.permit_expansion then
@@ -1047,7 +1111,7 @@ function Strategy:review(frame,a)
             elseif self.cooperation and self.cooperation:isFriend(attack.target) then why='Recalling troops from a Roblox friend'
             elseif friendly(frame.state,frame.me,attack.target) then why='Recalling troops after an alliance changed'
             elseif self.board.recover or a.incoming>a.home*.5 then why='Recalling the largest raid to defend the whole territory'
-            elseif c and c.captures>0 and o.kind==0 and ((self.board.human_neighbours or 0)>0
+            elseif c and c.captures>0 and o.kind==0 and (not c.objective or c.objective.kind~='eliminate_country') and ((self.board.human_neighbours or 0)>0
                 or self.board.mode=='guard' or c.sends>=3 or frame.now-c.lastProgress>6) then
                 why='Secured a country building; banking the gain and reassessing'
             elseif c and c.sends>=3 and frame.now-c.lastProgress>10 then why='Ending a stalled campaign; reassessing other fronts'
@@ -1347,7 +1411,7 @@ function Policy:reset(frame)
     self.cooldowns = {}
     self.opponents,self.attacksSeen,self.frontsSeen={},{},{}
     self.lastTick=nil;self.lastPlan=nil;self.history={};self.siteCache={};self.spatialTick=nil;self.defenseBuilds={}
-    self.spawnPlan=nil
+    self.spawnPlan=nil;self.missileAlerts={};self.missileHistory={};self.missilesSeen={};self.alertTick=nil
     self.profiles:start(frame)
     self.atlas=Atlas.new();self.planner=Planner.new()
     self.strategy=Strategy.new(frame,self.profiles)
@@ -1408,12 +1472,18 @@ function Policy:enemyPlan(frame,g,a,groups)
     local enemy=frame.state.owners[g.id]
     if self.strategy and not self.strategy:canTarget(frame,g.id,a) then return nil end
     local pressure,third,outgoing=self:opportunity(frame,g.id)
+    local conquest=self.strategy and self.strategy:conquest(frame,g.id,a)
     local wanted=math.max(250,(enemy.troops or 0)*1.4-(a.targets[g.id] or 0)*.5)
+    if conquest and conquest.finish then
+        wanted=math.ceil(math.max(0,(enemy.troops or 0)*1.8+recruitment(enemy,4)-(a.targets[g.id] or 0)))
+        if wanted<math.max(100,a.home*.01) and (a.targets[g.id] or 0)>0 then return nil end
+    end
     local ceiling,reserve=self:attackAmount(frame,a,wanted,false)
     if not ceiling then return nil end
     if self.strategy and self.strategy.board.permit_expansion and not self.strategy.core.fronts[g.id] then
         ceiling=math.min(ceiling,math.floor(a.home*.12))
     end
+    if conquest and conquest.finish then ceiling=math.min(ceiling,math.floor(a.home*.4)) end
     if enemy.kind==2 then ceiling=math.min(ceiling,math.floor(a.home*.15)) end
     local campaign=self.strategy and self.strategy.campaigns[g.id]
     if campaign and campaign.budget then ceiling=math.min(ceiling,math.floor(math.max(0,campaign.budget-campaign.spent))) end
@@ -1430,7 +1500,9 @@ function Policy:enemyPlan(frame,g,a,groups)
             end
             plan.risk+=math.max(0,coalition+a.incoming-(a.home-amount))
             local viable=(amount>=wanted or plan.score>0 and plan.land>=3) and plan.risk<a.home*.05
+            if conquest and conquest.finish and amount<ceiling then viable=false end
             if viable then
+                plan.conquest=conquest
                 -- Preference is bounded: being attacked is an opportunity,
                 -- not evidence that an enemy's remaining army has disappeared.
                 plan.selection_score=plan.score+pressure*12
@@ -1475,6 +1547,17 @@ function Policy:observe(frame)
         end
     end
     self.attacksSeen=live
+    if not self.alertTick or tick-self.alertTick>=2 then
+        self.alertTick=tick;self.missileAlerts=Weapons.alerts(frame.state,frame.me)
+        for _,alert in ipairs(self.missileAlerts) do
+            if not self.missilesSeen[alert.uid] then
+                local row=table.clone(alert);row.observed_tick=tick;table.insert(self.missileHistory,row)
+                if #self.missileHistory>32 then table.remove(self.missileHistory,1) end
+            end
+            self.missilesSeen[alert.uid]=true
+        end
+        for uid in pairs(self.missilesSeen) do if not frame.state.nukes[uid] then self.missilesSeen[uid]=nil end end
+    end
     if self.strategy then self.strategy:observe(frame) end
     self.profiles:observe(frame)
     if self.recorder then self.recorder:observe(frame) end
@@ -1961,6 +2044,7 @@ function Policy:economy(frame, sites, armies)
     for _, n in pairs(frame.state.nukes) do
         if valid(frame.map, n.to_tile) and frame.state:tile_owner(n.to_tile) == frame.me then incomingNuke = true end
     end
+    for _,alert in ipairs(self.missileAlerts or {}) do if alert.hits_us then incomingNuke=true end end
     local wanted = {}
     local exposed=false;local enemySilo=false
     local nuclearThreat=Weapons.threat(frame.state,frame.me)
@@ -2288,13 +2372,13 @@ function Policy:decide(frame)
                     if plan then
                     plan.objective_sid=sid;plan.asset_opportunity=asset
                     local value=self.strategy:utility(frame,proposal,plan,a)
-                    table.insert(board.candidates,{nation=id,kind=enemy.kind,score=value,amount=plan.amount,asset_opportunity=asset})
+                    table.insert(board.candidates,{nation=id,kind=enemy.kind,score=value,amount=plan.amount,asset_opportunity=asset,conquest=plan.conquest})
                     plan.utility=value
                     if (enemy.traitor_until or 0)>frame.state.tick then value+=.5 end
                     if score == nil or value > score then
                         best, score = {intent = {type = "attack", tile = tile, ratio = plan.amount / a.home},
                             reserve = plan.reserve, plan=plan, channel = "attack", cooldown = 2.5,
-                            label = "Attacking " .. enemy.name}, value
+                            label = (plan.conquest and plan.conquest.finish and "Finishing country for assets and conquest gold: " or "Attacking ") .. enemy.name}, value
                     end
                     if a.targets[id] and (not currentScore or value>currentScore) then
                         currentBest,currentScore={intent={type="attack",tile=tile,ratio=plan.amount/a.home},
@@ -2362,7 +2446,7 @@ function Policy:report()
             if u.owner==self.me and u.kind==2 then navy.warships+=1 end
         end
     end
-    return {version="2.1.0",cooperation=self.cooperation.status,
+    return {version="2.2.0",missile_alerts=self.missileAlerts or {},missile_alert_history=self.missileHistory or {},cooperation=self.cooperation.status,
         atlas=self.atlas and self.atlas:report(self.strategy and self.strategy.lastNow or 0) or {},
         planner=self.planner and self.planner.report or {},
         campaigns=self.strategy and self.strategy:campaignReport() or {},
@@ -2531,7 +2615,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 2.1.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 2.2.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -3449,7 +3533,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 2.1.0 | live strategy"
+title.Text = "RoWorld 2.2.0 | live strategy"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -3518,6 +3602,8 @@ local function repaint(message)
     if not api.alive then return end
     button.Text = api.enabled and "Stop bot" or "Start bot"
     button.BackgroundColor3 = api.enabled and Color3.fromRGB(166, 58, 65) or Color3.fromRGB(33, 133, 99)
+    local alert=env.__RoWorldBot and env.__RoWorldBot.missileWarning
+    if alert then message=alert.."\n"..(message or '') end
     status.Text = message or "Stopped - press Start bot (F6 also toggles)"
 end
 
@@ -3642,6 +3728,7 @@ local lastCommand, lastCommandAt = "", -math.huge
 local evaluatedState,evaluatedTick,evaluatedAt
 local function toggle()
     api.enabled = not api.enabled
+    api.missileWarning=nil
     if api.enabled then
         policy = Policy.new(profiles)
         runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
@@ -3692,6 +3779,8 @@ task.spawn(function()
                 runtime.decisions+=1;runtime.last_decision_ms=ms
                 runtime.mean_decision_ms+=(ms-runtime.mean_decision_ms)/runtime.decisions
                 runtime.friend_lookup=friendLookup
+                local alert=(policy.missileAlerts or {})[1]
+                api.missileWarning=alert and string.format("MISSILE ALERT: %s | %.1fs | %d own assets",alert.hits_us and 'our territory' or 'allied assets',alert.eta_seconds,alert.own_assets) or nil
                 policy.runtime=runtime
                 policy.lastWaiting=action and action.label or waiting
                 if not api.enabled or not api.alive then return end

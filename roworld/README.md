@@ -1,4 +1,4 @@
-# RoWorld bot 2.1.0
+# RoWorld bot 2.2.0
 
 A **Start bot / Stop bot** button, live strategy dashboard, **Save match report**, **Help Roblox friends: ON/OFF**, and F6 to toggle.
 Standalone Luau for the supplied RoWorld place `137151641329864`, version 111.
@@ -22,6 +22,41 @@ then execute `JJSploit_Launch.lua`. Pasting the entire script does not need file
 or HTTP functions and does not depend on the extraction location.
 
 ## Strategy
+
+Version 2.2 prioritizes valuable country conquests and adds visible missile alerts:
+
+- Country targets are ranked by current treasury, productive building kinds,
+  levels, readiness, missing production in our economy, defense and army cost.
+  Defense posts do not inflate the useful-asset score.
+- Weak, manageable countries with assets or money can become **elimination**
+  objectives. These continue after the first building capture instead of banking
+  that raid immediately. Finishing remains subject to home defense, route/front
+  feasibility, counterattack forecasts, spending limits and a 90-second deadline.
+- A finishing allocation is capped at 40% of the current home bank and existing
+  reserves can reduce it further. Reinforcement accounts for troops already
+  attacking, has a three-second country campaign interval and cannot exceed the
+  remaining campaign allocation. An adequate live army is not fed duplicate sends.
+- Inspected rules pay a country's remaining treasury to the credited conqueror.
+  The displayed amount is an estimate: spending and another player's finishing
+  attack can change or remove our reward. Elimination does not guarantee that we
+  captured every building or that all surviving territory is reachable.
+- Visible incoming missile flights trigger dashboard warnings with estimated
+  impact time, own/allied assets in the possible blast and SAM coverage at the
+  target. Alerts scan at up to 5 Hz, retain the latest 32 observations and are
+  exposed as `missile_alerts` / `missile_alert_history` in the report. Unrelated
+  distant launches do not create a local warning. Asset checks are exact point
+  checks against conservative radii; bounded unbuilt-land probes may miss thin
+  holdings. Interception, actual damage and last-second target changes are unknown.
+- Threatened own assets feed the existing SAM construction consideration. A
+  warning cannot supply missing money, instantly finish a SAM or cancel missiles.
+
+182 offline scenarios, UI lifecycle and compilation passed. Country conquest-gold
+math also matched the supplied original Rules. Two three-minute country-AI smoke
+seeds survived; results were mixed for land and do not establish faster credited
+eliminations or a live strength gain. The supplied v2.0 report confirms a betrayer
+committed most of its bank, but does not retain enough impact information to
+attribute each lost asset to a specific missile; the new alert history improves
+that evidence for subsequent matches.
 
 Version 2.1 adds team detection and optional Roblox-friend cooperation:
 
