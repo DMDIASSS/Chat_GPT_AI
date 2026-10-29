@@ -1,4 +1,4 @@
--- RoWorld 3.0.0 | independent observation / candidate policy
+-- RoWorld 3.1.0 | independent observation / candidate policy
 -- No OpenFront weights; no external runtime downloads.
 local Weapons=(function()
 -- RoWorld weapon observations and conservative launch checks shared by both routes.
@@ -184,6 +184,176 @@ function Weapons.allianceSafe(s,me,target)
     return true
 end
 return Weapons
+
+end)()
+
+local Coalition=(function()
+-- Tactical cooperation and opportunism from current public facts, not hidden intent.
+-- Shared by proposals and the final sender, so relationship/risk changes cancel orders.
+local Coalition={}
+
+local function valid(m,t) return type(t)=='number' and t%1==0 and t>=0 and t<m.N end
+local function sameTeam(s,a,b)
+    local x,y=s.owners[a],s.owners[b]
+    return x and y and (x.team or 0)>0 and x.team==y.team
+end
+local function protected(s,me,id)
+    return id==me or s:are_allies(me,id) or (s.bot_friend_guard or {})[id]==true
+end
+local function growth(p,seconds)
+    local h,c=math.max(0,p.troops or 0),math.max(1,p.max_troops or 1)
+    return math.max(0,(h^.73/4+10)*(1-h/c)*10*seconds)
+end
+function Coalition.armies(s)
+    local incoming,committed,between={},{},{}
+    for _,a in pairs(s.attacks) do if not a.retreating then
+        local n=math.max(0,a.troops or 0)
+        incoming[a.target]=(incoming[a.target] or 0)+n
+        committed[a.attacker]=(committed[a.attacker] or 0)+n
+        local key=a.attacker*1024+a.target;between[key]=(between[key] or 0)+n
+    end end
+    return incoming,committed,between
+end
+function Coalition.frontier(frame,who,target)
+    local s,m=frame.state,frame.map
+    if who==frame.me then
+        for t in pairs(frame.ctx.borders.border) do
+            if s:tile_owner(t)==who then
+                local x=t%m.W
+                for _,n in ipairs({x>0 and t-1 or -1,x<m.W-1 and t+1 or -1,t-m.W,t+m.W}) do
+                    if valid(m,n) and s:tile_owner(n)==target and m:is_contestable(n) and not s:has_fallout(n) then return n end
+                end
+            end
+        end
+        return nil
+    end
+    -- Other nations' border sets are not given by the client. Use bounded exact
+    -- tile checks around their public centers; lack of evidence means no proposal.
+    local anchors={};local p,q=s.owners[who],s.owners[target]
+    for _,o in ipairs({p or {},q or {}}) do
+        if valid(m,o.spawn_tile) then table.insert(anchors,o.spawn_tile) end
+        if valid(m,o.label_tile) and o.label_tile~=o.spawn_tile then table.insert(anchors,o.label_tile) end
+    end
+    local r=math.min(6,math.max(1,math.ceil(18/(m.k_lin or 1))))
+    for _,anchor in ipairs(anchors) do
+        local x,y=anchor%m.W,anchor//m.W
+        for yy=math.max(0,y-r),math.min(m.H-1,y+r) do for xx=math.max(0,x-r),math.min(m.W-1,x+r) do
+            local t=yy*m.W+xx
+            if s:tile_owner(t)==target and m:is_contestable(t) and not s:has_fallout(t) and s:borders_tile(who,t) then return t end
+        end end
+    end
+end
+function Coalition.support(frame,partner,target)
+    local s,me=frame.state,frame.me;local p,q=s.owners[partner],s.owners[target]
+    local function no(reason) return nil,reason end
+    if partner==me or partner==target or not p or not q or not p.alive or not q.alive or not s:are_allies(me,partner) then return no('partner or target is no longer eligible') end
+    if protected(s,me,target) or s:are_allies(partner,target) or sameTeam(s,partner,target)
+        or s:has_request(me,target) or s:has_request(partner,target) or s:has_request(target,partner) then return no('target is protected or partnered with a participant') end
+    if (p.traitor_until or 0)>s.tick or (frame.info.traitor_until or 0)>s.tick then return no('traitor vulnerability or unreliable recipient') end
+    if type(s.alliance_info)=='function' and not sameTeam(s,me,partner) then
+        local treaty=s:alliance_info(me,partner)
+        if treaty and treaty.ticks_left<450 then return no('partnership expires too soon') end
+    end
+    local incoming,committed,between=Coalition.armies(s)
+    local home=math.max(0,frame.info.troops or 0);local attack=between[partner*1024+target] or 0
+    if (incoming[me] or 0)>home*.2 or (between[partner*1024+me] or 0)>0 then return no('our home defense is under too much pressure') end
+    local counter=(between[target*1024+me] or 0)+(between[target*1024+partner] or 0)>math.max(1,q.troops or 0)*1.5
+    if attack<=0 and not (counter and Coalition.frontier(frame,partner,target)) then return no('no observed attack or reachable counter opportunity') end
+    local allyHome=math.max(0,p.troops or 0);local room=math.max(0,(p.max_troops or 0)-allyHome)
+    local allySpare=math.max(0,allyHome-math.max((p.max_troops or 0)*.42,(incoming[partner] or 0)*1.5))
+    local need=math.ceil(math.max(0,(q.troops or 0)*1.35+growth(q,3)+(incoming[partner] or 0)*.5-attack-allySpare))
+    local reserve=math.max(home*.75,math.ceil((frame.info.max_troops or 0)*.42),(incoming[me] or 0)*2)
+    local amount=math.min(need,math.floor(home*.08),math.floor(home-reserve),math.floor(room))
+    if amount<100 or amount<need then return no('grant cannot close the estimated funding gap while retaining reserves') end
+    if not sameTeam(s,me,partner) and not (s.bot_friend_guard or {})[partner] and allyHome+amount>(home-amount)*1.5 then return no('gift would create a dominant treaty neighbor') end
+    -- A target backed by a much stronger third party is not a cheap finishing job.
+    local backing=0
+    for id,o in pairs(s.owners) do
+        if id~=me and id~=partner and id~=target and o.alive and s:are_allies(target,id)
+            and not s:are_allies(me,id) and not s:are_allies(partner,id) then backing+=o.troops or 0 end
+    end
+    if backing>home+allyHome then return no('target coalition outweighs the supporting pair') end
+    return {partner=partner,target=target,amount=amount,reserve=reserve,need=need,
+        commitment=attack,target_land=q.tiles or 0,mode=counter and 'counterattack' or 'finish_attack',
+        score=(counter and 7 or 5.5)+math.min(1,attack/math.max(1,q.troops or 0)),
+        uncertainty='Recipient controls its own army; a grant cannot force an attack or guarantee elimination'}
+end
+function Coalition.betrayal(frame,target,tile,followup)
+    local s,m,me=frame.state,frame.map,frame.me;local p=s.owners[target]
+    local function no(reason) return nil,reason end
+    if not p or not p.alive or target==me or sameTeam(s,me,target) or (s.bot_friend_guard or {})[target] then return no('target is a teammate, protected friend or unavailable') end
+    if followup then
+        if s:are_allies(me,target) then return no('waiting for alliance break confirmation') end
+    elseif not s:are_allies(me,target) or (frame.info.traitor_until or 0)>s.tick then return no('no treaty to end or already under the traitor penalty') end
+    if not valid(m,tile) or s:tile_owner(tile)~=target or not s:borders_tile(me,tile)
+        or not m:is_contestable(tile) or s:has_fallout(tile) or Weapons.hazard(s,tile,0,3) then return no('no current safe land frontier') end
+    if s:has_request(me,target) then return no('our peace proposal is still pending') end
+    local incoming,committed,between=Coalition.armies(s)
+    local home=math.max(0,frame.info.troops or 0)
+    if (incoming[me] or 0)>0 then return no('cannot opportunistically betray during an invasion') end
+    for _,a in pairs(s.attacks) do
+        if a.attacker==me and a.target>0 and not a.retreating and (not followup or a.target~=target) then return no('another war is active') end
+    end
+    for _,alert in ipairs(Weapons.alerts(s,me)) do if alert.hits_us then return no('home territory has a missile warning') end end
+    for _,u in pairs(s.units or {}) do
+        if u.owner==me and u.kind==0 then return no('an existing expedition could create another front') end
+        if u.kind==2 and u.owner~=me and (u.owner==target or s:are_allies(target,u.owner)) and (u.hp or 1)>0 then
+            local path=u.path or {};local index=math.clamp(math.floor(math.max(0,s.tick-(u.start_tick or s.tick))*100/math.max(1,u.ticks_per_tile_x100 or 100))+1,1,math.max(1,#path))
+            local position=path[index] or u.patrol_tile
+            if valid(m,position) then
+                local near=valid(m,frame.info.label_tile) and m.dist2(position,frame.info.label_tile)*(m.k_lin or 1)^2<180^2
+                for _,b in pairs(s.structures) do if b.owner==me and m.dist2(position,b.tile)*(m.k_lin or 1)^2<180^2 then near=true;break end end
+                if near then return no('target or coalition warships can threaten our economic home') end
+            end
+        end
+    end
+    local victim=math.max(0,p.troops or 0)
+    local need=math.ceil(victim*1.5+growth(p,3))
+    local reserve=math.max(home*.8,math.ceil((frame.info.max_troops or 0)*.42))
+    local existing=between[me*1024+target] or 0
+    local amount=math.max(0,need-existing)
+    if victim>home*.1 or need>home*.15 or home-amount<reserve then return no('capture would commit too much of our army') end
+    if (p.tiles or 0)>math.max(200,(frame.info.tiles or 0)*.8) then return no('target is too large for a bounded raid') end
+    local nearby={};local work=0
+    for t in pairs(frame.ctx.borders.border) do
+        work+=1;if work>8192 then return no('frontier coverage is insufficient for a low-risk assessment') end
+        local x=t%m.W
+        if s:tile_owner(t)==me then for _,n in ipairs({x>0 and t-1 or -1,x<m.W-1 and t+1 or -1,t-m.W,t+m.W}) do
+            if valid(m,n) then nearby[s:tile_owner(n)]=true end
+        end end
+    end
+    local exposure=victim
+    for id,o in pairs(s.owners) do
+        if id~=me and id~=target and o.alive then
+            local center=o.label_tile or o.spawn_tile
+            local close=nearby[id] or valid(m,center) and m.dist2(tile,center)*(m.k_lin or 1)^2<150^2
+            if close and (not s:are_allies(me,id) or s:are_allies(target,id)) then exposure+=o.troops or 0 end
+        end
+    end
+    -- Any treaty break marks us as a traitor: defense is halved for 300 ticks.
+    if (home-amount)*.5<exposure*2 then return no('half-defense window is exposed to retaliation or a coalition') end
+    local assetValue,trade=0,0
+    for _,b in pairs(s.structures) do
+        if b.owner==target then
+            if b.kind==5 and (b.active_tick or 0)<=s.tick+300 and (p.gold or 0)>=750000 then return no('target can retaliate with missiles during our vulnerability window') end
+            if b.kind==3 and (b.active_tick or 0)<=s.tick and m.dist2(tile,b.tile)*(m.k_lin or 1)^2<80^2 then return no('fortified frontier is outside the cheap-capture estimate') end
+            if m.dist2(tile,b.tile)*(m.k_lin or 1)^2<=60^2 then
+                assetValue+=(({[0]=125000,[1]=125000,[2]=125000,[3]=0,[4]=1500000,[5]=1000000})[b.kind] or 0)*(b.level or 1)
+            end
+            if b.kind==1 then trade=125000 end
+        end
+    end
+    local treasury=math.max(0,p.gold or 0)*(p.kind==2 and .5 or 1)
+    -- Treasury is counted only for a small target; it is not a guaranteed raid payout.
+    local conquest=(p.tiles or 0)<=math.max(100,(frame.info.tiles or 0)*.25) and treasury or 0
+    local reward=assetValue+conquest
+    if reward<100000+trade*2 or reward<need*15 then return no('visible capture value does not compensate for army, treaty and trade costs') end
+    return {target=target,tile=tile,amount=amount,reserve=reserve,need=need,exposure=exposure,
+        estimated_assets=assetValue,estimated_conquest_gold=conquest,estimated_value=reward,
+        defense_multiplier=.5,vulnerability_ticks=300,score=6+math.min(2,reward/1000000),
+        uncertainty='Visible-state estimate; hidden intentions, future orders and credited conquests are unknown'}
+end
+return Coalition
 
 end)()
 
@@ -445,6 +615,7 @@ local Adapter=(function()
 -- Uses the existing live Main.session; never creates a second simulation.
 local Adapter = {}
 
+
 Adapter.__index = Adapter
 
 function Adapter.new(services, requireModule, now, capabilities)
@@ -582,7 +753,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 3.0.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 3.1.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -719,6 +890,11 @@ function Adapter:send(action, frame)
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end
             end
             local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.5)
+            if (action.plan or {}).after_betrayal then
+                local q,why=Coalition.betrayal(live,target,intent.tile,true)
+                if not q or q.amount>(action.plan.amount or 0)+1 then return false,why or 'Betrayal capture cost changed' end
+                reserve=math.max(reserve,q.reserve)
+            end
             if (action.plan or {}).defensive_counter then
                 local active=false
                 for _,a in pairs(s.attacks) do if a.attacker==target and a.target==me and not a.retreating then active=true end end
@@ -766,7 +942,13 @@ function Adapter:send(action, frame)
             for _,a in pairs(s.attacks) do if a.target==me and not a.retreating then incoming+=a.troops or 0 end end
             local home=math.max(0,live.info.troops or 0)
             local reserve=math.max(action.reserve or 0,home*.65,incoming*1.5)
-            if incoming>0 or type(intent.troops)~='number' or intent.troops~=intent.troops or intent.troops==math.huge then return false,'Holding support during an invasion or invalid budget' end
+            if type(intent.troops)~='number' or intent.troops~=intent.troops or math.abs(intent.troops)==math.huge
+                or (live.info.traitor_until or 0)>s.tick then return false,'Holding support during vulnerability or invalid budget' end
+            if (action.plan or {}).strategic_support then
+                local q,why=Coalition.support(live,intent.target,action.plan.support_target)
+                if not q or intent.troops<q.need then return false,why or 'Tactical support no longer covers the required amount' end
+                reserve=math.max(reserve,q.reserve);intent.troops=math.min(intent.troops,q.amount)
+            elseif incoming>0 then return false,'Holding support during an invasion' end
             intent.troops=math.floor(math.min(intent.troops,home*.08,math.max(0,home-reserve),math.max(0,(owner.max_troops or 0)-(owner.troops or 0))))
             if intent.troops<100 then return false,'No safe troop support budget' end
         elseif kind == "retreat" then
@@ -791,7 +973,11 @@ function Adapter:send(action, frame)
                 or (owner.traitor_until or 0)>s.tick) then return false,"Alliance request is no longer needed" end
             if kind=="ally_request" and not Weapons.allianceSafe(s,me,intent.target) then return false,"Our in-flight strike endangers this alliance" end
             if kind=="ally_break" then
-                if not s:are_allies(me,intent.target) or (owner.traitor_until or 0)<=s.tick
+                if (action.plan or {}).opportunistic_betrayal then
+                    local q,why=Coalition.betrayal(live,intent.target,action.plan.objective_tile,false)
+                    if not q then return false,why end
+                else
+                if not s:are_allies(me,intent.target) or (owner.traitor_until or 0)<=s.tick or (s.bot_friend_guard or {})[intent.target]
                     or (live.info.team or 0)>0 and live.info.team==owner.team then return false,"Alliance cannot be safely ended" end
                 local exposure=owner.troops or 0
                 for id,o in pairs(s.owners) do
@@ -800,6 +986,7 @@ function Adapter:send(action, frame)
                 if (live.info.troops or 0)<=math.max(50000,exposure*4) then return false,"Betrayal would leave too little defensive margin" end
                 for _,a in pairs(s.attacks) do
                     if not a.retreating and (a.target==me or a.attacker==me and a.target>0) then return false,"Cannot betray during an active war" end
+                end
                 end
             end
         elseif kind=="move_warship" then
@@ -815,7 +1002,7 @@ function Adapter:send(action, frame)
     -- the server validates and applies it; a sent order is not a confirmation.
     live.session:send_intent(intent)
     self.lastSent = live.now
-    return true
+    return true,intent
 end
 
 return Adapter
@@ -1670,7 +1857,7 @@ function Observe.read(frame,agent)
     local s,m,me,info=frame.state,frame.map,frame.me,frame.info
     local o={tick=s.tick,phase=s.phase,me=me,home=math.max(0,info.troops or 0),capacity=math.max(1,info.max_troops or 1),
         incoming=0,outgoing=0,incomingBy={},outgoingTo={},pressure={},committed={},assets={},counts={},levels={},
-        players={},attacks={},units={},missiles={},diplomacy={},relationships={},allyPower={},alliedNear=0,humanFronts=0,foreignFronts=0,threat=0}
+        players={},attacks={},units={},missiles={},diplomacy={},relationships={},allyPower={},ownStructures={},alliedNear=0,humanFronts=0,foreignFronts=0,threat=0}
     o.anchor=Geography.anchor(frame,agent.anchor)
     o.groups,o.near,o.frontSites,agent.frontCursor,o.frontCoverage=Geography.fronts(frame,agent.frontCursor)
     agent.anchor=o.anchor
@@ -1688,6 +1875,7 @@ function Observe.read(frame,agent)
         local value=({[0]=4,[1]=5,[2]=6,[3]=0,[4]=4,[5]=3})[b.kind] or 0
         o.assets[b.owner]=(o.assets[b.owner] or 0)+value*(b.level or 1)*((b.active_tick or 0)<=s.tick and 1 or .5)
         if b.owner==me then
+            table.insert(o.ownStructures,{sid=b.sid,kind=b.kind,tile=b.tile,level=b.level,active_tick=b.active_tick})
             o.counts[b.kind]=(o.counts[b.kind] or 0)+1;o.levels[b.kind]=(o.levels[b.kind] or 0)+(b.level or 1)
         end
     end
@@ -1739,6 +1927,9 @@ function Observe.read(frame,agent)
     o.alerts=Weapons.alerts(s,me);o.nuclearThreat=Weapons.threat(s,me)
     -- This is a policy safety budget, deliberately separate from game legality.
     o.reserve=math.max(o.home*.35,o.incoming*1.5,math.min(o.home*.7,o.threat*.25))
+    if (info.traitor_until or 0)>s.tick or agent.betrayalPlan then
+        o.reserve=math.max(o.reserve,o.home*.8,math.ceil(o.capacity*.42),agent.betrayalPlan and agent.betrayalPlan.reserve or 0)
+    end
     for id in pairs(o.near) do
         local p=s.owners[id];local rel=o.diplomacy[id]
         if p and rel and rel.allied and not rel.same_team and p.kind==2 and (p.troops or 0)>o.home*1.5 then
@@ -1787,6 +1978,7 @@ local Actions={}
 
 
 
+
 local function clamp(v) return Schema.clamp(v,0,8) end
 local function ratio(a,b) return clamp((a or 0)/math.max(1,b or 0)) end
 local function recruit(p,seconds)
@@ -1816,6 +2008,7 @@ function Actions.features(frame,o,a)
 end
 local function acceptScore(frame,agent,o,id)
     local s=frame.state;local p=s.owners[id]
+    if agent.betrayalPlan and agent.betrayalPlan.target==id then return -20 end
     if not p or not p.alive or (p.traitor_until or 0)>s.tick or (agent.distrust[id] or 0)>frame.now
         or (o.outgoingTo[id] or 0)>0 or not Weapons.allianceSafe(s,frame.me,id) then return -20 end
     local memory=agent.profiles:assessment(frame,id)
@@ -1876,6 +2069,7 @@ function Actions.generate(frame,o,agent)
     end
     for _,id in ipairs(ids) do
         local g=o.groups[id];local p=s.owners[id]
+        if agent.betrayalPlan then continue end
         if protected(frame,agent,id) then filtered.friendly=(filtered.friendly or 0)+1;continue end
         if id>0 and (not p or not p.alive or (agent.distrust[id] or 0)>now and o.incomingBy[id]==nil) then continue end
         local active=o.outgoingTo[id] or 0;local ceiling=o.available
@@ -1943,18 +2137,63 @@ function Actions.generate(frame,o,agent)
             add({kind='ally_request',intent={type='ally_request',target=id},bias=4+math.min(3,score/5),
                 channel='peace:'..id,cooldown=120,label='Offering a useful partnership'})
         end
-        if rel.allied and not rel.same_team and not rel.friend and (p.traitor_until or 0)>s.tick and o.incoming==0 and o.outgoing==0 then
-            local exposure=0
-            for other,q in pairs(s.owners) do if other~=me and q.alive and (other==id or not s:are_allies(me,other)) then exposure+=q.troops or 0 end end
-            if o.home>math.max(50000,exposure*4) then
-                add({kind='ally_break',intent={type='ally_break',target=id},bias=2,channel='break:'..id,cooldown=120,
-                    label='Ending a marked traitor partnership with a large defensive margin'})
+        if rel.allied and not rel.same_team and not rel.friend and not agent.betrayalPlan and o.near[id] then
+            local tile=Coalition.frontier(frame,me,id)
+            local q=Coalition.betrayal(frame,id,tile,false)
+            if q then add({kind='ally_break',intent={type='ally_break',target=id},bias=q.score,
+                channel='betrayal',cooldown=180,reserve=q.reserve,payback=q.estimated_value/1000000,
+                label='Ending a treaty for a valuable low-exposure capture',
+                plan={opportunistic_betrayal=true,objective_tile=tile,assessment=q}}) end
+        end
+    end
+    if agent.betrayalPlan and not s:are_allies(me,agent.betrayalPlan.target) then
+        local p=agent.betrayalPlan;local tile=Coalition.frontier(frame,me,p.target)
+        local q=Coalition.betrayal(frame,p.target,tile,true)
+        if q and q.amount>=minimum then
+            add({kind='attack',intent={type='attack',tile=tile,ratio=q.amount/math.max(1,o.home)},bias=10,
+                reserve=math.max(q.reserve,p.reserve),channel='betrayal_capture',cooldown=3,need=q.need,
+                label='Capturing the opportunity after the alliance break is confirmed',
+                plan={after_betrayal=true,amount=q.amount,assessment=q}})
+        end
+    end
+    -- Fund ordinary allies too, but only for an observed campaign or a reachable,
+    -- overcommitted attacker. The recipient remains in charge of its own controls.
+    agent.tacticalAssessments={}
+    local supportTargets={}
+    for _,a in pairs(s.attacks) do if not a.retreating then
+        if o.diplomacy[a.attacker] and o.diplomacy[a.attacker].allied and a.target>0 then
+            supportTargets[a.attacker]=supportTargets[a.attacker] or {};supportTargets[a.attacker][a.target]=true
+        end
+        if a.attacker>0 and (a.target==me or o.diplomacy[a.target] and o.diplomacy[a.target].allied) then
+            for _,partner in ipairs(playerIds) do if o.diplomacy[partner].allied and (a.target==me or a.target==partner) then
+                supportTargets[partner]=supportTargets[partner] or {};supportTargets[partner][a.attacker]=true
+            end end
+        end
+    end end
+    for _,partner in ipairs(playerIds) do
+        local rel=o.diplomacy[partner]
+        if agent.betrayalPlan then continue end
+        if not rel.allied or (agent.distrust[partner] or 0)>now or agent.profiles:assessment(frame,partner).betrayal_penalty>=5 then continue end
+        local targets={};for target in pairs(supportTargets[partner] or {}) do table.insert(targets,target) end;table.sort(targets)
+        for _,target in ipairs(targets) do
+            if partner==target then continue end
+            local key=partner..':'..target;local previous=agent.supportProjects[key]
+            local q,why=Coalition.support(frame,partner,target)
+            if q and previous and q.commitment<previous.commitment+math.max(100,previous.amount*.25)
+                and q.target_land>previous.target_land-math.max(5,previous.target_land*.03) then q=nil;why='previous grant has no new campaign progress' end
+            if #agent.tacticalAssessments<16 then table.insert(agent.tacticalAssessments,q or {partner=partner,target=target,eligible=false,reason=why}) end
+            if q then
+                add({kind='donate',intent={type='donate',target=partner,troops=q.amount},bias=q.score,
+                    channel='support',cooldown=45,reserve=math.max(o.reserve,q.reserve),need=q.need,
+                    label='Funding an ally '..q.mode..' against '..s:owner_name(target),
+                    plan={strategic_support=true,support_target=target,assessment=q}})
             end
         end
     end
     local aid=agent.cooperation:aid(frame,{home=o.home,incoming=o.incoming,available=o.available,reserve=o.reserve},true)
-    if aid then aid.kind='donate';aid.bias=5;add(aid) end
+    if aid and not agent.betrayalPlan then aid.kind='donate';aid.bias=5;add(aid) end
     local sites=Geography.sites(frame,o.anchor,o.frontSites)
+    agent.constructionAssessments={}
     local rules=frame.ctx.rules
     local kinds={'city','factory','port','defense','sam','silo'}
     local hasHostileSilo=false
@@ -1966,31 +2205,35 @@ function Actions.generate(frame,o,agent)
     local safeCache={}
     for _,kind in ipairs(kinds) do
         local available=rules:availability(kind)
-        if not available.ok then continue end
+        local diagnostic={kind=kind,available=available.ok==true,cost=available.cost,checked_sites=#sites,legal_sites=0,safe_sites=0}
+        table.insert(agent.constructionAssessments,diagnostic)
+        if not available.ok then diagnostic.reason=tostring(available.reason or 'unavailable according to current game rules');continue end
         local bias
         if kind=='city' then bias=4.5+(o.home/o.capacity)*2-(o.levels[0] or 0)*.35
         elseif kind=='factory' then bias=(o.levels[0] or 0)>0 and 5.2-(o.levels[2] or 0)*.7 or -3
         elseif kind=='port' then bias=4.3-(o.levels[1] or 0)*.7
         elseif kind=='defense' then
-            if posts>=3 or recent>=3 or o.incoming==0 then continue end
+            if posts>=3 or recent>=3 or o.incoming==0 then diagnostic.reason='post cap, rolling purchase cap or no land invasion';continue end
             bias=4+math.min(4,o.incoming/math.max(1,o.home)*5)
         elseif kind=='sam' then
-            if not hasHostileSilo and #o.alerts==0 then continue end
+            if not hasHostileSilo and #o.alerts==0 then diagnostic.reason='no observed missile threat';continue end
             bias=6+math.min(2,#o.alerts)-(o.levels[4] or 0)
         else
-            if o.home<o.incoming*2 or (o.levels[0] or 0)<2 or (frame.info.gold or 0)<available.cost+750000 then continue end
+            if o.home<o.incoming*2 or (o.levels[0] or 0)<2 or (frame.info.gold or 0)<available.cost+750000 then diagnostic.reason='holding invasion, economy or launch funding reserves';continue end
             bias=3-(o.levels[5] or 0)
         end
         local proposals={};local used={}
         for _,t in ipairs(sites) do
             local placement=rules:placement(kind,t)
             if placement.ok and not used[placement.tile] then
+                diagnostic.legal_sites+=1
                 used[placement.tile]=true
                 local margin=(kind=='defense' or kind=='sam') and 8 or 18
                 local key=tostring(placement.tile)..':'..margin..':'..tostring(kind=='port')
                 local safe=safeCache[key]
                 if safe==nil then safe=Geography.safe(frame,placement.tile,kind);safeCache[key]=safe end
                 if safe then
+                    diagnostic.safe_sites+=1
                     local level=0
                     for _,b in pairs(s.structures) do if b.tile==placement.tile then level=b.level or 1 end end
                     local concentration=0
@@ -2006,6 +2249,8 @@ function Actions.generate(frame,o,agent)
             end
         end
         table.sort(proposals,function(a,b) return a.bias==b.bias and a.intent.tile<b.intent.tile or a.bias>b.bias end)
+        diagnostic.candidates=math.min(2,#proposals);diagnostic.best_score=proposals[1] and proposals[1].bias
+        diagnostic.reason=#proposals==0 and 'no legal site passes the protected-building setback' or diagnostic.best_score<=0 and 'investment ranked below waiting' or 'investment candidate available'
         for i=1,math.min(2,#proposals) do add(proposals[i]) end
     end
     -- Naval routes, missile availability and blast protection use RoWorld's actual checks.
@@ -2018,7 +2263,7 @@ function Actions.generate(frame,o,agent)
         end
     end
     table.sort(coasts)
-    if o.boats==0 then
+    if o.boats==0 and not agent.betrayalPlan then
         local naval={}
         for _,t in ipairs(coasts) do
             local id=s:tile_owner(t);local p=s.owners[id]
@@ -2213,6 +2458,7 @@ function Agent:reset(frame)
     self.cooldowns={};self.campaigns={};self.distrust={};self.postPurchases={};self.outcome={};self.history={};self.lastObservation=nil
     self.lastSentAt,self.lastSentKind,self.pending,self.lastRejected,self.lastWaiting=nil,nil,nil,nil,nil
     self.blocked=false
+    self.supportProjects={};self.tacticalAssessments={};self.betrayalPlan=nil;self.betrayalHistory={}
     self.metrics={orders=0,peakLand=frame.info.tiles or 0};self.profiles:start(frame);self.recorder=Recorder.new(frame)
     self.allianceSeq=frame.state.alliance_seq or 0;self.missileHistory={};self.missilesSeen={}
 end
@@ -2228,6 +2474,14 @@ function Agent:prepare(frame)
         end
     end
     self.allianceSeq=frame.state.alliance_seq or 0
+    if self.betrayalPlan then
+        local p=self.betrayalPlan;local target=frame.state.owners[p.target]
+        if not target or not target.alive or frame.now>=p.deadline or self.cooperation:isFriend(p.target) then
+            table.insert(self.betrayalHistory,{target=p.target,tick=frame.state.tick,status=(not target or not target.alive) and 'target ended' or 'plan ended or protection changed'})
+            if #self.betrayalHistory>16 then table.remove(self.betrayalHistory,1) end
+            self.betrayalPlan=nil
+        end
+    end
     for i=#self.postPurchases,1,-1 do if frame.now-self.postPurchases[i]>=60 then table.remove(self.postPurchases,i) end end
     for id,c in pairs(self.campaigns) do
         local p=frame.state.owners[id]
@@ -2285,6 +2539,16 @@ function Agent:sent(action,now)
     self.lastSentAt=now;self.lastSentKind=Schema.ids[action.kind];self.blocked=false;self.pending=nil
     self.metrics.orders+=1
     local intent=action.intent
+    if intent.type=='donate' and (action.plan or {}).strategic_support then
+        local q=action.plan.assessment;local key=intent.target..':'..action.plan.support_target
+        self.supportProjects[key]={partner=intent.target,target=action.plan.support_target,at=now,
+            commitment=q.commitment,target_land=q.target_land,amount=intent.troops}
+        local count,oldest=0,nil
+        for k,row in pairs(self.supportProjects) do count+=1;if not oldest or row.at<self.supportProjects[oldest].at then oldest=k end end
+        if count>64 then self.supportProjects[oldest]=nil end
+    elseif intent.type=='ally_break' and (action.plan or {}).opportunistic_betrayal then
+        self.betrayalPlan={target=intent.target,created=now,deadline=now+35,reserve=action.reserve,status='awaiting confirmation',assessment=action.plan.assessment}
+    elseif (action.plan or {}).after_betrayal and self.betrayalPlan then self.betrayalPlan.status='capture issued' end
     self.metrics[intent.type]=(self.metrics[intent.type] or 0)+1
     if intent.type=='build' and intent.kind=='defense' then table.insert(self.postPurchases,now) end
     local target=intent.target or intent.tile and self.state:tile_owner(intent.tile)
@@ -2299,26 +2563,28 @@ function Agent:sent(action,now)
         c.spent+=amount
     end
     table.insert(self.history,{tick=self.state.tick,kind=action.kind,target=target,tile=intent.tile,
-        ratio=intent.ratio,cost=action.cost,label=action.label})
+        ratio=intent.ratio,troops=intent.troops,cost=action.cost,label=action.label,plan=action.plan})
     if #self.history>64 then table.remove(self.history,1) end
 end
 function Agent:rejected(reason)
     self.blocked=true;self.lastRejected=tostring(reason);self.pending=nil
 end
 function Agent:report()
-    if not self.observation then return {version='3.0.0',schema=Schema.version,status='no observed match'} end
+    if not self.observation then return {version='3.1.0',schema=Schema.version,status='no observed match'} end
     local ranked={};for i,a in ipairs(self.candidates or {}) do table.insert(ranked,{kind=a.kind,score=self.logits[i],
-        probability=self.probabilities and self.probabilities[i],intent=a.intent,label=a.label}) end
+        probability=self.probabilities and self.probabilities[i],intent=a.intent,label=a.label,plan=a.plan}) end
     table.sort(ranked,function(a,b) return a.score>b.score end)
     local o=self.observation;local diplomatic={};for id,r in pairs(o.diplomacy) do
         table.insert(diplomatic,{nation=id,allied=r.allied,same_team=r.same_team,friend=r.friend,
             outgoing_request=r.outgoing_request,incoming_request=r.incoming_request,expiry=r.expiry})
     end
-    return {version='3.0.0',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
+    return {version='3.1.0',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
         tick=self.state.tick,observation_tick=o.tick,observation_age_ticks=math.max(0,self.state.tick-o.tick),
         decision_interval_ticks=Schema.decision_ticks,me=self.me,own=self.state.owners[self.me],metrics=self.metrics,runtime=self.runtime,
         board=self.board,actions=self.history,candidates=ranked,filtered_by_risk=self.filtered,
         cooperation=self.cooperation.status,public_players=o.players,exact_diplomacy=diplomatic,public_alliance_pairs=o.relationships,
+        tactical_support=self.tacticalAssessments,support_projects=self.supportProjects,proposed_betrayal=self.betrayalPlan,ended_betrayal_plans=self.betrayalHistory,
+        construction_assessments=self.constructionAssessments,own_structures=o.ownStructures,
         exact_attacks=o.attacks,exact_units=o.units,exact_missiles=o.missiles,context=o.context,
         missile_alerts=self.missileAlerts,missile_alert_history=self.missileHistory,nuclear_threat=o.nuclearThreat,
         public_observations=self.recorder:report(),opponent_profiles=self.profiles:report({state=self.state,me=self.me}),
@@ -2370,7 +2636,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 3.0.0 | observation agent"
+title.Text = "RoWorld 3.1.0 | observation agent"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -2629,6 +2895,7 @@ task.spawn(function()
                 if action then
                     local sent, blocked = adapter:send(action, frame)
                     if sent then
+                        if type(blocked)=='table' then action=table.clone(action);action.intent=blocked end
                         policy:sent(action, frame.now)
                         lastCommand, lastCommandAt = action.label, os.clock()
                         return "Order sent: " .. action.label

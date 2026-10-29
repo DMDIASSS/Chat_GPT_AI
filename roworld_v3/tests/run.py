@@ -17,7 +17,7 @@ def main():
     build = importlib.util.module_from_spec(spec);spec.loader.exec_module(build)
     source = build.source()
     assert (ROOT/"RoWorld_V3.lua").read_text(encoding="utf8")==source
-    for name in ("test_adapter.lua","test_network.lua","test_weapons.lua","test_agent.lua"):
+    for name in ("test_adapter.lua","test_network.lua","test_weapons.lua","test_agent.lua","test_coalition.lua"):
         subprocess.run([args.luau,str(ROOT/"tests"/name)],check=True,timeout=30)
     compiled = subprocess.run([args.compiler,str(ROOT/"RoWorld_V3.lua")],capture_output=True,text=True,timeout=30)
     assert compiled.returncode==0,compiled.stderr
@@ -39,7 +39,7 @@ services.Players.LocalPlayer.children.PlayerScripts=scripts;scripts.children.Air
 for _=1,18 do f.state.tick+=1;step() end
 assert(#f.session.sent>0 and f.session.sent[1].type=='attack')
 local files={}
-services.HttpService={JSONEncode=function(_,r) assert(r.version=='3.0.0' or r.version==1);return 'json' end}
+services.HttpService={JSONEncode=function(_,r) assert(r.version=='3.1.0' or r.version==1);return 'json' end}
 writefile=function(name,body) files[name]=body end
 export.Activated:Fire();assert(files['RoWorld_Match_Report.json'] and first.report().schema=='roworld-observation-v1')
 toggle.Activated:Fire();local count=#f.session.sent

@@ -1,7 +1,7 @@
-# RoWorld v3 — experimental independent observation agent
+# RoWorld 3.1 — experimental independent observation agent
 
 **Play now:** paste the complete [`RoWorld_V3.lua`](RoWorld_V3.lua) into JJSploit,
-execute in a multiplayer RoWorld match, then press **Start bot**. Confirm **3.0.0**
+execute in a multiplayer RoWorld match, then press **Start bot**. Confirm **3.1.0**
 in the panel. Extract the ZIP anywhere. No Python, model download or training is
 required for the built-in policy. Re-execution stops the previous v2/v3 instance.
 The friends toggle, F6, match-report button and ordinary multiplayer connection
@@ -23,6 +23,43 @@ There are two policy modes:
   those same proposals. PPO training, self-play workers, checkpoint resume,
   evaluation and a standalone Luau export are included. There is **no trained
   multiplayer champion bundled**. OpenFront checkpoints are incompatible.
+
+## New in 3.1: tactical donations and opportunistic treaty breaks
+
+- Ordinary treaty allies can receive a calculated troop grant for an observed
+  attack or a nearby counter against an overcommitted attacker. The target must
+  be hostile to both participants; formal alliances, permanent teams, protected
+  friends and pending peace arrangements exclude the operation. We cannot force
+  another player's actions or guarantee they spend a grant as intended.
+- A grant must close the estimated funding gap, fit recipient capacity, and be
+  at most 8% of our bank. It retains at least 75% of our bank, 42% of troop capacity
+  and twice observed incoming armies. A modest invasion can permit tactical aid;
+  one above 20% of our bank blocks it. Strong target coalitions, expiring treaties,
+  marked traitors and a gift creating a dominant recipient are rejected.
+- The 45-second support cooldown remains. A recipient/target pair cannot get
+  another tactical gift without new target land losses or a larger observed
+  attack; the bounded project ledger resets on a new match. Existing limited
+  defensive friend/teammate support is retained.
+- A weak wealthy bordering treaty ally may be considered for betrayal when the
+  estimated capture value outweighs army, treaty and trade costs. Teammates and
+  protected Roblox friends are excluded. New wars, invasions, fortified fronts,
+  nearby coalition strength, retaliatory silos and nearby coalition warships can
+  veto the plan. Every break causes RoWorld's **300-tick / 30-second half-defense
+  penalty**, including breaks against marked traitors.
+- It issues the break first, waits for a real alliance-state change, then
+  rechecks the opportunity before proposing an attack. At least 80% of the home
+  bank and 42% of capacity are reserved during the plan/penalty. A 35-second plan
+  deadline and three-minute break cooldown prevent repeated speculative breaks.
+- Relationship, funding and risk checks run again immediately before sending.
+  Reports show the intended support target, project progress, betrayal assessment
+  and outcome. Construction diagnostics now show availability, legal/safe site
+  counts and rejected investment reasons, plus owned structure locations.
+
+These are conservative public-state estimates, not proof of hidden intent or a
+guaranteed profit. No training is required to use the new built-in decisions.
+Previously exported learned scripts must be rebuilt with the updated code to gain
+these functions. For ongoing training after updating, use a new run directory
+with `--init` from the previous JSON, as described below.
 
 ## What was adapted
 

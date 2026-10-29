@@ -90,7 +90,7 @@ for step=1,config.seconds*10 do
         table.insert(rows,row);lastRow=row
         if action then
             local sent,reason=adapter:send(action,currentFrame)
-            if sent then agent:sent(action,currentFrame.now);orders+=1 else agent:rejected(reason);rejected+=1 end
+            if sent then action=table.clone(action);action.intent=reason;agent:sent(action,currentFrame.now);orders+=1 else agent:rejected(reason);rejected+=1 end
         end
         if other and otherState.owners[opponent].alive then
             local f={state=otherState,map=map,me=opponent,info=otherState.owners[opponent],ctx=otherCtx,session=otherSession,now=sim.tick/10}
@@ -98,7 +98,7 @@ for step=1,config.seconds*10 do
             if a then
                 local otherAdapter=Adapter.new({},nil,function() return f.now end)
                 function otherAdapter:frame() return f end
-                local ok=otherAdapter:send(a,f);if ok then other:sent(a,f.now) end
+                local ok,intent=otherAdapter:send(a,f);if ok then a=table.clone(a);a.intent=intent;other:sent(a,f.now) end
             end
         end
     end

@@ -16,7 +16,7 @@ def main():
                  and p.name!="SOURCE_INFO.json" and p.suffix not in (".pyc",".pt",".pth",".log",".zip",".tmp")
                  and p.name not in ("RoWorld_V3_Trained.lua","evaluation.json")
                  and not p.name.startswith("RoWorld_Match_Report"))
-    info={"version":"3.0.0","observation_schema":"roworld-observation-v1","default_policy":"built-in; no neural weights bundled",
+    info={"version":"3.1.0","observation_schema":"roworld-observation-v1","default_policy":"built-in; no neural weights bundled",
           "place_id":137151641329864,"inspected_place_version":111,
           "place_sha256":"8be1727d80e44d4c1b0045b7ff7f19c39f8251e58efedca18f2243676f988399",
           "inspiration":"https://github.com/djmango/openfront-ai",

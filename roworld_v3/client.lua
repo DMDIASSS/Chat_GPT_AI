@@ -37,7 +37,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 3.0.0 | observation agent"
+title.Text = "RoWorld 3.1.0 | observation agent"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -296,6 +296,7 @@ task.spawn(function()
                 if action then
                     local sent, blocked = adapter:send(action, frame)
                     if sent then
+                        if type(blocked)=='table' then action=table.clone(action);action.intent=blocked end
                         policy:sent(action, frame.now)
                         lastCommand, lastCommandAt = action.label, os.clock()
                         return "Order sent: " .. action.label

@@ -1,11 +1,12 @@
 {
-  "version": "3.0.0",
+  "version": "3.1.0",
   "behavior_scenarios": {
     "adapter": 23,
     "network": 16,
     "weapons": 16,
     "new_agent": 24,
-    "total": 79
+    "total": 99,
+    "coalition": 20
   },
   "dashboard_friend_toggle_report_stop_reinjection": "passed",
   "standalone_generation_and_compilation": "passed",
@@ -24,51 +25,64 @@
       2
     ],
     "resume_steps": [
-      180,
-      360
+      120,
+      240
     ],
-    "curriculum_transfer": "Fresh stage-3 run initialized from stage-2 JSON; frozen-policy self-play episode collection and PPO passed",
+    "curriculum_transfer": "Compatible v3.0 JSON import and stage-3 PPO checked earlier in this release; final code also completed two stage-3 PPO updates with optimizer/checkpoint resume. No weights bundled.",
     "cpu_smoke_progress": [
       {
         "update": 1,
-        "steps": 180,
-        "seconds_elapsed": 0.5874210140027571,
-        "mean_land": 1315.5,
+        "steps": 120,
+        "seconds_elapsed": 0.5078400280035567,
+        "mean_land": 917.5,
         "deaths": 0,
         "terminal_wins": 0,
         "truncations": 2,
-        "loss": 1.0206622183322906,
-        "policy_loss": -0.02857804804807529,
-        "value_loss": 2.102885589003563,
-        "entropy": 0.22025380469858646
+        "loss": 1.528050035238266,
+        "policy_loss": -0.00016299933389118948,
+        "value_loss": 3.06220805644989,
+        "entropy": 0.28909825533628464
       },
       {
         "update": 2,
-        "steps": 360,
-        "seconds_elapsed": 0.5395820389967412,
-        "mean_land": 1362.0,
+        "steps": 240,
+        "seconds_elapsed": 0.4086834240006283,
+        "mean_land": 1083.0,
         "deaths": 0,
         "terminal_wins": 0,
         "truncations": 2,
-        "loss": 0.9052222594618797,
-        "policy_loss": 0.015402893302962184,
-        "value_loss": 1.7846262156963348,
-        "entropy": 0.24937500059604645
+        "loss": 1.4239400923252106,
+        "policy_loss": 1.513163262334416e-05,
+        "value_loss": 2.854284703731537,
+        "entropy": 0.3217362314462662
       }
     ],
     "selfplay_smoke_progress": [
       {
         "update": 1,
         "steps": 120,
-        "seconds_elapsed": 0.36509500100510195,
+        "seconds_elapsed": 0.5078400280035567,
         "mean_land": 917.5,
         "deaths": 0,
         "terminal_wins": 0,
         "truncations": 2,
-        "loss": 1.5110101103782654,
-        "policy_loss": -0.00018073494211423569,
-        "value_loss": 3.028164863586426,
-        "entropy": 0.28915756940841675
+        "loss": 1.528050035238266,
+        "policy_loss": -0.00016299933389118948,
+        "value_loss": 3.06220805644989,
+        "entropy": 0.28909825533628464
+      },
+      {
+        "update": 2,
+        "steps": 240,
+        "seconds_elapsed": 0.4086834240006283,
+        "mean_land": 1083.0,
+        "deaths": 0,
+        "terminal_wins": 0,
+        "truncations": 2,
+        "loss": 1.4239400923252106,
+        "policy_loss": 1.513163262334416e-05,
+        "value_loss": 2.854284703731537,
+        "entropy": 0.3217362314462662
       }
     ],
     "trained_standalone_compilation": "passed",
@@ -76,7 +90,7 @@
     "windows_batch_execution_verified": false,
     "live_training_cadence": "Both use 10 authoritative ticks; outcome history resets across matches; terminal changes bypass the wait; time-limit bootstrap uses a full decision interval"
   },
-  "benchmark": "benchmarks/engineering_v3.0.json",
+  "benchmark": "benchmarks/engineering_v3.1.json",
   "bundled_trained_weights": false,
   "live_jjsploit_verified": false,
   "competitive_strength_verified": false,
@@ -86,5 +100,8 @@
     "Candidate policy uses explicit safety/risk constraints, not the entire unconstrained game action space",
     "Eight command-result features; no recurrent network or trained spatial autoencoder",
     "No upstream model transfer or public game-source redistribution"
-  ]
+  ],
+  "original_coalition_contracts": "Passed against supplied original simulator: alliance-gated donation credits/debits; every active treaty break marks breaker for 300 ticks with 0.5 defense, including a break with an already marked traitor.",
+  "previous_version_benchmark": "benchmarks/engineering_v3.0.json",
+  "new_tactical_scope": "Ordinary-allied troop grants for observed attacks or reachable overcommitment counters; target not allied with either side, bounded funding/reserves, progress-gated repeated gifts, send-time revalidation. Profitable treaty break candidates account for the half-defense penalty, local coalitions, trade, fortifications, silos and ships; no team/friend betrayal; confirmed-break conditional follow-up, reserve and deadline."
 }

@@ -7,7 +7,7 @@ function Observe.read(frame,agent)
     local s,m,me,info=frame.state,frame.map,frame.me,frame.info
     local o={tick=s.tick,phase=s.phase,me=me,home=math.max(0,info.troops or 0),capacity=math.max(1,info.max_troops or 1),
         incoming=0,outgoing=0,incomingBy={},outgoingTo={},pressure={},committed={},assets={},counts={},levels={},
-        players={},attacks={},units={},missiles={},diplomacy={},relationships={},allyPower={},alliedNear=0,humanFronts=0,foreignFronts=0,threat=0}
+        players={},attacks={},units={},missiles={},diplomacy={},relationships={},allyPower={},ownStructures={},alliedNear=0,humanFronts=0,foreignFronts=0,threat=0}
     o.anchor=Geography.anchor(frame,agent.anchor)
     o.groups,o.near,o.frontSites,agent.frontCursor,o.frontCoverage=Geography.fronts(frame,agent.frontCursor)
     agent.anchor=o.anchor
@@ -25,6 +25,7 @@ function Observe.read(frame,agent)
         local value=({[0]=4,[1]=5,[2]=6,[3]=0,[4]=4,[5]=3})[b.kind] or 0
         o.assets[b.owner]=(o.assets[b.owner] or 0)+value*(b.level or 1)*((b.active_tick or 0)<=s.tick and 1 or .5)
         if b.owner==me then
+            table.insert(o.ownStructures,{sid=b.sid,kind=b.kind,tile=b.tile,level=b.level,active_tick=b.active_tick})
             o.counts[b.kind]=(o.counts[b.kind] or 0)+1;o.levels[b.kind]=(o.levels[b.kind] or 0)+(b.level or 1)
         end
     end
@@ -76,6 +77,9 @@ function Observe.read(frame,agent)
     o.alerts=Weapons.alerts(s,me);o.nuclearThreat=Weapons.threat(s,me)
     -- This is a policy safety budget, deliberately separate from game legality.
     o.reserve=math.max(o.home*.35,o.incoming*1.5,math.min(o.home*.7,o.threat*.25))
+    if (info.traitor_until or 0)>s.tick or agent.betrayalPlan then
+        o.reserve=math.max(o.reserve,o.home*.8,math.ceil(o.capacity*.42),agent.betrayalPlan and agent.betrayalPlan.reserve or 0)
+    end
     for id in pairs(o.near) do
         local p=s.owners[id];local rel=o.diplomacy[id]
         if p and rel and rel.allied and not rel.same_team and p.kind==2 and (p.troops or 0)>o.home*1.5 then

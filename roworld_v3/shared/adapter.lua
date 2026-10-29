@@ -2,6 +2,7 @@
 -- Uses the existing live Main.session; never creates a second simulation.
 local Adapter = {}
 local Weapons = require("./weapons")
+local Coalition=require('./coalition')
 Adapter.__index = Adapter
 
 function Adapter.new(services, requireModule, now, capabilities)
@@ -139,7 +140,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 3.0.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 3.1.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -276,6 +277,11 @@ function Adapter:send(action, frame)
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end
             end
             local reserve = math.max(action.reserve or 0, troops * .35, incoming * 1.5)
+            if (action.plan or {}).after_betrayal then
+                local q,why=Coalition.betrayal(live,target,intent.tile,true)
+                if not q or q.amount>(action.plan.amount or 0)+1 then return false,why or 'Betrayal capture cost changed' end
+                reserve=math.max(reserve,q.reserve)
+            end
             if (action.plan or {}).defensive_counter then
                 local active=false
                 for _,a in pairs(s.attacks) do if a.attacker==target and a.target==me and not a.retreating then active=true end end
@@ -323,7 +329,13 @@ function Adapter:send(action, frame)
             for _,a in pairs(s.attacks) do if a.target==me and not a.retreating then incoming+=a.troops or 0 end end
             local home=math.max(0,live.info.troops or 0)
             local reserve=math.max(action.reserve or 0,home*.65,incoming*1.5)
-            if incoming>0 or type(intent.troops)~='number' or intent.troops~=intent.troops or intent.troops==math.huge then return false,'Holding support during an invasion or invalid budget' end
+            if type(intent.troops)~='number' or intent.troops~=intent.troops or math.abs(intent.troops)==math.huge
+                or (live.info.traitor_until or 0)>s.tick then return false,'Holding support during vulnerability or invalid budget' end
+            if (action.plan or {}).strategic_support then
+                local q,why=Coalition.support(live,intent.target,action.plan.support_target)
+                if not q or intent.troops<q.need then return false,why or 'Tactical support no longer covers the required amount' end
+                reserve=math.max(reserve,q.reserve);intent.troops=math.min(intent.troops,q.amount)
+            elseif incoming>0 then return false,'Holding support during an invasion' end
             intent.troops=math.floor(math.min(intent.troops,home*.08,math.max(0,home-reserve),math.max(0,(owner.max_troops or 0)-(owner.troops or 0))))
             if intent.troops<100 then return false,'No safe troop support budget' end
         elseif kind == "retreat" then
@@ -348,7 +360,11 @@ function Adapter:send(action, frame)
                 or (owner.traitor_until or 0)>s.tick) then return false,"Alliance request is no longer needed" end
             if kind=="ally_request" and not Weapons.allianceSafe(s,me,intent.target) then return false,"Our in-flight strike endangers this alliance" end
             if kind=="ally_break" then
-                if not s:are_allies(me,intent.target) or (owner.traitor_until or 0)<=s.tick
+                if (action.plan or {}).opportunistic_betrayal then
+                    local q,why=Coalition.betrayal(live,intent.target,action.plan.objective_tile,false)
+                    if not q then return false,why end
+                else
+                if not s:are_allies(me,intent.target) or (owner.traitor_until or 0)<=s.tick or (s.bot_friend_guard or {})[intent.target]
                     or (live.info.team or 0)>0 and live.info.team==owner.team then return false,"Alliance cannot be safely ended" end
                 local exposure=owner.troops or 0
                 for id,o in pairs(s.owners) do
@@ -357,6 +373,7 @@ function Adapter:send(action, frame)
                 if (live.info.troops or 0)<=math.max(50000,exposure*4) then return false,"Betrayal would leave too little defensive margin" end
                 for _,a in pairs(s.attacks) do
                     if not a.retreating and (a.target==me or a.attacker==me and a.target>0) then return false,"Cannot betray during an active war" end
+                end
                 end
             end
         elseif kind=="move_warship" then
@@ -372,7 +389,7 @@ function Adapter:send(action, frame)
     -- the server validates and applies it; a sent order is not a confirmation.
     live.session:send_intent(intent)
     self.lastSent = live.now
-    return true
+    return true,intent
 end
 
 return Adapter

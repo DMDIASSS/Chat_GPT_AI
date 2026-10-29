@@ -3,6 +3,7 @@ local Actions={}
 local Schema=require('./schema')
 local Geography=require('./geography')
 local Weapons=require('./shared/weapons')
+local Coalition=require('./shared/coalition')
 local function clamp(v) return Schema.clamp(v,0,8) end
 local function ratio(a,b) return clamp((a or 0)/math.max(1,b or 0)) end
 local function recruit(p,seconds)
@@ -32,6 +33,7 @@ function Actions.features(frame,o,a)
 end
 local function acceptScore(frame,agent,o,id)
     local s=frame.state;local p=s.owners[id]
+    if agent.betrayalPlan and agent.betrayalPlan.target==id then return -20 end
     if not p or not p.alive or (p.traitor_until or 0)>s.tick or (agent.distrust[id] or 0)>frame.now
         or (o.outgoingTo[id] or 0)>0 or not Weapons.allianceSafe(s,frame.me,id) then return -20 end
     local memory=agent.profiles:assessment(frame,id)
@@ -92,6 +94,7 @@ function Actions.generate(frame,o,agent)
     end
     for _,id in ipairs(ids) do
         local g=o.groups[id];local p=s.owners[id]
+        if agent.betrayalPlan then continue end
         if protected(frame,agent,id) then filtered.friendly=(filtered.friendly or 0)+1;continue end
         if id>0 and (not p or not p.alive or (agent.distrust[id] or 0)>now and o.incomingBy[id]==nil) then continue end
         local active=o.outgoingTo[id] or 0;local ceiling=o.available
@@ -159,18 +162,63 @@ function Actions.generate(frame,o,agent)
             add({kind='ally_request',intent={type='ally_request',target=id},bias=4+math.min(3,score/5),
                 channel='peace:'..id,cooldown=120,label='Offering a useful partnership'})
         end
-        if rel.allied and not rel.same_team and not rel.friend and (p.traitor_until or 0)>s.tick and o.incoming==0 and o.outgoing==0 then
-            local exposure=0
-            for other,q in pairs(s.owners) do if other~=me and q.alive and (other==id or not s:are_allies(me,other)) then exposure+=q.troops or 0 end end
-            if o.home>math.max(50000,exposure*4) then
-                add({kind='ally_break',intent={type='ally_break',target=id},bias=2,channel='break:'..id,cooldown=120,
-                    label='Ending a marked traitor partnership with a large defensive margin'})
+        if rel.allied and not rel.same_team and not rel.friend and not agent.betrayalPlan and o.near[id] then
+            local tile=Coalition.frontier(frame,me,id)
+            local q=Coalition.betrayal(frame,id,tile,false)
+            if q then add({kind='ally_break',intent={type='ally_break',target=id},bias=q.score,
+                channel='betrayal',cooldown=180,reserve=q.reserve,payback=q.estimated_value/1000000,
+                label='Ending a treaty for a valuable low-exposure capture',
+                plan={opportunistic_betrayal=true,objective_tile=tile,assessment=q}}) end
+        end
+    end
+    if agent.betrayalPlan and not s:are_allies(me,agent.betrayalPlan.target) then
+        local p=agent.betrayalPlan;local tile=Coalition.frontier(frame,me,p.target)
+        local q=Coalition.betrayal(frame,p.target,tile,true)
+        if q and q.amount>=minimum then
+            add({kind='attack',intent={type='attack',tile=tile,ratio=q.amount/math.max(1,o.home)},bias=10,
+                reserve=math.max(q.reserve,p.reserve),channel='betrayal_capture',cooldown=3,need=q.need,
+                label='Capturing the opportunity after the alliance break is confirmed',
+                plan={after_betrayal=true,amount=q.amount,assessment=q}})
+        end
+    end
+    -- Fund ordinary allies too, but only for an observed campaign or a reachable,
+    -- overcommitted attacker. The recipient remains in charge of its own controls.
+    agent.tacticalAssessments={}
+    local supportTargets={}
+    for _,a in pairs(s.attacks) do if not a.retreating then
+        if o.diplomacy[a.attacker] and o.diplomacy[a.attacker].allied and a.target>0 then
+            supportTargets[a.attacker]=supportTargets[a.attacker] or {};supportTargets[a.attacker][a.target]=true
+        end
+        if a.attacker>0 and (a.target==me or o.diplomacy[a.target] and o.diplomacy[a.target].allied) then
+            for _,partner in ipairs(playerIds) do if o.diplomacy[partner].allied and (a.target==me or a.target==partner) then
+                supportTargets[partner]=supportTargets[partner] or {};supportTargets[partner][a.attacker]=true
+            end end
+        end
+    end end
+    for _,partner in ipairs(playerIds) do
+        local rel=o.diplomacy[partner]
+        if agent.betrayalPlan then continue end
+        if not rel.allied or (agent.distrust[partner] or 0)>now or agent.profiles:assessment(frame,partner).betrayal_penalty>=5 then continue end
+        local targets={};for target in pairs(supportTargets[partner] or {}) do table.insert(targets,target) end;table.sort(targets)
+        for _,target in ipairs(targets) do
+            if partner==target then continue end
+            local key=partner..':'..target;local previous=agent.supportProjects[key]
+            local q,why=Coalition.support(frame,partner,target)
+            if q and previous and q.commitment<previous.commitment+math.max(100,previous.amount*.25)
+                and q.target_land>previous.target_land-math.max(5,previous.target_land*.03) then q=nil;why='previous grant has no new campaign progress' end
+            if #agent.tacticalAssessments<16 then table.insert(agent.tacticalAssessments,q or {partner=partner,target=target,eligible=false,reason=why}) end
+            if q then
+                add({kind='donate',intent={type='donate',target=partner,troops=q.amount},bias=q.score,
+                    channel='support',cooldown=45,reserve=math.max(o.reserve,q.reserve),need=q.need,
+                    label='Funding an ally '..q.mode..' against '..s:owner_name(target),
+                    plan={strategic_support=true,support_target=target,assessment=q}})
             end
         end
     end
     local aid=agent.cooperation:aid(frame,{home=o.home,incoming=o.incoming,available=o.available,reserve=o.reserve},true)
-    if aid then aid.kind='donate';aid.bias=5;add(aid) end
+    if aid and not agent.betrayalPlan then aid.kind='donate';aid.bias=5;add(aid) end
     local sites=Geography.sites(frame,o.anchor,o.frontSites)
+    agent.constructionAssessments={}
     local rules=frame.ctx.rules
     local kinds={'city','factory','port','defense','sam','silo'}
     local hasHostileSilo=false
@@ -182,31 +230,35 @@ function Actions.generate(frame,o,agent)
     local safeCache={}
     for _,kind in ipairs(kinds) do
         local available=rules:availability(kind)
-        if not available.ok then continue end
+        local diagnostic={kind=kind,available=available.ok==true,cost=available.cost,checked_sites=#sites,legal_sites=0,safe_sites=0}
+        table.insert(agent.constructionAssessments,diagnostic)
+        if not available.ok then diagnostic.reason=tostring(available.reason or 'unavailable according to current game rules');continue end
         local bias
         if kind=='city' then bias=4.5+(o.home/o.capacity)*2-(o.levels[0] or 0)*.35
         elseif kind=='factory' then bias=(o.levels[0] or 0)>0 and 5.2-(o.levels[2] or 0)*.7 or -3
         elseif kind=='port' then bias=4.3-(o.levels[1] or 0)*.7
         elseif kind=='defense' then
-            if posts>=3 or recent>=3 or o.incoming==0 then continue end
+            if posts>=3 or recent>=3 or o.incoming==0 then diagnostic.reason='post cap, rolling purchase cap or no land invasion';continue end
             bias=4+math.min(4,o.incoming/math.max(1,o.home)*5)
         elseif kind=='sam' then
-            if not hasHostileSilo and #o.alerts==0 then continue end
+            if not hasHostileSilo and #o.alerts==0 then diagnostic.reason='no observed missile threat';continue end
             bias=6+math.min(2,#o.alerts)-(o.levels[4] or 0)
         else
-            if o.home<o.incoming*2 or (o.levels[0] or 0)<2 or (frame.info.gold or 0)<available.cost+750000 then continue end
+            if o.home<o.incoming*2 or (o.levels[0] or 0)<2 or (frame.info.gold or 0)<available.cost+750000 then diagnostic.reason='holding invasion, economy or launch funding reserves';continue end
             bias=3-(o.levels[5] or 0)
         end
         local proposals={};local used={}
         for _,t in ipairs(sites) do
             local placement=rules:placement(kind,t)
             if placement.ok and not used[placement.tile] then
+                diagnostic.legal_sites+=1
                 used[placement.tile]=true
                 local margin=(kind=='defense' or kind=='sam') and 8 or 18
                 local key=tostring(placement.tile)..':'..margin..':'..tostring(kind=='port')
                 local safe=safeCache[key]
                 if safe==nil then safe=Geography.safe(frame,placement.tile,kind);safeCache[key]=safe end
                 if safe then
+                    diagnostic.safe_sites+=1
                     local level=0
                     for _,b in pairs(s.structures) do if b.tile==placement.tile then level=b.level or 1 end end
                     local concentration=0
@@ -222,6 +274,8 @@ function Actions.generate(frame,o,agent)
             end
         end
         table.sort(proposals,function(a,b) return a.bias==b.bias and a.intent.tile<b.intent.tile or a.bias>b.bias end)
+        diagnostic.candidates=math.min(2,#proposals);diagnostic.best_score=proposals[1] and proposals[1].bias
+        diagnostic.reason=#proposals==0 and 'no legal site passes the protected-building setback' or diagnostic.best_score<=0 and 'investment ranked below waiting' or 'investment candidate available'
         for i=1,math.min(2,#proposals) do add(proposals[i]) end
     end
     -- Naval routes, missile availability and blast protection use RoWorld's actual checks.
@@ -234,7 +288,7 @@ function Actions.generate(frame,o,agent)
         end
     end
     table.sort(coasts)
-    if o.boats==0 then
+    if o.boats==0 and not agent.betrayalPlan then
         local naval={}
         for _,t in ipairs(coasts) do
             local id=s:tile_owner(t);local p=s.owners[id]
