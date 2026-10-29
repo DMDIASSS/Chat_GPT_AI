@@ -1,0 +1,90 @@
+{
+  "version": "3.0.0",
+  "behavior_scenarios": {
+    "adapter": 23,
+    "network": 16,
+    "weapons": 16,
+    "new_agent": 24,
+    "total": 79
+  },
+  "dashboard_friend_toggle_report_stop_reinjection": "passed",
+  "standalone_generation_and_compilation": "passed",
+  "original_place_preparation": "Original supplied place hash checked; newly prepared modules identical to existing inspected-source extraction",
+  "original_contracts": "Boat/build-warship/move/alliance/donation/renewal/nuclear encoding; mirror state, prices, SAM arcs/interception flags and country conquest treasury matched supplied original modules",
+  "learning": {
+    "parameters": 9250,
+    "pytorch": "2.15.0+cpu",
+    "python_luau_parity_candidates": 117,
+    "maximum_absolute_logit_or_value_error": 8.353371017122413e-08,
+    "real_ppo_gradient_step": "passed with changed parameters and finite losses",
+    "variable_action_masks": "passed",
+    "truncation_bootstrap": "passed",
+    "resume_updates": [
+      1,
+      2
+    ],
+    "resume_steps": [
+      180,
+      360
+    ],
+    "curriculum_transfer": "Fresh stage-3 run initialized from stage-2 JSON; frozen-policy self-play episode collection and PPO passed",
+    "cpu_smoke_progress": [
+      {
+        "update": 1,
+        "steps": 180,
+        "seconds_elapsed": 0.5874210140027571,
+        "mean_land": 1315.5,
+        "deaths": 0,
+        "terminal_wins": 0,
+        "truncations": 2,
+        "loss": 1.0206622183322906,
+        "policy_loss": -0.02857804804807529,
+        "value_loss": 2.102885589003563,
+        "entropy": 0.22025380469858646
+      },
+      {
+        "update": 2,
+        "steps": 360,
+        "seconds_elapsed": 0.5395820389967412,
+        "mean_land": 1362.0,
+        "deaths": 0,
+        "terminal_wins": 0,
+        "truncations": 2,
+        "loss": 0.9052222594618797,
+        "policy_loss": 0.015402893302962184,
+        "value_loss": 1.7846262156963348,
+        "entropy": 0.24937500059604645
+      }
+    ],
+    "selfplay_smoke_progress": [
+      {
+        "update": 1,
+        "steps": 120,
+        "seconds_elapsed": 0.36509500100510195,
+        "mean_land": 917.5,
+        "deaths": 0,
+        "terminal_wins": 0,
+        "truncations": 2,
+        "loss": 1.5110101103782654,
+        "policy_loss": -0.00018073494211423569,
+        "value_loss": 3.028164863586426,
+        "entropy": 0.28915756940841675
+      }
+    ],
+    "trained_standalone_compilation": "passed",
+    "gpu_training_verified": false,
+    "windows_batch_execution_verified": false,
+    "live_training_cadence": "Both use 10 authoritative ticks; outcome history resets across matches; terminal changes bypass the wait; time-limit bootstrap uses a full decision interval"
+  },
+  "benchmark": "benchmarks/engineering_v3.0.json",
+  "bundled_trained_weights": false,
+  "live_jjsploit_verified": false,
+  "competitive_strength_verified": false,
+  "limits": [
+    "Tiny synthetic development layouts, not multiplayer match replays",
+    "Current frozen-opponent smoke seeds stall at 540s; no win claimed",
+    "Candidate policy uses explicit safety/risk constraints, not the entire unconstrained game action space",
+    "Eight command-result features; no recurrent network or trained spatial autoencoder",
+    "No upstream model transfer or public game-source redistribution"
+  ]
+}
