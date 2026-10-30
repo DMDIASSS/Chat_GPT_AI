@@ -62,3 +62,33 @@ local hasReturned=false
 for _=1,600 do if Rail.step(coolEnd,cool,1/60,false,{a}).jumped then hasReturned=true end end
 assert(hasReturned)
 print("PASS Cool brakes at a dead end and resumes its spawn loop")
+for _,angle in ipairs({0,45,90}) do
+    for _,sign in ipairs({1,-1}) do
+        local state=Rail.new(long,{s=500},1)
+        local settings={style="farm",angle=angle,angleSign=sign,cruiseKmh=10000,farmTravel="area",farmRange=20}
+        local facing
+        for _=1,120 do
+            local pose=Rail.step(state,settings,.1,false,{long})
+            assert(state.s>=490 and state.s<=510)
+            assert(math.abs(pose.speed*1.2-10000)<1e-6)
+            assert(math.abs(math.abs(pose.targetAngle)-angle)<1e-6)
+            if facing then assert(math.abs((pose.bodyHeading-facing+math.pi)%(2*math.pi)-math.pi)<1e-6) end
+            facing=pose.bodyHeading
+        end
+    end
+end
+print("PASS 0/90-degree angles, inverted angle and 10000 km/h area reflection preserve bounds/facing")
+local timer=Rail.new(long,{s=500},1)
+local settings={style="farm",angle=60,cruiseKmh=120,farmTravel="area",reverseHz=2}
+local flips,previous=0,1
+for _=1,1000 do
+    local pose=Rail.step(timer,settings,.01,false,{long})
+    if timer.direction~=previous then flips+=1;previous=timer.direction end
+    assert(pose.speed==100 and timer.s>=timer.area.low and timer.s<=timer.area.high)
+end
+assert(flips>=19 and flips<=21,flips)
+local position=timer.s
+Rail.reverse(timer,true)
+Rail.step(timer,settings,1/240,true,{long})
+assert(math.abs(timer.s-position)<1e-6,'Manual reverse / brake must not teleport within the timed area')
+print("PASS selectable reversal Hz, timed-area bounds and manual reversal while paused")

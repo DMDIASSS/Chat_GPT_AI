@@ -7,7 +7,7 @@ MODULES = (("Controller", "controller.lua"), ("Roads", "roads.lua"), ("InputLeas
 
 
 def source():
-    code = "-- HowToDrift Assist 1.2.0 | farm / cool road autopilot\n-- No downloads, admin remotes, or score submission.\n"
+    code = "-- HowToDrift Assist 1.3.0 | farm / cool road autopilot\n-- No downloads, admin remotes, or score submission.\n"
     for name, filename in MODULES:
         module=(ROOT/filename).read_text(encoding='utf8').replace('local Roads=require("./roads")','')
         code += f"\nlocal {name} = (function()\n{module}\nend)()\n"

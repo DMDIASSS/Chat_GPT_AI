@@ -1,57 +1,53 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "date": "2026-10-31",
+  "controls": {
+    "angle_degrees": [
+      0,
+      90
+    ],
+    "angle_flip": "F8 / Flip Angle; independent of travel direction",
+    "speed_target_kmh": [
+      30,
+      10000
+    ],
+    "reverse_hz": [
+      0,
+      60
+    ],
+    "reverse_hz_definition": "Direction changes per second in Farm Area; 0 uses distance. Timed span is derived from requested speed/frequency and capped by road length."
+  },
   "offline_checks": {
-    "luau_compile": true,
-    "generated_source_matches": true,
-    "rail_scenarios": [
-      "Farm speed maintained at requested 500 km/h across joins and spawn loops",
-      "Unsupported connected exit rejection",
-      "Reverse mirrors drift side",
-      "Bounded local Farm area sweep with constant facing direction",
-      "Multiple reversals per frame on short paths",
-      "Cool lane envelope includes full car footprint",
-      "Cool dead-end stop and loop"
-    ],
-    "wheel_plane_cases": 63,
-    "wheel_plane_scope": "Synthetic planar grades/banks and +/-75 deg / reverse orientation",
-    "surface_guards": [
-      "Tunnel floor below roof",
-      "No high/sky ray fallback",
-      "Four wheel supports required",
-      "Grass/off-road rejection"
-    ],
-    "elevation_lookup": "3D profile slope interpolation and separate stacked roads",
-    "standalone_lifecycle": [
-      "Farm/Cool/Area GUI",
-      "Rejoin/Reverse while enabled",
-      "Spawn anchor from HomeCF",
-      "Ownership guard",
-      "Pause/resume",
-      "Stop and reinjection cleanup",
-      "Diagnostics JSON",
-      "Official HomeCF map teleport and live road-data replacement without stale anchor"
-    ],
-    "standalone_multilayer_tunnel": "360 frames on a banked/graded floor with roof and mountain layers; 500 km/h in both directions",
-    "native_tyre_code_cases": 144,
-    "native_tyre_code_scope": "User-supplied original CarPhysics / GarageConfig on mocked road planes; asserts 4 grounded wheels, native beta and speed at 85/500 km/h. No live physics solver, networking or executor."
+    "compile_and_generated_source": true,
+    "retained_route_surface_elevation_input_and_controller_checks": true,
+    "extreme_area_reflection": "0/45/90 degrees, normal/inverted, requested 10000 km/h; bounds and facing preserved",
+    "reverse_timer": "2 reversals/s over 10 seconds, bounded span; manual reverse and brake preserve position",
+    "standalone_ui": "Farm angle editing and Flip Angle do not reverse travel; Farm/Cool/Area, stop, diagnostics and reinjection",
+    "cool_physics": "Normal Cool ticks apply physical impulses / yaw assistance without model PivotTo; recovery retains pose solver",
+    "standalone_tunnel": "Banked floor below roof/mountain layers; forward/reverse at 500 km/h",
+    "wheel_plane_cases": 90,
+    "native_contact_cases": 324,
+    "native_contact_scope": "Original uploaded CarPhysics on mocked planes, +/-90 and backward zero orientation; 85/500/10000 km/h velocity targets. Not Roblox networking or actual collision solver.",
+    "original_controller_benchmark": {
+      "source": "User-supplied How To Drift place",
+      "test": "Original CarPhysics / GarageConfig on planar fixture",
+      "limitations": "Not Roblox, real 3D collision/suspension, networking, streaming or a live executor test",
+      "metrics": {
+        "manual_cases": 24.0,
+        "auto_cases": 18.0,
+        "manual_max_mean_angle_error": 0.01253569,
+        "auto_max_mean_angle_error": 0.09395017,
+        "auto_max_cross_track": 5.26351844
+      }
+    }
   },
-  "scoring_basis": {
-    "source": "Uploaded client DriftScore.update",
-    "eligible_speed_kmh_min": 25,
-    "angle_bonus": "clamp(abs(angle_degrees)/30, 0.5, 2)",
-    "angle_bonus_cap_degrees": 60,
-    "server_reward_guaranteed": false,
-    "same_spot_penalty_observed_in_client": true
-  },
-  "legacy_tests": "Retained controller/roads/input/surrogate tests also pass; old physics benchmark metrics belong to old versions.",
   "live_roblox_tested": false,
   "jjsploit_tested": false,
   "limitations": [
-    "Road/path data and loaded ground are still required.",
-    "Four-contact fitting cannot bridge an arbitrary cliff or non-supporting terrain; validated start fallback or waiting is used.",
-    "Farm controls constant requested speed while active on validated ground; pause/brake, lost ownership, missing ground and server corrections can interrupt it.",
-    "Cool mode is assisted kinematic driving, not an unmodified tyre simulation.",
-    "Repeated local area farming can receive the game same-spot payout penalty. No reward remotes are called."
+    "Extreme speed is a selectable/commanded target, not a promise that Roblox/server will sustain it.",
+    "Cool keeps normal vehicle physics and corner limits; it does not instantly reach the selected speed.",
+    "Visible reverse frequency is limited by update/render rate. Short roads cap timed sweep span, so position travel and commanded velocity can differ.",
+    "Four-wheel supported recovery requires loaded ground; server corrections/collisions can still interfere.",
+    "0 degrees does not qualify as a drift; the visible client angle bonus caps at 60 degrees; same-spot farming can pay less. No reward remotes are called."
   ]
 }

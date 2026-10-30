@@ -14,8 +14,8 @@ local env = if type(getgenv) == "function" then getgenv() else _G
 local old = rawget(env, "__HowToDriftAssist")
 if type(old) == "table" and type(old.destroy) == "function" then pcall(old.destroy) end
 
-local app = {version = "1.2.0", alive = true, enabled = true, connections = {},
-    settings = Controller.settings({mode="road",style="farm",angle=35,cruiseKmh=85}), controller = Controller.new(), lease = InputLease.new(player),
+local app = {version = "1.3.0", alive = true, enabled = true, connections = {},
+    settings = Controller.settings({mode="road",style="farm",angle=60,cruiseKmh=85}), controller = Controller.new(), lease = InputLease.new(player),
     status = "Autodrive armed; sit in your own car", trace = {}, frames = 0,
     physicsWrites = 0, inputWrites = 0, peakControllerMs = 0, lastControllerMs = 0,
     peakUpdateMs = 0, lastUpdateMs = 0, routes = {},
@@ -36,6 +36,7 @@ local function release()
     app.controller = Controller.new()
     app.rail=nil
     app.lastCommand = nil
+    app.coolInitialized=nil
 end
 function app.stop(reason)
     app.enabled = false
@@ -58,6 +59,10 @@ end
 function app.setStyle(style)
     app.settings.style=if style=="cool" then "cool" else "farm"
     if app.rail then app.rail.area=nil;app.rail.backwards=false end
+    app.controller=Controller.new();app.coolInitialized=nil
+end
+function app.flipAngle()
+    app.settings.angleSign=-app.settings.angleSign
 end
 
 local root, car, wheels = nil, nil, {}
@@ -281,12 +286,12 @@ local function corner(parent, radius) make("UICorner", {CornerRadius=UDim.new(0,
 local gui = make("ScreenGui", {Name="HowToDriftAssist", ResetOnSpawn=false, IgnoreGuiInset=true,
     DisplayOrder=95, ZIndexBehavior=Enum.ZIndexBehavior.Sibling}, playerGui)
 app.gui = gui
-local panel = make("Frame", {Name="Panel", Size=UDim2.fromOffset(364,520),
+local panel = make("Frame", {Name="Panel", Size=UDim2.fromOffset(364,616),
     Position=UDim2.new(1,-382,0,80), BackgroundColor3=palette.bg, BorderSizePixel=0}, gui)
 corner(panel,12)
 local scale = make("UIScale", {Scale=1}, panel)
 local header = make("TextLabel", {Name="Header", Size=UDim2.new(1,-80,0,46), Position=UDim2.fromOffset(14,0),
-    BackgroundTransparency=1, Text="DRIFT ASSIST  1.2.0", TextColor3=palette.ink,
+    BackgroundTransparency=1, Text="DRIFT ASSIST  1.3.0", TextColor3=palette.ink,
     TextSize=17, Font=Enum.Font.GothamBold, TextXAlignment=Enum.TextXAlignment.Left, Active=true}, panel)
 local function button(name, text, position, size, parent, callback)
     local b = make("TextButton", {Name=name, Text=text, Position=position, Size=size, BackgroundColor3=palette.panel,
@@ -297,12 +302,12 @@ local function button(name, text, position, size, parent, callback)
 end
 local minimized = false
 local body = make("ScrollingFrame", {Name="Body", Position=UDim2.fromOffset(12,48), Size=UDim2.new(1,-24,1,-60),
-    BackgroundTransparency=1, BorderSizePixel=0, ScrollBarThickness=3, CanvasSize=UDim2.fromOffset(0,535),
+    BackgroundTransparency=1, BorderSizePixel=0, ScrollBarThickness=3, CanvasSize=UDim2.fromOffset(0,631),
     ScrollingDirection=Enum.ScrollingDirection.Y}, panel)
 button("Minimize", "_", UDim2.new(1,-69,0,9), UDim2.fromOffset(27,27), panel, function()
     minimized = not minimized
     body.Visible = not minimized
-    panel.Size = UDim2.fromOffset(364, if minimized then 46 else 520)
+    panel.Size = UDim2.fromOffset(364, if minimized then 46 else 616)
 end)
 button("Close", "x", UDim2.new(1,-36,0,9), UDim2.fromOffset(27,27), panel, function() app.destroy() end)
 local startButton = button("Start", "Start  [F6]", UDim2.fromOffset(0,0), UDim2.new(1,-6,0,38), body, function()
@@ -315,12 +320,13 @@ local travelButton=button("FarmTravel", "Farm: Loop", UDim2.new(.5,3,0,46), UDim
     app.settings.farmTravel=if app.settings.farmTravel=="loop" then "area" else "loop"
     if app.rail then app.rail.area=nil;app.rail.backwards=false end
 end)
-local sideButton = button("Side", "Reverse", UDim2.new(0.62,3,0,85), UDim2.new(0.38,-9,0,30), body, function()
+local sideButton = button("Side", "Reverse travel", UDim2.new(0.62,3,0,85), UDim2.new(0.38,-9,0,30), body, function()
     app.direction=-app.direction
     if app.rail then Rail.reverse(app.rail,app.settings.style=="farm" and app.settings.farmTravel=="area") end
     app.guideAt=nil
 end)
 button("Rejoin","Rejoin nearest road [F7]",UDim2.fromOffset(0,85),UDim2.new(.62,-4,0,30),body,app.nearestRoad)
+local flipButton=button("FlipAngle","Flip Angle [F8]",UDim2.fromOffset(0,122),UDim2.new(1,-6,0,30),body,app.flipAngle)
 local sliderRefresh = {}
 local draggingSlider, draggingPanel
 local function slider(key, label, low, high, increment, suffix, y)
@@ -343,12 +349,11 @@ local function slider(key, label, low, high, increment, suffix, y)
         local fraction = (app.settings[key]-low)/(high-low)
         fill.Size, knob.Position = UDim2.fromScale(fraction,1), UDim2.fromScale(fraction,0.5)
         if not value:IsFocused() then
-            value.Text = if key=="angle" and app.settings.style=="farm" then "60 auto" else string.format(if increment >= 1 then "%.0f%s" else "%.2f%s", app.settings[key], suffix)
+            value.Text = string.format(if increment >= 1 then "%.0f%s" else "%.2f%s", app.settings[key], suffix)
         end
-        value.TextEditable=key~="angle" or app.settings.style~="farm"
+        value.TextEditable=true
     end
     local function set(v)
-        if key=="angle" and app.settings.style=="farm" then refresh();return end
         if Controller.finite(v) then
             app.settings[key] = math.clamp(math.floor(v/increment+0.5)*increment, low, high)
         end
@@ -368,13 +373,14 @@ local function slider(key, label, low, high, increment, suffix, y)
     sliderRefresh[key] = refresh
     refresh()
 end
-slider("angle", "Cool maximum angle / Farm auto", 15,75,1," deg",125)
-slider("cruiseKmh", "Speed (Farm: 25+ km/h)",20,500,1," km/h",183)
-slider("farmRange", "Farm area length (studs)",20,300,1,"",241)
-local status = make("TextLabel", {Name="Status", Position=UDim2.fromOffset(0,305), Size=UDim2.new(1,-8,0,61),
+slider("angle", "Angle / Cool maximum", 0,90,1," deg",163)
+slider("cruiseKmh", "Speed target",30,10000,1," km/h",221)
+slider("farmRange", "Area length (distance mode)",20,300,1,"",279)
+slider("reverseHz", "Reverse Hz (0 = by distance)",0,60,.1," Hz",337)
+local status = make("TextLabel", {Name="Status", Position=UDim2.fromOffset(0,401), Size=UDim2.new(1,-8,0,61),
     BackgroundTransparency=1, Text=app.status, TextWrapped=true, TextYAlignment=Enum.TextYAlignment.Top,
     TextXAlignment=Enum.TextXAlignment.Left, Font=Enum.Font.Gotham, TextSize=13, TextColor3=palette.dim}, body)
-local telemetry = make("TextLabel", {Name="Telemetry", Position=UDim2.fromOffset(0,370), Size=UDim2.new(1,-8,0,59),
+local telemetry = make("TextLabel", {Name="Telemetry", Position=UDim2.fromOffset(0,466), Size=UDim2.new(1,-8,0,59),
     BackgroundTransparency=1, Text="No car telemetry", TextWrapped=true, TextYAlignment=Enum.TextYAlignment.Top,
     TextXAlignment=Enum.TextXAlignment.Left, Font=Enum.Font.Code, TextSize=12, TextColor3=palette.ink}, body)
 
@@ -400,9 +406,9 @@ function app.report()
             wheel_distances=app.surface.distances} else nil,
         drift_pay=player:GetAttribute("DriftPay"),drift_pay_why=player:GetAttribute("DriftPayWhy"),
         elevation_segments=app.elevation and app.elevation.count,
-        note="Farm/Cool kinematic autopilot. Farm uses the client angle bonus cap at 60 degrees. Server payouts and live contact are not guaranteed."}
+        note="Farm/Cool autopilot, adjustable 0-90 degree angle and 30-10000 km/h target. Server payouts and actual speed/contact are not guaranteed."}
 end
-button("Diagnostics", "Save diagnostics", UDim2.fromOffset(0,438), UDim2.new(1,-6,0,33), body, function()
+button("Diagnostics", "Save diagnostics", UDim2.fromOffset(0,534), UDim2.new(1,-6,0,33), body, function()
     local ok, text = pcall(function() return HttpService:JSONEncode(app.report()) end)
     if not ok then app.status = "Diagnostics encode failed: "..tostring(text); return end
     if type(writefile) == "function" then
@@ -416,8 +422,8 @@ button("Diagnostics", "Save diagnostics", UDim2.fromOffset(0,438), UDim2.new(1,-
         app.status = "File writing unavailable; diagnostics printed in F9 console"
     end
 end)
-make("TextLabel", {Name="Help", Position=UDim2.fromOffset(0,482), Size=UDim2.new(1,-8,0,57),
-    BackgroundTransparency=1, Text="F6 Start/Stop | F7 Rejoin | S / Space Brake\nFarm: fixed 60 deg, Loop or Area reverse.\nCool: flowing lane line, automatic corner speed.",
+make("TextLabel", {Name="Help", Position=UDim2.fromOffset(0,578), Size=UDim2.new(1,-8,0,57),
+    BackgroundTransparency=1, Text="F6 Stop | F7 Rejoin | F8 Flip Angle\nFarm holds your angle; Cool uses it as a maximum.\nEdit the number boxes for precise values.",
     TextWrapped=true, TextYAlignment=Enum.TextYAlignment.Top, TextXAlignment=Enum.TextXAlignment.Left,
     Font=Enum.Font.Gotham, TextSize=11, TextColor3=palette.dim}, body)
 
@@ -445,6 +451,7 @@ connect(Input.InputBegan, function(input, processed)
     if processed or Input:GetFocusedTextBox() then return end
     if input.KeyCode == Enum.KeyCode.F6 then if app.enabled then app.stop() else app.start() end
     elseif input.KeyCode == Enum.KeyCode.F7 then app.nearestRoad()
+    elseif input.KeyCode == Enum.KeyCode.F8 then app.flipAngle()
     end
 end)
 connect(Input.WindowFocusReleased, function() app.focused=false; app.lease:release() end)
@@ -459,7 +466,8 @@ local function frame(dt)
         startButton.BackgroundColor3 = if app.enabled then palette.red else palette.accent
         modeButton.Text = if app.settings.style=="farm" then "Farm mode" else "Cool mode"
         travelButton.Text = if app.settings.farmTravel=="area" then "Farm: Area reverse" else "Farm: Loop"
-        sideButton.Text = "Reverse"
+        sideButton.Text = "Reverse travel"
+        flipButton.Text=if app.settings.angleSign==-1 then "Angle: Inverted [F8]" else "Flip Angle [F8]"
         for _,refresh in pairs(sliderRefresh) do refresh() end
         status.Text = app.status
         local s, cmd = app.lastSample, app.lastCommand
@@ -538,12 +546,24 @@ local function frame(dt)
     end
     app.rail.anchor=app.loopAnchor
     app.settings.offroad=player:GetAttribute("DriftPayWhy")=="offroad"
+    local measured=Controller.measure(sample)
+    if app.settings.style=="cool" then
+        -- Anchor planning to the actual car. Cool mode uses tyres/steering, not an advancing rail.
+        local projection=Roads.project(app.rail.path,sample,app.rail.s,sample.yaw)
+        if projection and projection.distance<app.rail.path.width then app.rail.s=projection.s end
+        app.rail.speed=measured and measured.speed or 0
+    end
     local oldPlan=table.clone(app.rail)
     local up=reference.up
     local _,planHeading=Roads.point(app.rail.path,app.rail.s)
     local slope=-(up.x*(-math.sin(planHeading))+up.z*(-math.cos(planHeading)))/math.max(up.y,.35)
     local travelScale=1/math.sqrt(1+slope*slope)
     local pose=Rail.step(app.rail,app.settings,dt,input.brake>.1 or input.handbrake,app.routes,travelScale)
+    if app.settings.style=="cool" then
+        local side=app.rail.side*app.settings.angleSign
+        pose.beta=math.rad(app.settings.angle)*side*math.clamp((measured.speed-9)/12,0,1)
+        pose.targetAngle=math.deg(pose.beta)
+    end
     if pose.reference then reference=pose.reference end
     local expected=if pose.point.y then pose.point.y else Surface.expected(reference,pose.point.x,pose.point.z)
     local hint=Elevation.height(app.elevation,pose.point.x,pose.point.z,expected,if app.surface then 6 else math.huge)
@@ -606,17 +626,52 @@ local function frame(dt)
     local r,n,f=surface.right,surface.up,surface.forward
     local targetCF=CFrame.fromMatrix(targetPosition,Vector3.new(r.x,r.y,r.z),Vector3.new(n.x,n.y,n.z),Vector3.new(-f.x,-f.y,-f.z))
     local gap=(root.Position-targetPosition).Magnitude
-    if gap>10 or sample.upY<.55 or pose.jumped then app.recoveries=(app.recoveries or 0)+1 end
-    local ok,err=app.lease:write({throttle=if pose.speed>2 then .6 else 0,brake=0,steer=0,handbrake=false})
+    local physicsCommand
+    local recovery=gap>math.max(12,measured.speed*.4) or sample.grounded<4 or sample.upY<.55 or pose.jumped
+    if app.settings.style=="cool" then
+        if measured.speed<2 and input.brake<.1 and not input.handbrake then
+            app.coolStuckSince=app.coolStuckSince or now
+            if now-app.coolStuckSince>2 then recovery=true;app.coolStuckSince=nil end
+        else app.coolStuckSince=nil end
+        if not recovery then
+            local guide=Roads.guide(app.path,app.direction,sample,measured.speed,sample.yaw,app.rail.s)
+            if guide then
+                local cross=guide.signedCrossTrack or 0
+                guide.yaw+=math.atan2(cross*1.5,math.max(measured.speed,8))
+                    -math.atan2((cross-(pose.lateral or 0))*1.5,math.max(measured.speed,8))
+                local settings=table.clone(app.settings)
+                settings.mode="road"
+                settings.side=if app.rail.side*app.settings.angleSign>0 then "left" else "right"
+                if not app.coolInitialized then app.controller.targetBeta=measured.beta;app.coolInitialized=true end
+                physicsCommand=Controller.step(app.controller,settings,sample,input,guide,dt)
+            else recovery=true end
+        end
+    end
+    local commandInput=physicsCommand or {throttle=if pose.speed>2 then .6 else 0,brake=0,steer=0,handbrake=false}
+    local ok,err=true,nil
+    if not physicsCommand or physicsCommand.override then ok,err=app.lease:write(commandInput) else app.lease:release() end
     if not ok then app.stop(err);return end
-    car:PivotTo(targetCF*root.CFrame:Inverse()*car:GetPivot())
-    local v=surface.travel
-    root.AssemblyLinearVelocity=Vector3.new(v.x,v.y,v.z)*pose.speed
-    root.AssemblyAngularVelocity=Vector3.zero
+    if physicsCommand then
+        root:ApplyImpulse(Vector3.new(physicsCommand.ax,0,physicsCommand.az)*sample.mass*math.clamp(dt,1/240,.05))
+        if physicsCommand.yawRate then
+            local rotation=root.AssemblyAngularVelocity
+            root.AssemblyAngularVelocity=Vector3.new(rotation.X,physicsCommand.yawRate,rotation.Z)
+        end
+        pose.targetAngle=physicsCommand.targetAngle or 0
+        pose.speed=(physicsCommand.targetKmh or 0)/1.2
+    else
+        if recovery then app.recoveries=(app.recoveries or 0)+1 end
+        car:PivotTo(targetCF*root.CFrame:Inverse()*car:GetPivot())
+        local v=surface.travel
+        root.AssemblyLinearVelocity=Vector3.new(v.x,v.y,v.z)*pose.speed
+        root.AssemblyAngularVelocity=Vector3.zero
+        app.coolInitialized=nil
+    end
     app.physicsWrites+=1;app.inputWrites+=1;app.frames+=1
-    app.status=(if app.settings.style=="cool" then "Cool line: " elseif app.settings.farmTravel=="area" then "Farm area: " else "Farm loop: ")..app.path.name
+    app.status=(if app.settings.style=="cool" then (if physicsCommand then "Cool physics: " else "Cool recovery: ") elseif app.settings.farmTravel=="area" then "Farm area: " else "Farm loop: ")..app.path.name
     app.lastCommand={targetAngle=pose.targetAngle,targetKmh=pose.speed*1.2,override=true,reason=app.status,
-        lateral=pose.lateral,contacts=surface.contacts,backwards=pose.backwards,loops=app.rail.loops,connections=app.rail.links}
+        lateral=pose.lateral,contacts=surface.contacts,backwards=pose.backwards,loops=app.rail.loops,connections=app.rail.links,
+        reverseHz=pose.reverseHz,areaSpan=pose.areaSpan,physics=physicsCommand~=nil}
     local command=app.lastCommand
     local guide=nil
     app.lastControllerMs=(os.clock()-started)*1000
@@ -651,4 +706,4 @@ connect(RunService.PreSimulation,function(dt)
         warn("[HowToDrift Assist] "..tostring(err))
     end
 end)
-print("[HowToDrift Assist 1.2.0] Farm/Cool autopilot armed. F6 Stop/Start; F7 Rejoin. Farm Loop / Area reverse; speed up to 500 km/h.")
+print("[HowToDrift Assist 1.3.0] Farm/Cool autopilot armed. F6 Stop/Start; F7 Rejoin. Farm Loop / Area reverse; 0-90 degrees; speed target 30-10000 km/h; F8 flips angle.")

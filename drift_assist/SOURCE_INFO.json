@@ -1,18 +1,18 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "entrypoint": "HowToDrift_Assist.lua",
   "files": {
     "HowToDrift_Assist.lua": {
-      "sha256": "4bd17402a70ef50310ae9061f882012f0f77ab64cc2c79614166a0a00af0435d",
-      "bytes": 68731
+      "sha256": "07cdb73a0423707312bd7099150269bc7bd7681743e3d71f09c15d3e315af765",
+      "bytes": 73449
     },
     "README.md": {
-      "sha256": "c142ab2b65d59b2d1bcbdf404f5e71e5c4c6b3f144653ec0d14f5516a8b8a2ca",
-      "bytes": 5844
+      "sha256": "93d21012c80cf241feb505be2ea7d07fbdb0022d5041a3992a3a3ac4145d5f28",
+      "bytes": 6152
     },
     "VERIFICATION.json": {
-      "sha256": "a0d699aafb42b59ef5a7adf09a806157f32277bb3dcab09dfa05e84b0057f36c",
-      "bytes": 2712
+      "sha256": "928e364bdcb9bf525786c682773d7d5db0cf81e048ca50680dd8b4cd91d33e02",
+      "bytes": 2685
     },
     "VERIFICATION_1.0.json": {
       "sha256": "22dc7aa60322034b4f5ddb91e28f5166dcb06dcae6f54c8dbc8c0c6654933f12",
@@ -22,21 +22,25 @@
       "sha256": "943500ff52decbfe03b6851f9bc177ee1fffe93474b525ce365484490766488f",
       "bytes": 1139
     },
+    "VERIFICATION_1.2.json": {
+      "sha256": "a0d699aafb42b59ef5a7adf09a806157f32277bb3dcab09dfa05e84b0057f36c",
+      "bytes": 2712
+    },
     "autorail.lua": {
-      "sha256": "e7bd53f84b0bf4125e66019252ad7f9e6a1714f16479e2130240d805f306df0e",
-      "bytes": 6621
+      "sha256": "8a022af390840a561fbbad2068a591cfedbd4faab61386a3ea95f1564aa052aa",
+      "bytes": 8127
     },
     "build.py": {
-      "sha256": "655154ea77f9bbc31f1dee7729ff73147124bac542682f3aa42faa4d42860f8e",
+      "sha256": "8a41222a7a87906e4cfb21f072a54d9d25f5b22fb70ebae252347aa7faa9665f",
       "bytes": 921
     },
     "client.lua": {
-      "sha256": "87a7aaf0b5d68376d608f8223a706c00a34549436a25d9add93b6a2090b7443a",
-      "bytes": 37381
+      "sha256": "c2082b443ae57ffbf706e3b266bc5788fb0fd1e006a3f9d91ba467a30fb5c582",
+      "bytes": 40481
     },
     "controller.lua": {
-      "sha256": "c2fdb735215186ab63f738ddd5748c8fabb43cf9def9fa94f79149faa07a7f64",
-      "bytes": 8627
+      "sha256": "72b27549e83128ea1a21ea819848d91de7461ab117104b88d72b3d7155444a9a",
+      "bytes": 8739
     },
     "elevation.lua": {
       "sha256": "0728c932dc5af28305042f04f9df177264a3e396a30a444cfb224ad5c1da1ca3",
@@ -47,7 +51,7 @@
       "bytes": 954
     },
     "package.py": {
-      "sha256": "17212020db0582dbc075708145ffb28151197ad40ffb8e2b0d127bcd2f8608ea",
+      "sha256": "33f9a5445a3d0b213c2ab179f718bd8b82534b9b6023a11215b9faec3ba28413",
       "bytes": 2243
     },
     "roads.lua": {
@@ -59,8 +63,8 @@
       "bytes": 4002
     },
     "tests/check_contact.py": {
-      "sha256": "109c08aa1be47646974e5d6c08aa745d4f3e3bfffa417a97457f440d933c22fd",
-      "bytes": 3184
+      "sha256": "f1236e3e38eeb05673f55727af3777adb7c1b93a886fbc91618072bc3f9e4602",
+      "bytes": 3228
     },
     "tests/check_place.py": {
       "sha256": "33991a1f15c0012cbf0f42daac520f434ada6edd1bec591e5e7cb1140faf939f",
@@ -71,15 +75,15 @@
       "bytes": 10806
     },
     "tests/run.py": {
-      "sha256": "c17c0274ca9c45fb50f1a4e4d4efc4f4866febb6cd123fe9fcfcb648903592d7",
-      "bytes": 6777
+      "sha256": "17b042e2f529561ee20978129204a7ae24dbbd1651b680fac6cf2dabe4c16d1d",
+      "bytes": 7238
     },
     "tests/test_autorail.lua": {
-      "sha256": "b971d2fd4b9981c7e568116a77d911b799c437778bdde3925c87cba172f5e90d",
-      "bytes": 2865
+      "sha256": "32e5571fd462be165584c3c15b44b02547dcd3289876df31ccb84635ef0b16e1",
+      "bytes": 4356
     },
     "tests/test_controller.lua": {
-      "sha256": "0a9a6fed79c6326e49137b31c6b9ed60460d2297be968936037c91481720949a",
+      "sha256": "9d16f3eace067bcc7486ff8f6ea37617b00fd3e5ee945cc76fc0199b0655530e",
       "bytes": 5571
     },
     "tests/test_driving.lua": {
@@ -99,8 +103,8 @@
       "bytes": 2973
     },
     "tests/test_surface.lua": {
-      "sha256": "a27c821861e6cfa859d67ad69add97594c940b61c5bf75f4a779be18737ca395",
-      "bytes": 2750
+      "sha256": "2a8d0db822e51105b394a6f1fcafd554fd12592d54fd7e5765e9a23544955073",
+      "bytes": 2767
     }
   },
   "uploaded_place_sha256": "b89c3d8616755662bcd2e642de1f4ea08b89e3a114852a4754b32a179c00ae32",

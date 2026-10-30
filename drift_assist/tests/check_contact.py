@@ -20,8 +20,8 @@ def main():
 local cases=0
 for _,grade in ipairs({-.5,0,.5}) do
 for _,bank in ipairs({-.4,0,.6}) do
-for _,angle in ipairs({-120,-75,-60,0,35,60,75,120}) do
-for _,kmh in ipairs({85,500}) do
+for _,angle in ipairs({-180,-120,-90,-75,-60,0,35,60,75,90,120,180}) do
+for _,kmh in ipairs({85,500,10000}) do
  local length=math.sqrt(1+grade*grade+bank*bank)
  local up=Vector3.new(-grade,1,-bank)/length
  local floor=12
@@ -53,14 +53,14 @@ for _,kmh in ipairs({85,500}) do
  engine:step(1/120,{throttle=.6,brake=0,steer=0,handbrake=false,analogSteer=true})
  assert(engine.groundedCount==4,'Original CarPhysics did not find all four wheels')
  assert(math.abs(engine.speed*1.2-kmh)<1e-5)
- local expected=if angle==120 then 60 elseif angle==-120 then -60 else angle
+ local expected=if math.abs(angle)>90 then math.sign(angle)*(180-math.abs(angle)) else angle
  assert(math.abs(math.deg(engine.beta)-expected)<1e-5,'Native drift angle differs')
  cases+=1;car:Destroy()
 end
 end
 end
 end
-print('PASS original CarPhysics: '..cases..' four-wheel contacts, bank/grade, forward/reverse angles and 85/500 km/h poses')
+print('PASS original CarPhysics: '..cases..' four-wheel contacts, bank/grade, forward/reverse angles and 85/500/10000 km/h poses')
 print('Scope: mocked road planes and rigid-body calls, not live Roblox collision/network validation')
 '''
     with tempfile.TemporaryDirectory() as directory:

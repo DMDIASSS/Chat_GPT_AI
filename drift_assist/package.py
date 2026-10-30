@@ -16,7 +16,7 @@ def main():
     (ROOT / "HowToDrift_Assist.lua").write_text(builder.source(), encoding="utf8", newline="\n")
     files = sorted(p for p in ROOT.rglob("*") if p.is_file() and p.suffix in (".lua", ".py", ".md", ".json")
                    and "__pycache__" not in p.parts and p.name != "SOURCE_INFO.json")
-    manifest = {"version": "1.2.0", "entrypoint": "HowToDrift_Assist.lua", "files": {
+    manifest = {"version": "1.3.0", "entrypoint": "HowToDrift_Assist.lua", "files": {
         p.relative_to(ROOT).as_posix(): {"sha256": hashlib.sha256(p.read_bytes()).hexdigest(), "bytes": p.stat().st_size}
         for p in files}, "uploaded_place_sha256": "b89c3d8616755662bcd2e642de1f4ea08b89e3a114852a4754b32a179c00ae32",
         "includes_original_game_sources": False}

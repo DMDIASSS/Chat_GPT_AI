@@ -18,8 +18,9 @@ Controller.finite, Controller.wrap = finite, wrap
 function Controller.settings(raw)
     raw = if type(raw) == "table" then raw else {}
     return {
-        angle = number(raw.angle, 35, 15, 75),
-        cruiseKmh = number(raw.cruiseKmh, 65, 20, 500),
+        angle = number(raw.angle, 60, 0, 90),
+        angleSign = if raw.angleSign == -1 then -1 else 1,
+        cruiseKmh = number(raw.cruiseKmh, 65, 30, 10000),
         power = number(raw.power, 1.25, 0.5, 4),
         speedMultiplier = number(raw.speedMultiplier, 1, 0.5, 2.5),
         strength = number(raw.strength, 0.85, 0, 1),
@@ -28,6 +29,7 @@ function Controller.settings(raw)
         style = if raw.style == "cool" then "cool" else "farm",
         farmTravel = if raw.farmTravel == "area" then "area" else "loop",
         farmRange = number(raw.farmRange,80,20,300),
+        reverseHz = number(raw.reverseHz,0,0,60),
     }
 end
 
@@ -75,7 +77,7 @@ function Controller.step(state, settings, sample, input, guide, dt)
         out.reason = if sample.paused then sample.paused else "Waiting for grounded, upright car"
         return out
     end
-    local cap = math.min(360, settings.cruiseKmh * settings.speedMultiplier * (if input.boost then 1.35 else 1)) / 1.2
+    local cap = math.min(10000, settings.cruiseKmh * settings.speedMultiplier * (if input.boost then 1.35 else 1)) / 1.2
     local targetSpeed = cap
     local desiredYaw = m.velocityYaw
     local side = if settings.side == "left" then 1 elseif settings.side == "right" then -1 else state.side

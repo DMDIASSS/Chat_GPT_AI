@@ -27,17 +27,22 @@ def main():
     fixture = (ROOT / "tests" / "roblox_fixture.lua").read_text(encoding="utf8")
     checks = r'''
 local first=assert(env.__HowToDriftAssist)
-assert(first.alive and first.enabled and first.version=='1.2.0' and first.settings.mode=='road')
+assert(first.alive and first.enabled and first.version=='1.3.0' and first.settings.mode=='road')
 local car,root,seat=spawnCar()
 car:SetAttribute('HomeCF',cf(0,Vector3.new(0,2,80)))
 local maps=object('Folder',services.ReplicatedStorage,'Minimap')
 local road=object('StringValue',maps,'TestRoad');road.Value='line|36|0,100;0,-300'
-first.settings.angle=75
+first.settings.angle=60
 for _=1,120 do step() end
 assert(not first.lastError,first.lastError)
 assert(first.physicsWrites>0 and math.abs(first.lastCommand.targetAngle-60)<1e-6)
 assert(player:GetAttribute('DebugInput') and root.pivots>0)
 assert(math.abs(first.loopAnchor.s-20)<1)
+local direction=first.rail.direction
+findCreated('FlipAngle').Activated:Fire();step()
+assert(first.settings.angleSign==-1 and first.rail.direction==direction)
+assert(first.lastCommand.targetAngle<0)
+findCreated('FlipAngle').Activated:Fire();step();assert(first.lastCommand.targetAngle>0)
 local writes=first.physicsWrites
 input.focus=object('TextBox');step();assert(first.physicsWrites==writes and player:GetAttribute('DebugInput')==nil)
 input.focus=nil;step();assert(first.physicsWrites>writes)
@@ -49,6 +54,9 @@ car:SetAttribute('NetOwner',player.UserId)
 findCreated('Side').Activated:Fire();step();assert(first.enabled)
 findCreated('FarmTravel').Activated:Fire();step();assert(first.enabled and first.settings.farmTravel=='area')
 findCreated('Mode').Activated:Fire();step();assert(first.enabled and first.settings.style=='cool')
+local coolPivots=root.pivots
+for _=1,6 do step() end
+assert(first.lastCommand.physics and root.pivots==coolPivots,'Cool should use physics, not frame-by-frame teleporting')
 services.Workspace.clockOffset=1793290000
 player:SetAttribute('RaceGoAt',services.Workspace:GetServerTimeNow()+10)
 n=first.physicsWrites;step();assert(first.physicsWrites==n)

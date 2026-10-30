@@ -18,7 +18,7 @@ end
 local cases=0
 for _,a in ipairs({-.5,0,.4}) do
     for _,b in ipairs({-.45,0,.6}) do
-        for _,beta in ipairs({-75,-60,0,35,60,75,120}) do
+        for _,beta in ipairs({-90,-75,-60,0,35,60,75,90,120,180}) do
             local query,reference=queryPlane(a,b,12,3)
             local fit,why=Surface.solve({x=8,z=-4},.7,math.rad(beta),wheels,reference,query)
             assert(fit,why)
@@ -30,13 +30,13 @@ for _,a in ipairs({-.5,0,.4}) do
             local f=motion.x*body.x+motion.y*body.y+motion.z*body.z
             local r=motion.x*right.x+motion.y*right.y+motion.z*right.z
             local measured=math.deg(math.atan2(r,math.abs(f)))
-            local expected=if beta==120 then 60 else beta
+            local expected=if beta>90 then 180-beta else beta
             assert(math.abs(measured-expected)<1e-5,measured.." vs "..expected)
             cases+=1
         end
     end
 end
-print("PASS "..cases.." wheel fits on grades/banks, both drift sides, 75 degrees and reversing")
+print("PASS "..cases.." wheel fits on grades/banks, both drift sides, 0/90 degrees and reversing")
 local q,reference=queryPlane(0,0,0,3)
 local fit=assert(Surface.solve({x=0,z=0},0,0,wheels,reference,q))
 assert(fit.position.y<3)

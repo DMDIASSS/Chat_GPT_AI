@@ -1,65 +1,65 @@
-# How To Drift Autodrive 1.2.0
+# How To Drift Autodrive 1.3.0
 
-The controller now has **Farm** and **Cool** modes, a speed setting up to **500 km/h**, near-floor tunnel probing, and a pose fitted to all four wheel supports.
+New controls: **Flip Angle**, **0–90 degrees**, **30–10,000 km/h speed targets**, and **Reverse Hz**. Cool mode now uses the original physics-based driving controller during normal movement, with the newer road/tunnel recovery fixes.
 
 ## Install
 
-1. Extract the ZIP anywhere. Open `HowToDrift_Assist.lua`.
+1. Extract the ZIP anywhere and open `HowToDrift_Assist.lua`.
 2. Paste the **entire file** into JJSploit and execute once, then sit in your own car.
-3. Check that the dashboard says **1.2.0**. It starts armed automatically.
-4. Choose Farm or Cool. No training or manual restart is needed when changing settings.
+3. Check that the dashboard says **1.3.0**. It starts armed automatically and replaces the previous instance.
 
-Executing this version stops and replaces the previous instance.
-
-## Farm mode
-
-Farm holds the chosen speed without the old corner or route-end speed cap. It uses a fixed **60-degree** native drift angle: the supplied client's angle bonus reaches its maximum at 60 degrees, so 75 does not add more angle bonus. Select at least **25 km/h** to meet the visible client's drift-speed condition.
-
-The **Farm: Loop / Area reverse** button chooses:
-
-- **Loop:** drive connected road segments, then return to the recorded spawn/start when there is no supported continuation. Closed roads loop naturally. Official map/spawn changes and replaced road data trigger a fresh route selection automatically. There is no intentional speed reduction during a Farm route transition or spawn loop.
-- **Area reverse:** drive back and forth over a local stretch, with the area length set by the third slider. Direction changes reverse the native drift side while preserving the car's facing direction. This is deliberately abrupt rather than a realistic braking manoeuvre.
-
-The game's client has a **SAME SPOT** payout reduction. Area farming may therefore pay less than full loops. The 60-degree setting optimizes the visible angle factor; it is not a promise of maximum or guaranteed server rewards.
-
-## Cool mode
-
-Cool follows a flowing side-to-side lane line rather than staying on the centerline. Its offset is bounded by the road width **and the full angled car footprint**, with an extra edge margin. It reduces the weave at high speeds. Grass, leafy grass, mud and unsupported wheel contacts cause the controller to try a more central line.
-
-The angle slider is the **maximum** angle (15–75 degrees), not a fixed sideways pose. The actual angle changes with road bends and speed and eases toward zero on straights and at stops. Cool slows for bends and brakes at a dead end before looping back. It is still assisted kinematic driving; it is not an unmodified tyre simulation.
-
-## Ground and tunnel behavior
-
-The old fixed 1.8-stud chassis height and always-upright car pose have been removed. The controller reads the car's wheel attachment positions, ride heights and tyre sizes. It probes below all four wheels, fits road pitch/bank and chooses a chassis height inside all four suspension contact ranges.
-
-Ground checks now start close to the expected floor. **There is no sky/high-mountain ray fallback.** Validated road-height continuity and replicated 3D race-course elevations help distinguish tunnels and stacked roads. If a wheel has no support or ground is not loaded, the controller retries a centerline/known start or waits. It cannot force four real contacts over an arbitrary cliff or fix incorrect/missing game path data.
+You can edit the number boxes directly for precise angle, speed and Hz values.
 
 ## Controls
 
 | Control | Action |
 | --- | --- |
-| Farm mode / Cool mode | Switch behavior without stopping. |
-| Farm: Loop / Area reverse | Choose full route farming or local forward/reverse farming. |
-| Angle | Cool maximum, 15–75 degrees. Farm shows `60 auto`. |
-| Speed | Requested 20–500 km/h. Cool can slow for bends; Farm holds the requested speed while active on supported ground. |
-| Area length | Local farming stretch, 20–300 studs. |
-| Reverse | Reverse motion and mirror the drift side. |
-| Rejoin / F7 | Re-select a nearby road without disabling the controller. |
+| Farm / Cool | Direct controlled farming, or the original driving controller's physics feel. |
+| Farm: Loop / Area reverse | Connected-road/spawn loops, or local forward/reverse farming. |
+| Flip Angle / F8 | Mirror the drift angle without reversing travel. The inverted setting persists through turns and travel reversals. |
+| Angle | 0–90 degrees in both modes. Farm holds the selected angle; Cool steers toward it with low-speed easing. Default: 60 degrees. |
+| Speed | Requested 30–10,000 km/h. Farm commands this speed on supported ground; Cool retains normal acceleration and corner limits. |
+| Reverse travel | Reverse motion, also mirroring the drift side. |
+| Area length | Local stretch, 20–300 studs, used when Reverse Hz is zero. |
+| Reverse Hz | 0–60 direction changes per second, used in Farm Area. 0 selects distance-based reversing. |
+| Rejoin / F7 | Select a nearby road while staying enabled. |
 | F6 | Stop / Start. |
 | S / Space | Temporary brake. |
 | Save diagnostics | Export `HowToDrift_Diagnostics.json` in the executor workspace. |
 
-Chat, menus, window focus loss, garage/replay, race countdowns, losing ownership and leaving your seat pause control. It resumes automatically when possible. Stop/close releases its input override. An existing external `DebugInput` controller is left intact.
+## Farm mode
 
-## Diagnostics and verification
+Farm holds your chosen angle and commands the chosen speed without corner or route-end slowdown. The visible client's angle bonus reaches its maximum at **60 degrees**; higher angles do not add more angle bonus. Zero degrees is allowed for driving, but does not qualify as a drift.
 
-Diagnostics include actual native speed/angle and contact counts, fitted wheel distances and normal, route joins/loops, lane offset, reverse state, last surface error, elevation segment count and the game's visible payout factor/reason. File writing falls back to the clipboard or F9 output; reports are not uploaded automatically.
+**Loop** connects supported road segments and returns to the recorded spawn/start when a continuation is unavailable. Closed roads loop naturally. Map/spawn changes and updated road data trigger route re-selection.
 
-Offline checks passed for route joining/spawn loops, 500 km/h Farm speed, reverse-side handling, local area bounds, Cool lane bounds, four-wheel fitting and tunnel floor selection. A full script fixture exercised a banked tunnel below a roof and mountain layer. The uploaded game's actual tyre code detected all four contacts in **144 mocked road-plane cases**, including forward/reverse and 85/500 km/h poses.
+**Area reverse** moves back and forth locally. Reversals mirror the native drift side and preserve the car's facing direction, including at a selected angle of zero. The game has a SAME SPOT payout penalty, so full loops may earn more.
 
-**This release has not been run in live Roblox/JJSploit here.** Server corrections, collisions, terrain not representable by a four-wheel pose, or unloaded roads can interrupt the requested motion. The ZIP includes `VERIFICATION.json` with the exact test scope. Historical results are labeled separately.
+When **Reverse Hz = 0**, the Area length slider controls the stretch. With a positive Hz value, each leg is timed: for example, 2 Hz means two direction changes per second, or one complete back-and-forth cycle per second. Its span is calculated from speed divided by frequency and capped by the available road length. In timed mode the distance slider is not used. Very short roads can therefore make position travel differ from the commanded velocity. Visible reversals are limited by update/frame rate.
 
-No admin calls, reward submissions, saved currency/upgrade edits or external runtime downloads are used. The uploaded place, its extracted sources, and private diagnostics are excluded from the ZIP.
+## Cool mode
+
+Cool uses the original controller's tyre motion, throttle, steering, bounded acceleration and yaw assistance during normal driving. It follows a flowing side-to-side line, bounded by road width and the full car footprint. It slows for bends and stops; the selected speed is a target, not an instantaneous forced velocity. Flip Angle mirrors the desired drift side, while angle changes ease through the controller.
+
+Pose resets are reserved for recovery: losing wheel support, overturning, major displacement, getting stuck, or returning to the start of an open route. It tries a more central line before recovering from unsupported/off-road terrain. This mode still includes assistance; it is not an unmodified tyre simulation.
+
+## Ground and tunnels
+
+Recovery and Farm poses use wheel attachments, ride heights and tyre sizes to fit road pitch, bank and chassis height inside all four suspension contact ranges. Ground probes start near the expected floor. **There is no sky/high-mountain ray fallback.** Validated height continuity and replicated 3D race-course elevations help distinguish tunnels and stacked roads.
+
+Four supports cannot be forced over an arbitrary cliff or missing road. The controller uses a supported start fallback or waits when needed. Normal Cool wheel contact is governed by the game's suspension and checked for recovery.
+
+Chat, menus, focus loss, garage/replay, race countdowns, ownership loss and leaving your seat pause control. Stop/close releases its input override. It leaves another script's input override intact.
+
+## Verification and limits
+
+Offline checks passed for Flip Angle, zero/90-degree reversing, extreme-speed area bounds, the reverse timer, route loops, tunnel floor selection, wheel fitting and lifecycle cleanup. The uploaded game's original tyre code detected all four supports in **324 mocked plane cases**, including 0/90-degree and reverse orientations with velocity targets up to 10,000 km/h. The original driving-controller physics benchmark also passed. These fixtures do not reproduce live Roblox collisions, server corrections or executor behavior.
+
+**Live Roblox/JJSploit is untested here.** In particular, a selectable 10,000 km/h target is not a guarantee that the game will sustain that speed. See `VERIFICATION.json` for exact scope; older results are labeled separately.
+
+If something goes wrong, click Save diagnostics. Reports include actual speed/angle/contact counts, surface fitting, mode, angle polarity, reverse Hz and area span. File writing falls back to the clipboard or F9 output. Reports are not uploaded automatically.
+
+No admin calls, reward submissions, saved currency/upgrade edits or runtime downloads. The uploaded place, its extracted sources and private diagnostics are excluded from the ZIP.
 
 ## Development
 
@@ -69,8 +69,9 @@ python tests/run.py --luau /path/to/luau --compiler /path/to/luau-compile
 python package.py
 ```
 
-Optional original-game contact check, using a private extraction of the supplied place:
+Optional private source checks:
 
 ```bash
 python tests/check_contact.py --scripts-dir /path/to/private/extraction --luau /path/to/luau
+python tests/check_place.py --scripts-dir /path/to/private/extraction --luau /path/to/luau
 ```
