@@ -135,6 +135,27 @@ function Roads.nearest(paths, position, heading)
     return bestPath, direction, bestProjection
 end
 
+function Roads.connection(paths,current,direction,excluded)
+    local endpoint,h=Roads.point(current,if direction>0 then current.total else 0)
+    h+=if direction<0 then math.pi else 0
+    local best,score=nil,math.huge
+    for _,path in ipairs(paths) do
+        if path==current or (excluded and excluded[path]) then continue end
+        local p=Roads.project(path,endpoint,nil,h)
+        if not p or p.distance>math.min(14,(path.width+current.width)*.2) or p.height>4 then continue end
+        for _,dir in ipairs({1,-1}) do
+            local remaining=if dir>0 then path.total-p.s else p.s
+            local turn=math.abs(wrap(p.yaw+(if dir<0 then math.pi else 0)-h))
+            -- Do not select an overlapping duplicate that immediately runs out of road.
+            if (path.closed or remaining>18) and turn<math.rad(100) then
+                local s=p.distance*3+turn*12+p.height*6
+                if s<score then score=s;best={path=path,s=p.s,direction=dir} end
+            end
+        end
+    end
+    return best
+end
+
 function Roads.guide(path, direction, position, speed, heading, previousS)
     local projected = Roads.project(path, position, previousS, heading)
     if not projected then return nil end

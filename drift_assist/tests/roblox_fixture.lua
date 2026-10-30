@@ -45,7 +45,7 @@ function UDim2.fromScale(x,y) return UDim2.new(x,0,y,0) end
 local Color3={fromRGB=function(...) return {...} end,fromHSV=function(...) return {...} end,new=function(...) return {...} end}
 local RaycastParams={new=function() return {} end}
 local function cf(yaw,position)
-    local value={yaw=yaw,LookVector=Vector3.new(-math.sin(yaw),0,-math.cos(yaw)),RightVector=Vector3.new(math.cos(yaw),0,-math.sin(yaw)),
+    local value={__cframe=true,yaw=yaw,LookVector=Vector3.new(-math.sin(yaw),0,-math.cos(yaw)),RightVector=Vector3.new(math.cos(yaw),0,-math.sin(yaw)),
         UpVector=Vector3.new(0,1,0),Position=position or Vector3.zero}
     function value:Inverse() return {inverse=true,original=self} end
     return setmetatable(value,{__mul=function(a,b)
@@ -53,7 +53,14 @@ local function cf(yaw,position)
         error('Unexpected CFrame fixture multiplication')
     end})
 end
+local nativeTypeof=typeof
+local function typeof(value) return if type(value)=="table" and value.__cframe then "CFrame" else nativeTypeof(value) end
 local CFrame={lookAt=function(p,target) local d=target-p;return cf(math.atan2(-d.X,-d.Z),p) end}
+function CFrame.fromMatrix(position,right,up,back)
+    local value=cf(math.atan2(back.X,back.Z),position)
+    value.RightVector,value.UpVector,value.LookVector=right,up,-back
+    return value
+end
 local methods={}
 local function object(class,parent,name)
     local p={ClassName=class,Name=name or class,Parent=parent,attrs={},events={},children={},
@@ -68,6 +75,7 @@ local function object(class,parent,name)
             local r=p.Parent;local o=p.localPosition
             return r.Position+r.CFrame.RightVector*o.X+r.CFrame.UpVector*o.Y-r.CFrame.LookVector*o.Z
         end
+        if k=="Position" and p.ClassName=="Attachment" then return p.localPosition end
         return p[k]
     end,__newindex=function(_,k,v)
         local previous=p[k];p[k]=v
@@ -102,6 +110,7 @@ function methods:IsDescendantOf(parent)
     return false
 end
 function methods:GetAttribute(k) return self.attrs[k] end
+function methods:IsFocused() return self.focused==true end
 function methods:SetAttribute(k,v) self.attrs[k]=v end
 function methods:GetPropertyChangedSignal(k) self.events[k]=self.events[k] or event();return self.events[k] end
 function methods:Destroy()

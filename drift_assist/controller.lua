@@ -19,12 +19,15 @@ function Controller.settings(raw)
     raw = if type(raw) == "table" then raw else {}
     return {
         angle = number(raw.angle, 35, 15, 75),
-        cruiseKmh = number(raw.cruiseKmh, 65, 20, 180),
+        cruiseKmh = number(raw.cruiseKmh, 65, 20, 500),
         power = number(raw.power, 1.25, 0.5, 4),
         speedMultiplier = number(raw.speedMultiplier, 1, 0.5, 2.5),
         strength = number(raw.strength, 0.85, 0, 1),
         mode = if raw.mode == "road" then "road" else "manual",
         side = if raw.side == "left" or raw.side == "right" then raw.side else "auto",
+        style = if raw.style == "cool" then "cool" else "farm",
+        farmTravel = if raw.farmTravel == "area" then "area" else "loop",
+        farmRange = number(raw.farmRange,80,20,300),
     }
 end
 
@@ -38,6 +41,10 @@ function Controller.measure(sample)
     end
     local speed = magnitude(sample.vx, sample.vz)
     if not finite(speed) or speed > 1e6 then return nil end
+    if finite(sample.forwardSpeed) and finite(sample.sideSpeed) then
+        return {speed=magnitude(sample.forwardSpeed,sample.sideSpeed),forward=sample.forwardSpeed,
+            beta=math.atan2(sample.sideSpeed,math.abs(sample.forwardSpeed)),velocityYaw=math.atan2(-sample.vx,-sample.vz)}
+    end
     local vx, vz = -math.sin(sample.yaw), -math.cos(sample.yaw)
     local forward = sample.vx * vx + sample.vz * vz
     local velocityYaw = if speed > 0.5 then math.atan2(-sample.vx, -sample.vz) else sample.yaw
