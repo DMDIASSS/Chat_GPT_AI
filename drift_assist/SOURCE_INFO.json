@@ -1,0 +1,72 @@
+{
+  "version": "1.0.0",
+  "entrypoint": "HowToDrift_Assist.lua",
+  "files": {
+    "HowToDrift_Assist.lua": {
+      "sha256": "7f80a945898a254b26229fbc873cdeaabd7141e6a6fb21db58c597a8aeae093f",
+      "bytes": 46244
+    },
+    "README.md": {
+      "sha256": "598337a43b8453a0f0d5e4445a5e9e64c548d27cb03166659256e3da9ef9a958",
+      "bytes": 7506
+    },
+    "VERIFICATION.json": {
+      "sha256": "22dc7aa60322034b4f5ddb91e28f5166dcb06dcae6f54c8dbc8c0c6654933f12",
+      "bytes": 2526
+    },
+    "build.py": {
+      "sha256": "770b601abf1e2eacf3262c35bee62ccd118730a18845e379e976c31309cc3324",
+      "bytes": 786
+    },
+    "client.lua": {
+      "sha256": "17ca34592fec24c96d7b085298e95abd2e2b2621fb551ce4e2f8a481483c722a",
+      "bytes": 28929
+    },
+    "controller.lua": {
+      "sha256": "7cd53937df0aa7fb3e558904476937d907d9a7b9969532af74e3ccb9318da440",
+      "bytes": 8137
+    },
+    "input_lease.lua": {
+      "sha256": "cc712aeb9016a38f2f45341ee6148175f94051b195a27ee5e0486116717051f6",
+      "bytes": 954
+    },
+    "package.py": {
+      "sha256": "948e7c6e0d75dd4176e05c160132c82beb88811b6b2cbdbf582b718347927490",
+      "bytes": 2243
+    },
+    "roads.lua": {
+      "sha256": "5bd0dc4e13ed002218cc900ff5468c09ee25a3d81498d9ccaba4d870af192384",
+      "bytes": 7970
+    },
+    "tests/check_place.py": {
+      "sha256": "33991a1f15c0012cbf0f42daac520f434ada6edd1bec591e5e7cb1140faf939f",
+      "bytes": 8797
+    },
+    "tests/roblox_fixture.lua": {
+      "sha256": "0cc5b36d404587a5a90ab427a67a191a947a1109a3c258329a6778d05719e052",
+      "bytes": 9709
+    },
+    "tests/run.py": {
+      "sha256": "67f0167f1794320a26232a727e31dbef302523ae9cb237e1c8a5fb94d931579c",
+      "bytes": 5419
+    },
+    "tests/test_controller.lua": {
+      "sha256": "caa0d5da025c5f7eb431784c90e0dc9a809f2b8a0765effee0d9f8735964d048",
+      "bytes": 5571
+    },
+    "tests/test_driving.lua": {
+      "sha256": "5f7085a4f3e73137a6b946aeedb3aba72b7cb5478ae83817e8e24a6d83c0abed",
+      "bytes": 3100
+    },
+    "tests/test_input_lease.lua": {
+      "sha256": "69b80e814bc1d0226788f4fef7bdd6308e638eeeaa1855fc5321fa0910cb5867",
+      "bytes": 973
+    },
+    "tests/test_roads.lua": {
+      "sha256": "a55c14cfbb064d164f60f5d7b371b6c037e1be97f4c626830b73c30da028a89a",
+      "bytes": 2973
+    }
+  },
+  "uploaded_place_sha256": "b89c3d8616755662bcd2e642de1f4ea08b89e3a114852a4754b32a179c00ae32",
+  "includes_original_game_sources": false
+}

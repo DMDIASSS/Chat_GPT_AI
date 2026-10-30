@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "date": "2026-10-30",
+  "compiled_with": "Official Luau CLI",
+  "offline_tests": {
+    "controller_scenarios": 13,
+    "road_scenarios": 9,
+    "input_lease_scenarios": 3,
+    "closed_loop_road_combinations": 36,
+    "finite_road_stop": true,
+    "standalone_lifecycle": {
+      "start_stop": true,
+      "manual_physics": true,
+      "auto_input": true,
+      "native_brake_override": true,
+      "focus_chat_menu_pause": true,
+      "garage_countdown_pause": true,
+      "seat_owner_and_ground_guards": true,
+      "diagnostics": true,
+      "reinjection": true,
+      "external_input_preserved": true
+    },
+    "external_network_admin_and_score_calls_in_standalone": false
+  },
+  "uploaded_place_contract": {
+    "sha256": "b89c3d8616755662bcd2e642de1f4ea08b89e3a114852a4754b32a179c00ae32",
+    "native_readInput_consumes_our_format": true,
+    "minimap_lines_parsed": 11,
+    "race_courses_parsed": 64
+  },
+  "original_game_physics_planar_test": {
+    "source": "User-supplied How To Drift place",
+    "test": "Original CarPhysics / GarageConfig on planar fixture",
+    "limitations": "Not Roblox, real 3D collision/suspension, networking, streaming or a live executor test",
+    "metrics": {
+      "manual_cases": 24.0,
+      "auto_cases": 18.0,
+      "manual_max_mean_angle_error": 0.01253569,
+      "auto_max_mean_angle_error": 0.09395017,
+      "auto_max_cross_track": 5.26351844
+    }
+  },
+  "exploratory_map_tests": {
+    "scope": "30 seconds per minimap line, S13, target 30 degrees, requested 80 km/h, original tyre code on planar rig",
+    "touge_four_lines_max_cross_track_studs": 5.484179191874089,
+    "touge_four_lines_worst_mean_target_angle_error_degrees": 3.0315622918836795,
+    "circuit_main_max_cross_track_studs": 5.140864936014195,
+    "circuit_main_mean_target_angle_error_degrees": 14.49638037850455,
+    "interpretation": "Road tracking stayed near the centerline in these short runs; angle tracking was less accurate on Circuit sharp / low-speed transitions. These are not full-map or live Roblox validations."
+  },
+  "live_roblox_tested": false,
+  "jjsploit_tested": false,
+  "windows_tested": false,
+  "limitations": [
+    "Planar fixtures omit 3D collision and suspension dynamics, other cars, streaming and network corrections.",
+    "The target angle eases at low speed; collisions, sharp curves and side changes can cause larger transient errors.",
+    "The script does not grant admin permissions or alter server-owned upgrades, currency or other players."
+  ]
+}
