@@ -18,7 +18,7 @@ Controller.finite, Controller.wrap = finite, wrap
 function Controller.settings(raw)
     raw = if type(raw) == "table" then raw else {}
     return {
-        angle = number(raw.angle, 30, 15, 50),
+        angle = number(raw.angle, 35, 15, 75),
         cruiseKmh = number(raw.cruiseKmh, 65, 20, 180),
         power = number(raw.power, 1.25, 0.5, 4),
         speedMultiplier = number(raw.speedMultiplier, 1, 0.5, 2.5),

@@ -14,9 +14,9 @@ local env = if type(getgenv) == "function" then getgenv() else _G
 local old = rawget(env, "__HowToDriftAssist")
 if type(old) == "table" and type(old.destroy) == "function" then pcall(old.destroy) end
 
-local app = {version = "1.0.0", alive = true, enabled = false, connections = {},
-    settings = Controller.settings(), controller = Controller.new(), lease = InputLease.new(player),
-    status = "Enter your car, choose Manual or Road auto, then Start", trace = {}, frames = 0,
+local app = {version = "1.1.0", alive = true, enabled = true, connections = {},
+    settings = Controller.settings({mode="road",angle=35,cruiseKmh=85}), controller = Controller.new(), lease = InputLease.new(player),
+    status = "Autodrive armed; sit in your own car", trace = {}, frames = 0,
     physicsWrites = 0, inputWrites = 0, peakControllerMs = 0, lastControllerMs = 0,
     peakUpdateMs = 0, lastUpdateMs = 0, routes = {},
     direction = 1, roadDirty = true, focused = true, keys = {}, lastError = nil}
@@ -34,6 +34,7 @@ end
 local function release()
     app.lease:release()
     app.controller = Controller.new()
+    app.rail=nil
     app.lastCommand = nil
 end
 function app.stop(reason)
@@ -48,17 +49,10 @@ function app.start()
     app.previousS, app.guide, app.guideAt = nil, nil, nil
     app.status = "Waiting for your seated, network-owned car"
 end
-function app.setMode(mode)
-    release()
-    app.settings.mode = if mode == "road" then "road" else "manual"
-    app.previousS, app.guide, app.guideAt = nil, nil, nil
-end
-function app.cycleSide()
-    app.settings.side = if app.settings.side == "auto" then "left" elseif app.settings.side == "left" then "right" else "auto"
-end
 function app.nearestRoad()
     app.path, app.previousS, app.guide, app.guideAt = nil, nil, nil, nil
     app.direction, app.roadDirty = 1, true
+    app.rail=nil
 end
 
 local root, car, wheels = nil, nil, {}
@@ -124,6 +118,22 @@ local function refreshRoads(now)
                 end
             end
             for _, path in ipairs(cached.paths) do if #paths < 128 then table.insert(paths, path) end end
+        end
+    end
+    -- Some maps expose road lines locally but are absent from the replicated minimap folder.
+    for _,map in ipairs(World:GetChildren()) do
+        if not map:IsA("Model") and not map:IsA("Folder") then continue end
+        local value=map:FindFirstChild("MinimapLines") or map:FindFirstChild("MinimapPath")
+        if value and value:IsA("StringValue") then
+            seen[value]=true
+            local cached=minimapCache[value]
+            if not cached or cached.text~=value.Value then
+                local data=value.Value
+                if not data:find("|",1,true) then data="line|36|"..data end
+                cached={text=value.Value,paths=Roads.parseMinimap(data,map.Name)}
+                minimapCache[value]=cached
+            end
+            for _,path in ipairs(cached.paths) do if #paths<128 then table.insert(paths,path) end end
         end
     end
     for value in pairs(minimapCache) do if not seen[value] then minimapCache[value] = nil end end
@@ -201,34 +211,6 @@ local function sampleCar()
         grounded = count, upY = cf.UpVector.Y, mass = mass}
 end
 
-local function obstacle(sample, guide, now)
-    if now < obstacleAt then return app.obstruction end
-    obstacleAt = now + 0.1
-    app.obstruction = nil
-    local speed = math.sqrt(sample.vx^2+sample.vz^2)
-    local heading = if speed > 3 then math.atan2(-sample.vx, -sample.vz) else sample.yaw
-    local direction = Vector3.new(-math.sin(heading), 0, -math.cos(heading))
-    local right = Vector3.new(math.cos(heading), 0, -math.sin(heading))
-    local reach = math.clamp(speed*0.35 + speed*speed/80 + 8, 10, 180)
-    for _, side in ipairs({-0.8, 0, 0.8}) do
-        local origin = root.Position + right*(root.Size.X*0.5*side) + Vector3.new(0,0.25,0)
-        local hit = World:Raycast(origin, direction*reach, obstacleParams)
-        if hit and math.abs(hit.Normal.Y) < 0.65 then
-            app.obstruction = "Obstacle ahead; braking"
-            app.lastObstacle = {name = hit.Instance.Name, distance = finiteOrNil(hit.Distance)}
-            return app.obstruction
-        end
-    end
-    -- A path can continue into unloaded geometry. Wait instead of accelerating into empty space.
-    if guide and guide.target then
-        local p = guide.target
-        local y = p.y or sample.y
-        local ground = World:Raycast(Vector3.new(p.x,y+25,p.z),Vector3.new(0,-65,0),groundParams)
-        if not ground then app.obstruction = "Road ahead is not loaded / no ground; braking" end
-    end
-    return app.obstruction
-end
-
 local palette = {bg = Color3.fromRGB(17,21,29), panel = Color3.fromRGB(27,33,45),
     ink = Color3.fromRGB(235,241,250), dim = Color3.fromRGB(153,170,190),
     accent = Color3.fromRGB(61,196,177), red = Color3.fromRGB(177,65,80)}
@@ -242,12 +224,12 @@ local function corner(parent, radius) make("UICorner", {CornerRadius=UDim.new(0,
 local gui = make("ScreenGui", {Name="HowToDriftAssist", ResetOnSpawn=false, IgnoreGuiInset=true,
     DisplayOrder=95, ZIndexBehavior=Enum.ZIndexBehavior.Sibling}, playerGui)
 app.gui = gui
-local panel = make("Frame", {Name="Panel", Size=UDim2.fromOffset(364,610),
+local panel = make("Frame", {Name="Panel", Size=UDim2.fromOffset(364,420),
     Position=UDim2.new(1,-382,0,80), BackgroundColor3=palette.bg, BorderSizePixel=0}, gui)
 corner(panel,12)
 local scale = make("UIScale", {Scale=1}, panel)
 local header = make("TextLabel", {Name="Header", Size=UDim2.new(1,-80,0,46), Position=UDim2.fromOffset(14,0),
-    BackgroundTransparency=1, Text="DRIFT ASSIST  1.0.0", TextColor3=palette.ink,
+    BackgroundTransparency=1, Text="DRIFT ASSIST  1.1.0", TextColor3=palette.ink,
     TextSize=17, Font=Enum.Font.GothamBold, TextXAlignment=Enum.TextXAlignment.Left, Active=true}, panel)
 local function button(name, text, position, size, parent, callback)
     local b = make("TextButton", {Name=name, Text=text, Position=position, Size=size, BackgroundColor3=palette.panel,
@@ -258,21 +240,23 @@ local function button(name, text, position, size, parent, callback)
 end
 local minimized = false
 local body = make("ScrollingFrame", {Name="Body", Position=UDim2.fromOffset(12,48), Size=UDim2.new(1,-24,1,-60),
-    BackgroundTransparency=1, BorderSizePixel=0, ScrollBarThickness=3, CanvasSize=UDim2.fromOffset(0,650),
+    BackgroundTransparency=1, BorderSizePixel=0, ScrollBarThickness=3, CanvasSize=UDim2.fromOffset(0,435),
     ScrollingDirection=Enum.ScrollingDirection.Y}, panel)
 button("Minimize", "_", UDim2.new(1,-69,0,9), UDim2.fromOffset(27,27), panel, function()
     minimized = not minimized
     body.Visible = not minimized
-    panel.Size = UDim2.fromOffset(364, if minimized then 46 else 610)
+    panel.Size = UDim2.fromOffset(364, if minimized then 46 else 420)
 end)
 button("Close", "x", UDim2.new(1,-36,0,9), UDim2.fromOffset(27,27), panel, function() app.destroy() end)
 local startButton = button("Start", "Start  [F6]", UDim2.fromOffset(0,0), UDim2.new(1,-6,0,38), body, function()
     if app.enabled then app.stop() else app.start() end
 end)
-local modeButton = button("Mode", "Manual + angle hold", UDim2.fromOffset(0,46), UDim2.new(0.56,-4,0,34), body, function()
-    app.setMode(if app.settings.mode == "manual" then "road" else "manual")
+local modeButton = button("Mode", "Rejoin nearest road", UDim2.fromOffset(0,46), UDim2.new(0.62,-4,0,34), body, app.nearestRoad)
+local sideButton = button("Side", "Reverse", UDim2.new(0.62,3,0,46), UDim2.new(0.38,-9,0,34), body, function()
+    app.direction=-app.direction
+    if app.rail then app.rail.direction=-app.rail.direction end
+    app.guideAt=nil
 end)
-local sideButton = button("Side", "Side: Auto", UDim2.new(0.56,3,0,46), UDim2.new(0.44,-9,0,34), body, app.cycleSide)
 local sliderRefresh = {}
 local draggingSlider, draggingPanel
 local function slider(key, label, low, high, increment, suffix, y)
@@ -316,21 +300,12 @@ local function slider(key, label, low, high, increment, suffix, y)
     sliderRefresh[key] = refresh
     refresh()
 end
-slider("angle", "Drift angle", 15,50,1," deg",93)
-slider("cruiseKmh", "Speed target / manual cap",20,180,1," km/h",151)
-slider("power", "Power assistance",0.5,4,0.05,"x",209)
-slider("speedMultiplier", "Speed multiplier",0.5,2.5,0.05,"x",267)
-slider("strength", "Angle lock strength",0,1,0.05,"",325)
-button("NearestRoad", "Nearest road", UDim2.fromOffset(0,387), UDim2.new(0.53,-4,0,32), body, app.nearestRoad)
-button("ReverseRoad", "Reverse route", UDim2.new(0.53,3,0,387), UDim2.new(0.47,-9,0,32), body, function()
-    app.stop("Route reversed. Align the car, then Start")
-    app.direction = -app.direction
-    app.previousS, app.guide, app.guideAt = nil, nil, nil
-end)
-local status = make("TextLabel", {Name="Status", Position=UDim2.fromOffset(0,429), Size=UDim2.new(1,-8,0,61),
+slider("angle", "Drift angle", 15,75,1," deg",93)
+slider("cruiseKmh", "Driving speed",20,180,1," km/h",151)
+local status = make("TextLabel", {Name="Status", Position=UDim2.fromOffset(0,215), Size=UDim2.new(1,-8,0,61),
     BackgroundTransparency=1, Text=app.status, TextWrapped=true, TextYAlignment=Enum.TextYAlignment.Top,
     TextXAlignment=Enum.TextXAlignment.Left, Font=Enum.Font.Gotham, TextSize=13, TextColor3=palette.dim}, body)
-local telemetry = make("TextLabel", {Name="Telemetry", Position=UDim2.fromOffset(0,494), Size=UDim2.new(1,-8,0,49),
+local telemetry = make("TextLabel", {Name="Telemetry", Position=UDim2.fromOffset(0,280), Size=UDim2.new(1,-8,0,49),
     BackgroundTransparency=1, Text="No car telemetry", TextWrapped=true, TextYAlignment=Enum.TextYAlignment.Top,
     TextXAlignment=Enum.TextXAlignment.Left, Font=Enum.Font.Code, TextSize=12, TextColor3=palette.ink}, body)
 
@@ -351,9 +326,9 @@ function app.report()
         last_obstacle=app.lastObstacle, last_error=app.lastError, controller_frames=app.frames,
         physics_writes=app.physicsWrites, input_writes=app.inputWrites, last_controller_ms=app.lastControllerMs,
         peak_controller_ms=app.peakControllerMs, last_update_ms=app.lastUpdateMs, peak_update_ms=app.peakUpdateMs, trace=app.trace,
-        note="Client physics assistance. No server/admin access; no drift reward submission. Offline tests do not prove live compatibility."}
+        recoveries=app.recoveries or 0, note="Kinematic client road autopilot with teleport recovery. No server/admin access; no drift reward submission. Offline tests do not prove live compatibility."}
 end
-button("Diagnostics", "Save diagnostics", UDim2.fromOffset(0,548), UDim2.new(1,-6,0,33), body, function()
+button("Diagnostics", "Save diagnostics", UDim2.fromOffset(0,338), UDim2.new(1,-6,0,33), body, function()
     local ok, text = pcall(function() return HttpService:JSONEncode(app.report()) end)
     if not ok then app.status = "Diagnostics encode failed: "..tostring(text); return end
     if type(writefile) == "function" then
@@ -367,8 +342,8 @@ button("Diagnostics", "Save diagnostics", UDim2.fromOffset(0,548), UDim2.new(1,-
         app.status = "File writing unavailable; diagnostics printed in F9 console"
     end
 end)
-make("TextLabel", {Name="Help", Position=UDim2.fromOffset(0,591), Size=UDim2.new(1,-8,0,57),
-    BackgroundTransparency=1, Text="F6 Start/Stop  |  F7 Mode  |  F8 Drift side\nW/S/A/D or arrows; hold Shift for boost.\nS / Space overrides Road auto. Use the game's Auto gearbox.",
+make("TextLabel", {Name="Help", Position=UDim2.fromOffset(0,382), Size=UDim2.new(1,-8,0,57),
+    BackgroundTransparency=1, Text="F6 Start/Stop | F7 Rejoin road | S / Space Brake\nAutomatic recovery and open-road turnarounds.\nLoaded map roads; automatic teleport recovery.",
     TextWrapped=true, TextYAlignment=Enum.TextYAlignment.Top, TextXAlignment=Enum.TextXAlignment.Left,
     Font=Enum.Font.Gotham, TextSize=11, TextColor3=palette.dim}, body)
 
@@ -395,8 +370,8 @@ end)
 connect(Input.InputBegan, function(input, processed)
     if processed or Input:GetFocusedTextBox() then return end
     if input.KeyCode == Enum.KeyCode.F6 then if app.enabled then app.stop() else app.start() end
-    elseif input.KeyCode == Enum.KeyCode.F7 then app.setMode(if app.settings.mode=="manual" then "road" else "manual")
-    elseif input.KeyCode == Enum.KeyCode.F8 then app.cycleSide() end
+    elseif input.KeyCode == Enum.KeyCode.F7 then app.nearestRoad()
+    end
 end)
 connect(Input.WindowFocusReleased, function() app.focused=false; release() end)
 connect(Input.WindowFocused, function() app.focused=true end)
@@ -408,8 +383,8 @@ local function frame(dt)
         uiAt = now
         startButton.Text = if app.enabled then "Stop  [F6]" else "Start  [F6]"
         startButton.BackgroundColor3 = if app.enabled then palette.red else palette.accent
-        modeButton.Text = if app.settings.mode=="road" then "Road auto  [F7]" else "Manual + angle hold"
-        sideButton.Text = "Side: "..app.settings.side
+        modeButton.Text = "Rejoin nearest road  [F7]"
+        sideButton.Text = "Reverse"
         status.Text = app.status
         local s, cmd = app.lastSample, app.lastCommand
         if s then
@@ -441,51 +416,50 @@ local function frame(dt)
     end
     if pause then release(); app.status=pause; return end
     local input = readInput()
-    local guide
-    if app.settings.mode=="road" then
-        refreshRoads(now)
-        local speed=math.sqrt(sample.vx^2+sample.vz^2)
-        if not app.path then
-            if app.racePath then app.path,app.direction=app.racePath,1
-            else app.path,app.direction=Roads.nearest(app.routes,sample,sample.yaw) end
-            app.direction=app.direction or 1
-        end
-        if app.path then
-            if not app.guideAt or now-app.guideAt >= 0.075 then
-                app.guide=Roads.guide(app.path,app.direction,sample,speed,sample.yaw,app.previousS)
-                app.guideAt=now
-                if app.guide then
-                    app.previousS=app.guide.s
-                    if app.path.finishS and app.direction>0 then app.guide.remaining=math.max(0,app.path.finishS-app.guide.s) end
-                end
-            end
-            guide=app.guide
-            if guide then guide.blocked=obstacle(sample,guide,now) end
-        end
+    refreshRoads(now)
+    if not app.path then
+        if app.racePath then app.path,app.direction=app.racePath,1
+        else app.path,app.direction=Roads.nearest(app.routes,sample,sample.yaw) end
+        app.direction=app.direction or 1
+    end
+    if not app.path then
+        release();app.status="Waiting for road data; drive near a loaded road"
+        return
     end
     local started=os.clock()
-    local command=Controller.step(app.controller,app.settings,sample,input,guide,dt)
-    app.frames+=1
-    app.status=command.reason
-    if command.override then
-        local ok, err=app.lease:write(command)
-        if not ok then app.stop(err); return end
-        app.inputWrites+=1
-    else app.lease:release() end
-    local controllable = sample.grounded>=3 and sample.upY>=0.55
-    if controllable and (command.ax~=0 or command.az~=0) then
-        local stepDt=math.clamp(dt,1/240,0.05)
-        root:ApplyImpulse(Vector3.new(command.ax,0,command.az)*sample.mass*stepDt)
-        app.physicsWrites+=1
+    if not app.rail or app.rail.path~=app.path then
+        local projection=Roads.project(app.path,sample,nil,sample.yaw)
+        if not projection then release();app.status="Waiting for a valid road";return end
+        app.rail=Rail.new(app.path,projection,app.direction)
+        app.recoveries=(app.recoveries or 0)+1
     end
-    if controllable and command.yawRate then
-        local current=root.AssemblyAngularVelocity
-        root.AssemblyAngularVelocity=Vector3.new(current.X,command.yawRate,current.Z)
-        app.physicsWrites+=1
+    local pose=Rail.step(app.rail,app.settings,dt,input.brake>.1 or input.handbrake)
+    app.direction=app.rail.direction
+    local p=pose.point
+    local roadY=p.y or app.roadHeight or sample.y-1.7
+    local surface=World:Raycast(Vector3.new(p.x,roadY+22,p.z),Vector3.new(0,-65,0),groundParams)
+    if not surface then surface=World:Raycast(Vector3.new(p.x,1024,p.z),Vector3.new(0,-2048,0),groundParams) end
+    if not surface or surface.Normal.Y<.35 then
+        -- Do not teleport into an unloaded map. Keep trying without requiring a restart.
+        app.rail.speed=0;app.lease:release();app.status="Waiting for loaded road surface";return
     end
-    app.lastCommand={throttle=command.throttle,brake=command.brake,steer=command.steer,handbrake=command.handbrake,
-        ax=command.ax,az=command.az,yawRate=command.yawRate,targetAngle=command.targetAngle,targetKmh=command.targetKmh,
-        override=command.override,reason=command.reason,crossTrack=guide and finiteOrNil(guide.crossTrack)}
+    app.roadHeight=surface.Position.Y
+    local targetPosition=Vector3.new(p.x,surface.Position.Y+1.8,p.z)
+    local forward=Vector3.new(-math.sin(pose.bodyHeading),0,-math.cos(pose.bodyHeading))
+    local targetCF=CFrame.lookAt(targetPosition,targetPosition+forward)
+    local gap=(root.Position-targetPosition).Magnitude
+    if gap>10 or sample.upY<.55 then app.recoveries=(app.recoveries or 0)+1 end
+    local ok,err=app.lease:write({throttle=if pose.speed>2 then .6 else 0,brake=0,steer=0,handbrake=false})
+    if not ok then app.stop(err);return end
+    -- Set the model pivot using its offset from Chassis, not an assumed model center.
+    car:PivotTo(targetCF*root.CFrame:Inverse()*car:GetPivot())
+    root.AssemblyLinearVelocity=Vector3.new(-math.sin(pose.heading)*pose.speed,0,-math.cos(pose.heading)*pose.speed)
+    root.AssemblyAngularVelocity=Vector3.zero
+    app.physicsWrites+=1;app.inputWrites+=1;app.frames+=1
+    app.status=if gap>10 then "Recovered onto "..app.path.name else "Autodrifting "..app.path.name
+    app.lastCommand={targetAngle=pose.targetAngle,targetKmh=pose.speed*1.2,override=true,reason=app.status}
+    local command=app.lastCommand
+    local guide=nil
     app.lastControllerMs=(os.clock()-started)*1000
     app.peakControllerMs=math.max(app.peakControllerMs,app.lastControllerMs)
     if now-traceAt>=0.5 then
@@ -518,4 +492,4 @@ connect(RunService.PreSimulation,function(dt)
         warn("[HowToDrift Assist] "..tostring(err))
     end
 end)
-print("[HowToDrift Assist 1.0.0] Ready. F6 Start/Stop; F7 mode; F8 side. Start at 65 km/h, 30 degrees.")
+print("[HowToDrift Assist 1.1.0] Autodrive armed. F6 Stop/Start; F7 Rejoin. 15-75 degrees.")

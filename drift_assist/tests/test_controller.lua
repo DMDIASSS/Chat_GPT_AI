@@ -10,7 +10,7 @@ local function near(a,b,tolerance) assert(math.abs(a-b)<(tolerance or 1e-5),tost
 
 test("Settings reject nonfinite values and clamp all numeric controls",function()
     local c=C.settings({angle=100,cruiseKmh=0/0,power=math.huge,speedMultiplier=-5,strength=9,mode="unsafe"})
-    assert(c.angle==50 and c.cruiseKmh==65 and c.power==1.25 and c.speedMultiplier==0.5 and c.strength==1 and c.mode=="manual")
+    assert(c.angle==75 and c.cruiseKmh==65 and c.power==1.25 and c.speedMultiplier==0.5 and c.strength==1 and c.mode=="manual")
 end)
 test("Left / right drift angles use the game's velocity-relative convention",function()
     near(math.deg(C.measure(sample({yaw=math.rad(30)})).beta),30)

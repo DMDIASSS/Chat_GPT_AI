@@ -1,29 +1,37 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "entrypoint": "HowToDrift_Assist.lua",
   "files": {
     "HowToDrift_Assist.lua": {
-      "sha256": "7f80a945898a254b26229fbc873cdeaabd7141e6a6fb21db58c597a8aeae093f",
-      "bytes": 46244
+      "sha256": "aea7a53807a31065f11e58216b9e248d638b310986a13439c8df66be111538fa",
+      "bytes": 46896
     },
     "README.md": {
-      "sha256": "598337a43b8453a0f0d5e4445a5e9e64c548d27cb03166659256e3da9ef9a958",
-      "bytes": 7506
+      "sha256": "50098b6d5352f568fa1dfb6fb246a3dfdcbfcbfe4bba9e4b4ccdbd9a8d2d2a56",
+      "bytes": 3010
     },
     "VERIFICATION.json": {
+      "sha256": "943500ff52decbfe03b6851f9bc177ee1fffe93474b525ce365484490766488f",
+      "bytes": 1139
+    },
+    "VERIFICATION_1.0.json": {
       "sha256": "22dc7aa60322034b4f5ddb91e28f5166dcb06dcae6f54c8dbc8c0c6654933f12",
       "bytes": 2526
     },
+    "autorail.lua": {
+      "sha256": "619cd10b736bda04908f0abc1b861060d77918d5f30743df4829ed610b3efd34",
+      "bytes": 1735
+    },
     "build.py": {
-      "sha256": "770b601abf1e2eacf3262c35bee62ccd118730a18845e379e976c31309cc3324",
-      "bytes": 786
+      "sha256": "1c48fea39c82ef5ca220437077bb2477513e584999b24e62e2ada7dc2ac6a9aa",
+      "bytes": 879
     },
     "client.lua": {
-      "sha256": "17ca34592fec24c96d7b085298e95abd2e2b2621fb551ce4e2f8a481483c722a",
-      "bytes": 28929
+      "sha256": "04fee94f1102334973a7612502725ada0ae6b5bf1d43e826367d76a9c8ea18ae",
+      "bytes": 27842
     },
     "controller.lua": {
-      "sha256": "7cd53937df0aa7fb3e558904476937d907d9a7b9969532af74e3ccb9318da440",
+      "sha256": "518ed4c43ddd4e243882d563cf1a0fec79251b0a324dcaefe4073f9c49925161",
       "bytes": 8137
     },
     "input_lease.lua": {
@@ -31,7 +39,7 @@
       "bytes": 954
     },
     "package.py": {
-      "sha256": "948e7c6e0d75dd4176e05c160132c82beb88811b6b2cbdbf582b718347927490",
+      "sha256": "cdc6e3d81e506a69f1cb37a3b0d5f27cf58a18e83f8d20f37086fa6d0b1688e3",
       "bytes": 2243
     },
     "roads.lua": {
@@ -43,15 +51,19 @@
       "bytes": 8797
     },
     "tests/roblox_fixture.lua": {
-      "sha256": "0cc5b36d404587a5a90ab427a67a191a947a1109a3c258329a6778d05719e052",
-      "bytes": 9709
+      "sha256": "d4e23063d670dcbda319e4ab4f3528ed24ef2f6212ac7968ec4b74f64c63defb",
+      "bytes": 10302
     },
     "tests/run.py": {
-      "sha256": "67f0167f1794320a26232a727e31dbef302523ae9cb237e1c8a5fb94d931579c",
-      "bytes": 5419
+      "sha256": "5a5b0ba5eb43536539b7b48bbeebc31740be3751ab3c71ef7d1b3c4398f9bd97",
+      "bytes": 4202
+    },
+    "tests/test_autorail.lua": {
+      "sha256": "b5ec09087716b8c7e21b8ce23836a965063d10e737f5abd0ed832eda15843a3c",
+      "bytes": 948
     },
     "tests/test_controller.lua": {
-      "sha256": "caa0d5da025c5f7eb431784c90e0dc9a809f2b8a0765effee0d9f8735964d048",
+      "sha256": "0a9a6fed79c6326e49137b31c6b9ed60460d2297be968936037c91481720949a",
       "bytes": 5571
     },
     "tests/test_driving.lua": {

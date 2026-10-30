@@ -45,9 +45,15 @@ function UDim2.fromScale(x,y) return UDim2.new(x,0,y,0) end
 local Color3={fromRGB=function(...) return {...} end,fromHSV=function(...) return {...} end,new=function(...) return {...} end}
 local RaycastParams={new=function() return {} end}
 local function cf(yaw,position)
-    return {LookVector=Vector3.new(-math.sin(yaw),0,-math.cos(yaw)),RightVector=Vector3.new(math.cos(yaw),0,-math.sin(yaw)),
+    local value={yaw=yaw,LookVector=Vector3.new(-math.sin(yaw),0,-math.cos(yaw)),RightVector=Vector3.new(math.cos(yaw),0,-math.sin(yaw)),
         UpVector=Vector3.new(0,1,0),Position=position or Vector3.zero}
+    function value:Inverse() return {inverse=true,original=self} end
+    return setmetatable(value,{__mul=function(a,b)
+        if b.inverse then return setmetatable({target=a},{__mul=function(transform,_) return transform.target end}) end
+        error('Unexpected CFrame fixture multiplication')
+    end})
 end
+local CFrame={lookAt=function(p,target) local d=target-p;return cf(math.atan2(-d.X,-d.Z),p) end}
 local methods={}
 local function object(class,parent,name)
     local p={ClassName=class,Name=name or class,Parent=parent,attrs={},events={},children={},
@@ -113,6 +119,10 @@ function methods:ApplyImpulseAtPosition(v,position)
 end
 function methods:GetVelocityAtPosition(position) return self.AssemblyLinearVelocity+self.AssemblyAngularVelocity:Cross(position-self.Position) end
 function methods:GetPivot() return self.PrimaryPart.CFrame end
+function methods:PivotTo(cframe)
+    self.PrimaryPart.CFrame=cframe;self.PrimaryPart.Position=cframe.Position
+    self.PrimaryPart.pivots=(self.PrimaryPart.pivots or 0)+1
+end
 local Instance={new=object}
 local services={Players={LocalPlayer=object("Player")},Workspace=object("Workspace"),ReplicatedStorage=object("ReplicatedStorage"),
     RunService={PreSimulation=event()},GuiService={MenuIsOpen=false},HttpService={}}
