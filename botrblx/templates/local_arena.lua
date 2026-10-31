@@ -167,23 +167,30 @@ end
 
 function Arena:measureCar(model,root)
     self.lastMeasure=os.clock()
+    local probe={selection_boxes=0,best_error=nil,candidates={}}
     for _,part in ipairs(model:GetDescendants())do
         if part:IsA("BasePart")and part~=root then
             local box=part:FindFirstChildOfClass("SelectionBox")
             if box and box.Adornee==part then
+                probe.selection_boxes=probe.selection_boxes+1
                 local k=1/self.profile.roblox_studs_per_sim_unit
                 local measured={part.Size.Z*k,part.Size.X*k,part.Size.Y*k}
                 local localOffset=root.CFrame:ToObjectSpace(part.CFrame).Position
                 local offset={-localOffset.Z*k,localOffset.X*k,localOffset.Y*k}
+                if #probe.candidates<6 then probe.candidates[#probe.candidates+1]={size=measured,offset=offset}end
                 for name,config in pairs(self.profile.car_presets)do
                     local error=0
                     for i=1,3 do error=error+abs(measured[i]-config.size[i])+abs(offset[i]-config.offset[i])end
-                    if error<1 then self.preset=name;self.hitboxVerified=true;return end
+                    if not probe.best_error or error<probe.best_error then
+                        probe.best_error=error;probe.closest_preset=name
+                    end
+                    if error<1 then self.preset=name;self.hitboxVerified=true;self.hitboxProbe=probe;return end
                 end
             end
         end
     end
     self.preset="standard";self.hitboxVerified=false
+    self.hitboxProbe=probe
 end
 
 function Arena:ballRadius(root)
@@ -208,13 +215,18 @@ function Arena:recovery(packet,previous,now)
     if not self.windowAt then self.windowAt=now;self.windowPosition=table.clone(p)end
     local moved=length({p[1]-self.windowPosition[1],p[2]-self.windowPosition[2],p[3]-self.windowPosition[3]})
     local inverted=p[3]<100 and packet.car.up[3]<-.5 and length(packet.car.velocity)<100
-    if moved>cfg.minimum_travel or(abs(previous[1])<.5 and not inverted)then self.windowAt=now;self.windowPosition=table.clone(p);return nil end
+    local nearBoundary=abs(p[1])>self.profile.arena.EXTENT_X-180 or abs(p[2])>self.profile.arena.EXTENT_Y-300
+    -- A neutral policy action can deadlock at a goal post just as a held
+    -- throttle can. Only count idle time at a boundary, away from ball control.
+    if moved>cfg.minimum_travel or(abs(previous[1])<.5 and not inverted and not nearBoundary)then
+        self.windowAt=now;self.windowPosition=table.clone(p);return nil
+    end
     if now-self.windowAt<cfg.stuck_seconds or now<(self.cooldownUntil or 0)then return nil end
     self.windowAt=now;self.windowPosition=table.clone(p)
     local ballDistance=length({p[1]-packet.ball.position[1],p[2]-packet.ball.position[2],p[3]-packet.ball.position[3]})
     if ballDistance<(packet.ball_radius or 91.25)+250 then return nil end
     local gap,normal=self:query(p)
-    if packet.ground_estimate and(abs(normal[3])<.8 or abs(p[2])>self.profile.arena.EXTENT_Y-300)and gap<120 then
+    if packet.ground_estimate and(abs(normal[3])<.8 or nearBoundary)and gap<120 then
         self.escapeSteer=dot(cross(packet.car.up,packet.car.forward),normal)>=0 and -1 or 1
         self.escapeUntil=now+cfg.escape_seconds;self.cooldownUntil=now+cfg.cooldown_seconds
         return {-1,self.escapeSteer,0,self.escapeSteer,0,0,0,1},"reverse/turn"

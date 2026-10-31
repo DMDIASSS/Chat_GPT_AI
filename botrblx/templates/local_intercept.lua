@@ -22,7 +22,7 @@ end
 function Intercept.new(profile,arena,physics)
     return setmetatable({profile=profile,arena=arena,physics=physics},Intercept)
 end
-function Intercept:reset()self.side=nil;self.last=nil end
+function Intercept:reset()self.side=nil;self.last=nil;self.padTarget=nil end
 
 function Intercept:heading(car,target)
     local x,y=target[1]-car.position[1],target[2]-car.position[2]
@@ -51,6 +51,35 @@ function Intercept:reach(car,boost,seconds,angle)
         travel=travel+speed/60
     end
     return travel
+end
+
+-- Use verified active pads on an existing approach, with a small detour budget.
+-- A grounded override must not hide boost information that the actor receives.
+function Intercept:routePad(packet,target,danger,behind,radius)
+    if packet.boost>=20 or danger or behind> -radius*.5 then self.padTarget=nil;return end
+    local car,ball=packet.car,packet.ball
+    local attack=packet.team==0 and 1 or -1
+    if distance(car.position,ball.position)<1500
+        or(ball.position[2]*attack< -self.profile.arena.EXTENT_Y*.35 and ball.velocity[2]*attack< -250)then
+        self.padTarget=nil;return
+    end
+    local direct=distance(car.position,target)
+    local tx,ty=unit(target[1]-car.position[1],target[2]-car.position[2])
+    local chosen,score=nil,math.huge
+    for _,pad in ipairs(packet.boost_pads or {})do
+        if pad.active==true then
+            local d=distance(car.position,pad.position)
+            local detour=d+distance(pad.position,target)-direct
+            local ahead=(pad.position[1]-car.position[1])*tx+(pad.position[2]-car.position[2])*ty
+            if d>80 and d<(pad.is_big and 1400 or 650)and ahead>d*.2 and detour<min(350,120+direct*.1)then
+                local cost=d*.2+detour-(pad.is_big and 150 or 0)
+                if self.padTarget and distance(self.padTarget,pad.position)<1 then cost=cost-80 end
+                if cost<score then chosen,score=pad,cost end
+            end
+        end
+    end
+    self.padTarget=chosen and table.clone(chosen.position)or nil
+    return chosen
 end
 
 function Intercept:step(packet,modelAction,now)
@@ -119,12 +148,19 @@ function Intercept:step(packet,modelAction,now)
         if abs(n[3])>.7 or gap>=160 then break end
         target[1]=target[1]+n[1]*(160-gap);target[2]=target[2]+n[2]*(160-gap)
     end
+    local pad=self:routePad(packet,target,danger,behind,radius)
+    local driveTime=chosen.time
+    if pad then
+        target={pad.position[1],pad.position[2],17}
+        mode="boost on approach"
+        driveTime=max(.35,distance(car.position,target)/max(speed,1000))
+    end
     local angle=self:heading(car,target)
     local remaining=distance(car.position,target)
     local headingError=angle-(car.angular_velocity and car.angular_velocity[3]or 0)*.16
     local steer=abs(headingError)>.055 and sign(headingError)or 0
     local forwardSpeed=dot(car.velocity,car.forward)
-    local desired=min(self.profile.physics.CAR_MAX_SPEED,max(450,remaining/max(chosen.time,.3)))
+    local desired=min(self.profile.physics.CAR_MAX_SPEED,max(450,remaining/max(driveTime,.3)))
     desired=min(desired,500+1700*max(math.cos(angle),0)^2)
     if abs(angle)>1.1 then desired=min(desired,650)end
     local throttle=1
@@ -134,7 +170,8 @@ function Intercept:step(packet,modelAction,now)
     local slide=abs(angle)>1.2 and speed>500 and speed<1400 and 1 or 0
     local action={throttle,steer,0,steer,0,0,boost,slide}
     self.last={mode=mode,target=target,ball=table.clone(future),time=chosen.time,
-        reachable=bestGap<=0,danger=danger,heading=angle,desired_speed=desired,action=action}
+        reachable=bestGap<=0,danger=danger,heading=angle,desired_speed=desired,action=action,
+        boost_pad=pad and {position=table.clone(pad.position),is_big=pad.is_big}or nil}
     self.physics.plan=self.last
     return action,mode
 end

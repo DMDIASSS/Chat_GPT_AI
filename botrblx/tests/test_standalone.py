@@ -139,7 +139,7 @@ task.wait=function(dt)move(dt)end
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-6')
+assert(result.version=='local-6.1')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -318,8 +318,9 @@ inputKey('F6');for i=1,30 do move(1/30)end
 inputKey('F8');click('Save physics report')
 assert(savedName=='TurboBall_Physics_Report.json' and savedReport,'Report was not written')
 local report=encoded[savedReport]
-assert(report.version=='local-6' and report.physics_assist_enabled==false)
+assert(report.version=='local-6.1' and report.physics_assist_enabled==false)
 assert(report.place==101880234193261 and #report.model_sha256==64)
+assert(report.saved_from.enabled==false and report.saved_from.last_stop_reason=='STOPPED by F8. F6 starts again.')
 assert(#report.trace>0 and #report.trace<=150 and report.profile=='turbo_soccer_standard')
 assert(not report.account and not report.tensors,'Private identity/weights entered report')
 click('Physics assist: OFF')
@@ -329,6 +330,63 @@ assert(next(held)==nil,'Report/toggle left inputs down')
 ''',"click('Close')",extra='''
 local savedName,savedReport
 writefile=function(name,body)savedName,savedReport=name,body end
+''')
+
+    def test_runtime_error_is_saved_with_stage_and_inputs_released(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,45 do move(1/30)end
+breakPose=true
+for i=1,5 do move(1/30)end
+local report=saved['TurboBall_Last_Error.json']
+assert(report and report.last_error.stage=='reading poses','Error stage was not captured')
+assert(errorWrites==1,'Paused sampling repeatedly overwrote the original error file')
+assert(string.find(report.last_error.reason,'fixture pose failure',1,true),'Original error lost')
+assert(report.saved_from.enabled and not report.runtime.enabled,'Error report did not distinguish running/stopped')
+assert(#report.runtime.held_inputs==0,'Error report captured held bot inputs')
+click('Save physics report')
+local manual=saved['TurboBall_Physics_Report.json']
+assert(manual.last_error.reason==report.last_error.reason,'Manual save erased the original error')
+local held={}
+for _,e in ipairs(emissions)do if e[1]=='down'then held[e[2]]=true else held[e[2]]=nil end end
+assert(next(held)==nil,'Runtime error left inputs pressed')
+''',"click('Close')",extra='''
+local saved={};local errorWrites=0
+writefile=function(name,body)
+ saved[name]=encoded[body]
+ if name=='TurboBall_Last_Error.json'then errorWrites=errorWrites+1 end
+end
+local breakPose=false
+local originalFrame=frame
+frame=function(x)
+ local f=originalFrame(x)
+ if breakPose then f.ToObjectSpace=function()error('fixture pose failure')end end
+ return f
+end
+''')
+
+    def test_actual_pose_reader_finds_pads_in_local_match_view(self):
+        self.client_case('''
+for i=1,12 do move(1/30)end
+click('Save physics report')
+local t=savedReport.trace[#savedReport.trace]
+assert(t.pads_total==1 and t.pads_known==1 and t.pad_folder_found,'Local nested pads were omitted')
+assert(t.boost_pads[1].active and t.boost_pads[1].position[1]==400)
+assert(t.hitbox_probe.selection_boxes==0,'Hitbox probe omitted missing renderer markers')
+''',"click('Close')",extra='''
+local savedReport
+writefile=function(_,body)savedReport=encoded[body]end
+local view=object('Folder','MatchView');view.Parent=scene
+car.Parent=view;ball.Parent=view
+local decoy=object('Folder','BoostPads');decoy.Parent=scene
+local folder=object('Folder','BoostPads');folder.Parent=view
+local halo=object('Part','PadHalo');halo.Parent=folder;halo.Position=Vector3.new(40,.48,12)
+for i=1,10 do
+ local ring=object('Part','PadRing');ring.Parent=folder
+ ring.Position=Vector3.new(40+math.cos(i*2*math.pi/10)*7,.53,12+math.sin(i*2*math.pi/10)*7)
+ ring.Transparency=0;ring.Color={R=1,G=.83,B=.19}
+ folder.children['ring'..i]=ring
+end
+folder.children.PadRing=nil
 ''')
 
     def test_custom_coordinate_scale_is_used_by_actual_shared_pose_reader(self):

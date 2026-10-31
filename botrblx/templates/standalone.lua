@@ -52,6 +52,7 @@ gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
 local alive,enabled,ready,armAt=true,false,false,0
+local lastStopReason,lastStopAt,lastReadReason
 local testingKeyboard=false
 local epoch=0
 local held,connections={},{}
@@ -88,15 +89,37 @@ local function controls()
     physicsButton.Visible=not enabled and not testingKeyboard
     reportButton.Visible=not enabled and not testingKeyboard
 end
+local function runtimeSnapshot(now)
+    local keys={};for _,key in ipairs(order)do if held[key]then keys[#keys+1]=key end end
+    local phase=not alive and "closed"or(testingKeyboard and "keyboard test"
+        or(enabled and(now<armAt and "arming"or(lastReadReason and "waiting"or "running"))or "paused"))
+    return {enabled=enabled,ready=ready,phase=phase,focused=focus,keyboard=keyboard.name,
+        keyboard_observed=keyboard:observed(),held_inputs=keys,last_stop_reason=lastStopReason,
+        last_stop_time=lastStopAt,read_reason=lastReadReason,time=now}
+end
 local function stop(reason)
     epoch=epoch+1;enabled=false;testingKeyboard=false;release();controls()
+    lastStopReason=reason or "paused by control";lastStopAt=os.clock()
+    physics:mark("stop",lastStopAt,lastStopReason)
+    physics.runtime=runtimeSnapshot(lastStopAt)
     if reason then label.Text=reason end
+end
+local function saveReport(filename,savedFrom)
+    assert(type(writefile)=="function","Executor writefile is unavailable")
+    physics.runtime=runtimeSnapshot(os.clock())
+    local report=physics:report()
+    report.physics_assist_enabled=physicsEnabled;report.saved_from=savedFrom
+    report.model_sha256="__MODEL_SHA__";report.place=game.PlaceId
+    local body=game:GetService("HttpService"):JSONEncode(report)
+    writefile(filename,body)
 end
 local function toggle()
     if not ready then return end
     if enabled or testingKeyboard then stop("LOCAL paused. F6 starts; F8 stops.");return end
     epoch=epoch+1
-    if keyboard.selected then enabled=true;armAt=os.clock()+.5;controls();return end
+    if keyboard.selected then
+        enabled=true;armAt=os.clock()+.5;physics:mark("start",os.clock());controls();return
+    end
     testingKeyboard=true;controls()
     local testEpoch=epoch
     task.spawn(function()
@@ -117,6 +140,7 @@ local function toggle()
         end
         label.Text="LOCAL keyboard verified: "..keyboard.name.."\nStarting model. F8 stops."
         enabled=true;armAt=os.clock()+.3;controls()
+        physics:mark("start",os.clock(),"keyboard verified")
     end)
 end
 local function connect(signal,callback)
@@ -135,14 +159,10 @@ physicsButton.Activated:Connect(function()
         or "Model only. Ball monitoring remains active. F6 starts."
 end)
 reportButton.Activated:Connect(function()
-    stop()
+    local savedFrom=runtimeSnapshot(os.clock())
+    stop("Paused to save physics report.")
     local ok,reason=pcall(function()
-        assert(type(writefile)=="function","Executor writefile is unavailable")
-        local report=physics:report()
-        report.physics_assist_enabled=physicsEnabled
-        report.model_sha256="__MODEL_SHA__";report.place=game.PlaceId
-        local body=game:GetService("HttpService"):JSONEncode(report)
-        writefile("TurboBall_Physics_Report.json",body)
+        saveReport("TurboBall_Physics_Report.json",savedFrom)
     end)
     label.Text=ok and "Saved TurboBall_Physics_Report.json in the executor workspace."
         or("Could not save physics report: "..tostring(reason))
@@ -200,7 +220,7 @@ task.spawn(function()
         local period=math.max(1/15,peak*1.3)
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=("Update271 LOCAL v6 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nPhysics approach ON | AUTO team | F6 starts.")
+        label.Text=("Update271 LOCAL v6.1 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nPhysics approach ON | AUTO team | F6 starts.")
             :format(peak*1000,1/period)
         local lastTick,lastDecision,lastUi=os.clock(),-math.huge,-math.huge
         local busy=false
@@ -211,19 +231,28 @@ task.spawn(function()
             if now-lastTick<1/HZ then return end
             local elapsed=now-lastTick;lastTick=now
             busy=true
+            local stage="frame guard"
+            local attemptAt=os.clock()
             local success,err=pcall(function()
                 if enabled and(elapsed>.3 or not focus or input:GetFocusedTextBox()
                     or input:IsKeyDown(Enum.KeyCode.F8)or(activeWindow and not activeWindow()))then
                     stop("LOCAL paused: focus/chat/F8 or stalled frame. F6 restarts.")
                 end
+                stage="reading poses"
                 local packet,reason=read()
+                if reason~=lastReadReason then physics:mark(packet and "poses ready"or "waiting",now,reason)end
+                lastReadReason=reason
+                physics.runtime=runtimeSnapshot(now)
+                stage="observing ball physics"
                 physics:observe(packet,now)
                 if not enabled or now<armAt then return end
+                stage="verifying keyboard"
                 local keyboardOk,keyboardReason=keyboard:verify()
                 assert(keyboardOk,keyboardReason)
                 if not packet then
                     release();label.Text="LOCAL waiting: "..tostring(reason);return
                 end
+                stage="kickoff"
                 local override,recovery=kickoff:step(packet,now,pg)
                 local decisionPeriod=override and 1/30 or period
                 if now-lastDecision<decisionPeriod then return end
@@ -237,14 +266,19 @@ task.spawn(function()
                 local action=override
                 physics.plan=nil
                 if not action then
+                    stage="model observation"
                     local query,entities=Policy.observe(packet,previous,hasFlip)
+                    stage="model inference"
                     local index=predict(query,entities)
+                    stage="recovery"
                     action,recovery=arenaAdapter:recovery(packet,previous,now)
                     if not action and physicsEnabled then
+                        stage="ground interception"
                         action,recovery=intercept:step(packet,actions[index],now)
                     end
                     action=action or actions[index]
                 end
+                stage="mapping inputs"
                 local wanted,actual=Policy.keys(action,ground)
                 local inferenceMs=(os.clock()-began)*1000
                 assert(inferenceMs<200,"Local inference exceeded 200ms")
@@ -257,11 +291,13 @@ task.spawn(function()
                     if ground then jumpAt=now else usedFlip=true end
                 end
                 local inputAt=os.clock()
+                stage="releasing inputs"
                 for _,key in ipairs(order)do
                     if held[key]and not wanted[key]then event(key,false);held[key]=nil end
                 end
                 for _,key in ipairs(order)do
                     if wanted[key]and not held[key]then
+                        stage="pressing "..key
                         held[key]=true;event(key,true)
                         if epoch~=decisionEpoch or not enabled or not focus then
                             -- A yielding press can complete after F8 already released it.
@@ -271,15 +307,17 @@ task.spawn(function()
                     end
                 end
                 local inputMs=(os.clock()-inputAt)*1000
+                stage="input timing"
                 assert(inputMs<200,"Executor input calls exceeded 200ms")
-                physics.decision={mode=recovery or "model",milliseconds=inferenceMs,
+                physics.decision={time=now,mode=recovery or "model",milliseconds=inferenceMs,
                     input_milliseconds=inputMs,action=table.clone(actual)}
                 previous=actual;count=count+1
                 if now-rateStart>=1 then rate=count/(now-rateStart);count=0;rateStart=now end
                 if now-lastUi>=.2 then
+                    stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=("LOCAL v6 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=("LOCAL v6.1 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -290,9 +328,20 @@ task.spawn(function()
                 end
             end)
             busy=false
-            if not success then stop("LOCAL stopped: "..tostring(err))end
+            -- Keep the first stopped-run error. A broken pose source can also
+            -- fail while paused; never overwrite the useful report every frame.
+            if not success and(enabled or not physics.lastError)then
+                local beforeStop=runtimeSnapshot(os.clock())
+                physics.lastError={time=now,stage=stage,reason=tostring(err),
+                    frame_seconds=elapsed,attempt_milliseconds=(os.clock()-attemptAt)*1000}
+                stop("LOCAL stopped at "..stage..": "..tostring(err))
+                if type(writefile)=="function"then
+                    local saved=pcall(saveReport,"TurboBall_Last_Error.json",beforeStop)
+                    if saved then label.Text=label.Text.."\nSaved TurboBall_Last_Error.json"end
+                end
+            end
         end)
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6"}
+return {started=true,version="local-6.1"}

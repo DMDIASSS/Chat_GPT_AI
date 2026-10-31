@@ -63,9 +63,12 @@ carRoot.CFrame.ToObjectSpace=function()return {Position=Vector3.new(cfg.offset[2
 local decoration=object('Part','Hat');decoration.Parent=car;decoration.Size=Vector3.new(100,100,100)
 arena:measureCar(car,carRoot)
 assert(arena.preset=='low'and arena.hitboxVerified)
+assert(arena.hitboxProbe.selection_boxes==1 and arena.hitboxProbe.best_error<1)
+assert(arena.hitboxProbe.candidates[1].size[1]==cfg.size[1])
 selection.Parent=nil;boxPart.children.SelectionBox=nil
 arena:measureCar(car,carRoot)
 assert(arena.preset=='standard'and not arena.hitboxVerified)
+assert(arena.hitboxProbe.selection_boxes==0 and #arena.hitboxProbe.candidates==0)
 ''',mock=True)
 
     def test_wheel_ball_contacts_use_current_ball_radius(self):
@@ -111,6 +114,20 @@ local previous=table.create(8,0)
 assert(not arena:recovery(p,previous,0))
 local action,reason=arena:recovery(p,previous,2.3)
 assert(action and action[5]==1 and action[6]==1 and reason=='upright')
+''')
+
+    def test_neutral_policy_deadlock_at_goal_post_recovers_but_midfield_wait_does_not(self):
+        self.run_lua('''
+local p={car={position={758,5064,17.03},forward={1,0,0},up={0,0,1},velocity={0,0,0}},
+ ball={position={-500,-4000,500}},ground_estimate=true,ball_radius=91.25}
+local idle={0,-1,0,0,-1,0,0,1}
+assert(not arena:recovery(p,idle,0))
+local action,reason=arena:recovery(p,idle,2.3)
+assert(action and action[1]==-1 and reason=='reverse/turn','Neutral policy bypassed boundary recovery')
+arena:resetRecovery();p.car.position={0,0,17}
+assert(not arena:recovery(p,idle,0));assert(not arena:recovery(p,idle,3),'Overrode intentional midfield wait')
+arena:resetRecovery();p.car.position={758,5064,17};p.ball.position={758,5000,100}
+assert(not arena:recovery(p,idle,0));assert(not arena:recovery(p,idle,3),'Overrode close goal-post touch')
 ''')
 
     def test_pad_positions_type_and_activity_are_measured_live(self):

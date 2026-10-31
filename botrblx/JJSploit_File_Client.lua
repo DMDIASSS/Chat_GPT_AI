@@ -343,14 +343,16 @@ local function read()
         packet.ball_wheel_contacts=ballContacts
     end
     if padReader then
-        packet.boost_pads=padReader:read(scene,cp.position,now)
+        packet.boost_pads=padReader:read(car.Parent or scene,cp.position,now)
         packet.boost_known=padReader.known;packet.boost_total=padReader.total
+        packet.pad_folder_found=padReader.folder~=nil
     end
     if carReader then
         packet.other_cars=carReader:read(scene,carRoot,ballRoot,now,pose,bp,ballRadius,TEAM)
         packet.opponents=carReader.opponents;packet.teammates=carReader.teammates
         packet.unknown_cars=carReader.unknown
     end
+    if arenaAdapter then packet.hitbox_probe=arenaAdapter.hitboxProbe end
     return packet
 end
 -- POSE_READER_END

@@ -12,8 +12,11 @@ local function limit(v,cap)
     if speed>cap then for i=1,3 do v[i]=v[i]*cap/speed end end
 end
 local function copy(ball)
-    return {position=table.clone(ball.position),velocity=table.clone(ball.velocity),
+    local body={position=table.clone(ball.position),velocity=table.clone(ball.velocity),
         angular_velocity=table.clone(ball.angular_velocity or {0,0,0}),slow=ball.slow or 0}
+    if ball.forward then body.forward=table.clone(ball.forward)end
+    if ball.up then body.up=table.clone(ball.up)end
+    return body
 end
 local function median(values)
     local sorted=table.clone(values);table.sort(sorted)
@@ -22,7 +25,13 @@ end
 
 function Physics.new(profile,arena)
     return setmetatable({profile=profile,arena=arena,gravity=profile.physics.GRAVITY_Z,
-        history={},gravitySamples={},errors={},trace={},status="saved profile",resets=0},Physics)
+        history={},gravitySamples={},errors={},trace={},events={},status="saved profile",resets=0,
+        totalFlightErrors=0},Physics)
+end
+
+function Physics:mark(kind,now,reason)
+    self.events[#self.events+1]={kind=kind,time=now,reason=reason}
+    if #self.events>40 then table.remove(self.events,1)end
 end
 
 -- One stationary-world sphere contact has a closed-form normal/friction impulse.
@@ -157,6 +166,8 @@ function Physics:observe(packet,now)
             local error=distance(p,future[#future].position)
             self.errors[#self.errors+1]=error;if #self.errors>20 then table.remove(self.errors,1)end
             self.error=median(self.errors)
+            self.lastFlightError=self.error;self.lastFlightAt=now
+            self.totalFlightErrors=self.totalFlightErrors+1
             self.forecast=nil
         end
         if not self.forecast then self.forecast={at=now,ball=copy(packet.ball)}end
@@ -165,24 +176,36 @@ function Physics:observe(packet,now)
     self.mismatch=self.arena:distance(p)<-radius*2 or(self.error or 0)>radius*2
     if now-(self.traceAt or -math.huge)>=.2 then
         self.traceAt=now
+        local others={}
+        for _,car in ipairs(packet.other_cars or {})do
+            local body=copy(car)
+            body.team=car.team;body.boost_estimate=car.boost_estimate
+            body.ground_estimate=car.ground_estimate;body.flip_estimate=car.flip_estimate
+            others[#others+1]=body
+        end
         self.trace[#self.trace+1]={time=now,car=copy(packet.car),ball=copy(packet.ball),
+            other_cars=others,boost_pads=packet.boost_pads,
             team=packet.team,ground=packet.ground_estimate,radius=radius,boost=packet.boost,
             radius_verified=packet.ball_size_verified==true,car_preset=packet.car_preset,
             car_verified=packet.car_size_verified==true,wheel_contacts=packet.wheel_contacts,
-            pads_known=packet.boost_known,pads_total=packet.boost_total,sample_dt=packet.sample_dt,
-            decision=self.decision,physics_status=self.status,gravity=self.gravity,
+            pads_known=packet.boost_known,pads_total=packet.boost_total,pad_folder_found=packet.pad_folder_found,
+            hitbox_probe=packet.hitbox_probe,sample_dt=packet.sample_dt,
+            decision=self.decision,decision_age=self.decision and self.decision.time and now-self.decision.time or nil,
+            runtime=self.runtime,physics_status=self.status,gravity=self.gravity,
             flight_error=self.error,plan=self.plan}
         if #self.trace>150 then table.remove(self.trace,1)end
     end
 end
 
 function Physics:report()
-    return {version="local-6",profile=self.profile.name,units="simulation units; seconds",
+    return {version="local-6.1",profile=self.profile.name,units="simulation units; seconds",
         studs_per_unit=self.profile.roblox_studs_per_sim_unit,arena=self.profile.arena,
         saved_physics=self.profile.physics,gravity_used=self.gravity,observed_gravity=self.observedGravity,
         gravity_samples=#self.gravitySamples,flight_position_error_median=self.error,
         flight_error_samples=#self.errors,status=self.status,profile_mismatch=self.mismatch==true,
-        resets=self.resets,trace=self.trace,
+        last_valid_flight_error=self.lastFlightError,last_valid_flight_time=self.lastFlightAt,
+        total_flight_error_samples=self.totalFlightErrors,resets=self.resets,trace=self.trace,
+        runtime=self.runtime,events=self.events,last_error=self.lastError,
         limitations="Ball/world forecast only; future car touches and exact curved goal-frame contact are uncertain. Ground reach is an estimate."}
 end
 

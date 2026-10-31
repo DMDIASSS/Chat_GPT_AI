@@ -8,7 +8,9 @@ function Pads.new(profile)
 end
 local function horizontal(a,b)return (a.X-b.X)^2+(a.Z-b.Z)^2 end
 function Pads:index(scene,now)
-    local folder=scene:FindFirstChild("BoostPads")
+    -- Match play nests BoostPads under MatchView; freeplay may put it directly
+    -- under the scene. The caller scopes discovery to the local car's view.
+    local folder=scene:FindFirstChild("BoostPads",true)
     if folder==self.folder and now-self.lastIndex<2 then return end
     self.folder=folder;self.lastIndex=now;self.entries={};self.known=0
     if not folder then self.total=0;return end

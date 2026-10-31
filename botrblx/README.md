@@ -1,4 +1,4 @@
-# TurboBall Roblox bot — Local v6
+# TurboBall Roblox bot — Local v6.1
 
 ## Local Lua mode: remove the file round trip
 
@@ -20,7 +20,7 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v6 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v6.1 ready | model self-test passed`**, then press **F6**.
    **Team: AUTO** identifies `Deadline_coolgun` from the match scoreboard and
    cross-checks the rendered nameplate relationship. It follows team changes.
    If the team cannot be identified, open the in-game scoreboard once. The
@@ -83,6 +83,41 @@ Optional exporter overrides:
 EXPORT_LOCAL_BOT.bat --workspace "C:\Users\almas\AppData\Roaming\jjsploit\workspace"
 EXPORT_LOCAL_BOT.bat --model "D:\Models\update.pt"
 ```
+
+## Match pad detection and stop diagnostics (local v6.1)
+
+Rerun **EXPORT_LOCAL_BOT.bat** after updating this folder. Existing generated Lua
+scripts contain the previous runtime; the current ready badge is **v6.1**.
+
+The first live v6 report showed a measured standard ball radius and gravity close
+to the saved profile, but zero discovered boost pads throughout the run. The
+saved match renderer nests `BoostPads` inside `MatchView`. The old reader only
+searched the scene's direct children. Discovery now follows the local car's
+render view and finds nested pads, excluding unrelated views. Verified pad state
+reaches both the actor and a new small detour option in ground assistance. With
+low boost, it can collect a nearby active pad along its approach. It avoids
+unknown/inactive pads, long detours and incoming own-goal threats.
+
+Boundary recovery now also detects a stationary neutral policy action near a
+wall or goal post. The old timer reset whenever throttle was zero, so that state
+could never recover. Close-ball control, kickoff countdowns and intentional
+midfield waits keep their existing behavior.
+
+The uploaded report did **not** include the error that stopped that run; it does
+not establish that error's cause. Runtime exceptions now retain the exact error,
+stage, frame timing, pause reason and lifecycle events. When `writefile` is
+available, the stopped run automatically saves **TurboBall_Last_Error.json** in
+the executor workspace. Repeated failures while paused do not overwrite it.
+The manual report keeps that original error too. Both files remain local.
+
+Reports now include full car orientation, anonymous other-car poses, observed
+pads, held/observed inputs and each decision's age. A paused trace can no longer
+present an old action without marking it stale. Hitbox marker counts and nearest
+preset measurements explain an unverified `standard?` fallback instead of silently
+calling it measured. Last valid flight-error measurements survive pose resets.
+The attached private standalone model and original diagnostics are excluded from
+the public download. These fixes are covered by offline tests; a new live run is
+still needed to confirm behavior and identify the earlier stop error.
 
 ## Physics-aware ground approach (local v6)
 
@@ -192,7 +227,7 @@ change model weights or create a policy mesh input.
 
 Rerun **EXPORT_LOCAL_BOT.bat after installing this update**: the previous generated
 standalone script contains the previous adapter. No model weights are downloaded
-or retrained. The current package shows a **v6** badge after re-export.
+or retrained. The current package shows a **v6.1** badge after re-export.
 
 The game uses its own match teams. The new reader matches your name to the
 scoreboard row's team edge; it does not assume Roblox's `Player.Team` is the match

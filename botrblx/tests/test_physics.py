@@ -108,6 +108,26 @@ p.car.position={0,-1400,17};p.car.forward={0,1,0}
 planner:step(p,model,.2);assert(planner.side==nil,'Approach side never reset')
 ''')
 
+    def test_low_boost_uses_verified_on_route_pad_without_abandoning_defense(self):
+        self.run_lua('''
+local p=packet({0,-3000,17},{0,1000,93.15})
+p.boost=0
+p.boost_pads={{position={60,-2400,70},active=true,is_big=false},
+ {position={3500,0,73},active=true,is_big=true},
+ {position={0,-2600,70},active=false,is_big=false}}
+local a,mode=planner:step(p,model,0)
+assert(a and mode=='boost on approach' and planner.last.boost_pad,'Ignored verified pad during ground override')
+assert(planner.last.target[1]==60 and planner.last.target[2]==-2400,'Chose distant or inactive pad')
+p.boost=30;planner:step(p,model,.1)
+assert(not planner.last.boost_pad,'Kept detouring after replenishing boost')
+p.boost=0;p.ball.position={0,-2200,93.15};p.ball.velocity={0,-1800,0}
+planner:step(p,model,.2)
+assert(not planner.last.boost_pad,'Abandoned incoming goal threat for boost')
+p.ball.position={0,1000,93.15};p.ball.velocity={0,0,0};p.boost_pads[1].active=nil
+planner:step(p,model,.3)
+assert(not planner.last.boost_pad,'Invented availability for an unknown pad')
+''')
+
     def test_team_mirror_and_steer_sign(self):
         self.run_lua('''
 local p=packet({1500,-2400,17},{400,-300,93.15},{-300,0,0})
@@ -177,6 +197,25 @@ assert(#physics.gravitySamples==samples,'Fitted a car touch')
 physics:observe(nil,3)
 assert(#physics.history==0 and not physics.lastAt,'Reset retained flight window')
 assert(physics:report().observed_gravity and physics:report().resets>0)
+assert(physics:report().total_flight_error_samples>0 and physics:report().last_valid_flight_error,'Reset erased the last useful error measurement')
+''')
+
+    def test_report_keeps_orientation_pause_state_and_decision_age(self):
+        self.run_lua('''
+local p=packet({0,-2000,17},{0,0,93.15})
+physics.runtime={enabled=true,phase='running'}
+physics.decision={time=1,mode='ground intercept',action=model}
+physics:observe(p,1)
+physics.runtime={enabled=false,phase='paused',last_stop_reason='F8'}
+physics:mark('stop',1.1,'F8')
+physics:observe(p,1.3)
+local t=physics.trace[#physics.trace]
+assert(t.car.forward[2]==1 and t.car.up[3]==1,'Lost orientation required to replay policy')
+assert(t.runtime.enabled==false and t.runtime.last_stop_reason=='F8')
+assert(math.abs(t.decision_age-.3)<1e-6,'Stale decisions appear current after pause')
+assert(physics:report().events[1].reason=='F8')
+p.car.forward[2]=0
+assert(physics.trace[1].car.forward[2]==1,'Trace retained mutable pose references')
 ''')
 
     def test_report_trace_is_bounded_and_outside_arena_disables_assist(self):
@@ -187,6 +226,6 @@ assert(#physics.trace<=150)
 p.ball.position={9000,0,93.15};physics:observe(p,2001/30)
 assert(physics.mismatch,'Outside geometry did not flag profile mismatch')
 local report=physics:report()
-assert(report.version=='local-6' and report.profile_mismatch and report.arena.EXTENT_X==4096)
+assert(report.version=='local-6.1' and report.profile_mismatch and report.arena.EXTENT_X==4096)
 assert(report.saved_physics.BALLWORLD_RESTITUTION==.6)
 ''')

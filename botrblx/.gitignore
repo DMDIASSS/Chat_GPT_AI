@@ -15,3 +15,4 @@ botrblx_diag_*
 botrblx_standalone.lua
 standalone_export.log
 TurboBall_Physics_Report.json
+TurboBall_Last_Error.json
