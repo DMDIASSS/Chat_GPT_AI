@@ -1,5 +1,9 @@
 # GigaLearn C++ migration decision — read before switching
 
+A newer CPU C++ build and replay-training path is now tested: see
+[GigaLearn native backend](GigaLearn_Project/Native_Backend/README.md). Native Nexto
+attention checkpoint transfer and live export validation remain separate work.
+
 ## Verified claim and boundaries
 
 The author of GigaLearnCPP-Leak reports **approximately 10× experience collection throughput** compared with RLGym-PPO on their own hardware, and ~2× compared with RLGymPPO_CPP. This is not a controlled benchmark on this user's machine, and does not mean 10× final policy improvement. The repository was archived August 24, 2025; its README provides no installation guide. Source: https://github.com/ZealanL/GigaLearnCPP-Leak.

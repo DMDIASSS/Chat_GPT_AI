@@ -1,0 +1,88 @@
+"""Run Luau behavior tests, standalone compilation, and UI teardown checks.
+
+Usage: python roworld/tests/run.py --luau /path/to/luau --compiler /path/to/luau-compile
+"""
+import argparse
+import importlib.util
+from pathlib import Path
+import subprocess
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--luau", default="luau")
+    parser.add_argument("--compiler", default="luau-compile")
+    args = parser.parse_args()
+    spec = importlib.util.spec_from_file_location("roworld_build", ROOT / "build.py")
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    source = build.source()
+    assert (ROOT / "RoWorld_Bot.lua").read_text(encoding="utf8") == source, "Rebuild the standalone script"
+    for name in ("test_policy.lua", "test_adapter.lua", "test_network.lua", "test_weapons.lua", "test_strategy.lua", "test_core.lua", "test_recovery.lua", "test_diplomacy.lua", "test_adaptation.lua", "test_planning.lua", "test_cooperation.lua", "test_conquest.lua", "test_early_survival.lua"):
+        subprocess.run([args.luau, str(ROOT / "tests" / name)], check=True, timeout=30)
+    compiled = subprocess.run([args.compiler, str(ROOT / "RoWorld_Bot.lua")], capture_output=True, text=True, timeout=30)
+    assert compiled.returncode == 0, compiled.stderr
+    fixture = (ROOT / "tests/client_fixture.lua").read_text(encoding="utf8")
+    assertions = r'''
+local first = assert(env.__RoWorldBot)
+assert(first.alive and not first.enabled)
+local toggle, label, export, friendsToggle, buttons = nil, nil, nil, nil, 0
+for _, obj in ipairs(created) do
+    if obj.ClassName == "TextButton" then buttons += 1;if obj.Name == "Toggle" then toggle = obj elseif obj.Name == "ExportReport" then export = obj elseif obj.Name == "FriendsToggle" then friendsToggle=obj end end
+    if obj.ClassName == "TextLabel" and obj.Name == "Status" then label = obj end
+end
+assert(buttons == 3 and toggle.Text == "Start bot" and first.helpFriends)
+friendsToggle.Activated:Fire(); assert(not first.helpFriends and friendsToggle.Text:find("OFF"))
+friendsToggle.Activated:Fire(); assert(first.helpFriends)
+export.Activated:Fire(); assert(label.Text:find("Executor file writing unavailable"))
+step(); assert(not first.enabled and #warnings == 0)
+toggle.Activated:Fire(); step()
+assert(first.enabled and label.Text:find("Waiting for the RoWorld client"))
+toggle.Activated:Fire(); step()
+assert(not first.enabled and toggle.Text == "Start bot")
+input.InputBegan:Fire({KeyCode = Enum.KeyCode.F6}, false); step(); assert(first.enabled)
+local world = makeWorld()
+cachedMain = world.main
+local scripts, client, module = object("PlayerScripts"), object("LocalScript"), object("ModuleScript")
+services.Players.LocalPlayer.children.PlayerScripts = scripts
+scripts.children.AirfrontClient = client
+client.children.Main = module
+for _ = 1,18 do step() end
+assert(#world.session.sent > 0 and world.session.sent[1].type == "attack")
+local files={}
+services.HttpService={JSONEncode=function(_,report) assert((report.version=="2.4.0" and report.runtime.decisions>0) or (report.version==1 and report.records));return "report-json" end}
+writefile=function(name,body) files[name]=body end
+export.Activated:Fire();assert(files["RoWorld_Match_Report.json"]=="report-json")
+local archived=false;for name in pairs(files) do if name:find("RoWorld_Match_Report_123456_") then archived=true end end
+assert(archived and label.Text:find("Saved RoWorld_Match_Report"))
+assert(files["RoWorld_Opponent_Profiles.json"] and first.profiles().version==1)
+toggle.Activated:Fire()
+local count = #world.session.sent
+for _ = 1,6 do step() end
+assert(#world.session.sent == count and not first.enabled)
+'''
+    after = r'''
+local second = assert(env.__RoWorldBot)
+assert(second ~= first and not first.alive and not first.enabled)
+assert(second.alive and not second.enabled and second.profiles().version==1)
+for _, c in ipairs(first.connections) do assert(not c.active) end
+step()
+second.destroy(); step()
+assert(env.__RoWorldBot == nil and not second.alive and #warnings == 0)
+print("PASS", "dashboard, waiting status, stop, hotkey and reinjection teardown")
+'''
+    with tempfile.TemporaryDirectory() as directory:
+        test = Path(directory) / "client_test.luau"
+        # Each injection has its own locals, just as separate executor runs do.
+        world_fixture = "local makeWorld = (function()\n" + (ROOT / "tests/fixture.lua").read_text(encoding="utf8") + "\nend)()\n"
+        test.write_text(fixture + world_fixture + "\ndo\n" + source + "\nend\n" + assertions + "\ndo\n" + source + "\nend\n" + after,
+                        encoding="utf8")
+        subprocess.run([args.luau, str(test)], check=True, timeout=30)
+    print("PASS standalone generation and Luau compilation")
+
+
+if __name__ == "__main__":
+    main()

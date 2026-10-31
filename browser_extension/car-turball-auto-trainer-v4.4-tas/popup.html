@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}body{width:350px;margin:0;padding:16px;background:#101827;color:#e9f0fb;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+h1{font-size:17px;margin:0 0 4px}h2{font-size:14px;margin:0 0 10px}.muted,.hint{color:#9aacc4}.hint{font-size:12px;margin:8px 0 0}.section{background:#172335;border:1px solid #293950;border-radius:10px;padding:12px;margin-top:12px}label{display:block;font-weight:600;margin:10px 0 5px}.row{display:flex;gap:7px}.row>*{min-width:0}button{padding:9px 11px;border:1px solid #376ac6;border-radius:7px;background:#2868c6;color:white;font:600 12px system-ui;cursor:pointer}button.secondary{background:#283850;border-color:#43566f}button.danger{background:#4b2731;border-color:#74404b}button:disabled{opacity:.55;cursor:default}input[type=text],select{background:#0b1422;color:#f4f7ff;border:1px solid #43566f;border-radius:7px;padding:9px;width:100%;min-width:0;font:13px system-ui}input[type=file]{display:none}.grow{flex:1}#status,#model-status{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:#b9cbe2;margin-top:10px}#status{border-radius:6px;background:#0c1725;padding:9px}.pill{display:inline-block;font-size:11px;color:#b7d3ff}.uploader{width:100%;padding:11px}.small{font-size:11px;color:#a7b7cd;margin:8px 0 0}a{color:#9bc2ff}
+</style></head><body>
+<h1>Car Soccer + Turball AI Trainer <span class="pill">v4.5.1</span></h1>
+<div class="muted">Model library & in-game switching</div>
+<section class="section"><h2>Game connection (automatic)</h2><div class="row"><button class="grow" id="enable">Enable + reload</button><button class="grow secondary" id="disable">Disable</button></div><p class="hint">Detects turball.io or car-soccer.com and automatically selects the matching patcher when you open/reload a game. Use Enable + reload if the auto-patch misses the page.</p><div id="status">Checking…</div></section>
+<section class="section"><h2>My models</h2><label for="model">Active model</label><select id="model"></select>
+  <div class="row" style="margin-top:8px"><button class="grow secondary" id="rename">Rename</button><button class="grow danger" id="remove">Delete</button></div>
+  <label for="display-name">Model display name</label><input id="display-name" type="text" maxlength="80" placeholder="Name shown in game">
+  <label for="model-file">Import a model</label><input id="model-file" type="file" accept=".pt,.zip,.bin">
+  <div class="row"><button class="grow uploader" id="upload">＋ Upload a model…</button></div>
+  <p class="hint">Direct offline uploads: compatible Nexto .bin, .pt (PyTorch state_dict or TorchScript), or .zip exports. No Python, BAT, server or account required.</p>
+  <div id="model-status" role="status"></div>
+  <label for="nexto-file">Original Nexto model missing?</label>
+  <input id="nexto-file" type="file" accept=".pt,.zip,.bin">
+  <button id="install-nexto" type="button" class="secondary" style="width:100%;margin-top:3px">Install Original Nexto weights…</button>
+  <p class="hint">Select your genuine Nexto model (.bin or .pt). This restores the built-in Original Nexto option without needing nexto-weights.bin in the extension folder. A compatible .pt works directly in the browser.</p>
+  <div id="nexto-status" class="small" role="status"></div>
+</section>
+<p class="small">All imported models are kept separately. Switch from this popup or the in-game AI menu. Press <b>Give Control</b> after switching. <b>F8</b> takes control back.</p>
+<script type="module" src="popup.js"></script></body></html>

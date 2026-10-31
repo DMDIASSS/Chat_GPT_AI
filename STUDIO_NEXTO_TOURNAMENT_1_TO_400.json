@@ -1,0 +1,115 @@
+{
+  "selector_run": "nexto_tournament400_01",
+  "max_games": 100000,
+  "until": "confirm",
+  "selector": {
+    "goal_race": null,
+    "baseline": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt",
+    "anchors": {
+      "update180": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt",
+      "update019": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000019.pt",
+      "update271": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+      "update205": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000205.pt",
+      "update266": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000266.pt"
+    },
+    "families": {
+      "original_mechanics": [
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_*.pt"
+      ]
+    },
+    "rivals": {
+      "nexto": "vendor/nexto/nexto-model.pt"
+    },
+    "device": "auto",
+    "worlds": 16,
+    "job_group": 128,
+    "top_per_family": 8,
+    "refine_per_family": 32,
+    "uncertain_extra_per_family": 8,
+    "confirm_leaders": 6,
+    "learner_scripted_kickoff": true,
+    "frozen_scripted_kickoff": true,
+    "stages": {
+      "screen": {
+        "seeds": [
+          917000000,
+          917000997
+        ],
+        "seconds": 30,
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "rivals": [
+          "nexto"
+        ],
+        "head_to_head_per_family": 0,
+        "team_policy": "candidate_squad"
+      },
+      "refine": {
+        "seeds": [
+          918000000,
+          918000997,
+          918001994,
+          918002991
+        ],
+        "seconds": 60,
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "rivals": [
+          "nexto"
+        ],
+        "head_to_head_per_family": 0,
+        "team_policy": "candidate_squad"
+      },
+      "finalists": {
+        "seeds": [
+          919000000,
+          919000997,
+          919001994,
+          919002991,
+          919003988,
+          919004985
+        ],
+        "seconds": 120,
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "rivals": [
+          "nexto"
+        ],
+        "head_to_head_per_family": 0,
+        "team_policy": "candidate_squad"
+      },
+      "confirm": {
+        "seeds": [
+          920000000,
+          920000997,
+          920001994,
+          920002991,
+          920003988,
+          920004985,
+          920005982,
+          920006979
+        ],
+        "seconds": 300,
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "rivals": [
+          "nexto"
+        ],
+        "head_to_head_per_family": 0,
+        "team_policy": "candidate_squad"
+      }
+    }
+  }
+}

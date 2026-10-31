@@ -1,0 +1,31 @@
+{
+  "actors": [
+    {
+      "id": "target271",
+      "path": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt"
+    },
+    {
+      "id": "target14",
+      "path": "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000014/actor.pt"
+    },
+    {
+      "id": "target_nexto",
+      "path": "vendor/nexto/nexto-model.pt"
+    }
+  ],
+  "rivals_by_format": {
+    "1v1": [
+      "target271",
+      "source"
+    ],
+    "2v2": [
+      "target271",
+      "source"
+    ],
+    "3v3": [
+      "target14",
+      "target_nexto",
+      "source"
+    ]
+  }
+}

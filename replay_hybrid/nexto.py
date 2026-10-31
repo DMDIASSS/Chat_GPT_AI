@@ -1,0 +1,18 @@
+"""Optional original Nexto opponent using local, fingerprinted weights."""
+import numpy as np
+import torch
+
+
+class NextoOpponent:
+    def __init__(self,path,device='cpu'):
+        # The original traced Nexto graph creates CPU constants inside forward.
+        # map_location/.to(cuda) moves weights, not those graph constants. Keep
+        # this small opponent on CPU independently of the learning model device.
+        self.device='cpu';self.actor=torch.jit.load(str(path),map_location=self.device).eval()
+
+    @torch.inference_mode()
+    def logits(self,views):
+        values=tuple(torch.as_tensor(np.stack([v[i] for v in views]),device=self.device,dtype=torch.float32) for i in range(3))
+        result=self.actor(values)[0]
+        if result.shape!=(len(views),90) or not torch.isfinite(result).all():raise ValueError('Invalid Nexto opponent logits')
+        return result.cpu().numpy()

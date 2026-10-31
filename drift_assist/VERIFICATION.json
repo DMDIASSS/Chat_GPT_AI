@@ -1,0 +1,53 @@
+{
+  "version": "1.3.0",
+  "date": "2026-10-31",
+  "controls": {
+    "angle_degrees": [
+      0,
+      90
+    ],
+    "angle_flip": "F8 / Flip Angle; independent of travel direction",
+    "speed_target_kmh": [
+      30,
+      10000
+    ],
+    "reverse_hz": [
+      0,
+      60
+    ],
+    "reverse_hz_definition": "Direction changes per second in Farm Area; 0 uses distance. Timed span is derived from requested speed/frequency and capped by road length."
+  },
+  "offline_checks": {
+    "compile_and_generated_source": true,
+    "retained_route_surface_elevation_input_and_controller_checks": true,
+    "extreme_area_reflection": "0/45/90 degrees, normal/inverted, requested 10000 km/h; bounds and facing preserved",
+    "reverse_timer": "2 reversals/s over 10 seconds, bounded span; manual reverse and brake preserve position",
+    "standalone_ui": "Farm angle editing and Flip Angle do not reverse travel; Farm/Cool/Area, stop, diagnostics and reinjection",
+    "cool_physics": "Normal Cool ticks apply physical impulses / yaw assistance without model PivotTo; recovery retains pose solver",
+    "standalone_tunnel": "Banked floor below roof/mountain layers; forward/reverse at 500 km/h",
+    "wheel_plane_cases": 90,
+    "native_contact_cases": 324,
+    "native_contact_scope": "Original uploaded CarPhysics on mocked planes, +/-90 and backward zero orientation; 85/500/10000 km/h velocity targets. Not Roblox networking or actual collision solver.",
+    "original_controller_benchmark": {
+      "source": "User-supplied How To Drift place",
+      "test": "Original CarPhysics / GarageConfig on planar fixture",
+      "limitations": "Not Roblox, real 3D collision/suspension, networking, streaming or a live executor test",
+      "metrics": {
+        "manual_cases": 24.0,
+        "auto_cases": 18.0,
+        "manual_max_mean_angle_error": 0.01253569,
+        "auto_max_mean_angle_error": 0.09395017,
+        "auto_max_cross_track": 5.26351844
+      }
+    }
+  },
+  "live_roblox_tested": false,
+  "jjsploit_tested": false,
+  "limitations": [
+    "Extreme speed is a selectable/commanded target, not a promise that Roblox/server will sustain it.",
+    "Cool keeps normal vehicle physics and corner limits; it does not instantly reach the selected speed.",
+    "Visible reverse frequency is limited by update/render rate. Short roads cap timed sweep span, so position travel and commanded velocity can differ.",
+    "Four-wheel supported recovery requires loaded ground; server corrections/collisions can still interfere.",
+    "0 degrees does not qualify as a drift; the visible client angle bonus caps at 60 degrees; same-spot farming can pay less. No reward remotes are called."
+  ]
+}

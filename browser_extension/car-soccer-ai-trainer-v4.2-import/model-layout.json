@@ -1,0 +1,414 @@
+[
+  {
+    "key": "q1w",
+    "offset": 0,
+    "length": 4096,
+    "tensor": "net.earl.query_preprocess.0.weight",
+    "shape": [
+      128,
+      32
+    ]
+  },
+  {
+    "key": "q1b",
+    "offset": 4096,
+    "length": 128,
+    "tensor": "net.earl.query_preprocess.0.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "q2w",
+    "offset": 4224,
+    "length": 16384,
+    "tensor": "net.earl.query_preprocess.2.weight",
+    "shape": [
+      128,
+      128
+    ]
+  },
+  {
+    "key": "q2b",
+    "offset": 20608,
+    "length": 128,
+    "tensor": "net.earl.query_preprocess.2.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "k1w",
+    "offset": 20736,
+    "length": 3072,
+    "tensor": "net.earl.key_value_preprocess.0.weight",
+    "shape": [
+      128,
+      24
+    ]
+  },
+  {
+    "key": "k1b",
+    "offset": 23808,
+    "length": 128,
+    "tensor": "net.earl.key_value_preprocess.0.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "k2w",
+    "offset": 23936,
+    "length": 16384,
+    "tensor": "net.earl.key_value_preprocess.2.weight",
+    "shape": [
+      128,
+      128
+    ]
+  },
+  {
+    "key": "k2b",
+    "offset": 40320,
+    "length": 128,
+    "tensor": "net.earl.key_value_preprocess.2.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b0iw",
+    "offset": 40448,
+    "length": 49152,
+    "tensor": "net.earl.blocks.0.attention.in_proj_weight",
+    "shape": [
+      384,
+      128
+    ]
+  },
+  {
+    "key": "b0ib",
+    "offset": 89600,
+    "length": 384,
+    "tensor": "net.earl.blocks.0.attention.in_proj_bias",
+    "shape": [
+      384
+    ]
+  },
+  {
+    "key": "b0ow",
+    "offset": 89984,
+    "length": 16384,
+    "tensor": "net.earl.blocks.0.attention.out_proj.weight",
+    "shape": [
+      128,
+      128
+    ]
+  },
+  {
+    "key": "b0ob",
+    "offset": 106368,
+    "length": 128,
+    "tensor": "net.earl.blocks.0.attention.out_proj.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b0f1w",
+    "offset": 106496,
+    "length": 65536,
+    "tensor": "net.earl.blocks.0.linear1.weight",
+    "shape": [
+      512,
+      128
+    ]
+  },
+  {
+    "key": "b0f1b",
+    "offset": 172032,
+    "length": 512,
+    "tensor": "net.earl.blocks.0.linear1.bias",
+    "shape": [
+      512
+    ]
+  },
+  {
+    "key": "b0f2w",
+    "offset": 172544,
+    "length": 65536,
+    "tensor": "net.earl.blocks.0.linear2.weight",
+    "shape": [
+      128,
+      512
+    ]
+  },
+  {
+    "key": "b0f2b",
+    "offset": 238080,
+    "length": 128,
+    "tensor": "net.earl.blocks.0.linear2.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b0n1w",
+    "offset": 238208,
+    "length": 128,
+    "tensor": "net.earl.blocks.0.norm1.weight",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b0n1b",
+    "offset": 238336,
+    "length": 128,
+    "tensor": "net.earl.blocks.0.norm1.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b0n2w",
+    "offset": 238464,
+    "length": 128,
+    "tensor": "net.earl.blocks.0.norm2.weight",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b0n2b",
+    "offset": 238592,
+    "length": 128,
+    "tensor": "net.earl.blocks.0.norm2.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b0n3w",
+    "offset": 238720,
+    "length": 128,
+    "tensor": "net.earl.blocks.0.norm3.weight",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b0n3b",
+    "offset": 238848,
+    "length": 128,
+    "tensor": "net.earl.blocks.0.norm3.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b1iw",
+    "offset": 238976,
+    "length": 49152,
+    "tensor": "net.earl.blocks.1.attention.in_proj_weight",
+    "shape": [
+      384,
+      128
+    ]
+  },
+  {
+    "key": "b1ib",
+    "offset": 288128,
+    "length": 384,
+    "tensor": "net.earl.blocks.1.attention.in_proj_bias",
+    "shape": [
+      384
+    ]
+  },
+  {
+    "key": "b1ow",
+    "offset": 288512,
+    "length": 16384,
+    "tensor": "net.earl.blocks.1.attention.out_proj.weight",
+    "shape": [
+      128,
+      128
+    ]
+  },
+  {
+    "key": "b1ob",
+    "offset": 304896,
+    "length": 128,
+    "tensor": "net.earl.blocks.1.attention.out_proj.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b1f1w",
+    "offset": 305024,
+    "length": 65536,
+    "tensor": "net.earl.blocks.1.linear1.weight",
+    "shape": [
+      512,
+      128
+    ]
+  },
+  {
+    "key": "b1f1b",
+    "offset": 370560,
+    "length": 512,
+    "tensor": "net.earl.blocks.1.linear1.bias",
+    "shape": [
+      512
+    ]
+  },
+  {
+    "key": "b1f2w",
+    "offset": 371072,
+    "length": 65536,
+    "tensor": "net.earl.blocks.1.linear2.weight",
+    "shape": [
+      128,
+      512
+    ]
+  },
+  {
+    "key": "b1f2b",
+    "offset": 436608,
+    "length": 128,
+    "tensor": "net.earl.blocks.1.linear2.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b1n1w",
+    "offset": 436736,
+    "length": 128,
+    "tensor": "net.earl.blocks.1.norm1.weight",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b1n1b",
+    "offset": 436864,
+    "length": 128,
+    "tensor": "net.earl.blocks.1.norm1.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b1n2w",
+    "offset": 436992,
+    "length": 128,
+    "tensor": "net.earl.blocks.1.norm2.weight",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b1n2b",
+    "offset": 437120,
+    "length": 128,
+    "tensor": "net.earl.blocks.1.norm2.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b1n3w",
+    "offset": 437248,
+    "length": 128,
+    "tensor": "net.earl.blocks.1.norm3.weight",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "b1n3b",
+    "offset": 437376,
+    "length": 128,
+    "tensor": "net.earl.blocks.1.norm3.bias",
+    "shape": [
+      128
+    ]
+  },
+  {
+    "key": "a1w",
+    "offset": 437504,
+    "length": 256,
+    "tensor": "net.output.net.0.weight",
+    "shape": [
+      32,
+      8
+    ]
+  },
+  {
+    "key": "a1b",
+    "offset": 437760,
+    "length": 32,
+    "tensor": "net.output.net.0.bias",
+    "shape": [
+      32
+    ]
+  },
+  {
+    "key": "a2w",
+    "offset": 437792,
+    "length": 1024,
+    "tensor": "net.output.net.2.weight",
+    "shape": [
+      32,
+      32
+    ]
+  },
+  {
+    "key": "a2b",
+    "offset": 438816,
+    "length": 32,
+    "tensor": "net.output.net.2.bias",
+    "shape": [
+      32
+    ]
+  },
+  {
+    "key": "a3w",
+    "offset": 438848,
+    "length": 1024,
+    "tensor": "net.output.net.4.weight",
+    "shape": [
+      32,
+      32
+    ]
+  },
+  {
+    "key": "a3b",
+    "offset": 439872,
+    "length": 32,
+    "tensor": "net.output.net.4.bias",
+    "shape": [
+      32
+    ]
+  },
+  {
+    "key": "ecw",
+    "offset": 439904,
+    "length": 4096,
+    "tensor": "net.output.emb_convertor.weight",
+    "shape": [
+      32,
+      128
+    ]
+  },
+  {
+    "key": "ecb",
+    "offset": 444000,
+    "length": 32,
+    "tensor": "net.output.emb_convertor.bias",
+    "shape": [
+      32
+    ]
+  }
+]
