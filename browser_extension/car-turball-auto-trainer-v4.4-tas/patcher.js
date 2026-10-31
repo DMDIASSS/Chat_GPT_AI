@@ -11,7 +11,14 @@ export function transformMainSource(source) {
     source.includes('sl=c.getPads();R.onError=');
   const build20261014 = source.includes('D=new ak(Zh.load().botId)') &&
     source.includes('xt=c.getPads();D.onError=');
+  const build20261031 = source.includes('P=new dw(Nd.load().botId)') &&
+    source.includes('jl=c.getPads();P.onError=');
   const maps = {
+    current: {
+      Pc:'bh',ce:'te',ic:'Lc',sk:'dw',Gf:'Zg',te:'Y',Ra:'ln',zn:'po',
+      R:'L',D:'P',De:'He',wr:'_r',xt:'jl',q:'_',St:'vt',Z:'D',j:'v',
+      ke:'be',Oe:'ze',Gt:'zt',se:'ie'
+    },
     latest: {
       Pc:'lh', ce:'ee', ic:'Sc', sk:'Qk', Gf:'k0', te:'Q', Ra:'Ya', zn:'ro',
       R:'P', D:'R', De:'He', wr:'Mr', xt:'sl', q:'$', St:'wt', Z:'D', j:'v',
@@ -19,12 +26,18 @@ export function transformMainSource(source) {
     },
     previous: {Pc:'Ic', ce:'oe', ic:'sc', sk:'ak', Gf:'Df', te:'ee', Ra:'Pa', zn:'Vn'}
   };
-  const names = build20261015 ? maps.latest : build20261014 ? maps.previous : {};
+  const names = build20261031 ? maps.current : build20261015 ? maps.latest : build20261014 ? maps.previous : {};
   const fragment = text => text.replace(
-    /\b(Pc|ce|ic|sk|Gf|te|Ra|zn|De|wr|xt|St|ke|Oe|Gt|R|D|q|Z|j)\b/g,
+    /\b(Pc|ce|ic|sk|Gf|te|Ra|zn|De|wr|xt|St|ke|Oe|Gt|R|D|q|Z|j|se)\b/g,
     name => Object.hasOwn(names, name) ? names[name] : name
   );
-  const signatures = build20261015 ? [
+  const signatures = build20261031 ? [
+    'class dw{','class Zg{',
+    'He=51,oh=8,ln=8,po=L.CARS+ln*He',
+    'Y={throttle:0,steer:0,pitch:0,yaw:0,roll:0,jump:!1,boost:!1,handbrake:!1}',
+    'let ie=new Xm(c.ballRadius,s,t)',
+    'L={TICK:0,GOAL:1,NUM_CARS:2,NUM_PADS:3,BALL:4,CARS:22}'
+  ] : build20261015 ? [
     'class Qk{', 'class k0{',
     'He=51,Xc=8,Ya=8,ro=P.CARS+Ya*He',
     'Q={throttle:0,steer:0,pitch:0,yaw:0,roll:0,jump:!1,boost:!1,handbrake:!1}'

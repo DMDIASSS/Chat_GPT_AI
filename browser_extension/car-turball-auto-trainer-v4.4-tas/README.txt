@@ -1,37 +1,48 @@
-TURBALL UPDATE STATUS — 4.5.2 CAPTURE / DIAGNOSTICS UPDATE
+CAR SOCCER COMPATIBILITY UPDATE — 4.5.3
 
-The supplied website is release 98f9b3003e60-41220884867-1. Its lobby
-chunk-DLWGG6LS.js imports gameplay from chunk-KALAXRXF.js. The supplied
-HAR contains the lobby but no request/response for that gameplay module.
-Direct retrieval of turball.io is blocked in the development environment.
-The gameplay patch therefore remains UNVERIFIED for this new release.
-This update does not claim to make the new game's AI/TAS adapter compatible.
+The uploaded Car Soccer HAR includes the full main-B95SF9Gf.js gameplay
+bundle (SHA256 605448d5ef0bbff6a014fe723702875f925145220223392a0c5501f4306ca96b).
+This release adds its verified variable bindings for AI, TAS, state fields,
+rendered ball, all six offline physics hooks and multiplayer bot helpers.
+The original multiplayer tick expression and native physics factory remain
+unchanged. The previously supported main-DVUMtcmY.js still passes its checks.
 
-To obtain the one missing file without exporting another HAR:
-1. Update files INSIDE your existing unpacked extension folder. Keep its
-   directory/extension ID, imported models and existing private .bin files.
-2. Reload the extension at chrome://extensions; close DevTools on the game tab.
-3. Open Turball, click Enable + reload in the extension popup, then Free Play.
-4. Reopen the extension popup. Click Save gameplay JS and upload that .js file.
-   The expected current filename is chunk-KALAXRXF.js; future releases may
-   change it. Save diagnostics is an optional, smaller connection report.
-5. A grey Save gameplay JS button means the gameplay module has not yet been
-   captured. Enter Free Play after enabling/reloading, then reopen the popup.
+INSTALL: copy these files INSIDE your existing unpacked extension folder,
+keeping that same folder/extension ID and existing private model binaries.
+Reload it at chrome://extensions, then reload https://car-soccer.com/.
+Use Enable + reload if necessary. Confirm version 4.5.3 in the popup.
+Use F7 to select an existing model or TAS; F8 returns control.
+No model re-import or retraining is required by this compatibility change.
 
-An unsupported module is passed through unchanged so the game can still load.
-Captures remain in this browser session until a new scan or tab close; they
-survive a background worker restart. Nothing is uploaded automatically.
-Connection reports contain public asset paths/hashes/status, not HAR headers,
-cookies, account data or the full game source. Exports require a popup click.
-No new extension permissions are requested. Existing Car Soccer features and
-model storage are retained. The source-only ZIP does not include game assets,
-uploaded HTML/HAR files or private model binaries.
+VERIFIED: actual new bundle transformation/syntax, injected runtime and visual
+bindings, AI controls/neutral restoration, TAS tick order, fun-control hotkeys,
+async cancellation, model storage and UI fixtures. The actual new embedded
+WASM physics passes synthetic-floor TAS restore/ticks, boost, jumps, both-team
+goals, steering, powerslide, combined effects and speed tests. These checks
+are not a live multiplayer or full-arena recording-success measurement.
+Full-page offline replay cannot reproduce the original service-worker startup
+from these saved files; no live match was played.
 
-CAR SOCCER + TURBALL AI TRAINER 4.5.2
+TURBALL STATUS: your earlier Turball HAR still lacks chunk-KALAXRXF.js,
+referenced by lobby chunk-DLWGG6LS.js in release 98f9b3003e60-41220884867-1.
+New Turball gameplay compatibility is NOT verified. Its old strict patch is
+retained and unsupported builds are passed through unchanged.
+Enable + reload on Turball, enter Free Play, reopen the popup and click
+Save gameplay JS. Upload that saved .js to complete the Turball adaptation.
+Save diagnostics is optional. Captures stay in session storage until a new
+scan or tab close, survive worker sleep, and are never auto-uploaded.
+Only the extension popup can export gameplay source. The smaller connection
+report omits gameplay source, HAR data, cookies and account information.
+
+No game HTML/JS/WASM assets, HARs, account data or model weights are bundled.
+The separate SingleFile HTML snapshot has no executable gameplay scripts;
+its archive-only security policy is not changed by this extension.
+
+CAR SOCCER + TURBALL AI TRAINER 4.5.3
 ===================================
 
 NEW: Car Soccer fun controls. Read FUN_CONTROLS.md for keys and host/local scope.
-4.5.2 fixes steering with effects enabled and adds friend-hosted controls.
+4.5.3 fixes steering with effects enabled and adds friend-hosted controls.
 Both players update; the host enables "Allow friend controls", then the joining
 player clicks "Connect to friend's host". The friend keeps hosting normally.
 TAS playback and minimize/restore are retained; see TAS_README.md.
@@ -63,7 +74,7 @@ The patchers must NOT be interchanged: each targets different minified code.
 INSTALLATION
 1. Extract the ZIP. Do not load the ZIP itself.
 2. In Chrome, open chrome://extensions and enable Developer mode.
-3. Choose "Load unpacked" and select Car_Turball_Auto_Trainer_v4.5.2,
+3. Choose "Load unpacked" and select Car_Turball_Auto_Trainer_v4.5.3,
    the directory containing manifest.json.
 4. Disable/remove the previous separate AI trainer extensions before
    using this one; multiple extensions trying to patch the same page can

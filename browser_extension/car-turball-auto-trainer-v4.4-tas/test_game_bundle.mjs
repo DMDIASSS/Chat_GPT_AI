@@ -6,7 +6,8 @@ import {transformMainSource} from './patcher.js';
 const original=fs.readFileSync(process.argv[2],'utf8');
 const patched=transformMainSource(original);
 const latest=original.includes('R=new Qk(kd.load().botId)');
-const runtime=patched.slice(patched.indexOf('const __GCT4_KICKOFF='),patched.lastIndexOf(latest?'R.onError=':'D.onError='));
+const current=original.includes('P=new dw(Nd.load().botId)');
+const runtime=patched.slice(patched.indexOf('const __GCT4_BALL_VISUAL='),patched.lastIndexOf(current?'P.onError=':latest?'R.onError=':'D.onError='));
 assert.ok(runtime.length>10000);
 const neutral={throttle:0,steer:0,pitch:0,yaw:0,roll:0,jump:false,boost:false,handbrake:false};
 const state=new Float32Array(500);state[2]=1;state[6]=92;state[23]=-4608;state[24]=17;state[41]=1;state[40]=33;
@@ -19,11 +20,15 @@ class FakeNative {
   step(){return {...neutral,throttle:1,steer:0.75};}
 }
 const shared={
+ requestAnimationFrame(){},se:{ball:{visible:false},customMapActive:false},ie:{ball:{visible:false},customMapActive:false},
  window:{postMessage:m=>posts.push(m),addEventListener:()=>{}},document:{addEventListener(){}},location:{origin:'https://car-soccer.com'},
  d:false,m:null,h:0,A:{playerTeam:0,botTeam:1},M:{POS:0,FWD:3,UP:9,VEL:12,ANG_VEL:15,BOOST:18,ON_GROUND:19,DEMOED:21,HAS_FLIP_OR_JUMP:22},
  c:{state,setControls:(slot,controls)=>applied.push({slot,...controls})},performance,clearTimeout,setTimeout
 };
-const context=vm.createContext(latest?{
+const context=vm.createContext(current?{
+ ...shared,dw:FakeNative,Zg:class{},Y:neutral,L:physics,He:51,ln:8,po:430,
+ jl:[],_:{state:{mode:'match'}},vt:{boostOption:'normal'},D:null
+}:latest?{
  ...shared, Qk:FakeNative,k0:class{},Q:neutral,P:physics,He:51,Ya:8,ro:430,
  sl:[],$:{state:{mode:'match'}},wt:{boostOption:'normal'},D:null
 }:{
@@ -55,4 +60,9 @@ brain.restoreOnlineProvider();assert.equal(session.readControls,originalRead);
 const hot='this.tick++,this.spectator||(this.controls[this.carSlot]={...this.readControls()}),this.peer.host?';
 assert.equal(patched.split(hot).length,original.split(hot).length);
 assert.equal(patched.split('__GCT4.stepOffline(),c.step(1)').length-1,6);
+if(current){
+  assert.throws(()=>transformMainSource(original.replace('He=51,oh=8,ln=8,po=L.CARS+ln*He','He=52,oh=8,ln=8,po=L.CARS+ln*He')),/Unsupported game build/);
+  const start=original.indexOf('async function lg('),end=original.indexOf('const bn=[',start);
+  assert(patched.includes(original.slice(start,end)),'Native physics factory changed');
+}
 console.log('PASS: uploaded bundle hooks, runtime startup, state observation, scripted kickoff, neural handoff, neutral restore, online provider restore.');

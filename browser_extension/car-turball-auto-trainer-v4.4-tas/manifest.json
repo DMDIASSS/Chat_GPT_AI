@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Car Soccer + Turball AI Trainer",
-  "version": "4.5.2",
-  "description": "AI models and TAS playback, with public gameplay capture and connection diagnostics for Turball updates. Current new Turball gameplay patch awaits its module.",
+  "version": "4.5.3",
+  "description": "AI models, TAS and local/host fun controls updated for Car Soccer main-B95SF9Gf; includes local capture for unsupported Turball builds.",
   "permissions": [
     "debugger",
     "tabs",

@@ -28,14 +28,15 @@ for(const site of ['car-soccer','turball']) {
     location:{origin:`https://${site==='turball'?'turball.io':'car-soccer.com'}`},performance,setTimeout,clearTimeout,
     Float32Array,ArrayBuffer,DataView,console};
   const latest=carSource.includes('R=new Qk(kd.load().botId)');
+  const current=carSource.includes('P=new dw(Nd.load().botId)');
   const globals=site==='turball'?{r:env.sim,k:env.fields,N:51,h:0,u:null,w:[{team:0},{team:1}],x:null,o:{playerTeam:0},
     d:{state:{mode:'freeplay'}},Le:{boostOption:'normal'},g:{customMapActive:false},wi:Native,ut:neutral}:
     {d:false,m:null,c:env.sim,h:0,A:{playerTeam:0,botTeam:1},M:{BOOST:18},
-      ...(latest?{Qk:Native,Q:neutral,P:env.fields,He:51,Ya:8,ro:430,sl:[],$:{state:{mode:'freeplay'}},wt:{boostOption:'normal'},D:null,k0:class{}}:
+      ...(current?{dw:Native,Zg:class{},Y:neutral,L:env.fields,He:51,ln:8,po:430,jl:[],_:{state:{mode:'freeplay'}},vt:{boostOption:'normal'},D:null}:latest?{Qk:Native,Q:neutral,P:env.fields,He:51,Ya:8,ro:430,sl:[],$:{state:{mode:'freeplay'}},wt:{boostOption:'normal'},D:null,k0:class{}}:
         {sk:Native,te:neutral,R:env.fields,De:51,Ra:8,zn:430,xt:[],q:{state:{mode:'freeplay'}},St:{boostOption:'normal'},Z:null,Gf:class{}})};
   const context=vm.createContext({...shared,...globals});
   const patched=(site==='turball'?turballPatch:carPatch)(site==='turball'?turballSource:carSource);
-  const code=patched.slice(patched.indexOf(site==='turball'?'const __GCT4_CHANNEL=':'const __GCT4_KICKOFF='),site==='turball'?patched.indexOf('\nconst ti='):patched.lastIndexOf(latest?'R.onError=':'D.onError='));
+  const code=patched.slice(patched.indexOf(site==='turball'?'const __GCT4_CHANNEL=':'const __GCT4_KICKOFF='),site==='turball'?patched.indexOf('\nconst ti='):patched.lastIndexOf(current?'P.onError=':latest?'R.onError=':'D.onError='));
   vm.runInContext(code,context);const brain=window.__GCTrainerRuntime;
   const dispatch=async command=>{
     for(const fn of listeners.message||[])await fn({source:window,origin:shared.location.origin,

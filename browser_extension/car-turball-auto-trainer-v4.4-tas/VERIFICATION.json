@@ -1,6 +1,6 @@
 {
-  "extension_version": "4.5.2",
-  "release_type": "gameplay capture and diagnostics; new gameplay compatibility blocked",
+  "extension_version": "4.5.3",
+  "release_type": "Car Soccer main-B95SF9Gf compatibility update; Turball capture tools retained",
   "uploaded_site_release": "98f9b3003e60-41220884867-1",
   "loader": "game-IDU5267J.js",
   "lobby": {
@@ -22,12 +22,28 @@
     "fun_controls_and_cooperation": "passed",
     "chromium_tas_picker_minimize_f8_both_hosts": "passed",
     "chromium_model_picker": "passed",
-    "chromium_fun_controls_scope_both_hosts": "passed"
+    "chromium_fun_controls_scope_both_hosts": "passed",
+    "model_nexto_restore": "passed"
   },
   "limitations": [
     "No gameplay response in the uploaded HAR; loader/lobby files are not the gameplay implementation.",
     "Public asset download from turball.io was blocked by this environment (HTTP CONNECT 403).",
     "The old strict Turball patch is retained; unsupported gameplay is passed through unchanged.",
-    "Chromium checks use mocked extension APIs/game runtimes, not a live Turball match."
-  ]
+    "Chromium checks use mocked extension APIs/game runtimes, not a live Turball match.",
+    "New Car Soccer adapter is verified with actual code/native physics and mocked page globals; live multiplayer and full-page service-worker startup remain unverified."
+  ],
+  "car_soccer": {
+    "bundle": "main-B95SF9Gf.js",
+    "sha256": "605448d5ef0bbff6a014fe723702875f925145220223392a0c5501f4306ca96b",
+    "source": "Full response from the newly uploaded HAR; original code stays private",
+    "transform_and_complete_module_syntax": "passed",
+    "runtime_including_rendered_ball_binding": "passed",
+    "unknown_stride_rejected": "passed",
+    "native_physics_factory_unchanged": "passed",
+    "multiplayer_tick_expression_unchanged": "passed",
+    "native_embedded_wasm": "Synthetic-floor TAS restore and 120Hz sequence, own-car boost, both-team goals, repeated flips, speed/displacement, player/opponent left/right steering and powerslide with each and combined effects passed",
+    "previous_main_DVUMtcmY_regression": "passed",
+    "full_page_offline_replay": "Not completed: HAR main-document body absent; SingleFile snapshot lacks scripts and adds archive CSP. Private offline test restored the public module but original service-worker startup cannot complete from the capture.",
+    "live_play_verified": false
+  }
 }

@@ -6,12 +6,13 @@ import assert from 'node:assert/strict';
 import {createTasPlayer} from './tas-player.mjs';
 import {recording} from './test_tas.mjs';
 const source=fs.readFileSync(process.argv[2],'utf8');
-const begin=source.indexOf('async function Fg('),end=source.indexOf('const cn=[',begin);
+const current=source.includes('P=new dw(Nd.load().botId)'),factory=current?'lg':'Fg';
+const begin=source.indexOf('async function '+factory+'('),end=source.indexOf(current?'const bn=[':'const cn=[',begin);
 assert.ok(begin>=0&&end>begin,'Unsupported supplied physics factory');
 const context=vm.createContext({console,window:{},document:{currentScript:null},location:{href:'https://car-soccer.com/'},
   o:(object,name,value)=>Object.defineProperty(object,name,{value,writable:true,enumerable:true,configurable:true}),
   WebAssembly,TextDecoder,TextEncoder,URL,performance,setTimeout,clearTimeout});
-vm.runInContext(source.slice(begin,end).replaceAll('import.meta.url','"https://car-soccer.com/"')+';globalThis.factory=Fg;',context);
+vm.runInContext(source.slice(begin,end).replaceAll('import.meta.url','"https://car-soccer.com/"')+';globalThis.factory='+factory+';',context);
 const mod=await context.factory({noFSInit:true});
 // Synthetic flat floor for pose round trips and tick checks, not a claim that
 // this test recreates the full arena or validates recorded trick outcomes.

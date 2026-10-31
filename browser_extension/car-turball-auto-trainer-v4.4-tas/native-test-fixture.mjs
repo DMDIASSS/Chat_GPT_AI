@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 export async function nativeTestArena(path,cars=2) {
-  const source=fs.readFileSync(path,'utf8'),begin=source.indexOf('async function Fg('),end=source.indexOf('const cn=[',begin);
+  const source=fs.readFileSync(path,'utf8');
+  const current=source.includes('P=new dw(Nd.load().botId)'),factory=current?'lg':'Fg';
+  const begin=source.indexOf('async function '+factory+'('),end=source.indexOf(current?'const bn=[':'const cn=[',begin);
   assert.ok(begin>=0&&end>begin,'Unsupported supplied physics factory');
   const context=vm.createContext({console,window:{},document:{currentScript:null},location:{href:'https://car-soccer.com/'},
     o:(object,name,value)=>Object.defineProperty(object,name,{value,writable:true,enumerable:true,configurable:true}),
     WebAssembly,TextDecoder,TextEncoder,URL,performance,setTimeout,clearTimeout});
-  vm.runInContext(source.slice(begin,end).replaceAll('import.meta.url','"https://car-soccer.com/"')+';globalThis.factory=Fg;',context);
+  vm.runInContext(source.slice(begin,end).replaceAll('import.meta.url','"https://car-soccer.com/"')+';globalThis.factory='+factory+';',context);
   const mod=await context.factory({noFSInit:true});
   const data=new Uint8Array(80),view=new DataView(data.buffer);
   view.setInt32(0,2,true);view.setInt32(4,4,true);

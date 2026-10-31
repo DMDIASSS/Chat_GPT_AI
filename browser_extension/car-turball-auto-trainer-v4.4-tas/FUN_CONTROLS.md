@@ -121,3 +121,7 @@ python test_fun_browser.py
 
 The download excludes model weights, uploaded TAS recordings, HARs, original
 game JavaScript, native engine binaries and original collision assets.
+
+## 4.5.3 compatibility
+
+The main-B95SF9Gf.js adapter passes the same native synthetic-floor boost, jump, goal, speed, steering and combined-effect checks. It retains the old main-DVUMtcmY.js adapter. No live match or service-worker startup was verified from the incomplete offline page capture.

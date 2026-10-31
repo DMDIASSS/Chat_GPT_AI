@@ -5,6 +5,7 @@ import {transformMainSource} from './patcher.js';
 import {fakeEnvironment} from './test_tas.mjs';
 const source=fs.readFileSync(process.argv[2],'utf8'),patched=transformMainSource(source);
 const latest=source.includes('R=new Qk(kd.load().botId)');
+const current=source.includes('P=new dw(Nd.load().botId)');
 const env=fakeEnvironment(),posts=[],listeners={};env.sim.controlsView=new Float32Array(16);env.sim.getPads=()=>[];
 const neutral={throttle:0,steer:0,pitch:0,yaw:0,roll:0,jump:false,boost:false,handbrake:false};
 class Native {reset(){};isReady=false;}
@@ -12,9 +13,9 @@ const window={postMessage:m=>posts.push(m),addEventListener:(key,fn)=>(listeners
 const document={hidden:false,addEventListener:(key,fn)=>(listeners[key]??=[]).push(fn)};
 const context=vm.createContext({window,document,location:{origin:'https://car-soccer.com'},performance,setTimeout,clearTimeout,Float32Array,
   d:false,m:null,c:env.sim,h:0,A:{playerTeam:0,botTeam:1},M:{BOOST:18},
-  ...(latest?{Qk:Native,Q:neutral,P:env.fields,He:51,Ya:8,ro:430,sl:[],$:{state:{mode:'freeplay'}},wt:{boostOption:'normal'},D:null,k0:class{}}:
+  ...(current?{dw:Native,Zg:class{},Y:neutral,L:env.fields,He:51,ln:8,po:430,jl:[],_:{state:{mode:'freeplay'}},vt:{boostOption:'normal'},D:null}:latest?{Qk:Native,Q:neutral,P:env.fields,He:51,Ya:8,ro:430,sl:[],$:{state:{mode:'freeplay'}},wt:{boostOption:'normal'},D:null,k0:class{}}:
     {sk:Native,te:neutral,R:env.fields,De:51,Ra:8,zn:430,xt:[],q:{state:{mode:'freeplay'}},St:{boostOption:'normal'},Z:null,Gf:class{}})});
-vm.runInContext(patched.slice(patched.indexOf('const __GCT4_KICKOFF='),patched.lastIndexOf(latest?'R.onError=':'D.onError=')),context);
+vm.runInContext(patched.slice(patched.indexOf('const __GCT4_KICKOFF='),patched.lastIndexOf(current?'P.onError=':latest?'R.onError=':'D.onError=')),context);
 const brain=window.__GCTrainerRuntime;
 const command=async value=>{for(const fn of listeners.message)await fn({source:window,origin:context.location.origin,data:{source:'__grandchamp_trainer_v4__',from:'ui',...value}});};
 function key(code,extra={}) {

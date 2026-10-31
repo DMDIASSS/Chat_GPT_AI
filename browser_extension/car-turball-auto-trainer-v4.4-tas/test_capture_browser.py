@@ -22,7 +22,7 @@ with sync_playwright() as p:
           message:'Gameplay module needed',expectedGameplay:'/assets/app/chunk-KALAXRXF.js',canSaveGameplay:captured,
           gameplay:captured?{filename:'chunk-KALAXRXF.js',bytes:source.length}:null}};
         if(m.type==='gct-gameplay-source')return {ok:true,filename:'chunk-KALAXRXF.js',source};
-        if(m.type==='gct-diagnostics')return {ok:true,report:{extensionVersion:'4.5.2',scope:'Public asset diagnostics'}};
+        if(m.type==='gct-diagnostics')return {ok:true,report:{extensionVersion:'4.5.3',scope:'Public asset diagnostics'}};
         return {ok:true};}},
       storage:{onChanged:{addListener(){}},local:{get:async()=>({})}}};
     ''')
@@ -36,7 +36,7 @@ with sync_playwright() as p:
     assert download.suggested_filename=='chunk-KALAXRXF.js'
     assert Path(download.path()).read_text()=='export{changed as startGame};'
     with page.expect_download() as pending:page.locator('#save-diagnostics').click()
-    assert json.loads(Path(pending.value.path()).read_text())['extensionVersion']=='4.5.2'
+    assert json.loads(Path(pending.value.path()).read_text())['extensionVersion']=='4.5.3'
     assert not errors,errors
     print('PASS Chromium popup waiting/captured states, gameplay JS and diagnostics downloads; no page errors')
     browser.close()

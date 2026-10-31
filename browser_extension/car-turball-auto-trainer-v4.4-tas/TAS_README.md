@@ -69,7 +69,7 @@ it does not change collision geometry or promise the recorded trick succeeds.
 
 ## Compatibility and validation
 
-- **Car Soccer:** the full supplied `main-DVUMtcmY.js` passes transformation and
+- **Car Soccer:** the supplied `main-B95SF9Gf.js` and earlier `main-DVUMtcmY.js` pass transformation and
   syntax checks. Its actual native WASM engine accepts the saved position,
   rotation, linear/angular velocity and selected boost for all five uploads.
   Every supplied input frame also passes consecutive simulation-step playback to completion. The native test uses a synthetic flat
@@ -99,3 +99,5 @@ node test_nexto_restore.mjs
 python test_tas_browser.py
 python test_picker_browser.py
 ```
+
+4.5.3 update: the current main-B95SF9Gf native engine was checked with the synthetic recording and floor. Earlier all-five-upload results above refer to the prior engine verification; no new full-arena trick-success claim is made.

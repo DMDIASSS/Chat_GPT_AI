@@ -27,7 +27,7 @@ const chrome={storage:{session:storage},
   async attach(){},async detach(){},async sendCommand(_,method,params){calls.push({method,params});return method==='Fetch.getResponseBody'?{body,base64Encoded:false}:{};}},
  tabs:{async get(){return {id:7,url:'https://turball.io/'};},async reload(){},onRemoved:{addListener:fn=>events.remove=fn}},
  webNavigation:{onBeforeNavigate:{addListener:fn=>events.navigate=fn}},
- runtime:{getURL:name=>'chrome-extension://fixture/'+name,getManifest:()=>({version:'4.5.2'}),
+ runtime:{getURL:name=>'chrome-extension://fixture/'+name,getManifest:()=>({version:'4.5.3'}),
   onInstalled:{addListener:fn=>events.install=fn},onMessage:{addListener:fn=>events.message=fn}}};
 const code=fs.readFileSync(new URL('./background.js',import.meta.url),'utf8').replace(/^import .+;\n/gm,'');
 function boot(){vm.runInNewContext(code,{chrome,URL,Uint8Array,TextEncoder,TextDecoder,crypto:webcrypto,atob,btoa,
