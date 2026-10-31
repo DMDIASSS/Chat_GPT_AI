@@ -275,12 +275,13 @@ function Mirror.context(session)
     function rules:availability(kind)
         local supported=KINDS[kind]~=nil or kind=="warship" or Weapons.kinds[kind]~=nil
         local info=ctx.state.owners[ctx.state.local_owner]
+        local unlocked=kind~='scatter' or type(session.has_unlock)=='function' and session:has_unlock('scatter')
         local launcher=Weapons.kinds[kind]==nil or #Weapons.launchers(ctx.state,ctx.state.local_owner,0)>0
         local port=kind~="warship"
         if not port then for _,b in pairs(ctx.state.structures) do
             if b.owner==ctx.state.local_owner and b.kind==1 and b.active_tick<=ctx.state.tick then port=true;break end
         end end
-        return {ok=supported and info.alive and info.spawned and ctx.state.phase==1 and info.gold>=self:cost(kind)
+        return {ok=supported and unlocked and info.alive and info.spawned and ctx.state.phase==1 and info.gold>=self:cost(kind)
             and launcher and port and (kind~="port" or borders:has_coast()),cost=self:cost(kind)}
     end
     function rules:placement(kind,tile)

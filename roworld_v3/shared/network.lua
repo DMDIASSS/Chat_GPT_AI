@@ -44,6 +44,12 @@ function Network:process(row)
         if self.destroyed or row.generation~=self.generation then return end
         local observer=self
         local session={mode=2,_sim=nil,state=state,connected=true}
+        function session:has_unlock(key)
+            if observer.inventoryKnown then return observer.unlocks[key]==true end
+            -- The user explicitly owns Scattershot. This setting permits a
+            -- normal order, never grants an entitlement; the server checks it.
+            return key=='scatter' and observer.declaredScatter==true
+        end
         function session:multiplayer_available() return self.connected and not observer.destroyed end
         function session:send_intent(intent)
             assert(self.state.loaded and self.connected and not observer.destroyed,"Observer is not synchronized")
@@ -66,6 +72,14 @@ end
 function Network:receive(op,...)
     if self.destroyed then return end
     self.packets+=1;self.lastPacket=self.now()
+    if op==32 then
+        local inventory=...
+        if type(inventory)=='table' and type(inventory.unlocks)=='table' then
+            self.inventoryKnown=true;self.unlocks={}
+            for _,key in pairs(inventory.unlocks) do if type(key)=='string' then self.unlocks[key]=true end end
+        end
+        return
+    end
     if op==24 then
         self.generation+=1;table.clear(self.queue)
         self.closed=true;self:invalidate("Match closed; join a multiplayer match");return
@@ -135,6 +149,7 @@ function Network:poll()
 end
 function Network:diagnostics()
     return "network_packets="..self.packets.."\nnetwork_status="..self.status.."\nnetwork_error="..tostring(self.error or "none")
+        ..'\nscatter_unlock_source='..(self.inventoryKnown and 'server inventory' or self.declaredScatter and 'user-declared ownership; server validates' or 'not enabled')
 end
 function Network:destroy()
     self.destroyed=true;self.generation+=1;table.clear(self.queue)

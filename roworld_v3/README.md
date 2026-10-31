@@ -1,7 +1,7 @@
-# RoWorld 3.1 — experimental independent observation agent
+# RoWorld 3.2 — experimental independent observation agent
 
 **Play now:** paste the complete [`RoWorld_V3.lua`](RoWorld_V3.lua) into JJSploit,
-execute in a multiplayer RoWorld match, then press **Start bot**. Confirm **3.1.0**
+execute in a multiplayer RoWorld match, then press **Start bot**. Confirm **3.2.0**
 in the panel. Extract the ZIP anywhere. No Python, model download or training is
 required for the built-in policy. Re-execution stops the previous v2/v3 instance.
 The friends toggle, F6, match-report button and ordinary multiplayer connection
@@ -19,12 +19,67 @@ There are two policy modes:
 
 - **Built-in policy:** immediately playable, chooses among scored, legal RoWorld
   proposals. This is the default download, without neural weights.
-- **Learned residual policy:** an optional 9,250-parameter actor–critic re-ranks
+- **Learned residual policy:** an optional 9,282-parameter actor–critic re-ranks
   those same proposals. PPO training, self-play workers, checkpoint resume,
   evaluation and a standalone Luau export are included. There is **no trained
   multiplayer champion bundled**. OpenFront checkpoints are incompatible.
 
-## New in 3.1: tactical donations and opportunistic treaty breaks
+## New in 3.2: coastal economy, defended core and Scattershot salvos
+
+- **Continuous construction:** ports and cities remain useful investment
+  candidates throughout a rich match. One-second construction/fleet cooldowns
+  replace the old small-fleet and declining economic priorities. Current gold,
+  prices, placement, reserve funding and safe land still limit spending.
+- **Factories:** at a coastal start, make only a small early investment (the
+  first two minutes, at most two levels); subsequently prioritize ports. Without
+  owned coastal access, factories remain the income fallback.
+- **Protected infrastructure:** productive buildings retain their interior
+  setback and fallout/flight avoidance. SAMs proactively cover the economic core,
+  with two interception slots per asset in peace and a seven-slot overlapping
+  target after observing hostile silos or incoming missiles. This is a coverage
+  target, not proof of immunity. Sites and existing upgrades rotate through a
+  bounded search, including coast-specific probes.
+- **Coastal fleet:** the target force grows with ports, coast and enemy naval
+  pressure, up to 32 warships. Spread healthy ships across connected-water defense
+  zones and intercept visible threats. Damaged/retreating ships keep repairing;
+  new orders are checked for matching water bodies. Warships protect accessible
+  coast, so an inland holding cannot have a literal ring of ships.
+- **Several launch slots:** fund up to six silo levels when the economy can
+  afford the launch ammunition. Launcher upgrades use the native `upgrade_sid`
+  destination as well as the observer's upgrade flag.
+- **Owned Scattershot:** the new toggle defaults ON because you said you own it.
+  Native client availability and observed inventory are respected. If the
+  independent observer attached after the inventory message, your declared
+  ownership permits ordinary launch attempts; a later inventory message takes
+  precedence. The server still validates every order. No unlock is granted or
+  purchased by the script.
+- **Real weapon rules:** the supplied game code charges **3,750,000 gold** for
+  Scattershot (displayed as roughly 3.8M), regardless of previous launches. It
+  launches the main missile plus 4–6 smaller warheads. MIRV keeps its separate,
+  globally escalating price. Native rule costs are re-read at send time.
+- **SAM suppression:** estimate interception opportunities from levels, shots,
+  construction times, trajectory and the 90-tick reload, including third-party
+  and launch-side SAMs. Use a fully funded 1–6-launch salvo, at one launch per
+  one-second decision, when current launcher capacity and asset value support it.
+  Offset single-shot aims so child warheads can hit a SAM rather than all landing
+  outside it. This estimate is uncertain: child locations are random, and new
+  enemy actions or unobserved rapid reload can change interception outcomes.
+- **Reassessment:** recheck allies/friends, spread collateral, fallout, price,
+  available launch slots and the entire remaining ammunition budget before each
+  shot. Stop if the objective SAM disappears or changes owner, defenses increase,
+  funding is lost, or the plan expires. Wait for the strike result before planning
+  another suppression salvo against the same SAM. Ordinary atom/hydrogen/MIRV
+  strikes still compare target value and avoid duplicate flights.
+- **Reports:** `economy_plan`, `naval_plan`, `missile_assessments`,
+  `active_scatter_salvo` and `last_scatter_salvo` show these decisions locally.
+
+**No training is needed.** Extract this update anywhere, replace the complete
+`RoWorld_V3.lua`, execute it once and press **Start bot**. Confirm **3.2.0**.
+The observation schema is now `roworld-observation-v2` with 49 action features.
+Old 3.0/3.1 learned JSON weights have a different shape and are rejected; preserve
+those checkpoints and start a new training run if you want a new learned policy.
+
+## Retained from 3.1: tactical donations and opportunistic treaty breaks
 
 - Ordinary treaty allies can receive a calculated troop grant for an observed
   attack or a nearby counter against an overcommitted attacker. The target must
@@ -57,9 +112,9 @@ There are two policy modes:
 
 These are conservative public-state estimates, not proof of hidden intent or a
 guaranteed profit. No training is required to use the new built-in decisions.
-Previously exported learned scripts must be rebuilt with the updated code to gain
-these functions. For ongoing training after updating, use a new run directory
-with `--init` from the previous JSON, as described below.
+The current 3.2 built-in script includes these functions. Preserve old learned
+exports; their schema differs from 3.2. Within schema v2, future curriculum
+transfers can use a new run directory with `--init`, as described below.
 
 ## What was adapted
 
@@ -75,16 +130,16 @@ license file; this is an independent implementation of those ideas.
 |---|---|
 | Map | Actual `W`, `H`, `k_lin`, terrain bytes, impassable cells, coast and connected water bodies. Local 5×5 and coarse 4×4 current ownership/passability/fallout samples. Candidate destinations are precise tiles. |
 | Exact facts | Public player banks/capacity/gold/income, player kind, team IDs, formal alliance graph, pending requests/expiry, attacks, unit health/routes, missile flights and reload stamps. These are read directly. |
-| Learned input | 204 context values and 48 values per candidate: globals, map samples, eight recent command/result values, action identity, target relationships, allied army strength, costs, quantities and risk. Full raw public rows are also in reports. |
+| Learned input | 204 context values and 49 values per candidate: globals, map samples, eight recent command/result values, action identity, target relationships, allied army strength, costs, quantities and risk. Full raw public rows are also in reports. |
 | Model | Small shared candidate scorer and value head, with the built-in score as a prior. No spatial autoencoder or LSTM; no learned reconstruction of diplomacy. It can only choose among the generated proposals. |
 | Troops | Real global bank/capacity, approximate recruitment from RoWorld's formula, existing armies subtracted from reinforcement. Game minimum is 1% of home troops. |
 | Counters | Reckless live attacker: its army against us exceeds 1.5× its home bank. Proportional funding retains at least `ceil(0.42 × capacity)`, strategic reserves and 1.5× incoming troops. Combat can still reduce the bank below that floor. |
 | Countries/tribes/humans | Separate features and priorities; country treasury and useful assets affect targets. Private country grace/jitter/difficulty are not claimed as visible or as immunity. |
 | Diplomacy | Actual expiry/renewal window, observed betrayals and uncertain display-name profiles, useful human/friend partnerships, permanent teams, pending-peace stand-down and limited allied troop aid. Strong treaty allies increase reserves without an automatic declaration of war. |
-| Buildings | Current costs/placement/upgrade destination, interior setback, fallout/strike avoidance, concentration cost, productive investment and a rolling three-post cap. |
-| Navy | Legal connected-water transports, useful water crossings, redundant neighboring landings excluded, open landing room and nearby human strength considered, one expedition at sea, 10% neutral survival expedition under overwhelming land attack, own warship construction/interception, damaged-ship repair respected. |
-| Missiles | Atom/hydrogen/MIRV, real cost escalation/reloads, hostile SAM trajectories, friendly/friend blast protection, valuable clusters, duplicate-strike avoidance and flight alerts. MIRV warheads are not assumed SAM-immune. |
-| Omitted OpenFront actions | No invented embargo, gold donation, unit deletion or boat-cancellation protocol. Other RoWorld arsenal types, paid unlocks and reinforce are not automated. |
+| Buildings | Continuous coastal/inland investment, current costs and native upgrade destinations, interior setback, fallout/strike avoidance, overlapping SAM protection and a rolling three-post cap. |
+| Navy | Legal connected-water transports, useful landings, one expedition at sea and a bounded survival expedition. Scaling coastal warship construction, defensive dispersal and interception; damaged-ship repair respected. |
+| Missiles | Atom/hydrogen/MIRV and owned Scattershot; funded suppression salvos, real costs/reloads, SAM trajectories/capacity, full spread collateral protection, cluster value, duplicate avoidance and flight alerts. MIRV warheads remain interceptable. |
+| Omitted OpenFront actions | No invented embargo, gold donation, unit deletion or boat-cancellation protocol. Arsenal purchases, other weapon types and reinforce are not automated. |
 
 Proposals first satisfy current game checks and explicit reserve/friendship/risk
 filters. Those safety filters are distinct from legality; training is deliberately
@@ -188,7 +243,15 @@ python tests\run.py --luau tools\luau.exe --compiler tools\luau-compile.exe
 .venv\Scripts\python.exe tests\test_learning.py --luau tools\luau.exe
 ```
 
+Optional checks against your privately prepared original engine:
+
+```bat
+python tests\check_original_military.py --engine private\engine.json --luau tools\luau.exe
+```
+
 See [`VERIFICATION.json`](VERIFICATION.json) for the recorded engineering tests.
+The isolated Scattershot trials are not multiplayer wins or a guarantee against
+real opponents. The live JJSploit build has not been exercised here.
 This release has an executable learning pipeline, not a demonstrated multiplayer
 strength improvement over v2.4. Training maps are small synthetic layouts and the
 current candidate generator is intentionally bounded. Harder water/self-play

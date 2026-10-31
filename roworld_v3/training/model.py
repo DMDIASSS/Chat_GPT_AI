@@ -4,8 +4,8 @@ from pathlib import Path
 import torch
 from torch import nn
 
-SCHEMA = "roworld-observation-v1"
-CONTEXT, ACTION, HIDDEN = 204, 48, 32
+SCHEMA = "roworld-observation-v2"
+CONTEXT, ACTION, HIDDEN = 204, 49, 32
 
 
 class Model(nn.Module):
@@ -39,7 +39,7 @@ class Model(nn.Module):
     def load_json(self, path):
         weights = json.loads(Path(path).read_text(encoding="utf8"))
         if weights.get("version") != 1 or weights.get("schema") != SCHEMA:
-            raise ValueError("Only RoWorld v3 JSON weights are compatible")
+            raise ValueError("Only RoWorld 3.2 schema-v2 JSON weights are compatible")
         with torch.no_grad():
             for name in ("context", "action", "fusion", "score", "value"):
                 layer = getattr(self, name)

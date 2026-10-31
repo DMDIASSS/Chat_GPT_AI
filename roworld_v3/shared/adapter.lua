@@ -140,7 +140,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 3.1.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 3.2.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -303,6 +303,16 @@ function Adapter:send(action, frame)
         elseif kind == "build" or kind == "nuke" then
             if not tileValid(live, intent.tile) or not rules:availability(intent.kind).ok then return false, "Building or weapon is not ready" end
             if not rules:placement(intent.kind, intent.tile).ok then return false, "Placement changed" end
+            local cost=rules:cost(intent.kind)
+            local salvo=(action.plan or {}).salvo
+            local committed=salvo and (salvo.remaining or 1)*cost or cost
+            if (live.info.gold or 0)-committed<(action.gold_reserve or 0) then return false,'Preserving construction or complete salvo funding' end
+            if action.cost and cost>action.cost then return false,'Purchase price increased; recalculating' end
+            if salvo and (s.tick>salvo.deadline or salvo.remaining<=0) then return false,'Salvo expired or completed' end
+            if salvo and salvo.objective_sid then
+                local objective=s.structures[salvo.objective_sid]
+                if not objective or objective.owner~=salvo.objective_owner then return false,'Suppression objective disappeared or changed owner' end
+            end
             if kind=="build" and action.safety then
                 if Weapons.hazard(s,intent.tile,action.safety.margin) then return false,"Incoming strike threatens the construction site" end
                 local map=live.map;local x,y=intent.tile%map.W,intent.tile//map.W
@@ -319,7 +329,7 @@ function Adapter:send(action, frame)
                 end
             end
             if kind == "nuke" then
-                local allowed,reason=Weapons.canLaunch(s,me,intent.tile,intent.kind)
+                local allowed,reason=Weapons.canLaunch(s,me,intent.tile,intent.kind,salvo)
                 if not allowed then return false,reason end
             end
         elseif kind=='donate' then
@@ -381,6 +391,10 @@ function Adapter:send(action, frame)
             if not u or u.owner~=me or u.kind~=2 or u.state~=0 or not tileValid(live,intent.tile)
                 or type(live.map.is_water)~="function" or not live.map:is_water(intent.tile) then return false,"Warship order is no longer valid" end
             if u.max_hp>0 and u.hp<u.max_hp*.8 then return false,"Letting the warship retreat and repair" end
+            local body=live.map.water_body_of or live.map.body_of
+            local path=u.path or {};local i=math.clamp(math.floor(math.max(0,s.tick-(u.start_tick or s.tick))*100/math.max(1,u.ticks_per_tile_x100 or 100))+1,1,math.max(1,#path))
+            local current=path[i] or u.patrol_tile
+            if body and (not tileValid(live,current) or body(live.map,current)~=body(live.map,intent.tile)) then return false,'Warship destination is in a different water body' end
         else
             return false, "Unsupported order type: " .. tostring(kind)
         end

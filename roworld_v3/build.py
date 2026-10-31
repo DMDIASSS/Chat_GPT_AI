@@ -11,13 +11,13 @@ MODULES = (("Weapons", "shared/weapons.lua"), ("Coalition", "shared/coalition.lu
            ("Adapter", "shared/adapter.lua"), ("Wire", "shared/wire.lua"),
            ("Mirror", "shared/mirror.lua"), ("Network", "shared/network.lua"),
            ("Schema", "schema.lua"), ("Geography", "geography.lua"), ("Observe", "observe.lua"),
-           ("Actions", "actions.lua"), ("Neural", "neural.lua"), ("Agent", "agent.lua"))
+           ("Infrastructure", "infrastructure.lua"), ("Navy", "navy.lua"), ("Arsenal", "arsenal.lua"), ("Actions", "actions.lua"), ("Neural", "neural.lua"), ("Agent", "agent.lua"))
 
 
 def validate_weights(weights):
-    if not isinstance(weights, dict) or weights.get("schema") != "roworld-observation-v1" or weights.get("version") != 1:
-        raise ValueError("Only RoWorld v3 model JSON is compatible; OpenFront weights cannot be used")
-    for name, (rows, cols) in {"context": (32, 204), "action": (32, 48), "fusion": (32, 32), "score": (1, 32), "value": (1, 32)}.items():
+    if not isinstance(weights, dict) or weights.get("schema") != "roworld-observation-v2" or weights.get("version") != 1:
+        raise ValueError("Only RoWorld 3.2 schema-v2 JSON is compatible; older/OpenFront weights cannot be used")
+    for name, (rows, cols) in {"context": (32, 204), "action": (32, 49), "fusion": (32, 32), "score": (1, 32), "value": (1, 32)}.items():
         layer = weights.get(name, {})
         w, b = layer.get("w", []), layer.get("b", [])
         if len(w) != rows or len(b) != rows or any(not isinstance(row, list) or len(row) != cols for row in w):
@@ -55,7 +55,7 @@ def modules_source():
 
 
 def source(weights=None):
-    header = "-- RoWorld 3.1.0 | independent observation / candidate policy\n"
+    header = "-- RoWorld 3.2.0 | independent observation / candidate policy\n"
     header += "-- No OpenFront weights; no external runtime downloads.\n"
     return header + modules_source() + "\nlocal ModelWeights=" + literal(weights) + "\nlocal Policy=Agent\n" + (ROOT / "client.lua").read_text(encoding="utf8")
 

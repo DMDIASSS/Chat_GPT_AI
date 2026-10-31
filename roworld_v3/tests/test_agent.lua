@@ -22,7 +22,7 @@ end
 test('new policy acts on public state without an old policy module or trained weights',function()
     local f=world();local p=Agent.new();local a=assert(p:decide(f))
     assert(a.kind=='expand' and p.weights==nil and #p.observation.context==204)
-    for _,c in ipairs(p.candidates) do assert(#c.features==48) end
+    for _,c in ipairs(p.candidates) do assert(#c.features==49) end
 end)
 test('observation preserves exact public relationships, banks and attack identifiers',function()
     local f=world();f.state.allied[1026]=true;f.state.requests[2049]=10
@@ -30,7 +30,7 @@ test('observation preserves exact public relationships, banks and attack identif
     local p,o=prepared(f)
     assert(o.diplomacy[2].allied and o.diplomacy[2].incoming_request)
     assert(o.players[2].troops==1000 and o.attacks[1].id==7 and o.incoming==4321)
-    assert(#Schema.globals==32 and #Schema.types+#Schema.arguments==48)
+    assert(#Schema.globals==32 and #Schema.types+#Schema.arguments==49)
 end)
 test('candidate troop allocation is proportionate and retains 42 percent capacity for counters',function()
     local f=world();f.set(393,2);f.state.attacks[3]={attacker=2,target=1,troops=4000}
@@ -161,7 +161,7 @@ test('campaign budgets and deadlines do not reset with reinforcement',function()
 end)
 test('new report exposes candidate ranks and exact observation scope without claiming trained strength',function()
     local f=world();local p=Agent.new();p:decide(f);local r=p:report()
-    assert(r.version=='3.1.0' and r.schema==Schema.version and #r.candidates>0 and not r.competitive_strength_verified)
+    assert(r.version=='3.2.0' and r.schema==Schema.version and #r.candidates>0 and not r.competitive_strength_verified)
     assert(r.policy:find('no trained model') and #r.context==204 and r.exact_diplomacy)
 end)
 print('V3 AGENT SCENARIOS',n)

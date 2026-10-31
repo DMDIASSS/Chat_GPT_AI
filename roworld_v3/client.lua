@@ -21,7 +21,7 @@ local parent = type(gethui) == "function" and gethui() or Services.CoreGui
 local attached = pcall(function() gui.Parent = parent end)
 if not attached then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
 local panel = Instance.new("Frame")
-panel.Size = UDim2.fromOffset(410, 318)
+panel.Size = UDim2.fromOffset(410, 354)
 panel.Position = UDim2.new(1, -426, 0, 60)
 panel.BackgroundColor3 = Color3.fromRGB(20, 29, 42)
 panel.BorderSizePixel = 0
@@ -37,7 +37,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 3.1.0 | observation agent"
+title.Text = "RoWorld 3.2.0 | observation agent"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -102,6 +102,11 @@ local friendsCorner=corner:Clone();friendsCorner.Parent=friendsButton
 api.helpFriends=not previous or previous.helpFriends~=false
 local function paintFriends() friendsButton.Text="Help Roblox friends: "..(api.helpFriends and "ON" or "OFF") end
 paintFriends()
+local scatterButton=friendsButton:Clone()
+scatterButton.Name='ScatterToggle';scatterButton.Position=UDim2.fromOffset(12,310);scatterButton.Parent=panel
+api.useScatter=not previous or previous.useScatter~=false
+local function paintScatter() scatterButton.Text='Use owned Scattershot: '..(api.useScatter and 'ON' or 'OFF') end
+paintScatter()
 local function repaint(message)
     if not api.alive then return end
     button.Text = api.enabled and "Stop bot" or "Start bot"
@@ -126,6 +131,7 @@ local adapter = Adapter.new(Services, require, nil, {
 adapter.network = Network.new(Services,Wire,Mirror,os.clock,task.spawn,function() task.wait() end,function(bytes)
     return game:GetService("EncodingService"):DecompressBuffer(bytes,Enum.CompressionAlgorithm.Zstd)
 end)
+adapter.network.declaredScatter=api.useScatter
 local reported
 function api.diagnostics() return adapter:diagnostics() end
 local function reportAccessFailure()
@@ -185,6 +191,11 @@ table.insert(api.connections,friendsButton.Activated:Connect(function()
     api.helpFriends=not api.helpFriends;policy.cooperation.enabled=api.helpFriends
     if policy.state then policy.cooperation:update({state=policy.state,me=policy.me,info=policy.state.owners[policy.me]}) end
     paintFriends()
+end))
+table.insert(api.connections,scatterButton.Activated:Connect(function()
+    api.useScatter=not api.useScatter;adapter.network.declaredScatter=api.useScatter
+    if not api.useScatter then policy.salvoPlan=nil end
+    paintScatter()
 end))
 local runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
 local function updateStats()
@@ -277,6 +288,8 @@ task.spawn(function()
                 -- from user input. Keep that same heartbeat while autoplay is on.
                 if type(frame.session.note_activity) == "function" then frame.session:note_activity() end
                 local started=os.clock()
+                frame.useScatter=api.useScatter
+                runtime.use_owned_scattershot=api.useScatter
                 policy.cooperation.enabled=api.helpFriends
                 policy.cooperation:setRoster(roster)
                 local action, waiting = policy:decide(frame)

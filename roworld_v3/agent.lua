@@ -21,6 +21,7 @@ function Agent:reset(frame)
     self.lastSentAt,self.lastSentKind,self.pending,self.lastRejected,self.lastWaiting=nil,nil,nil,nil,nil
     self.blocked=false
     self.supportProjects={};self.tacticalAssessments={};self.betrayalPlan=nil;self.betrayalHistory={}
+    self.salvoPlan=nil;self.lastSalvo=nil;self.strikeCooldowns={};self.suppressionCooldowns={};self.missileAssessments={};self.economyPlan=nil;self.navalPlan=nil
     self.metrics={orders=0,peakLand=frame.info.tiles or 0};self.profiles:start(frame);self.recorder=Recorder.new(frame)
     self.allianceSeq=frame.state.alliance_seq or 0;self.missileHistory={};self.missilesSeen={}
 end
@@ -36,6 +37,8 @@ function Agent:prepare(frame)
         end
     end
     self.allianceSeq=frame.state.alliance_seq or 0
+    for key,untilTick in pairs(self.strikeCooldowns) do if untilTick<=frame.state.tick then self.strikeCooldowns[key]=nil end end
+    for key,untilTick in pairs(self.suppressionCooldowns) do if untilTick<=frame.state.tick then self.suppressionCooldowns[key]=nil end end
     if self.betrayalPlan then
         local p=self.betrayalPlan;local target=frame.state.owners[p.target]
         if not target or not target.alive or frame.now>=p.deadline or self.cooperation:isFriend(p.target) then
@@ -112,6 +115,11 @@ function Agent:sent(action,now)
         self.betrayalPlan={target=intent.target,created=now,deadline=now+35,reserve=action.reserve,status='awaiting confirmation',assessment=action.plan.assessment}
     elseif (action.plan or {}).after_betrayal and self.betrayalPlan then self.betrayalPlan.status='capture issued' end
     self.metrics[intent.type]=(self.metrics[intent.type] or 0)+1
+    if intent.type=='nuke' and (action.plan or {}).salvo then
+        local p=table.clone(action.plan.salvo)
+        p.sent+=1;p.remaining=p.total-p.sent;self.salvoPlan=p
+        if p.objective_sid then self.suppressionCooldowns[tostring(p.objective_sid)]=self.state.tick+(p.flight_ticks or 300)+p.remaining*10+30 end
+    end
     if intent.type=='build' and intent.kind=='defense' then table.insert(self.postPurchases,now) end
     local target=intent.target or intent.tile and self.state:tile_owner(intent.tile)
     if intent.type=='attack' and target and target>0 then
@@ -130,9 +138,13 @@ function Agent:sent(action,now)
 end
 function Agent:rejected(reason)
     self.blocked=true;self.lastRejected=tostring(reason);self.pending=nil
+    if self.salvoPlan then
+        self.lastSalvo={tile=self.salvoPlan.tile,status='send rejected',reason=tostring(reason),sent=self.salvoPlan.sent}
+        self.strikeCooldowns[self.salvoPlan.tile]=self.state.tick+100;self.salvoPlan=nil
+    end
 end
 function Agent:report()
-    if not self.observation then return {version='3.1.0',schema=Schema.version,status='no observed match'} end
+    if not self.observation then return {version='3.2.0',schema=Schema.version,status='no observed match'} end
     local ranked={};for i,a in ipairs(self.candidates or {}) do table.insert(ranked,{kind=a.kind,score=self.logits[i],
         probability=self.probabilities and self.probabilities[i],intent=a.intent,label=a.label,plan=a.plan}) end
     table.sort(ranked,function(a,b) return a.score>b.score end)
@@ -140,13 +152,15 @@ function Agent:report()
         table.insert(diplomatic,{nation=id,allied=r.allied,same_team=r.same_team,friend=r.friend,
             outgoing_request=r.outgoing_request,incoming_request=r.incoming_request,expiry=r.expiry})
     end
-    return {version='3.1.0',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
+    return {version='3.2.0',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
         tick=self.state.tick,observation_tick=o.tick,observation_age_ticks=math.max(0,self.state.tick-o.tick),
         decision_interval_ticks=Schema.decision_ticks,me=self.me,own=self.state.owners[self.me],metrics=self.metrics,runtime=self.runtime,
         board=self.board,actions=self.history,candidates=ranked,filtered_by_risk=self.filtered,
         cooperation=self.cooperation.status,public_players=o.players,exact_diplomacy=diplomatic,public_alliance_pairs=o.relationships,
         tactical_support=self.tacticalAssessments,support_projects=self.supportProjects,proposed_betrayal=self.betrayalPlan,ended_betrayal_plans=self.betrayalHistory,
         construction_assessments=self.constructionAssessments,own_structures=o.ownStructures,
+        economy_plan=self.economyPlan,naval_plan=self.navalPlan,missile_assessments=self.missileAssessments,
+        active_scatter_salvo=self.salvoPlan,last_scatter_salvo=self.lastSalvo,
         exact_attacks=o.attacks,exact_units=o.units,exact_missiles=o.missiles,context=o.context,
         missile_alerts=self.missileAlerts,missile_alert_history=self.missileHistory,nuclear_threat=o.nuclearThreat,
         public_observations=self.recorder:report(),opponent_profiles=self.profiles:report({state=self.state,me=self.me}),

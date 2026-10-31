@@ -1,10 +1,10 @@
--- RoWorld 3.1.0 | independent observation / candidate policy
+-- RoWorld 3.2.0 | independent observation / candidate policy
 -- No OpenFront weights; no external runtime downloads.
 local Weapons=(function()
 -- RoWorld weapon observations and conservative launch checks shared by both routes.
 local Weapons={}
-Weapons.kinds={atom=0,hydrogen=1,mirv=2}
-Weapons.costs={atom=750000,hydrogen=5000000,mirv=25000000}
+Weapons.kinds={atom=0,hydrogen=1,mirv=2,scatter=5}
+Weapons.costs={atom=750000,hydrogen=5000000,mirv=25000000,scatter=3750000}
 local function valid(s,t) return type(t)=="number" and t>=0 and t<s.map.N end
 local function friendly(s,me,id) return id==me or id>0 and s:are_allies(me,id) end
 local function protected(s,me,id) return friendly(s,me,id) or (s.bot_friend_guard or {})[id]==true end
@@ -18,6 +18,12 @@ function Weapons.ready(s,b,cooldown)
     for _,stamp in ipairs(b.shots) do if stamp+cooldown>s.tick then busy+=1 end end
     return busy<(b.level or 1)
 end
+function Weapons.slots(s,b,cooldown)
+    if (b.active_tick or 0)>s.tick or type(b.shots)~='table' then return 0 end
+    local busy=0
+    for _,stamp in ipairs(b.shots) do if stamp+cooldown>s.tick then busy+=1 end end
+    return math.max(0,(b.level or 1)-busy)
+end
 function Weapons.launchers(s,me,tile)
     local selected,distance={},nil
     for _,b in pairs(s.structures) do
@@ -30,7 +36,9 @@ function Weapons.launchers(s,me,tile)
     return selected
 end
 function Weapons.radius(map,kind)
-    return (kind=="hydrogen" and 100 or kind=="mirv" and 1518 or 30)/(map.k_lin or 1)
+    -- Scatter children land up to 46 full-map units away, then blast another
+    -- 18 units. Include cell-rounding error in the collateral/hazard envelope.
+    return (kind=="hydrogen" and 100 or kind=="mirv" and 1518 or kind=='scatter' and 66 or 30)/(map.k_lin or 1)
 end
 function Weapons.blastSafe(s,me,tile,kind)
     if not valid(s,tile) or not Weapons.kinds[kind] then return false end
@@ -88,7 +96,80 @@ function Weapons.blocked(s,me,from,to,kind)
     end
     return false
 end
-function Weapons.canLaunch(s,me,tile,kind)
+-- A bounded upper estimate of interception opportunities over the whole volley.
+-- Shots, active times and 90-tick reloads are public; future construction,
+-- interception randomness and hidden rapid-reload unlocks remain uncertain.
+function Weapons.scatterAssessment(s,me,tile,limit,committed)
+    local map=s.map;local k=map.k_lin or 1;local launchers={};local free=0
+    for _,b in pairs(s.structures) do if b.owner==me and b.kind==5 then
+        local slots=Weapons.slots(s,b,90)
+        if slots>0 then free+=slots;table.insert(launchers,b) end
+    end end
+    if free==0 then return nil,'No reloaded silo capacity' end
+    table.sort(launchers,function(a,b)
+        local da=math.abs(a.tile%map.W-tile%map.W)+math.abs(a.tile//map.W-tile//map.W)
+        local db=math.abs(b.tile%map.W-tile%map.W)+math.abs(b.tile//map.W-tile//map.W)
+        return da==db and a.tile<b.tile or da<db
+    end)
+    -- A six-launch plan cannot consume more than the nearest six ready slots.
+    -- Include ties because the server may choose either equally near silo.
+    local relevant,slots,lastDistance={},0,nil
+    for _,b in ipairs(launchers) do
+        local d=math.abs(b.tile%map.W-tile%map.W)+math.abs(b.tile//map.W-tile//map.W)
+        if slots>=6 and d~=lastDistance then break end
+        table.insert(relevant,b);slots+=Weapons.slots(s,b,90);lastDistance=d
+    end
+    launchers=relevant
+    local sams={};local flights={};local nearLaunch={}
+    for _,launcher in ipairs(launchers) do
+        local arc=Weapons.arc(map,launcher.tile,tile);local length=0
+        for i=2,#arc do length+=math.sqrt((arc[i].x-arc[i-1].x)^2+(arc[i].y-arc[i-1].y)^2) end
+        table.insert(flights,math.max(1,math.ceil(length*k/10)))
+        for sid,b in pairs(s.structures) do if b.kind==4 and not friendly(s,me,b.owner) then
+            local reach=(150-480/(math.max(1,b.level or 1)+5))/k
+            local covers=false
+            for i,p in ipairs(arc) do
+                local q=arc[math.min(i+1,#arc)]
+                local pad=math.sqrt((q.x-p.x)^2+(q.y-p.y)^2)+48/k+2
+                local dx,dy=b.tile%map.W+.5-p.x,b.tile//map.W+.5-p.y
+                -- Including the full arc is conservative even outside the
+                -- game's targetable endpoint regions; never miss launch-side SAMs.
+                if dx*dx+dy*dy<=(reach+pad)^2 then covers=true;break end
+            end
+            if covers then sams[sid]=b
+                if map.dist2(b.tile,launcher.tile)<=(300/k)^2 then nearLaunch[sid]=true end
+            end
+        end end
+    end
+    local earliest,latest=math.huge,0
+    for _,n in ipairs(flights) do earliest=math.min(earliest,n);latest=math.max(latest,n) end
+    local x,y=tile%map.W,tile//map.W;local ring=math.ceil(46/k+1)
+    -- At map edges some children cannot be placed. Do not promise a full payload.
+    local payload=x>=ring and y>=ring and x<map.W-ring and y<map.H-ring and 5 or 1
+    local ceiling=math.min(6,limit or 6,free+(committed or 0))
+    for count=1,ceiling do
+        local capacity,levels=0,0
+        for sid,b in pairs(sams) do
+            levels+=b.level or 1
+            local first=s.tick+(nearLaunch[sid] and 0 or math.max(0,earliest-45))
+            local last=s.tick+latest+(count-1)*10+12
+            if nearLaunch[sid] then last=math.min(last,s.tick+45+(count-1)*10+12) end
+            for slot=1,(b.level or 1) do
+                local readyAt=math.max(b.active_tick or 0,((b.shots or {})[slot] or -100000)+90)
+                local start=math.max(first,readyAt)
+                if start<=last then capacity+=1+math.floor((last-start)/90) end
+            end
+        end
+        if count*payload>=capacity+(capacity>0 and 2 or 0) then
+            local coverage={};for sid,b in pairs(sams) do coverage[tostring(sid)]=b.level or 1 end
+            return {count=count,minimum_payload=payload,interception_budget=capacity,sam_levels=levels,
+                coverage=coverage,free_silo_slots=free,flight_ticks=latest,
+                scope='Estimated saturation; random child impacts and future enemy changes are not guaranteed'}
+        end
+    end
+    return nil,'Observed SAM capacity exceeds the bounded volley or ready silo capacity'
+end
+function Weapons.canLaunch(s,me,tile,kind,salvo)
     if Weapons.kinds[kind]==nil or not valid(s,tile) then return false,"Unsupported weapon or target" end
     local id=s:tile_owner(tile)
     if id==0 or friendly(s,me,id) then return false,"Target is no longer hostile" end
@@ -97,6 +178,19 @@ function Weapons.canLaunch(s,me,tile,kind)
     if not Weapons.blastSafe(s,me,tile,kind) then return false,"Friendly territory is inside the possible strike area" end
     local launchers=Weapons.launchers(s,me,tile)
     if #launchers==0 then return false,"No missile silo is ready" end
+    if kind=='scatter' then
+        if salvo then
+            local current,why=Weapons.scatterAssessment(s,me,tile,6,salvo.sent or 0)
+            if not current or current.count>salvo.total then return false,why or 'SAM capacity changed; reassess the salvo' end
+            for sid,level in pairs(current.coverage) do
+                if level>((salvo.coverage or {})[sid] or 0) then return false,'New or upgraded SAM coverage; reassess the salvo' end
+            end
+        else
+            local q,why=Weapons.scatterAssessment(s,me,tile,1)
+            if not q then return false,why end
+        end
+        return true
+    end
     for _,b in ipairs(launchers) do
         if Weapons.blocked(s,me,b.tile,tile,kind) then return false,"Observed SAM coverage threatens the launch route" end
     end
@@ -115,7 +209,7 @@ function Weapons.covered(s,me,tile,minimum)
     return false
 end
 function Weapons.hazard(s,tile,margin,imminentSeconds)
-    local radii={[0]=30,[1]=100,[2]=1518,[3]=18,[4]=60,[5]=30,[6]=1.5,[7]=15,[8]=5}
+    local radii={[0]=30,[1]=100,[2]=1518,[3]=18,[4]=60,[5]=66,[6]=1.5,[7]=15,[8]=5}
     for _,n in pairs(s.nukes) do
         local radius=radii[n.kind]
         local remaining=(n.launch_tick or s.tick)+(n.flight_ticks or math.huge)-s.tick
@@ -143,7 +237,7 @@ function Weapons.threat(s,me)
 end
 -- Alerts use observed impact points and conservative blast radii, not launch intent.
 function Weapons.alerts(s,me)
- local rows={};local radii={[0]=30,[1]=100,[2]=1518,[3]=18,[4]=60,[5]=30,[6]=1.5,[7]=15,[8]=5}
+ local rows={};local radii={[0]=30,[1]=100,[2]=1518,[3]=18,[4]=60,[5]=66,[6]=1.5,[7]=15,[8]=5}
  for uid,n in pairs(s.nukes) do
   local radius=radii[n.kind]
   if radius and n.owner~=me and valid(s,n.to_tile) then
@@ -177,7 +271,7 @@ function Weapons.allianceSafe(s,me,target)
     local proxy=setmetatable({are_allies=function(_,a,b) return b==target or s:are_allies(a,b) end},{__index=s})
     for _,n in pairs(s.nukes) do
         if n.owner==me then
-            local kind=({[0]="atom",[1]="hydrogen",[2]="mirv",[3]="atom"})[n.kind]
+            local kind=({[0]="atom",[1]="hydrogen",[2]="mirv",[3]="atom",[5]='scatter'})[n.kind]
             if kind and not Weapons.blastSafe(proxy,me,n.to_tile,kind) then return false end
         end
     end
@@ -753,7 +847,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 3.1.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 3.2.0 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -916,6 +1010,16 @@ function Adapter:send(action, frame)
         elseif kind == "build" or kind == "nuke" then
             if not tileValid(live, intent.tile) or not rules:availability(intent.kind).ok then return false, "Building or weapon is not ready" end
             if not rules:placement(intent.kind, intent.tile).ok then return false, "Placement changed" end
+            local cost=rules:cost(intent.kind)
+            local salvo=(action.plan or {}).salvo
+            local committed=salvo and (salvo.remaining or 1)*cost or cost
+            if (live.info.gold or 0)-committed<(action.gold_reserve or 0) then return false,'Preserving construction or complete salvo funding' end
+            if action.cost and cost>action.cost then return false,'Purchase price increased; recalculating' end
+            if salvo and (s.tick>salvo.deadline or salvo.remaining<=0) then return false,'Salvo expired or completed' end
+            if salvo and salvo.objective_sid then
+                local objective=s.structures[salvo.objective_sid]
+                if not objective or objective.owner~=salvo.objective_owner then return false,'Suppression objective disappeared or changed owner' end
+            end
             if kind=="build" and action.safety then
                 if Weapons.hazard(s,intent.tile,action.safety.margin) then return false,"Incoming strike threatens the construction site" end
                 local map=live.map;local x,y=intent.tile%map.W,intent.tile//map.W
@@ -932,7 +1036,7 @@ function Adapter:send(action, frame)
                 end
             end
             if kind == "nuke" then
-                local allowed,reason=Weapons.canLaunch(s,me,intent.tile,intent.kind)
+                local allowed,reason=Weapons.canLaunch(s,me,intent.tile,intent.kind,salvo)
                 if not allowed then return false,reason end
             end
         elseif kind=='donate' then
@@ -994,6 +1098,10 @@ function Adapter:send(action, frame)
             if not u or u.owner~=me or u.kind~=2 or u.state~=0 or not tileValid(live,intent.tile)
                 or type(live.map.is_water)~="function" or not live.map:is_water(intent.tile) then return false,"Warship order is no longer valid" end
             if u.max_hp>0 and u.hp<u.max_hp*.8 then return false,"Letting the warship retreat and repair" end
+            local body=live.map.water_body_of or live.map.body_of
+            local path=u.path or {};local i=math.clamp(math.floor(math.max(0,s.tick-(u.start_tick or s.tick))*100/math.max(1,u.ticks_per_tile_x100 or 100))+1,1,math.max(1,#path))
+            local current=path[i] or u.patrol_tile
+            if body and (not tileValid(live,current) or body(live.map,current)~=body(live.map,intent.tile)) then return false,'Warship destination is in a different water body' end
         else
             return false, "Unsupported order type: " .. tostring(kind)
         end
@@ -1456,12 +1564,13 @@ function Mirror.context(session)
     function rules:availability(kind)
         local supported=KINDS[kind]~=nil or kind=="warship" or Weapons.kinds[kind]~=nil
         local info=ctx.state.owners[ctx.state.local_owner]
+        local unlocked=kind~='scatter' or type(session.has_unlock)=='function' and session:has_unlock('scatter')
         local launcher=Weapons.kinds[kind]==nil or #Weapons.launchers(ctx.state,ctx.state.local_owner,0)>0
         local port=kind~="warship"
         if not port then for _,b in pairs(ctx.state.structures) do
             if b.owner==ctx.state.local_owner and b.kind==1 and b.active_tick<=ctx.state.tick then port=true;break end
         end end
-        return {ok=supported and info.alive and info.spawned and ctx.state.phase==1 and info.gold>=self:cost(kind)
+        return {ok=supported and unlocked and info.alive and info.spawned and ctx.state.phase==1 and info.gold>=self:cost(kind)
             and launcher and port and (kind~="port" or borders:has_coast()),cost=self:cost(kind)}
     end
     function rules:placement(kind,tile)
@@ -1546,6 +1655,12 @@ function Network:process(row)
         if self.destroyed or row.generation~=self.generation then return end
         local observer=self
         local session={mode=2,_sim=nil,state=state,connected=true}
+        function session:has_unlock(key)
+            if observer.inventoryKnown then return observer.unlocks[key]==true end
+            -- The user explicitly owns Scattershot. This setting permits a
+            -- normal order, never grants an entitlement; the server checks it.
+            return key=='scatter' and observer.declaredScatter==true
+        end
         function session:multiplayer_available() return self.connected and not observer.destroyed end
         function session:send_intent(intent)
             assert(self.state.loaded and self.connected and not observer.destroyed,"Observer is not synchronized")
@@ -1568,6 +1683,14 @@ end
 function Network:receive(op,...)
     if self.destroyed then return end
     self.packets+=1;self.lastPacket=self.now()
+    if op==32 then
+        local inventory=...
+        if type(inventory)=='table' and type(inventory.unlocks)=='table' then
+            self.inventoryKnown=true;self.unlocks={}
+            for _,key in pairs(inventory.unlocks) do if type(key)=='string' then self.unlocks[key]=true end end
+        end
+        return
+    end
     if op==24 then
         self.generation+=1;table.clear(self.queue)
         self.closed=true;self:invalidate("Match closed; join a multiplayer match");return
@@ -1637,6 +1760,7 @@ function Network:poll()
 end
 function Network:diagnostics()
     return "network_packets="..self.packets.."\nnetwork_status="..self.status.."\nnetwork_error="..tostring(self.error or "none")
+        ..'\nscatter_unlock_source='..(self.inventoryKnown and 'server inventory' or self.declaredScatter and 'user-declared ownership; server validates' or 'not enabled')
 end
 function Network:destroy()
     self.destroyed=true;self.generation+=1;table.clear(self.queue)
@@ -1650,11 +1774,11 @@ end)()
 local Schema=(function()
 -- Versioned RoWorld features. No OpenFront checkpoint is compatible with this schema.
 local Schema = {
-    version = 'roworld-observation-v1', context = 204, action = 48, hidden = 32,
+    version = 'roworld-observation-v2', context = 204, action = 49, hidden = 32,
     max_candidates = 96, prior_scale = 1, decision_ticks = 10,
     types = {'wait','spawn','expand','attack','boat','retreat','city','factory','port',
         'defense','sam','silo','warship','move_warship','ally_request','ally_accept',
-        'ally_reject','ally_extend','donate','atom','hydrogen','mirv','ally_break'},
+        'ally_reject','ally_extend','donate','atom','hydrogen','mirv','ally_break','scatter'},
 }
 Schema.ids = {}
 for i,name in ipairs(Schema.types) do Schema.ids[name]=i end
@@ -1774,11 +1898,18 @@ function Geography.sites(frame,anchor,frontSites)
         local xx,yy=x+dx*spacing,y+dy*spacing
         if xx>=0 and yy>=0 and xx<m.W and yy<m.H then add(yy*m.W+xx) end
     end end
-    for _,b in pairs(frame.state.structures) do if b.owner==frame.me then add(b.tile) end end
+    local buildings={}
+    for _,b in pairs(frame.state.structures) do if b.owner==frame.me then table.insert(buildings,b.tile) end end
+    table.sort(buildings)
+    local offset=#buildings>0 and ((frame.state.tick or 0)//10*127)%#buildings or 0
+    for i=1,math.min(128,#buildings) do add(buildings[(offset+i-1)%#buildings+1]) end
     for _,t in ipairs(frontSites or {}) do if m:is_coastal(t) then add(t) end end
     -- The original spawn can remain owned while its neighborhood becomes unsafe.
     -- Search other holdings too, rather than silently saving forever at that point.
     for i=1,64 do add(Geography.sample(m,'land_list',(frame.state.tick or 0)*31337+i*104729)) end
+    -- Ports must search coast explicitly; random land probes rarely hit a thin
+    -- coastline on a large map. Rotate a bounded set across the whole map.
+    for i=1,128 do add(Geography.sample(m,'coast_list',(frame.state.tick or 0)*7919+i*104729)) end
     return sites
 end
 function Geography.landing(frame,t,anchor,escape)
@@ -1972,9 +2103,374 @@ return Observe
 
 end)()
 
+local Infrastructure=(function()
+-- Continuous investment, with a defended economic core and marginal coverage.
+local Infrastructure={}
+
+
+local ids={city=0,port=1,factory=2,defense=3,sam=4,silo=5}
+local weights={[0]=2,[1]=3,[2]=2,[3]=.2,[4]=1,[5]=4}
+local function coverage(frame,t)
+    local s,m=frame.state,frame.map;local n=0
+    for _,b in pairs(s.structures) do
+        if b.kind==4 and (b.owner==frame.me or s:are_allies(frame.me,b.owner)) then
+            local r=(150-480/(math.max(1,b.level or 1)+5))/(m.k_lin or 1)
+            if m.dist2(t,b.tile)<=r*r then n+=b.level or 1 end
+        end
+    end
+    return n
+end
+function Infrastructure.reserve(frame,o,agent)
+    local gold=math.max(0,frame.info.gold or 0)
+    local reserve=math.min(gold*.15,math.max(125000,(frame.info.income or 0)*3))
+    if agent.salvoPlan then reserve=math.max(reserve,agent.salvoPlan.remaining*frame.ctx.rules:cost('scatter')) end
+    return reserve
+end
+function Infrastructure.generate(frame,o,agent,sites)
+    local s,m,me=frame.state,frame.map,frame.me;local rules=frame.ctx.rules
+    local rows,diagnostics={},{};local gold=frame.info.gold or 0
+    local reserve=Infrastructure.reserve(frame,o,agent)
+    local city,port,factory=o.levels[0] or 0,o.levels[1] or 0,o.levels[2] or 0
+    local coast=port>0
+    for _,t in ipairs(sites) do if m:is_coastal(t) then coast=true;break end end
+    if not coast then for t in pairs(frame.ctx.borders.border) do if m:is_coastal(t) then coast=true;break end end end
+    local early=s.tick-math.max(0,s.playing_since or 0)<1200
+    local threat=(o.nuclearThreat.hostile_silos or 0)>0 or #o.alerts>0
+    local desiredDefense=threat and 7 or 2 -- extra slots help withstand Scattershot.
+    local recent=0;for _,at in ipairs(agent.postPurchases) do if frame.now-at<60 then recent+=1 end end
+    local missileCost=rules:cost('scatter')
+    if missileCost==math.huge then missileCost=3750000 end
+    local siloGoal=math.clamp(math.floor(math.max(0,gold-reserve)/math.max(750000,missileCost)),1,6)
+    agent.economyPlan={coast_access=coast,early_factory_window=early,gold_reserve=reserve,
+        sam_slots_per_asset=desiredDefense,desired_silo_levels=siloGoal,
+        scope='Continuous marginal investment; safety, available sites and current prices bound purchases'}
+    local own={};for _,b in pairs(s.structures) do if b.owner==me then table.insert(own,b) end end
+    local covered={};for _,b in ipairs(own) do covered[b.tile]=coverage(frame,b.tile) end
+    for _,kind in ipairs({'city','port','factory','sam','silo','defense'}) do
+        local available=rules:availability(kind);local cost=available.cost or rules:cost(kind)
+        local d={kind=kind,available=available.ok==true,cost=cost,checked_sites=#sites,legal_sites=0,safe_sites=0,gold_reserve=reserve}
+        table.insert(diagnostics,d)
+        if not available.ok then d.reason=tostring(available.reason or 'current game availability');continue end
+        if gold-cost<reserve and not (kind=='sam' and #o.alerts>0 and not agent.salvoPlan) then
+            d.reason='preserving economic or committed salvo funding';continue
+        end
+        if kind=='factory' and coast and (not early or factory>=2 or factory>=math.max(1,city)) then
+            d.reason='coastal economy uses ports after a small early factory investment';continue
+        end
+        if kind=='factory' and city==0 then d.reason='establish the first city before factory support';continue end
+        if kind=='defense' and ((o.counts[3] or 0)>=3 or recent>=3 or o.incoming==0) then
+            d.reason='post cap, rolling purchase cap or no land invasion';continue
+        end
+        if kind=='silo' and ((o.levels[5] or 0)>=siloGoal or city<2 or gold-cost-reserve<750000 or o.incoming>o.home*.8) then
+            d.reason='launcher capacity, economy or invasion funding target already met';continue
+        end
+        local base
+        if kind=='city' then base=6.2+math.clamp(o.home/o.capacity,0,1.2)*1.8+math.clamp(port/2-city,-2,4)*.45
+        elseif kind=='port' then base=6.8+math.clamp(city*1.5-port,-2,4)*.4
+        elseif kind=='factory' then base=coast and 7.2-factory*1.2 or 6.7+math.clamp(city-factory,-2,4)*.35
+        elseif kind=='sam' then base=4.4+(threat and 2 or 0)+math.min(3,#o.alerts)
+        elseif kind=='silo' then base=5.5+(siloGoal-(o.levels[5] or 0))*.45
+        else base=4+math.min(4,o.incoming/math.max(1,o.home)*5) end
+        local proposals,used={},{}
+        for _,requested in ipairs(sites) do
+            local p=rules:placement(kind,requested)
+            if p.ok and Geography.valid(m,p.tile) and not used[p.tile] then
+                used[p.tile]=true;d.legal_sites+=1
+                local safe,margin=Geography.safe(frame,p.tile,kind)
+                if not safe then continue end
+                d.safe_sites+=1
+                local previous,concentration=nil,0
+                for _,b in ipairs(own) do
+                    if b.tile==p.tile and b.kind==ids[kind] then previous=b end
+                    if m.dist2(b.tile,p.tile)*(m.k_lin or 1)^2<60^2 then concentration+=b.level or 1 end
+                end
+                -- Native UIRules returns upgrade_sid, the observer returns upgrade.
+                local upgrade=p.upgrade==true or (p.upgrade_sid or 0)>0
+                local level=previous and previous.level or 0
+                local bias=base-concentration*.025-(upgrade and level*.04 or 0)
+                local gain=0
+                if kind=='sam' then
+                    local radius=(150-480/(math.max(1,level+1)+5))/(m.k_lin or 1)
+                    for _,b in ipairs(own) do
+                        local count=covered[b.tile] or 0
+                        if count<desiredDefense and m.dist2(p.tile,b.tile)<=radius^2 then
+                            local extra=upgrade and 1 or math.min(desiredDefense-count,1)
+                            gain+=(weights[b.kind] or 0)*extra/desiredDefense
+                        end
+                    end
+                    if gain==0 then continue end
+                    bias+=math.min(7,gain*1.4)
+                elseif kind~='defense' then
+                    local slots=coverage(frame,p.tile)
+                    bias+=math.min(.5,slots*.1)
+                    if kind=='silo' and slots==0 and threat then bias-=2 end
+                end
+                -- Keep the economic core useful without stacking everything in a
+                -- single blast circle. Upgrade protected existing sites as well.
+                local distance=math.sqrt(m.dist2(o.anchor,p.tile))*(m.k_lin or 1)
+                bias-=math.min(.5,distance/1500)
+                table.insert(proposals,{kind=kind,intent={type='build',kind=kind,tile=p.tile},cost=cost,
+                    bias=bias,upgrade=upgrade,level=level,payback=gain,channel='construction',cooldown=1,
+                    gold_reserve=reserve,safety={margin=margin,coastal=kind=='port'},
+                    label=(upgrade and 'Upgrading ' or 'Building ')..kind..(kind=='sam' and ' for overlapping core protection' or ' at a protected site')})
+            end
+        end
+        table.sort(proposals,function(a,b) return a.bias==b.bias and a.intent.tile<b.intent.tile or a.bias>b.bias end)
+        d.candidates=math.min(3,#proposals);d.best_score=proposals[1] and proposals[1].bias
+        d.reason=#proposals==0 and 'no legal safe site adds the required coverage or investment' or 'continuous investment candidate'
+        for i=1,math.min(3,#proposals) do table.insert(rows,proposals[i]) end
+    end
+    return rows,diagnostics
+end
+return Infrastructure
+
+end)()
+
+local Navy=(function()
+-- Connected-water coastal defense; healthy ships spread out rather than pile up.
+local Navy={}
+
+function Navy.position(s,u)
+    local path=u.path or {};local i=math.clamp(math.floor(math.max(0,s.tick-(u.start_tick or s.tick))*100/math.max(1,u.ticks_per_tile_x100 or 100))+1,1,math.max(1,#path))
+    return path[i] or u.patrol_tile
+end
+local function body(m,t)
+    if not Geography.valid(m,t) then return 0 end
+    local fn=m.water_body_of or m.body_of
+    return fn and fn(m,t) or 0
+end
+function Navy.generate(frame,o,agent)
+    local s,m,me=frame.state,frame.map,frame.me;local k=m.k_lin or 1;local rules=frame.ctx.rules
+    local zones,seen={},{};local ships={};local readyPorts=0
+    local function add(t,weight,source)
+        if not Geography.valid(m,t) or type(m.is_water)~='function' or not m:is_water(t) then return end
+        if not seen[t] then seen[t]={tile=t,weight=weight,source=source,body=body(m,t)};table.insert(zones,seen[t])
+        else seen[t].weight=math.max(seen[t].weight,weight) end
+    end
+    for _,b in pairs(s.structures) do if b.owner==me and b.kind==1 and (b.active_tick or 0)<=s.tick then
+        readyPorts+=1;Geography.neighbors(m,b.tile,function(t) add(t,2+(b.level or 1)*.2,'port') end)
+    end end
+    -- Border probes are spread over the entire frontier, not only the home port.
+    local coast={};for t in pairs(frame.ctx.borders.border) do if s:tile_owner(t)==me and m:is_coastal(t) then table.insert(coast,t) end end
+    table.sort(coast)
+    local stride=math.max(1,math.ceil(#coast/48))
+    for i=1,#coast,stride do local t=coast[i]
+        local weight=1+math.max(0,1-math.sqrt(m.dist2(t,o.anchor))*k/220)*2
+        Geography.neighbors(m,t,function(n) add(n,weight,'coast') end)
+    end
+    local threats={}
+    for uid,u in pairs(s.units or {}) do
+        if u.owner==me and u.kind==2 then table.insert(ships,{uid=uid,u=u,tile=Navy.position(s,u)})
+        elseif u.owner~=me and not s:are_allies(me,u.owner) and not (s.bot_friend_guard or {})[u.owner]
+            and (u.kind==0 or u.kind==2) then
+            local t=Navy.position(s,u)
+            if Geography.valid(m,t) then
+                local near=m.dist2(t,o.anchor)*k*k<240^2
+                if not near then for _,z in ipairs(zones) do if m.dist2(t,z.tile)*k*k<180^2 then near=true;break end end end
+                if near then table.insert(threats,{tile=t,kind=u.kind,owner=u.owner,weight=u.kind==0 and 5 or 6}) end
+            end
+        end
+    end
+    table.sort(ships,function(a,b) return a.uid<b.uid end)
+    for _,t in ipairs(threats) do add(t.tile,t.weight,'threat') end
+    local eligible={}
+    for _,z in ipairs(zones) do
+        if not rules:placement('warship',z.tile).ok then
+            -- Placement includes gold; movement must remain possible when broke.
+            local connected=false
+            for _,b in pairs(s.structures) do if b.owner==me and b.kind==1 and (b.active_tick or 0)<=s.tick then
+                Geography.neighbors(m,b.tile,function(t) if body(m,t)>0 and body(m,t)==z.body then connected=true end end)
+            end end
+            if not connected then continue end
+        end
+        local cover=0
+        for _,ship in ipairs(ships) do
+            local t=Geography.valid(m,ship.u.patrol_tile) and ship.u.patrol_tile or ship.tile
+            if Geography.valid(m,t) and body(m,t)==z.body and m.dist2(t,z.tile)*k*k<100^2 then
+                local ready=ship.u.state==0 and (ship.u.hp or 0)>=math.max(1,ship.u.max_hp or 0)*.8
+                cover+=ready and 1 or .25
+            end
+        end
+        z.cover=cover;z.score=z.weight-cover*2.7
+        table.insert(eligible,z)
+    end
+    table.sort(eligible,function(a,b) return a.score==b.score and a.tile<b.tile or a.score>b.score end)
+    local rows={};local best=eligible[1]
+    -- Dynamic force size grows with protected coastline, ports and hostile fleets.
+    local desired=math.min(32,math.max(2,readyPorts*2,math.ceil(#coast*k/120),#threats*2+1))
+    local gold=frame.info.gold or 0;local reserve=(agent.economyPlan or {}).gold_reserve or 0
+    if best and readyPorts>0 and #ships<desired and rules:availability('warship').ok
+        and gold-rules:cost('warship')>=reserve and (best.cover<2 or #threats>0) then
+        table.insert(rows,{kind='warship',intent={type='build',kind='warship',tile=best.tile},cost=rules:cost('warship'),
+            bias=(#threats>0 and 10 or 7.6)-best.cover*.6,channel='fleet',cooldown=1,gold_reserve=reserve,
+            label='Expanding the connected coastal defense fleet',plan={desired_fleet=desired,zone=best.source}})
+    end
+    local assigned={}
+    for _,ship in ipairs(ships) do
+        local u=ship.u
+        if u.state~=0 or (u.max_hp or 0)<=0 or u.hp<u.max_hp*.8 then continue end
+        for _,z in ipairs(eligible) do
+            if assigned[z.tile] or body(m,ship.tile)~=z.body then continue end
+            if z.source~='threat' and (z.cover>0 or #ships<2) then continue end
+            if Geography.valid(m,u.patrol_tile) and m.dist2(u.patrol_tile,z.tile)*k*k<(z.source=='threat' and 10 or 40)^2 then continue end
+            local currentCovered=0
+            for _,other in ipairs(ships) do if other.uid~=ship.uid and Geography.valid(m,other.tile)
+                and m.dist2(other.tile,ship.tile)*k*k<80^2 then currentCovered+=1 end end
+            if z.source~='threat' and currentCovered==0 then continue end
+            assigned[z.tile]=true
+            table.insert(rows,{kind='move_warship',intent={type='move_warship',uid=ship.uid,tile=z.tile},
+                bias=z.source=='threat' and 11 or 8.2,channel='ship:'..ship.uid,cooldown=8,
+                label=z.source=='threat' and 'Intercepting a visible coastal threat' or 'Spreading healthy warships around the economic coast'})
+            break
+        end
+    end
+    agent.navalPlan={desired_fleet=desired,own_ships=#ships,ready_ports=readyPorts,coastal_probes=#coast,
+        defensive_zones=#eligible,hostile_coastal_units=#threats,best_zone=best}
+    return rows
+end
+return Navy
+
+end)()
+
+local Arsenal=(function()
+-- Value-ranked strikes and finite, fully funded Scattershot suppression salvos.
+local Arsenal={}
+
+
+local function hostile(frame,id)
+    return id>0 and id~=frame.me and not frame.state:are_allies(frame.me,id)
+        and not (frame.state.bot_friend_guard or {})[id] and not frame.state:has_request(frame.me,id)
+end
+local function duplicate(frame,t,kind)
+    for _,n in pairs(frame.state.nukes) do
+        if n.owner==frame.me and Geography.valid(frame.map,n.to_tile)
+            and frame.map.dist2(n.to_tile,t)<(Weapons.radius(frame.map,kind)*.8)^2 then return true end
+    end
+    return false
+end
+local values={[0]=125000,[1]=175000,[2]=125000,[3]=50000,[4]=1500000,[5]=1000000}
+local function value(frame,t,kind)
+    local v=0;local s,m=frame.state,frame.map;local r=Weapons.radius(m,kind)
+    for _,b in pairs(s.structures) do if hostile(frame,b.owner) and not s:has_fallout(b.tile) and m.dist2(t,b.tile)<=r*r then
+        local weight=1
+        -- Child targets are random. A structure in the outer ring is potential
+        -- collateral value, not a guaranteed hit by every warhead.
+        if kind=='scatter' and m.dist2(t,b.tile)>(30/(m.k_lin or 1))^2 then weight=.35 end
+        v+=(values[b.kind] or 0)*(b.level or 1)*weight
+    end end
+    return v
+end
+local function scatterAction(frame,p,first)
+    return {kind='scatter',intent={type='nuke',kind='scatter',tile=p.tile},cost=frame.ctx.rules:cost('scatter'),
+        bias=first and p.score or 14,channel='missile',cooldown=1,gold_reserve=p.gold_reserve,
+        label='Scattershot suppression '..tostring(p.sent+1)..'/'..tostring(p.total)..'; reassess SAMs before every launch',
+        plan={salvo={tile=p.tile,total=p.total,sent=p.sent,remaining=p.remaining,coverage=p.coverage,
+            created_tick=p.created_tick,deadline=p.deadline,gold_reserve=p.gold_reserve,
+            interception_budget=p.interception_budget,score=p.score,objective_sid=p.objective_sid,objective_owner=p.objective_owner,flight_ticks=p.flight_ticks}}}
+end
+function Arsenal.generate(frame,o,agent)
+    local s,m,me=frame.state,frame.map,frame.me;local rules=frame.ctx.rules
+    local rows={};agent.missileAssessments={}
+    if agent.salvoPlan then
+        local p=agent.salvoPlan;local cost=rules:cost('scatter')
+        local allowed,why=Weapons.canLaunch(s,me,p.tile,'scatter',p)
+        local objective=p.objective_sid and s.structures[p.objective_sid]
+        if p.remaining<=0 or frame.useScatter==false or s.tick>p.deadline or not hostile(frame,s:tile_owner(p.tile))
+            or p.objective_sid and (not objective or objective.owner~=p.objective_owner)
+            or not allowed or not rules:availability('scatter').ok or frame.info.gold<p.remaining*cost+p.gold_reserve then
+            agent.lastSalvo={tile=p.tile,status=p.remaining<=0 and 'completed' or 'stopped',sent=p.sent,total=p.total,tick=s.tick,
+                reason=p.remaining<=0 and 'planned launch count completed; waiting for impact' or why or 'objective, target, deadline, funding or unlock changed'}
+            agent.strikeCooldowns[p.tile]=s.tick+150;agent.salvoPlan=nil
+        else
+            table.insert(rows,scatterAction(frame,p,false));return rows
+        end
+    end
+    local targets={}
+    for sid,b in pairs(s.structures) do if hostile(frame,b.owner) and not s:has_fallout(b.tile) then
+        table.insert(targets,{tile=b.tile,kind=b.kind,owner=b.owner,sid=sid,weight=(b.level or 1)*(b.kind==4 and 9 or b.kind==5 and 7 or b.kind==3 and 1 or 4)})
+    end end
+    table.sort(targets,function(a,b) return a.weight==b.weight and a.tile<b.tile or a.weight>b.weight end)
+    while #targets>128 do table.remove(targets) end
+    -- Keep SAM suppression candidates as well as the best economic clusters.
+    for _,target in ipairs(targets) do target.cluster=value(frame,target.tile,'hydrogen') end
+    table.sort(targets,function(a,b)
+        local x=a.cluster+(a.kind==4 and 2500000 or 0);local y=b.cluster+(b.kind==4 and 2500000 or 0)
+        return x==y and a.tile<b.tile or x>y
+    end)
+    local gold=frame.info.gold or 0
+    local reserve=math.min(gold*.15,math.max(125000,(frame.info.income or 0)*3))
+    for _,kind in ipairs({'atom','hydrogen','mirv','scatter'}) do
+        local available=rules:availability(kind)
+        if kind=='scatter' and frame.useScatter==false or not available.ok then
+            table.insert(agent.missileAssessments,{kind=kind,available=false,reason=kind=='scatter' and frame.useScatter==false
+                and 'Scattershot disabled' or available.reason or 'gold, owned unlock or ready launcher unavailable'})
+            continue
+        end
+        local choices={}
+        local aims={}
+        for i=1,math.min(8,#targets) do
+            local target=targets[i];table.insert(aims,target)
+            if kind=='scatter' and target.kind==4 then
+                -- A centered single Scattershot can lose its main warhead to
+                -- the SAM while all children land outside that SAM's blast
+                -- radius. Offset the aim so children can actually hit it.
+                local r=math.max(1,math.floor(28/(m.k_lin or 1)+.5))
+                for _,d in ipairs({{1,0},{-1,0},{0,1},{0,-1}}) do
+                    local x,y=target.tile%m.W+d[1]*r,target.tile//m.W+d[2]*r
+                    local t=y*m.W+x
+                    if x>=0 and x<m.W and y>=0 and y<m.H and s:tile_owner(t)==target.owner then
+                        local aim=table.clone(target);aim.tile=t;aim.offset=true;table.insert(aims,aim)
+                    end
+                end
+            end
+        end
+        local recorded=0
+        for _,target in ipairs(aims) do
+            if s.tick<((agent.suppressionCooldowns or {})[tostring(target.sid)] or 0) then continue end
+            if s.tick<(agent.strikeCooldowns[target.tile] or 0) or duplicate(frame,target.tile,kind) then continue end
+            local cost=rules:cost(kind);local v=value(frame,target.tile,kind)
+            local q,why
+            if kind=='scatter' then q,why=Weapons.scatterAssessment(s,me,target.tile,6) end
+            local count=q and q.count or 1;local total=cost*count
+            local worthwhile=v>=total*.9
+            -- Taking out the observed hostile air-defense network can unlock
+            -- cheaper follow-up strikes. Still require a significant SAM asset.
+            if kind=='scatter' and q and target.kind==4 and q.sam_levels>0 then worthwhile=v>=total*.35 and total<=gold*.4 end
+            if kind=='scatter' and q and target.kind==4 and not target.offset and q.count==1 and q.interception_budget>0 then
+                worthwhile=false -- choose a ring offset or save for another salvo.
+            end
+            local p=q and {tile=target.tile,total=count,sent=0,remaining=count,coverage=q.coverage,
+                created_tick=s.tick,deadline=s.tick+(count+2)*10,gold_reserve=reserve,
+                interception_budget=q.interception_budget,objective_sid=target.kind==4 and target.sid or nil,objective_owner=target.owner,flight_ticks=q.flight_ticks} or nil
+            local allowed,reason=Weapons.canLaunch(s,me,target.tile,kind,p)
+            if recorded<6 then recorded+=1;table.insert(agent.missileAssessments,{kind=kind,tile=target.tile,
+                estimated_value=v,launch_count=count,total_cost=total,interception=q,eligible=allowed and worthwhile and gold>=total+reserve,
+                reason=why or reason or (not worthwhile and 'asset value below total salvo expense' or gold<total+reserve and 'whole salvo is not funded' or 'candidate available')}) end
+            if not worthwhile or kind=='scatter' and not q or gold<total+reserve or not allowed or not rules:placement(kind,target.tile).ok then continue end
+            local score=4+math.min(6,v/math.max(1,total))+(o.incomingBy[target.owner] and 3 or 0)
+            if kind=='scatter' then
+                p.score=score+(target.kind==4 and 2 or 0)+(target.offset and count<=2 and .5 or 0);table.insert(choices,scatterAction(frame,p,true))
+            else
+                table.insert(choices,{kind=kind,intent={type='nuke',kind=kind,tile=target.tile},cost=cost,
+                    bias=score,channel='missile',cooldown=2,gold_reserve=reserve,
+                    label='Launching '..kind..' at the best affordable exposed asset cluster'})
+            end
+        end
+        table.sort(choices,function(a,b) return a.bias==b.bias and a.intent.tile<b.intent.tile or a.bias>b.bias end)
+        for i=1,math.min(2,#choices) do table.insert(rows,choices[i]) end
+    end
+    return rows
+end
+return Arsenal
+
+end)()
+
 local Actions=(function()
 -- RoWorld candidate decoder: engine-feasible proposals plus explicit, separate risk filters.
 local Actions={}
+
+
+
 
 
 
@@ -2193,66 +2689,10 @@ function Actions.generate(frame,o,agent)
     local aid=agent.cooperation:aid(frame,{home=o.home,incoming=o.incoming,available=o.available,reserve=o.reserve},true)
     if aid and not agent.betrayalPlan then aid.kind='donate';aid.bias=5;add(aid) end
     local sites=Geography.sites(frame,o.anchor,o.frontSites)
-    agent.constructionAssessments={}
+    local construction,diagnostics=Infrastructure.generate(frame,o,agent,sites)
+    agent.constructionAssessments=diagnostics
+    for _,action in ipairs(construction) do add(action) end
     local rules=frame.ctx.rules
-    local kinds={'city','factory','port','defense','sam','silo'}
-    local hasHostileSilo=false
-    for _,b in pairs(s.structures) do
-        if b.kind==5 and b.owner~=me and not s:are_allies(me,b.owner) then hasHostileSilo=true;break end
-    end
-    local posts=(o.counts[3] or 0);local recent=0
-    for _,stamp in ipairs(agent.postPurchases) do if now-stamp<60 then recent+=1 end end
-    local safeCache={}
-    for _,kind in ipairs(kinds) do
-        local available=rules:availability(kind)
-        local diagnostic={kind=kind,available=available.ok==true,cost=available.cost,checked_sites=#sites,legal_sites=0,safe_sites=0}
-        table.insert(agent.constructionAssessments,diagnostic)
-        if not available.ok then diagnostic.reason=tostring(available.reason or 'unavailable according to current game rules');continue end
-        local bias
-        if kind=='city' then bias=4.5+(o.home/o.capacity)*2-(o.levels[0] or 0)*.35
-        elseif kind=='factory' then bias=(o.levels[0] or 0)>0 and 5.2-(o.levels[2] or 0)*.7 or -3
-        elseif kind=='port' then bias=4.3-(o.levels[1] or 0)*.7
-        elseif kind=='defense' then
-            if posts>=3 or recent>=3 or o.incoming==0 then diagnostic.reason='post cap, rolling purchase cap or no land invasion';continue end
-            bias=4+math.min(4,o.incoming/math.max(1,o.home)*5)
-        elseif kind=='sam' then
-            if not hasHostileSilo and #o.alerts==0 then diagnostic.reason='no observed missile threat';continue end
-            bias=6+math.min(2,#o.alerts)-(o.levels[4] or 0)
-        else
-            if o.home<o.incoming*2 or (o.levels[0] or 0)<2 or (frame.info.gold or 0)<available.cost+750000 then diagnostic.reason='holding invasion, economy or launch funding reserves';continue end
-            bias=3-(o.levels[5] or 0)
-        end
-        local proposals={};local used={}
-        for _,t in ipairs(sites) do
-            local placement=rules:placement(kind,t)
-            if placement.ok and not used[placement.tile] then
-                diagnostic.legal_sites+=1
-                used[placement.tile]=true
-                local margin=(kind=='defense' or kind=='sam') and 8 or 18
-                local key=tostring(placement.tile)..':'..margin..':'..tostring(kind=='port')
-                local safe=safeCache[key]
-                if safe==nil then safe=Geography.safe(frame,placement.tile,kind);safeCache[key]=safe end
-                if safe then
-                    diagnostic.safe_sites+=1
-                    local level=0
-                    for _,b in pairs(s.structures) do if b.tile==placement.tile then level=b.level or 1 end end
-                    local concentration=0
-                    for _,b in pairs(s.structures) do
-                        if b.owner==me and m.dist2(b.tile,placement.tile)*(m.k_lin or 1)^2<80^2 then concentration+=b.level or 1 end
-                    end
-                    local payback=kind=='city' and recruit({troops=o.home,max_troops=o.capacity+250000},30)-recruit(frame.info,30) or 0
-                    table.insert(proposals,{kind=kind,intent={type='build',kind=kind,tile=placement.tile},cost=available.cost,
-                        bias=bias-(placement.upgrade and .15+level*.12 or 0)-concentration*.015,
-                        upgrade=placement.upgrade,level=level,payback=payback/100000,channel='construction',cooldown=3,
-                        safety={margin=margin,coastal=kind=='port'},label=(placement.upgrade and 'Upgrading ' or 'Building ')..kind..' at a protected site'})
-                end
-            end
-        end
-        table.sort(proposals,function(a,b) return a.bias==b.bias and a.intent.tile<b.intent.tile or a.bias>b.bias end)
-        diagnostic.candidates=math.min(2,#proposals);diagnostic.best_score=proposals[1] and proposals[1].bias
-        diagnostic.reason=#proposals==0 and 'no legal site passes the protected-building setback' or diagnostic.best_score<=0 and 'investment ranked below waiting' or 'investment candidate available'
-        for i=1,math.min(2,#proposals) do add(proposals[i]) end
-    end
     -- Naval routes, missile availability and blast protection use RoWorld's actual checks.
     local coasts={};local seenCoasts={}
     for i=1,64 do
@@ -2282,80 +2722,8 @@ function Actions.generate(frame,o,agent)
         table.sort(naval,function(a,b) return a.bias==b.bias and a.intent.tile<b.intent.tile or a.bias>b.bias end)
         for i=1,math.min(4,#naval) do add(naval[i]) end
     end
-    local waterTargets={}
-    for _,b in pairs(s.structures) do if b.owner==me and b.kind==1 and b.active_tick<=s.tick then
-        Geography.neighbors(m,b.tile,function(t) if type(m.is_water)=='function' and m:is_water(t) then table.insert(waterTargets,t) end end)
-    end end
-    local threats={}
-    for _,u in pairs(s.units or {}) do
-        local path=u.path or {};local index=math.clamp(math.floor(math.max(0,s.tick-(u.start_tick or s.tick))*100/math.max(1,u.ticks_per_tile_x100 or 100))+1,1,math.max(1,#path))
-        local t=path[index] or u.patrol_tile
-        if u.owner~=me and not s:are_allies(me,u.owner) and (u.kind==0 or u.kind==2)
-            and Geography.valid(m,t) and type(m.is_water)=='function' and m:is_water(t)
-            and m.dist2(o.anchor,t)*(m.k_lin or 1)^2<200^2 then table.insert(threats,t) end
-    end
-    table.sort(waterTargets);table.sort(threats)
-    local patrol=threats[1] or waterTargets[1]
-    if patrol and #waterTargets>0 then
-        if o.ships<(#threats>0 and 3 or 1) and rules:availability('warship').ok then
-            local t=waterTargets[1]
-            if rules:placement('warship',t).ok then add({kind='warship',intent={type='build',kind='warship',tile=t},
-                cost=rules:cost('warship'),bias=#threats>0 and 7 or 3.5,channel='fleet',cooldown=10,label='Building a coastal warship'}) end
-        end
-        for uid,u in pairs(s.units or {}) do
-            if #threats>0 and u.owner==me and u.kind==2 and u.state==0 and (u.max_hp or 0)>0 and u.hp>=u.max_hp*.8 then
-                local path=u.path or {};local pos=path[1] or u.patrol_tile;local body=m.water_body_of or m.body_of
-                if Geography.valid(m,pos) and body and body(m,pos)==body(m,patrol)
-                    and (not Geography.valid(m,u.patrol_tile) or m.dist2(u.patrol_tile,patrol)>25) then
-                    add({kind='move_warship',intent={type='move_warship',uid=uid,tile=patrol},bias=8,
-                        channel='ship:'..uid,cooldown=6,label='Intercepting a visible coastal threat'})
-                end
-            end
-        end
-    end
-    local strikeTargets={}
-    for _,b in pairs(s.structures) do
-        if b.owner>0 and not protected(frame,agent,b.owner) then table.insert(strikeTargets,{tile=b.tile,value=(b.level or 1)*(b.kind==3 and 1 or 4),owner=b.owner}) end
-    end
-    table.sort(strikeTargets,function(a,b) return a.value==b.value and a.tile<b.tile or a.value>b.value end)
-    -- Keep a bounded strategic shortlist, then favor real clusters rather than the
-    -- first arbitrary building in a large empire (large blasts need real value).
-    while #strikeTargets>128 do table.remove(strikeTargets) end
-    local clusterRadius=Weapons.radius(m,'hydrogen')^2
-    for _,target in ipairs(strikeTargets) do
-        target.cluster=0
-        for _,other in ipairs(strikeTargets) do
-            if m.dist2(target.tile,other.tile)<=clusterRadius then target.cluster+=other.value end
-        end
-    end
-    table.sort(strikeTargets,function(a,b)
-        if a.cluster~=b.cluster then return a.cluster>b.cluster end
-        return a.value==b.value and a.tile<b.tile or a.value>b.value
-    end)
-    for _,kind in ipairs({'atom','hydrogen','mirv'}) do
-        if not rules:availability(kind).ok then continue end
-        for i=1,math.min(4,#strikeTargets) do
-            local target=strikeTargets[i]
-            local duplicate=false
-            for _,n in pairs(s.nukes) do
-                if n.owner==me and Geography.valid(m,n.to_tile) and m.dist2(n.to_tile,target.tile)<(Weapons.radius(m,kind)*.8)^2 then duplicate=true;break end
-            end
-            local value=0;local radius=Weapons.radius(m,kind)
-            for _,b in pairs(s.structures) do
-                if b.owner>0 and not protected(frame,agent,b.owner) and m.dist2(b.tile,target.tile)<=radius^2 then
-                    value+=(({[0]=125000,[1]=125000,[2]=125000,[3]=50000,[4]=1500000,[5]=1000000})[b.kind] or 0)*(b.level or 1)
-                end
-            end
-            local cost=rules:cost(kind)
-            if not duplicate and value>=cost*.9 and rules:placement(kind,target.tile).ok
-                and Weapons.canLaunch(s,me,target.tile,kind) then
-                add({kind=kind,intent={type='nuke',kind=kind,tile=target.tile},cost=rules:cost(kind),
-                    bias=3+math.min(5,value/math.max(1,cost))+(o.incomingBy[target.owner] and 4 or 0),channel='missile',cooldown=10,
-                    label='Launching '..kind..' at a valuable exposed target'})
-                break
-            end
-        end
-    end
+    for _,action in ipairs(Navy.generate(frame,o,agent)) do add(action) end
+    for _,action in ipairs(Arsenal.generate(frame,o,agent)) do add(action) end
     -- Fair family budget: a large diplomacy roster cannot evict every combat/build proposal.
     table.sort(rows,function(a,b)
         if a.bias~=b.bias then return a.bias>b.bias end
@@ -2459,6 +2827,7 @@ function Agent:reset(frame)
     self.lastSentAt,self.lastSentKind,self.pending,self.lastRejected,self.lastWaiting=nil,nil,nil,nil,nil
     self.blocked=false
     self.supportProjects={};self.tacticalAssessments={};self.betrayalPlan=nil;self.betrayalHistory={}
+    self.salvoPlan=nil;self.lastSalvo=nil;self.strikeCooldowns={};self.suppressionCooldowns={};self.missileAssessments={};self.economyPlan=nil;self.navalPlan=nil
     self.metrics={orders=0,peakLand=frame.info.tiles or 0};self.profiles:start(frame);self.recorder=Recorder.new(frame)
     self.allianceSeq=frame.state.alliance_seq or 0;self.missileHistory={};self.missilesSeen={}
 end
@@ -2474,6 +2843,8 @@ function Agent:prepare(frame)
         end
     end
     self.allianceSeq=frame.state.alliance_seq or 0
+    for key,untilTick in pairs(self.strikeCooldowns) do if untilTick<=frame.state.tick then self.strikeCooldowns[key]=nil end end
+    for key,untilTick in pairs(self.suppressionCooldowns) do if untilTick<=frame.state.tick then self.suppressionCooldowns[key]=nil end end
     if self.betrayalPlan then
         local p=self.betrayalPlan;local target=frame.state.owners[p.target]
         if not target or not target.alive or frame.now>=p.deadline or self.cooperation:isFriend(p.target) then
@@ -2550,6 +2921,11 @@ function Agent:sent(action,now)
         self.betrayalPlan={target=intent.target,created=now,deadline=now+35,reserve=action.reserve,status='awaiting confirmation',assessment=action.plan.assessment}
     elseif (action.plan or {}).after_betrayal and self.betrayalPlan then self.betrayalPlan.status='capture issued' end
     self.metrics[intent.type]=(self.metrics[intent.type] or 0)+1
+    if intent.type=='nuke' and (action.plan or {}).salvo then
+        local p=table.clone(action.plan.salvo)
+        p.sent+=1;p.remaining=p.total-p.sent;self.salvoPlan=p
+        if p.objective_sid then self.suppressionCooldowns[tostring(p.objective_sid)]=self.state.tick+(p.flight_ticks or 300)+p.remaining*10+30 end
+    end
     if intent.type=='build' and intent.kind=='defense' then table.insert(self.postPurchases,now) end
     local target=intent.target or intent.tile and self.state:tile_owner(intent.tile)
     if intent.type=='attack' and target and target>0 then
@@ -2568,9 +2944,13 @@ function Agent:sent(action,now)
 end
 function Agent:rejected(reason)
     self.blocked=true;self.lastRejected=tostring(reason);self.pending=nil
+    if self.salvoPlan then
+        self.lastSalvo={tile=self.salvoPlan.tile,status='send rejected',reason=tostring(reason),sent=self.salvoPlan.sent}
+        self.strikeCooldowns[self.salvoPlan.tile]=self.state.tick+100;self.salvoPlan=nil
+    end
 end
 function Agent:report()
-    if not self.observation then return {version='3.1.0',schema=Schema.version,status='no observed match'} end
+    if not self.observation then return {version='3.2.0',schema=Schema.version,status='no observed match'} end
     local ranked={};for i,a in ipairs(self.candidates or {}) do table.insert(ranked,{kind=a.kind,score=self.logits[i],
         probability=self.probabilities and self.probabilities[i],intent=a.intent,label=a.label,plan=a.plan}) end
     table.sort(ranked,function(a,b) return a.score>b.score end)
@@ -2578,13 +2958,15 @@ function Agent:report()
         table.insert(diplomatic,{nation=id,allied=r.allied,same_team=r.same_team,friend=r.friend,
             outgoing_request=r.outgoing_request,incoming_request=r.incoming_request,expiry=r.expiry})
     end
-    return {version='3.1.0',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
+    return {version='3.2.0',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
         tick=self.state.tick,observation_tick=o.tick,observation_age_ticks=math.max(0,self.state.tick-o.tick),
         decision_interval_ticks=Schema.decision_ticks,me=self.me,own=self.state.owners[self.me],metrics=self.metrics,runtime=self.runtime,
         board=self.board,actions=self.history,candidates=ranked,filtered_by_risk=self.filtered,
         cooperation=self.cooperation.status,public_players=o.players,exact_diplomacy=diplomatic,public_alliance_pairs=o.relationships,
         tactical_support=self.tacticalAssessments,support_projects=self.supportProjects,proposed_betrayal=self.betrayalPlan,ended_betrayal_plans=self.betrayalHistory,
         construction_assessments=self.constructionAssessments,own_structures=o.ownStructures,
+        economy_plan=self.economyPlan,naval_plan=self.navalPlan,missile_assessments=self.missileAssessments,
+        active_scatter_salvo=self.salvoPlan,last_scatter_salvo=self.lastSalvo,
         exact_attacks=o.attacks,exact_units=o.units,exact_missiles=o.missiles,context=o.context,
         missile_alerts=self.missileAlerts,missile_alert_history=self.missileHistory,nuclear_threat=o.nuclearThreat,
         public_observations=self.recorder:report(),opponent_profiles=self.profiles:report({state=self.state,me=self.me}),
@@ -2620,7 +3002,7 @@ local parent = type(gethui) == "function" and gethui() or Services.CoreGui
 local attached = pcall(function() gui.Parent = parent end)
 if not attached then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
 local panel = Instance.new("Frame")
-panel.Size = UDim2.fromOffset(410, 318)
+panel.Size = UDim2.fromOffset(410, 354)
 panel.Position = UDim2.new(1, -426, 0, 60)
 panel.BackgroundColor3 = Color3.fromRGB(20, 29, 42)
 panel.BorderSizePixel = 0
@@ -2636,7 +3018,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 3.1.0 | observation agent"
+title.Text = "RoWorld 3.2.0 | observation agent"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")
@@ -2701,6 +3083,11 @@ local friendsCorner=corner:Clone();friendsCorner.Parent=friendsButton
 api.helpFriends=not previous or previous.helpFriends~=false
 local function paintFriends() friendsButton.Text="Help Roblox friends: "..(api.helpFriends and "ON" or "OFF") end
 paintFriends()
+local scatterButton=friendsButton:Clone()
+scatterButton.Name='ScatterToggle';scatterButton.Position=UDim2.fromOffset(12,310);scatterButton.Parent=panel
+api.useScatter=not previous or previous.useScatter~=false
+local function paintScatter() scatterButton.Text='Use owned Scattershot: '..(api.useScatter and 'ON' or 'OFF') end
+paintScatter()
 local function repaint(message)
     if not api.alive then return end
     button.Text = api.enabled and "Stop bot" or "Start bot"
@@ -2725,6 +3112,7 @@ local adapter = Adapter.new(Services, require, nil, {
 adapter.network = Network.new(Services,Wire,Mirror,os.clock,task.spawn,function() task.wait() end,function(bytes)
     return game:GetService("EncodingService"):DecompressBuffer(bytes,Enum.CompressionAlgorithm.Zstd)
 end)
+adapter.network.declaredScatter=api.useScatter
 local reported
 function api.diagnostics() return adapter:diagnostics() end
 local function reportAccessFailure()
@@ -2784,6 +3172,11 @@ table.insert(api.connections,friendsButton.Activated:Connect(function()
     api.helpFriends=not api.helpFriends;policy.cooperation.enabled=api.helpFriends
     if policy.state then policy.cooperation:update({state=policy.state,me=policy.me,info=policy.state.owners[policy.me]}) end
     paintFriends()
+end))
+table.insert(api.connections,scatterButton.Activated:Connect(function()
+    api.useScatter=not api.useScatter;adapter.network.declaredScatter=api.useScatter
+    if not api.useScatter then policy.salvoPlan=nil end
+    paintScatter()
 end))
 local runtime={decisions=0,skipped=0,blocked_orders=0,last_decision_ms=0,mean_decision_ms=0,profile_source=profileSource,profile_storage=type(writefile)=="function" and "local JSON and memory" or "memory only"}
 local function updateStats()
@@ -2876,6 +3269,8 @@ task.spawn(function()
                 -- from user input. Keep that same heartbeat while autoplay is on.
                 if type(frame.session.note_activity) == "function" then frame.session:note_activity() end
                 local started=os.clock()
+                frame.useScatter=api.useScatter
+                runtime.use_owned_scattershot=api.useScatter
                 policy.cooperation.enabled=api.helpFriends
                 policy.cooperation:setRoster(roster)
                 local action, waiting = policy:decide(frame)

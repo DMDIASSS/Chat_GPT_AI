@@ -93,11 +93,18 @@ function Geography.sites(frame,anchor,frontSites)
         local xx,yy=x+dx*spacing,y+dy*spacing
         if xx>=0 and yy>=0 and xx<m.W and yy<m.H then add(yy*m.W+xx) end
     end end
-    for _,b in pairs(frame.state.structures) do if b.owner==frame.me then add(b.tile) end end
+    local buildings={}
+    for _,b in pairs(frame.state.structures) do if b.owner==frame.me then table.insert(buildings,b.tile) end end
+    table.sort(buildings)
+    local offset=#buildings>0 and ((frame.state.tick or 0)//10*127)%#buildings or 0
+    for i=1,math.min(128,#buildings) do add(buildings[(offset+i-1)%#buildings+1]) end
     for _,t in ipairs(frontSites or {}) do if m:is_coastal(t) then add(t) end end
     -- The original spawn can remain owned while its neighborhood becomes unsafe.
     -- Search other holdings too, rather than silently saving forever at that point.
     for i=1,64 do add(Geography.sample(m,'land_list',(frame.state.tick or 0)*31337+i*104729)) end
+    -- Ports must search coast explicitly; random land probes rarely hit a thin
+    -- coastline on a large map. Rotate a bounded set across the whole map.
+    for i=1,128 do add(Geography.sample(m,'coast_list',(frame.state.tick or 0)*7919+i*104729)) end
     return sites
 end
 function Geography.landing(frame,t,anchor,escape)

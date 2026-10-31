@@ -1,10 +1,10 @@
 -- Versioned RoWorld features. No OpenFront checkpoint is compatible with this schema.
 local Schema = {
-    version = 'roworld-observation-v1', context = 204, action = 48, hidden = 32,
+    version = 'roworld-observation-v2', context = 204, action = 49, hidden = 32,
     max_candidates = 96, prior_scale = 1, decision_ticks = 10,
     types = {'wait','spawn','expand','attack','boat','retreat','city','factory','port',
         'defense','sam','silo','warship','move_warship','ally_request','ally_accept',
-        'ally_reject','ally_extend','donate','atom','hydrogen','mirv','ally_break'},
+        'ally_reject','ally_extend','donate','atom','hydrogen','mirv','ally_break','scatter'},
 }
 Schema.ids = {}
 for i,name in ipairs(Schema.types) do Schema.ids[name]=i end

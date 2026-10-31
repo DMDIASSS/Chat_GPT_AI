@@ -4,6 +4,9 @@ local Schema=require('./schema')
 local Geography=require('./geography')
 local Weapons=require('./shared/weapons')
 local Coalition=require('./shared/coalition')
+local Infrastructure=require('./infrastructure')
+local Navy=require('./navy')
+local Arsenal=require('./arsenal')
 local function clamp(v) return Schema.clamp(v,0,8) end
 local function ratio(a,b) return clamp((a or 0)/math.max(1,b or 0)) end
 local function recruit(p,seconds)
@@ -218,66 +221,10 @@ function Actions.generate(frame,o,agent)
     local aid=agent.cooperation:aid(frame,{home=o.home,incoming=o.incoming,available=o.available,reserve=o.reserve},true)
     if aid and not agent.betrayalPlan then aid.kind='donate';aid.bias=5;add(aid) end
     local sites=Geography.sites(frame,o.anchor,o.frontSites)
-    agent.constructionAssessments={}
+    local construction,diagnostics=Infrastructure.generate(frame,o,agent,sites)
+    agent.constructionAssessments=diagnostics
+    for _,action in ipairs(construction) do add(action) end
     local rules=frame.ctx.rules
-    local kinds={'city','factory','port','defense','sam','silo'}
-    local hasHostileSilo=false
-    for _,b in pairs(s.structures) do
-        if b.kind==5 and b.owner~=me and not s:are_allies(me,b.owner) then hasHostileSilo=true;break end
-    end
-    local posts=(o.counts[3] or 0);local recent=0
-    for _,stamp in ipairs(agent.postPurchases) do if now-stamp<60 then recent+=1 end end
-    local safeCache={}
-    for _,kind in ipairs(kinds) do
-        local available=rules:availability(kind)
-        local diagnostic={kind=kind,available=available.ok==true,cost=available.cost,checked_sites=#sites,legal_sites=0,safe_sites=0}
-        table.insert(agent.constructionAssessments,diagnostic)
-        if not available.ok then diagnostic.reason=tostring(available.reason or 'unavailable according to current game rules');continue end
-        local bias
-        if kind=='city' then bias=4.5+(o.home/o.capacity)*2-(o.levels[0] or 0)*.35
-        elseif kind=='factory' then bias=(o.levels[0] or 0)>0 and 5.2-(o.levels[2] or 0)*.7 or -3
-        elseif kind=='port' then bias=4.3-(o.levels[1] or 0)*.7
-        elseif kind=='defense' then
-            if posts>=3 or recent>=3 or o.incoming==0 then diagnostic.reason='post cap, rolling purchase cap or no land invasion';continue end
-            bias=4+math.min(4,o.incoming/math.max(1,o.home)*5)
-        elseif kind=='sam' then
-            if not hasHostileSilo and #o.alerts==0 then diagnostic.reason='no observed missile threat';continue end
-            bias=6+math.min(2,#o.alerts)-(o.levels[4] or 0)
-        else
-            if o.home<o.incoming*2 or (o.levels[0] or 0)<2 or (frame.info.gold or 0)<available.cost+750000 then diagnostic.reason='holding invasion, economy or launch funding reserves';continue end
-            bias=3-(o.levels[5] or 0)
-        end
-        local proposals={};local used={}
-        for _,t in ipairs(sites) do
-            local placement=rules:placement(kind,t)
-            if placement.ok and not used[placement.tile] then
-                diagnostic.legal_sites+=1
-                used[placement.tile]=true
-                local margin=(kind=='defense' or kind=='sam') and 8 or 18
-                local key=tostring(placement.tile)..':'..margin..':'..tostring(kind=='port')
-                local safe=safeCache[key]
-                if safe==nil then safe=Geography.safe(frame,placement.tile,kind);safeCache[key]=safe end
-                if safe then
-                    diagnostic.safe_sites+=1
-                    local level=0
-                    for _,b in pairs(s.structures) do if b.tile==placement.tile then level=b.level or 1 end end
-                    local concentration=0
-                    for _,b in pairs(s.structures) do
-                        if b.owner==me and m.dist2(b.tile,placement.tile)*(m.k_lin or 1)^2<80^2 then concentration+=b.level or 1 end
-                    end
-                    local payback=kind=='city' and recruit({troops=o.home,max_troops=o.capacity+250000},30)-recruit(frame.info,30) or 0
-                    table.insert(proposals,{kind=kind,intent={type='build',kind=kind,tile=placement.tile},cost=available.cost,
-                        bias=bias-(placement.upgrade and .15+level*.12 or 0)-concentration*.015,
-                        upgrade=placement.upgrade,level=level,payback=payback/100000,channel='construction',cooldown=3,
-                        safety={margin=margin,coastal=kind=='port'},label=(placement.upgrade and 'Upgrading ' or 'Building ')..kind..' at a protected site'})
-                end
-            end
-        end
-        table.sort(proposals,function(a,b) return a.bias==b.bias and a.intent.tile<b.intent.tile or a.bias>b.bias end)
-        diagnostic.candidates=math.min(2,#proposals);diagnostic.best_score=proposals[1] and proposals[1].bias
-        diagnostic.reason=#proposals==0 and 'no legal site passes the protected-building setback' or diagnostic.best_score<=0 and 'investment ranked below waiting' or 'investment candidate available'
-        for i=1,math.min(2,#proposals) do add(proposals[i]) end
-    end
     -- Naval routes, missile availability and blast protection use RoWorld's actual checks.
     local coasts={};local seenCoasts={}
     for i=1,64 do
@@ -307,80 +254,8 @@ function Actions.generate(frame,o,agent)
         table.sort(naval,function(a,b) return a.bias==b.bias and a.intent.tile<b.intent.tile or a.bias>b.bias end)
         for i=1,math.min(4,#naval) do add(naval[i]) end
     end
-    local waterTargets={}
-    for _,b in pairs(s.structures) do if b.owner==me and b.kind==1 and b.active_tick<=s.tick then
-        Geography.neighbors(m,b.tile,function(t) if type(m.is_water)=='function' and m:is_water(t) then table.insert(waterTargets,t) end end)
-    end end
-    local threats={}
-    for _,u in pairs(s.units or {}) do
-        local path=u.path or {};local index=math.clamp(math.floor(math.max(0,s.tick-(u.start_tick or s.tick))*100/math.max(1,u.ticks_per_tile_x100 or 100))+1,1,math.max(1,#path))
-        local t=path[index] or u.patrol_tile
-        if u.owner~=me and not s:are_allies(me,u.owner) and (u.kind==0 or u.kind==2)
-            and Geography.valid(m,t) and type(m.is_water)=='function' and m:is_water(t)
-            and m.dist2(o.anchor,t)*(m.k_lin or 1)^2<200^2 then table.insert(threats,t) end
-    end
-    table.sort(waterTargets);table.sort(threats)
-    local patrol=threats[1] or waterTargets[1]
-    if patrol and #waterTargets>0 then
-        if o.ships<(#threats>0 and 3 or 1) and rules:availability('warship').ok then
-            local t=waterTargets[1]
-            if rules:placement('warship',t).ok then add({kind='warship',intent={type='build',kind='warship',tile=t},
-                cost=rules:cost('warship'),bias=#threats>0 and 7 or 3.5,channel='fleet',cooldown=10,label='Building a coastal warship'}) end
-        end
-        for uid,u in pairs(s.units or {}) do
-            if #threats>0 and u.owner==me and u.kind==2 and u.state==0 and (u.max_hp or 0)>0 and u.hp>=u.max_hp*.8 then
-                local path=u.path or {};local pos=path[1] or u.patrol_tile;local body=m.water_body_of or m.body_of
-                if Geography.valid(m,pos) and body and body(m,pos)==body(m,patrol)
-                    and (not Geography.valid(m,u.patrol_tile) or m.dist2(u.patrol_tile,patrol)>25) then
-                    add({kind='move_warship',intent={type='move_warship',uid=uid,tile=patrol},bias=8,
-                        channel='ship:'..uid,cooldown=6,label='Intercepting a visible coastal threat'})
-                end
-            end
-        end
-    end
-    local strikeTargets={}
-    for _,b in pairs(s.structures) do
-        if b.owner>0 and not protected(frame,agent,b.owner) then table.insert(strikeTargets,{tile=b.tile,value=(b.level or 1)*(b.kind==3 and 1 or 4),owner=b.owner}) end
-    end
-    table.sort(strikeTargets,function(a,b) return a.value==b.value and a.tile<b.tile or a.value>b.value end)
-    -- Keep a bounded strategic shortlist, then favor real clusters rather than the
-    -- first arbitrary building in a large empire (large blasts need real value).
-    while #strikeTargets>128 do table.remove(strikeTargets) end
-    local clusterRadius=Weapons.radius(m,'hydrogen')^2
-    for _,target in ipairs(strikeTargets) do
-        target.cluster=0
-        for _,other in ipairs(strikeTargets) do
-            if m.dist2(target.tile,other.tile)<=clusterRadius then target.cluster+=other.value end
-        end
-    end
-    table.sort(strikeTargets,function(a,b)
-        if a.cluster~=b.cluster then return a.cluster>b.cluster end
-        return a.value==b.value and a.tile<b.tile or a.value>b.value
-    end)
-    for _,kind in ipairs({'atom','hydrogen','mirv'}) do
-        if not rules:availability(kind).ok then continue end
-        for i=1,math.min(4,#strikeTargets) do
-            local target=strikeTargets[i]
-            local duplicate=false
-            for _,n in pairs(s.nukes) do
-                if n.owner==me and Geography.valid(m,n.to_tile) and m.dist2(n.to_tile,target.tile)<(Weapons.radius(m,kind)*.8)^2 then duplicate=true;break end
-            end
-            local value=0;local radius=Weapons.radius(m,kind)
-            for _,b in pairs(s.structures) do
-                if b.owner>0 and not protected(frame,agent,b.owner) and m.dist2(b.tile,target.tile)<=radius^2 then
-                    value+=(({[0]=125000,[1]=125000,[2]=125000,[3]=50000,[4]=1500000,[5]=1000000})[b.kind] or 0)*(b.level or 1)
-                end
-            end
-            local cost=rules:cost(kind)
-            if not duplicate and value>=cost*.9 and rules:placement(kind,target.tile).ok
-                and Weapons.canLaunch(s,me,target.tile,kind) then
-                add({kind=kind,intent={type='nuke',kind=kind,tile=target.tile},cost=rules:cost(kind),
-                    bias=3+math.min(5,value/math.max(1,cost))+(o.incomingBy[target.owner] and 4 or 0),channel='missile',cooldown=10,
-                    label='Launching '..kind..' at a valuable exposed target'})
-                break
-            end
-        end
-    end
+    for _,action in ipairs(Navy.generate(frame,o,agent)) do add(action) end
+    for _,action in ipairs(Arsenal.generate(frame,o,agent)) do add(action) end
     -- Fair family budget: a large diplomacy roster cannot evict every combat/build proposal.
     table.sort(rows,function(a,b)
         if a.bias~=b.bias then return a.bias>b.bias end
