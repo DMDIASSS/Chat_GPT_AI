@@ -1,6 +1,6 @@
 {
   "profile": "turbo_soccer_standard",
-  "profile_sha256": "62c0b95b4941daed3d947c2c062bb4c4922db3b86cea45f254de6332d87be6d6",
+  "profile_sha256": "1c02ed0441cc0b99d806f68ceb8205fbd41cb7f84dbda5fd611f8fe38ad3ceb2",
   "step_sim_units": 128,
   "vertices": 21015,
   "triangles": 42026,

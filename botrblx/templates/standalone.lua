@@ -6,12 +6,17 @@
 -- LOCAL_TEAMS_HERE
 -- LOCAL_CARS_HERE
 -- LOCAL_KICKOFF_HERE
+-- LOCAL_PHYSICS_HERE
+-- LOCAL_INTERCEPT_HERE
 local PROFILE=
 -- ARENA_PROFILE_HERE
 local arenaAdapter=Arena.new(PROFILE)
 local padReader=Pads.new(PROFILE)
 local carReader=Cars.new(PROFILE,Arena)
 local kickoff=Kickoff.new(PROFILE)
+local physics=Physics.new(PROFILE,arenaAdapter)
+local intercept=Intercept.new(PROFILE,arenaAdapter,physics)
+local physicsEnabled=true
 local TEAM,manualTeam=nil,nil
 local HZ=30 -- pose sampling; policy decisions target 15 Hz (tick skip 8 at 120 Hz)
 local player=game:GetService("Players").LocalPlayer
@@ -22,21 +27,27 @@ assert(not pg:FindFirstChild("Update271Standalone"),"Close the old standalone pa
 local gui=Instance.new("ScreenGui")
 gui.Name="Update271Standalone";gui.ResetOnSpawn=false;gui.DisplayOrder=1000072
 local panel=Instance.new("Frame",gui)
-panel.Size=UDim2.fromOffset(480,200);panel.Position=UDim2.fromOffset(20,20)
+panel.Size=UDim2.fromOffset(480,260);panel.Position=UDim2.fromOffset(20,20)
 panel.BackgroundColor3=Color3.fromRGB(18,22,30)
 local label=Instance.new("TextLabel",panel)
-label.Position=UDim2.fromOffset(10,8);label.Size=UDim2.new(1,-20,0,150)
+label.Position=UDim2.fromOffset(10,8);label.Size=UDim2.new(1,-20,0,172)
 label.BackgroundTransparency=1;label.TextColor3=Color3.new(1,1,1)
 label.TextSize=14;label.Font=Enum.Font.Code;label.TextWrapped=true
 label.Text="Update271 LOCAL: loading private model..."
 local start=Instance.new("TextButton",panel)
-start.Position=UDim2.fromOffset(10,165);start.Size=UDim2.fromOffset(150,30)
+start.Position=UDim2.fromOffset(10,185);start.Size=UDim2.fromOffset(150,30)
 start.Text="Start bot / F6";start.Active=false
 local teamButton=Instance.new("TextButton",panel)
-teamButton.Position=UDim2.fromOffset(170,165);teamButton.Size=UDim2.fromOffset(140,30)
+teamButton.Position=UDim2.fromOffset(170,185);teamButton.Size=UDim2.fromOffset(140,30)
 teamButton.Text="Team: AUTO"
 local close=Instance.new("TextButton",panel)
-close.Position=UDim2.fromOffset(320,165);close.Size=UDim2.fromOffset(150,30);close.Text="Close"
+close.Position=UDim2.fromOffset(320,185);close.Size=UDim2.fromOffset(150,30);close.Text="Close"
+local physicsButton=Instance.new("TextButton",panel)
+physicsButton.Position=UDim2.fromOffset(10,222);physicsButton.Size=UDim2.fromOffset(220,28)
+physicsButton.Text="Physics assist: ON"
+local reportButton=Instance.new("TextButton",panel)
+reportButton.Position=UDim2.fromOffset(240,222);reportButton.Size=UDim2.fromOffset(230,28)
+reportButton.Text="Save physics report"
 gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
@@ -68,11 +79,14 @@ local function release()
     keyboard:release()
     arenaAdapter:resetRecovery()
     kickoff:reset()
+    intercept:reset();physics.plan=nil
 end
 local function controls()
     start.Visible=not enabled and not testingKeyboard
     teamButton.Visible=not enabled and not testingKeyboard
     close.Visible=not enabled and not testingKeyboard
+    physicsButton.Visible=not enabled and not testingKeyboard
+    reportButton.Visible=not enabled and not testingKeyboard
 end
 local function stop(reason)
     epoch=epoch+1;enabled=false;testingKeyboard=false;release();controls()
@@ -113,6 +127,25 @@ teamButton.Activated:Connect(function()
     stop();manualTeam=manualTeam==nil and 0 or(manualTeam==0 and 1 or nil)
     teamReader.at=-math.huge
     teamButton.Text=manualTeam==nil and "Team: AUTO"or(manualTeam==0 and "Manual: BLUE"or "Manual: ORANGE")
+end)
+physicsButton.Activated:Connect(function()
+    stop();physicsEnabled=not physicsEnabled
+    physicsButton.Text=physicsEnabled and "Physics assist: ON"or "Physics assist: OFF"
+    label.Text=physicsEnabled and "Physics ground approach enabled. F6 starts."
+        or "Model only. Ball monitoring remains active. F6 starts."
+end)
+reportButton.Activated:Connect(function()
+    stop()
+    local ok,reason=pcall(function()
+        assert(type(writefile)=="function","Executor writefile is unavailable")
+        local report=physics:report()
+        report.physics_assist_enabled=physicsEnabled
+        report.model_sha256="__MODEL_SHA__";report.place=game.PlaceId
+        local body=game:GetService("HttpService"):JSONEncode(report)
+        writefile("TurboBall_Physics_Report.json",body)
+    end)
+    label.Text=ok and "Saved TurboBall_Physics_Report.json in the executor workspace."
+        or("Could not save physics report: "..tostring(reason))
 end)
 connect(input.InputBegan,function(key,processed)
     if key.KeyCode==Enum.KeyCode.F8 then stop("STOPPED by F8. F6 starts again.")
@@ -167,7 +200,7 @@ task.spawn(function()
         local period=math.max(1/15,peak*1.3)
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=("Update271 LOCAL v5 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nAUTO team enabled for Deadline_coolgun. F6 starts.")
+        label.Text=("Update271 LOCAL v6 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nPhysics approach ON | AUTO team | F6 starts.")
             :format(peak*1000,1/period)
         local lastTick,lastDecision,lastUi=os.clock(),-math.huge,-math.huge
         local busy=false
@@ -184,6 +217,7 @@ task.spawn(function()
                     stop("LOCAL paused: focus/chat/F8 or stalled frame. F6 restarts.")
                 end
                 local packet,reason=read()
+                physics:observe(packet,now)
                 if not enabled or now<armAt then return end
                 local keyboardOk,keyboardReason=keyboard:verify()
                 assert(keyboardOk,keyboardReason)
@@ -199,12 +233,16 @@ task.spawn(function()
                 local ground=packet.ground_estimate
                 if ground and(not lastGround or previous[6]==0)then jumpAt=nil;usedFlip=false end
                 lastGround=ground
-                local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<1.45))
+                local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<PROFILE.physics.DOUBLEJUMP_MAX_DELAY))
                 local action=override
+                physics.plan=nil
                 if not action then
                     local query,entities=Policy.observe(packet,previous,hasFlip)
                     local index=predict(query,entities)
                     action,recovery=arenaAdapter:recovery(packet,previous,now)
+                    if not action and physicsEnabled then
+                        action,recovery=intercept:step(packet,actions[index],now)
+                    end
                     action=action or actions[index]
                 end
                 local wanted,actual=Policy.keys(action,ground)
@@ -234,17 +272,21 @@ task.spawn(function()
                 end
                 local inputMs=(os.clock()-inputAt)*1000
                 assert(inputMs<200,"Executor input calls exceeded 200ms")
+                physics.decision={mode=recovery or "model",milliseconds=inferenceMs,
+                    input_milliseconds=inputMs,action=table.clone(actual)}
                 previous=actual;count=count+1
                 if now-rateStart>=1 then rate=count/(now-rateStart);count=0;rateStart=now end
                 if now-lastUi>=.2 then
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=("LOCAL v5 | %.1f Hz | %s\nInfer %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop")
+                    label.Text=("LOCAL v6 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
                             packet.car_preset or "standard",packet.car_size_verified and ""or "?",
-                            packet.ball_radius or PROFILE.physics.BALL_RADIUS,packet.ball_size_verified and ""or "?",packet.wheel_contacts or 0)
+                            packet.ball_radius or PROFILE.physics.BALL_RADIUS,packet.ball_size_verified and ""or "?",packet.wheel_contacts or 0,
+                            physics.mismatch and "MISMATCH / model"or physics.status,physics.gravity,
+                            physics.error and("%.1f units"):format(physics.error)or "unmeasured")
                 end
             end)
             busy=false
@@ -253,4 +295,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-5"}
+return {started=true,version="local-6"}

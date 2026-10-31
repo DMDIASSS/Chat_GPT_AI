@@ -78,9 +78,10 @@ function Cars:read(scene,ownRoot,ballRoot,now,pose,ball,ballRadius,ownTeam)
         end
     end
     local p=ownRoot.Position
+    local scale=1/self.profile.roblox_studs_per_sim_unit
     local function distance(body)
         local v=body.position
-        return (v[1]-p.X*10)^2+(v[2]-p.Z*10)^2+(v[3]-p.Y*10)^2
+        return (v[1]-p.X*scale)^2+(v[2]-p.Z*scale)^2+(v[3]-p.Y*scale)^2
     end
     table.sort(rows,function(a,b)return distance(a)<distance(b)end)
     while #rows>5 do table.remove(rows)end

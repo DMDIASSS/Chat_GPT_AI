@@ -1,4 +1,4 @@
-# Update271 Roblox adapter
+# TurboBall Roblox bot — Local v6
 
 ## Local Lua mode: remove the file round trip
 
@@ -20,7 +20,7 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v5 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v6 ready | model self-test passed`**, then press **F6**.
    **Team: AUTO** identifies `Deadline_coolgun` from the match scoreboard and
    cross-checks the rendered nameplate relationship. It follows team changes.
    If the team cannot be identified, open the in-game scoreboard once. The
@@ -84,6 +84,54 @@ EXPORT_LOCAL_BOT.bat --workspace "C:\Users\almas\AppData\Roaming\jjsploit\worksp
 EXPORT_LOCAL_BOT.bat --model "D:\Models\update.pt"
 ```
 
+## Physics-aware ground approach (local v6)
+
+This update targets **standard soccer in place 101880234193261**. Extract it over
+the existing `botrblx` folder and rerun **EXPORT_LOCAL_BOT.bat**. Keep your existing
+checkpoint; no training is required to use the new controller.
+
+**Physics assist: ON** is the default. A new independent ball/world predictor
+steps at the saved game's 120 Hz, forecasting 2.5 seconds ahead with gravity,
+exponential drag, friction, restitution, contact spin, speed limits and sleep.
+It uses the analytic collision field and scales both collision radii from the
+observed ball marker. Future car touches are unknown and are not simulated.
+
+On the flat ground, the approach controller selects a low future ball position
+using a bounded travel estimate with the saved throttle torque curve, speed cap
+and finite boost. It sets up behind the ball toward the opposing goal, takes a
+side approach from the wrong side, checks for an incoming own-goal trajectory,
+brakes for turns and only boosts when aligned. Steering accounts for current
+yaw rate. Rounded corners constrain approach targets. The frozen actor still
+handles close contact, jumps, aerials and wall play; scripted kickoffs and stuck
+recovery retain priority. The actor's observation format and weights are unchanged.
+The flip timer now uses the saved **1.25 seconds**, and pose/nearby-car coordinates
+honor the selected profile scale throughout.
+
+The panel shows gravity in use and the median short-flight position error when
+measurable. Gravity can adapt after at least six consistent isolated airborne
+position windows. Near-car motion, boundary contacts, pose gaps and resets are
+excluded. This does not infer arbitrary arena dimensions, friction or steering
+from a few frames. A gross geometry/flight mismatch returns approach decisions
+to the actor and displays **MISMATCH / model**. Unknown or alternate arenas still
+need their own profile.
+
+Pause with **F8** to switch **Physics assist: ON/OFF** for comparison. **Save physics
+report** writes `TurboBall_Physics_Report.json` to the executor workspace on click.
+It contains the selected numeric profile, radius/contact measurements, bounded
+recent pose/control trace, calibration result and decision timing. Nothing is
+uploaded. It excludes model tensors and account names. The last 150 samples at
+up to 5 Hz are retained (about 30 seconds).
+
+Offline checks compare twelve ball scenarios with numeric results from the saved
+solver, including scaled balls, ramps, spin, goals and sleep. Flat-world cases
+agree within 0.004 simulation units; curved goal-frame responses are approximate
+and use separate tolerances. These tolerances describe these reference cases,
+not an error guarantee for every trajectory. Controller scenarios cover leading
+lateral motion, team mirroring, approach direction, defensive interception and
+handoff to the actor. This release has **not been live-tested in Roblox/JJSploit**.
+It adds a physics controller around the existing model; full adaptation of its
+learned aerial/touch mechanics still requires target-physics training.
+
 ## Measured arena, hitboxes and boost pads (local v3)
 
 `arena_profile.json` records numeric specifications recovered from the saved
@@ -128,16 +176,15 @@ the normal Windows exporter does not need a Luau CLI.
 
 **Model 271 has no hitbox-size, mesh, goal-shape or physics-parameter input.** Its
 existing 24-feature entity format does accept the measured boost positions and
-availability, which are now used. Hitbox and arena data inform contact estimation
-and recovery around the policy. Loading an OBJ cannot make frozen weights learn
+availability, which are now used. Hitbox and arena data inform contact estimation,
+recovery and the v6 ground interception controller around the policy. Loading an OBJ cannot make frozen weights learn
 different bounce, friction, jump or steering dynamics. Matching those dynamics
 fully requires simulator validation and fine-tuning on the target physics.
-The profile and collision preview prepare that work; no training is launched by
-this update. Alternate `ArenaFree` modes are paused instead of using the standard
+No training is launched by this update. Alternate `ArenaFree` modes are paused instead of using the standard
 stadium collision shape for them.
 
 After updating this folder, **rerun `EXPORT_LOCAL_BOT.bat`** to embed the geometry
-and pad adapter in your private standalone script. An optional
+and physics/pad adapters in your private standalone script. An optional
 `--arena-profile "D:\path\profile.json"` selects a numeric profile; it does not
 change model weights or create a policy mesh input.
 
@@ -145,7 +192,7 @@ change model weights or create a policy mesh input.
 
 Rerun **EXPORT_LOCAL_BOT.bat after installing this update**: the previous generated
 standalone script contains the previous adapter. No model weights are downloaded
-or retrained. Wait for the **v5** badge to confirm the new script is installed.
+or retrained. The current package shows a **v6** badge after re-export.
 
 The game uses its own match teams. The new reader matches your name to the
 scoreboard row's team edge; it does not assume Roblox's `Player.Team` is the match

@@ -57,7 +57,33 @@
     "DOUBLEJUMP_MAX_DELAY": 1.25,
     "MAX_SUSPENSION_TRAVEL": 12.0,
     "WHEEL_RAY_MIN_HIT_DIST": 17.079519899575633,
-    "CAR_SPAWN_REST_Z": 17.0
+    "CAR_SPAWN_REST_Z": 17.0,
+    "TICK_RATE": 120,
+    "BALLWORLD_FRICTION": 0.35,
+    "BALLWORLD_RESTITUTION": 0.6,
+    "SOLVER_ERP2": 0.8,
+    "RESTITUTION_VEL_THRESHOLD": 10,
+    "CONTACT_BREAKING_THRESHOLD": 1,
+    "BALL_WORLD_CONTACT_FLAT": 0.0050000000000001155,
+    "BALL_SLEEP_LIN_SPEED": 40,
+    "BALL_SLEEP_ANG_SPEED": 1,
+    "BALL_SLEEP_TIME": 2,
+    "CAR_MASS": 180,
+    "THROTTLE_TORQUE_AMOUNT": 72000,
+    "DRIVE_SPEED_TORQUE_FACTOR": [
+      [
+        0,
+        1
+      ],
+      [
+        1400,
+        0.1
+      ],
+      [
+        1410,
+        0
+      ]
+    ]
   },
   "car_presets": {
     "standard": {

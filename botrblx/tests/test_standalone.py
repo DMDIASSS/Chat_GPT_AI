@@ -139,7 +139,7 @@ task.wait=function(dt)move(dt)end
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-5')
+assert(result.version=='local-6')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -307,6 +307,44 @@ local held={}
 for _,e in ipairs(emissions)do if e[1]=='down'then held[e[2]]=true else held[e[2]]=nil end end
 assert(next(held)==nil,'Invalid state did not release')
 click('Close')
+''')
+
+    def test_physics_assist_toggle_and_manual_report_export_release_inputs(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,45 do move(1/30)end
+inputKey('F8')
+click('Physics assist: ON')
+inputKey('F6');for i=1,30 do move(1/30)end
+inputKey('F8');click('Save physics report')
+assert(savedName=='TurboBall_Physics_Report.json' and savedReport,'Report was not written')
+local report=encoded[savedReport]
+assert(report.version=='local-6' and report.physics_assist_enabled==false)
+assert(report.place==101880234193261 and #report.model_sha256==64)
+assert(#report.trace>0 and #report.trace<=150 and report.profile=='turbo_soccer_standard')
+assert(not report.account and not report.tensors,'Private identity/weights entered report')
+click('Physics assist: OFF')
+local held={}
+for _,e in ipairs(emissions)do if e[1]=='down'then held[e[2]]=true else held[e[2]]=nil end end
+assert(next(held)==nil,'Report/toggle left inputs down')
+''',"click('Close')",extra='''
+local savedName,savedReport
+writefile=function(name,body)savedName,savedReport=name,body end
+''')
+
+    def test_custom_coordinate_scale_is_used_by_actual_shared_pose_reader(self):
+        # The geometry reader already honored profile scale, but the shared pose
+        # reader previously multiplied by 10 regardless of the chosen profile.
+        source=(APP/"client271.lua").read_text().split("-- POSE_READER_BEGIN",1)[1].partition("\n")[2].split("-- POSE_READER_END",1)[0]
+        prefix=(HERE/"fixtures/roblox_mock.luau").read_text()
+        self.run_lua(prefix+'''
+local arenaAdapter={profile={roblox_studs_per_sim_unit=.2}}
+'''+source+'''
+local p=pose(frame(12),frame(10),.1)
+assert(p.position[1]==60 and p.position[3]==10)
+assert(p.velocity[1]==100,'Pose velocity used a hardcoded coordinate scale')
+arenaAdapter=nil
+p=pose(frame(12),frame(10),.1)
+assert(p.position[1]==120 and p.velocity[1]==200,'Legacy bridge scale changed')
 ''')
 
     def test_cli_exports_native_actor_without_installing_or_starting_bridge(self):

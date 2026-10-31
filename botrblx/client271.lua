@@ -297,7 +297,8 @@ local function pose(frame,previous,dt)
     local delta=frame.Position-previous.Position
     local axis,angle=previous:ToObjectSpace(frame):ToAxisAngle()
     local omega=previous:VectorToWorldSpace(axis)*(angle/dt)
-    return {position=sim(frame.Position,10),velocity=sim(delta/dt,10),
+    local scale=arenaAdapter and 1/arenaAdapter.profile.roblox_studs_per_sim_unit or 10
+    return {position=sim(frame.Position,scale),velocity=sim(delta/dt,scale),
         forward=sim(frame.LookVector,1),up=sim(frame.UpVector,1),
         angular_velocity=sim(omega,-1)},delta.Magnitude
 end
@@ -348,7 +349,7 @@ local function read()
         ballRadius,ballSizeVerified=arenaAdapter:ballRadius(ballRoot)
         grounded,contacts,ballContacts=arenaAdapter:ground(cp,bp,ballRadius)
     end
-    local packet={car=cp,ball=bp,boost=b,team=TEAM,ground_estimate=grounded,valid=true}
+    local packet={car=cp,ball=bp,boost=b,team=TEAM,ground_estimate=grounded,valid=true,sample_dt=dt}
     packet.team_source=teamSource
     if arenaAdapter then
         packet.ball_radius,packet.ball_size_verified=ballRadius,ballSizeVerified

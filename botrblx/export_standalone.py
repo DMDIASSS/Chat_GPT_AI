@@ -136,6 +136,24 @@ def load_arena_profile(path):
         if isinstance(value,(float,int)):return bool(np.isfinite(value))
         return isinstance(value,(str,bool))
     if not finite(profile):raise ValueError("Non-finite or unsupported profile value")
+    physics=profile["physics"]
+    def number(value):return type(value) in (int,float)
+    for key in ("BALL_RADIUS","BALL_WORLD_RADIUS","CAR_MASS","THROTTLE_TORQUE_AMOUNT",
+                "CAR_MAX_SPEED","BALL_MAX_SPEED","BALL_MAX_ANG_SPEED","DOUBLEJUMP_MAX_DELAY"):
+        if not number(physics[key]) or physics[key]<=0:raise ValueError("Invalid physics value: "+key)
+    if type(physics["TICK_RATE"]) is not int or not 30<=physics["TICK_RATE"]<=240:
+        raise ValueError("TICK_RATE must be an integer from 30 to 240")
+    for key,upper,inclusive in (("BALL_DRAG",1,False),("BALLWORLD_RESTITUTION",1,True),
+                                ("BALLWORLD_FRICTION",5,True),("SOLVER_ERP2",1,True)):
+        value=physics[key]
+        if not number(value) or value<0 or value>upper or(not inclusive and value==upper):
+            raise ValueError("Invalid physics value: "+key)
+    curve=physics["DRIVE_SPEED_TORQUE_FACTOR"]
+    if not isinstance(curve,list) or len(curve)<2 or any(
+        not isinstance(point,list) or len(point)!=2 or
+        any(not number(v) or v<0 for v in point) for point in curve
+    ) or any(a[0]>=b[0] for a,b in zip(curve,curve[1:])):
+        raise ValueError("Invalid DRIVE_SPEED_TORQUE_FACTOR curve")
     return profile
 
 
@@ -148,6 +166,8 @@ def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None):
     cars=(app_dir/"templates/local_cars.lua").read_text(encoding="utf-8")
     teams=(app_dir/"templates/local_teams.lua").read_text(encoding="utf-8")
     kickoff=(app_dir/"templates/local_kickoff.lua").read_text(encoding="utf-8")
+    physics=(app_dir/"templates/local_physics.lua").read_text(encoding="utf-8")
+    intercept=(app_dir/"templates/local_intercept.lua").read_text(encoding="utf-8")
     if profile is None:profile=load_arena_profile(app_dir/"arena_profile.json")
     client=(app_dir/"client271.lua").read_text(encoding="utf-8")
     pose=client.split("-- POSE_READER_BEGIN",1)[1].partition("\n")[2].split("-- POSE_READER_END",1)[0]
@@ -159,6 +179,8 @@ def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None):
             .replace("-- LOCAL_CARS_HERE", "local Cars=(function()\n"+cars+"\nend)()")
             .replace("-- LOCAL_TEAMS_HERE", "local Teams=(function()\n"+teams+"\nend)()")
             .replace("-- LOCAL_KICKOFF_HERE", "local Kickoff=(function()\n"+kickoff+"\nend)()")
+            .replace("-- LOCAL_PHYSICS_HERE", "local Physics=(function()\n"+physics+"\nend)()")
+            .replace("-- LOCAL_INTERCEPT_HERE", "local Intercept=(function()\n"+intercept+"\nend)()")
             .replace("-- ARENA_PROFILE_HERE",literal(profile))
             .replace("-- MODEL_TENSORS_HERE",tensor_source(tensors))
             .replace("-- MODEL_CASES_HERE",literal(cases))
