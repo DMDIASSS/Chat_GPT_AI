@@ -1,6 +1,7 @@
 import { selectModel } from './model-store.js';
 import { transformMainSource as patchCarSoccer } from './patcher.js';
 import { transformMainSource as patchTurball } from './turball-patcher.js';
+import { assetPath, exportsStartGame, gameplayDependency } from './turball-build.mjs';
 
 // Each site has its own minified source layout and needs its own patcher.
 const SITES = Object.freeze({
@@ -15,8 +16,8 @@ const SITES = Object.freeze({
     id: 'turball',
     label: 'Turball',
     // Gameplay chunks receive a new content-hash filename after game releases.
-    // The game loader in Turball build 332c59c495f7-38732477493-1
-    // imports chunk-TVJT3ATP.js. Match all JS chunks and identify the
+    // The uploaded 98f9b3003e60-41220884867-1 lobby imports chunk-KALAXRXF.js.
+    // Match all JS chunks and identify the
     // gameplay module by its exported startGame entry point, rather than
     // assuming a filename from the previous game build.
     pattern: 'https://turball.io/assets/app/chunk-*.js*',
@@ -38,6 +39,16 @@ function siteForUrl(url) {
 }
 
 function disabledKey(tabId) { return `gct-disabled-tab-${tabId}`; }
+function captureKey(tabId) { return `gct-gameplay-${tabId}`; }
+async function captureGameplay(tabId, url, source) {
+  const path=assetPath(url),bytes=new TextEncoder().encode(source);
+  if(bytes.length>3*1024*1024)throw new Error('Gameplay source exceeds the 3 MiB capture limit');
+  const hash=await crypto.subtle.digest('SHA-256',bytes);
+  const capture={path,filename:path.split('/').pop(),bytes:bytes.length,
+    sha256:Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join(''),source};
+  await chrome.storage.session.set({[captureKey(tabId)]:capture});
+  setStatus(tabId,{canSaveGameplay:true,gameplay:{path,filename:capture.filename,bytes:capture.bytes,sha256:capture.sha256},captureError:null});
+}
 async function isPaused(tabId) {
   const key = disabledKey(tabId);
   return Boolean((await chrome.storage.session.get(key))[key]);
@@ -82,7 +93,9 @@ async function arm(tabId, site, { reload = false } = {}) {
     if (armedTabs.has(tabId)) {
       await detach(tabId, { state: 'switched', enabled: false, message: 'Switched websites.' });
     }
+    await chrome.storage.session.remove(captureKey(tabId));
     setStatus(tabId, { site: site.id, state: 'attaching', enabled: false,
+      canSaveGameplay:false,gameplay:null,expectedGameplay:null,captureError:null,
       message: `Detecting ${site.label}. Preparing the matching script…` });
     try {
       await chrome.debugger.attach({ tabId }, PROTOCOL_VERSION);
@@ -171,14 +184,24 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
   }
 
   try {
+    if (params.responseStatusCode && (params.responseStatusCode<200 || params.responseStatusCode>=300)) {
+      await command(tabId,'Fetch.continueResponse',{requestId});return;
+    }
     const response = await command(tabId, 'Fetch.getResponseBody', { requestId });
     const original = decodeBody(response.body, response.base64Encoded);
     // Turball loads dozens of shared chunks. Only the gameplay module exports
     // startGame; let every other response pass through unmodified. This also
     // prevents accidental rewrites of third-party or unrelated modules.
-    if (site.id === 'turball' && !/\bexport\s*\{[^}]{0,256}\bas\s+startGame\b/.test(original)) {
+    if (site.id === 'turball' && !exportsStartGame(original)) {
+      const expected=gameplayDependency(original,url);
+      if(expected)setStatus(tabId,{expectedGameplay:expected,state:'waiting-gameplay',
+        message:`Lobby loaded. Enter Free Play to load ${expected.split('/').pop()}. The lobby alone does not contain gameplay code.`});
       await command(tabId, 'Fetch.continueResponse', { requestId });
       return;
+    }
+    if(site.id==='turball') {
+      try {await captureGameplay(tabId,url,original);}
+      catch(error){setStatus(tabId,{canSaveGameplay:false,captureError:String(error?.message||error)});}
     }
     setStatus(tabId, { site: site.id, enabled: true, state: 'patching',
       message: `Found ${site.label} gameplay module ${new URL(url).pathname.split('/').pop()}; checking patch compatibility…` });
@@ -201,7 +224,7 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
       try { await command(tabId, 'Fetch.failRequest', { requestId, errorReason: 'Failed' }); } catch {}
     }
     await detach(tabId, { state: /Unsupported Turball build|anchor missing|expected one anchor|Post-patch check/i.test(reason) ? 'unsupported' : 'error', enabled: false,
-      message: `${site.label} ${new URL(url).pathname.split('/').pop()} could not be patched: ${reason}. Game left unmodified. Save this gameplay JS module from DevTools > Network for an updated patch.` });
+      message: `${site.label} ${new URL(url).pathname.split('/').pop()} could not be patched: ${reason}. Game left unmodified. ${statusByTab.get(tabId)?.canSaveGameplay?'Click Save gameplay JS in this popup and send that file for an updated patch.':'Save this gameplay JS response from DevTools > Network for an updated patch.'}` });
   }
 });
 
@@ -237,7 +260,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(details => {
 chrome.tabs.onRemoved.addListener(tabId => {
   armedTabs.delete(tabId);
   statusByTab.delete(tabId);
-  chrome.storage.session.remove([disabledKey(tabId), `gct-status-${tabId}`]).catch(() => {});
+  chrome.storage.session.remove([disabledKey(tabId), `gct-status-${tabId}`,captureKey(tabId)]).catch(() => {});
 });
 
 // When installed while a game tab is already open, reload that tab once so
@@ -262,6 +285,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     const tabId = message.tabId ?? sender.tab?.id;
     if (!tabId) throw new Error('No tab selected.');
+    if(message.type==='gct-gameplay-source'||message.type==='gct-diagnostics') {
+      if(sender.url!==chrome.runtime.getURL('popup.html'))throw new Error('Open the extension popup to export diagnostics');
+      const key=`gct-status-${tabId}`,stored=await chrome.storage.session.get([key,captureKey(tabId)]);
+      if(message.type==='gct-gameplay-source') {
+        const capture=stored[captureKey(tabId)];
+        if(!capture)throw new Error('No gameplay captured yet. Enable + reload, enter Free Play, then reopen this popup.');
+        sendResponse({ok:true,filename:capture.filename,source:capture.source});return;
+      }
+      sendResponse({ok:true,report:{extensionVersion:chrome.runtime.getManifest().version,
+        status:statusByTab.get(tabId)||stored[key]||null,
+        scope:'Connection status and public asset paths/hashes only; no HAR, cookies, account data or gameplay source'}});return;
+    }
     if (message.type === 'gct-select-model') {
       await selectModel(message.modelId);
       sendResponse({ ok: true }); return;

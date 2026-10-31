@@ -1,8 +1,37 @@
-CAR SOCCER + TURBALL AI TRAINER 4.5.1
+TURBALL UPDATE STATUS — 4.5.2 CAPTURE / DIAGNOSTICS UPDATE
+
+The supplied website is release 98f9b3003e60-41220884867-1. Its lobby
+chunk-DLWGG6LS.js imports gameplay from chunk-KALAXRXF.js. The supplied
+HAR contains the lobby but no request/response for that gameplay module.
+Direct retrieval of turball.io is blocked in the development environment.
+The gameplay patch therefore remains UNVERIFIED for this new release.
+This update does not claim to make the new game's AI/TAS adapter compatible.
+
+To obtain the one missing file without exporting another HAR:
+1. Update files INSIDE your existing unpacked extension folder. Keep its
+   directory/extension ID, imported models and existing private .bin files.
+2. Reload the extension at chrome://extensions; close DevTools on the game tab.
+3. Open Turball, click Enable + reload in the extension popup, then Free Play.
+4. Reopen the extension popup. Click Save gameplay JS and upload that .js file.
+   The expected current filename is chunk-KALAXRXF.js; future releases may
+   change it. Save diagnostics is an optional, smaller connection report.
+5. A grey Save gameplay JS button means the gameplay module has not yet been
+   captured. Enter Free Play after enabling/reloading, then reopen the popup.
+
+An unsupported module is passed through unchanged so the game can still load.
+Captures remain in this browser session until a new scan or tab close; they
+survive a background worker restart. Nothing is uploaded automatically.
+Connection reports contain public asset paths/hashes/status, not HAR headers,
+cookies, account data or the full game source. Exports require a popup click.
+No new extension permissions are requested. Existing Car Soccer features and
+model storage are retained. The source-only ZIP does not include game assets,
+uploaded HTML/HAR files or private model binaries.
+
+CAR SOCCER + TURBALL AI TRAINER 4.5.2
 ===================================
 
 NEW: Car Soccer fun controls. Read FUN_CONTROLS.md for keys and host/local scope.
-4.5.1 fixes steering with effects enabled and adds friend-hosted controls.
+4.5.2 fixes steering with effects enabled and adds friend-hosted controls.
 Both players update; the host enables "Allow friend controls", then the joining
 player clicks "Connect to friend's host". The friend keeps hosting normally.
 TAS playback and minimize/restore are retained; see TAS_README.md.
@@ -34,7 +63,7 @@ The patchers must NOT be interchanged: each targets different minified code.
 INSTALLATION
 1. Extract the ZIP. Do not load the ZIP itself.
 2. In Chrome, open chrome://extensions and enable Developer mode.
-3. Choose "Load unpacked" and select Car_Turball_Auto_Trainer_v4.5.1,
+3. Choose "Load unpacked" and select Car_Turball_Auto_Trainer_v4.5.2,
    the directory containing manifest.json.
 4. Disable/remove the previous separate AI trainer extensions before
    using this one; multiple extensions trying to patch the same page can
@@ -91,7 +120,7 @@ CARRIED-OVER FILES
 
 Static verification completed on 2026-10-15.
 
-V4.3.1 TURBALL UPDATE DETECTION
+V4.3.1 TURBALL UPDATE DETECTION (HISTORICAL)
 - A newer Turball build 332c59c495f7-38732477493-1 was observed.
 - Its loader imports chunk-TVJT3ATP.js, instead of the previous chunk-IORKFJL5.js.
 - Turball now detects the gameplay chunk by its `export { ... as startGame }`

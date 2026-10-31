@@ -1,30 +1,32 @@
-TURBALL 332c59c495f7-38732477493-1 (detected from uploaded HTML/HAR)
+TURBALL UPDATE STATUS — 4.5.2 CAPTURE / DIAGNOSTICS UPDATE
 
-This release was created because the extension targeted a previous single
-chunk-IORKFJL5.js gameplay asset. The Turball homepage's current JavaScript
-imports ./chunk-TVJT3ATP.js when starting gameplay.
+The supplied website is release 98f9b3003e60-41220884867-1. Its lobby
+chunk-DLWGG6LS.js imports gameplay from chunk-KALAXRXF.js. The supplied
+HAR contains the lobby but no request/response for that gameplay module.
+Direct retrieval of turball.io is blocked in the development environment.
+The gameplay patch therefore remains UNVERIFIED for this new release.
+This update does not claim to make the new game's AI/TAS adapter compatible.
 
-Version 4.3.1 now scans /assets/app/chunk-*.js for a real startGame export
-and only attempts to patch that file; all other chunks are passed through.
+To obtain the one missing file without exporting another HAR:
+1. Update files INSIDE your existing unpacked extension folder. Keep its
+   directory/extension ID, imported models and existing private .bin files.
+2. Reload the extension at chrome://extensions; close DevTools on the game tab.
+3. Open Turball, click Enable + reload in the extension popup, then Free Play.
+4. Reopen the extension popup. Click Save gameplay JS and upload that .js file.
+   The expected current filename is chunk-KALAXRXF.js; future releases may
+   change it. Save diagnostics is an optional, smaller connection report.
+5. A grey Save gameplay JS button means the gameplay module has not yet been
+   captured. Enter Free Play after enabling/reloading, then reopen the popup.
 
-IMPORTANT: The user's newest HAR does NOT include the actual
-chunk-TVJT3ATP.js gameplay JavaScript; only the reference to the chunk is
-present. We cannot confirm that the old AI patch's minified anchors are still
-valid. A popup showing 'unsupported' means the game was deliberately left
-unchanged to avoid a broken/crashing game.
+An unsupported module is passed through unchanged so the game can still load.
+Captures remain in this browser session until a new scan or tab close; they
+survive a background worker restart. Nothing is uploaded automatically.
+Connection reports contain public asset paths/hashes/status, not HAR headers,
+cookies, account data or the full game source. Exports require a popup click.
+No new extension permissions are requested. Existing Car Soccer features and
+model storage are retained. The source-only ZIP does not include game assets,
+uploaded HTML/HAR files or private model binaries.
 
-TO PROVIDE THE MISSING FILE FOR A FULL COMPATIBILITY UPDATE
-1. Temporarily DISABLE the trainer extension on the Turball tab.
-2. On https://turball.io press F12 > Network. Tick Disable cache.
-3. Reload. Enter Free Play or a match (not just the home screen).
-4. Filter Network by TVJT3ATP or `chunk-` and select the gameplay module.
-   The relevant filename can change again after a new release. Look for
-   'chunk-TVJT3ATP.js' in version 332c59c495f7-38732477493-1.
-5. In the Network response/details, copy or save the JS response as a file,
-   or export HAR WITH CONTENT after gameplay has started.
-6. Send the gameplay JS so the patch anchors can be updated and validated.
-
-Do not confuse the homepage entry `game-ATG57U4Q.js` with the dynamic
-`chunk-TVJT3ATP.js` gameplay module. The entry alone is insufficient.
-
-Version 4.3.2 adds an experimental F9 rendering-only ball visibility workaround. This does not change the compatibility status of unknown Turball game builds.
+The previous validated minified Turball anchors target gameplay chunk-IORKFJL5.js
+(release 6ecc13b81511-38608307515-1). They are deliberately not guessed from
+the new lobby. The full gameplay module is needed for a tested adapter rewrite.

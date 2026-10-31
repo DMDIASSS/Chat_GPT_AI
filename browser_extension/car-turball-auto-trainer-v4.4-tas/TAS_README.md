@@ -77,7 +77,7 @@ it does not change collision geometry or promise the recorded trick succeeds.
 - **Turball:** UI and patched adapter behavior pass tests, including physics
   batches, jump edges, F8, focus loss and mode changes. The patch retains the
   supplied extension's verified control-flow signatures. The newest uploaded HAR
-  includes only the loader's reference to `chunk-TVJT3ATP.js`, not that gameplay
+  includes only the loader's reference to `chunk-KALAXRXF.js`, not that gameplay
   file's contents. **Live compatibility with that newer Turball build remains
   unverified.** See `NEW_TURBALL_BUILD_README.txt` to capture the missing file.
 - Chromium tests exercise binary upload, multiple-file selection, restore/play

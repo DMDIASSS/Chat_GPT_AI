@@ -12,6 +12,7 @@ const uploadBtn = $('upload');
 const installNextoBtn = $('install-nexto');
 const nextoFile = $('nexto-file');
 const nextoStatus = $('nexto-status');
+const saveGameplay=$('save-gameplay'),saveDiagnostics=$('save-diagnostics'),captureStatus=$('capture-status');
 let busy = false;
 const SUPPORTED_HOSTS = new Set(['car-soccer.com', 'turball.io']);
 async function activeTab() {
@@ -32,9 +33,31 @@ async function refreshStatus() {
     const res = await send('gct-status');
     if (!res.ok) throw new Error(res.error);
     const s = res.status;
+    saveGameplay.disabled=!s.canSaveGameplay;
+    captureStatus.textContent=s.gameplay?`${s.gameplay.filename} · ${s.gameplay.bytes} bytes captured`
+      :s.captureError?`Capture unavailable: ${s.captureError}`:s.expectedGameplay?`Waiting for ${s.expectedGameplay.split('/').pop()}`:'Enter Free Play to load gameplay.';
     statusEl.textContent = `${s.site === 'turball' ? 'Turball' : s.site === 'car-soccer' ? 'Car Soccer' : 'Game'} · ${s.enabled ? 'Enabled' : 'Disabled'} · ${s.state}${s.message ? '\n' + s.message : ''}`;
-  } catch (e) { statusEl.textContent = e.message || String(e); }
+  } catch (e) { saveGameplay.disabled=true;statusEl.textContent = e.message || String(e); }
 }
+function downloadText(filename,source,type) {
+  const url=URL.createObjectURL(new Blob([source],{type}));
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
+saveGameplay.onclick=async()=>{
+  try {
+    const res=await send('gct-gameplay-source');if(!res.ok)throw new Error(res.error);
+    downloadText(res.filename,res.source,'text/javascript;charset=utf-8');
+    captureStatus.textContent='Gameplay JS saved. Send that file for the compatibility update.';
+  }catch(e){captureStatus.textContent=e.message||String(e);}
+};
+saveDiagnostics.onclick=async()=>{
+  try {
+    const res=await send('gct-diagnostics');if(!res.ok)throw new Error(res.error);
+    downloadText('Turball_Connection_Diagnostics.json',JSON.stringify(res.report,null,2),'application/json');
+    captureStatus.textContent='Connection diagnostics saved.';
+  }catch(e){captureStatus.textContent=e.message||String(e);}
+};
 for (const [id, type, message] of [['enable','gct-enable','Arming the correct game script and reloading…'],['disable','gct-disable','Reloading normal game…']]) {
   $(id).onclick = async () => {
     $(id).disabled = true;

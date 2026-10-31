@@ -1,0 +1,33 @@
+{
+  "extension_version": "4.5.2",
+  "release_type": "gameplay capture and diagnostics; new gameplay compatibility blocked",
+  "uploaded_site_release": "98f9b3003e60-41220884867-1",
+  "loader": "game-IDU5267J.js",
+  "lobby": {
+    "filename": "chunk-DLWGG6LS.js",
+    "sha256": "3831e34c815f421861dcb25a12a2078d80c48716ce777ba2f56897ee78b55df4"
+  },
+  "missing_gameplay": "chunk-KALAXRXF.js",
+  "new_turball_gameplay_compatibility_verified": false,
+  "live_game_verified": false,
+  "checks": {
+    "actual_uploaded_lobby_dependency_detection": "passed",
+    "capture_original_hash_export_redaction_worker_restart_cleanup_and_http_errors": "passed",
+    "unsupported_module_is_not_modified": "passed",
+    "chromium_popup_gameplay_and_report_downloads": "passed",
+    "tas_parser_and_both_mock_adapters": "passed",
+    "existing_car_soccer_actual_bundle_transform_and_mock_runtime": "passed",
+    "model_library_migration_and_preservation": "passed",
+    "runtime_kickoff_stale_results_neural_handoff": "passed",
+    "fun_controls_and_cooperation": "passed",
+    "chromium_tas_picker_minimize_f8_both_hosts": "passed",
+    "chromium_model_picker": "passed",
+    "chromium_fun_controls_scope_both_hosts": "passed"
+  },
+  "limitations": [
+    "No gameplay response in the uploaded HAR; loader/lobby files are not the gameplay implementation.",
+    "Public asset download from turball.io was blocked by this environment (HTTP CONNECT 403).",
+    "The old strict Turball patch is retained; unsupported gameplay is passed through unchanged.",
+    "Chromium checks use mocked extension APIs/game runtimes, not a live Turball match."
+  ]
+}
