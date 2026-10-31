@@ -1,4 +1,4 @@
--- RoWorld 3.2.0 | independent observation / candidate policy
+-- RoWorld 3.2.1 | independent observation / candidate policy
 -- No OpenFront weights; no external runtime downloads.
 local Weapons=(function()
 -- RoWorld weapon observations and conservative launch checks shared by both routes.
@@ -847,7 +847,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 3.2.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 3.2.1 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -979,6 +979,14 @@ function Adapter:send(action, frame)
             if kind == "boat" and (not live.map:is_coastal(intent.tile) or not live.ctx.borders:can_reach_by_sea(intent.tile)
                 or rules:transports() >= (s.rules.MAX_BOATS_PLAYER or 3)) then return false, "Sea route unavailable" end
             local troops = math.max(0, live.info.troops or 0)
+            local finish=(action.plan or {}).country_finish
+            if finish then
+                local p=s.owners[target]
+                if not p or not p.alive or p.kind~=0 or (p.gold or 0)<=0
+                    or (p.tiles or 0)>finish.remaining_tiles*1.2 or (p.troops or 0)>finish.defender_home*1.2+100 then
+                    return false,'Country finishing opportunity changed; recalculating'
+                end
+            end
             local incoming = 0
             for _, attack in pairs(s.attacks) do
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end
@@ -2485,6 +2493,24 @@ local function protected(frame,agent,id)
     return id==frame.me or id>0 and (frame.state:are_allies(frame.me,id) or agent.cooperation:isFriend(id)
         or frame.state:has_request(frame.me,id))
 end
+function Actions.countryFinish(frame,o,id)
+    local p=frame.state.owners[id]
+    if not p or p.kind~=0 or not p.alive or (p.tiles or 0)<=0 or (p.gold or 0)<=0 then return nil end
+    if p.tiles>math.max(24,(frame.info.tiles or 0)*.25) or (p.troops or 0)>o.home*.2
+        or o.incoming>o.home*.1 or (o.allyPower[id] or 0)>o.home*.5 then return nil end
+    -- Public treasury is the potential conquest payout, not a fixed extra prize.
+    -- Budget remaining land as well as the defender's bank and recruitment;
+    -- otherwise a nearly empty country can stall a home-bank-only estimate.
+    local total=math.ceil((p.troops or 0)*1.5+recruit(p,8)+p.tiles*25*(frame.map.k_lin or 1)^2)
+    local active=o.outgoingTo[id] or 0
+    local need=math.max(0,total-active)
+    if need>0 then need=math.max(need,100,math.ceil(o.home*.01)) end
+    local reserve=math.max(o.reserve,o.home*.55)
+    if need>math.max(0,o.home-reserve) then return nil end
+    return {need=need,total=total,reserve=reserve,expected_treasury=p.gold,remaining_tiles=p.tiles,defender_home=p.troops or 0,
+        score=10+math.min(3,math.log(1+p.gold/50000))+math.min(1,(o.assets[id] or 0)/10),
+        scope='Estimated full elimination budget; treasury is paid only if we receive conquest credit'}
+end
 function Actions.features(frame,o,a)
     local s,m=frame.state,frame.map;local intent=a.intent or {};local t=intent.tile
     local target=intent.target or (Geography.valid(m,t) and s:tile_owner(t) or 0)
@@ -2569,8 +2595,10 @@ function Actions.generate(frame,o,agent)
         if protected(frame,agent,id) then filtered.friendly=(filtered.friendly or 0)+1;continue end
         if id>0 and (not p or not p.alive or (agent.distrust[id] or 0)>now and o.incomingBy[id]==nil) then continue end
         local active=o.outgoingTo[id] or 0;local ceiling=o.available
+        local finish=id>0 and Actions.countryFinish(frame,o,id) or nil
         local counter=id>0 and (o.incomingBy[id] or 0)>1.5*math.max(1,p.troops or 0)
         local reserve=o.reserve
+        if finish then reserve=math.max(reserve,finish.reserve);ceiling=math.min(ceiling,math.max(0,o.home-reserve)) end
         if counter then reserve=math.max(reserve,math.ceil(o.capacity*.42));ceiling=math.max(0,o.home-reserve) end
         local campaign=agent.campaigns[id]
         if campaign then
@@ -2583,11 +2611,12 @@ function Actions.generate(frame,o,agent)
             bias=3.5+math.min(1,g.front/100)
         else
             local home=p.troops or 0
-            need=math.ceil(math.max(0,home*1.5+recruit(p,3)-active))
+            need=finish and finish.need or math.ceil(math.max(0,home*1.5+recruit(p,3)-active))
             bias=2+math.min(2,(o.assets[id] or 0)/10)+math.min(2,Schema.log(p.gold)*2)
             if p.kind==1 then bias+=1 elseif p.kind==2 then bias-=2 end
             bias+=math.min(3,(o.pressure[id] or 0)/math.max(1,home))-math.min(4,(o.allyPower[id] or 0)/math.max(1,o.home))
             if counter then bias+=6 end
+            if finish then bias=math.max(bias,finish.score) end
             -- A pressure estimate is not a promise that a human will defend this way.
             local otherThreat=math.max(0,o.threat-home)
             if not counter and (home>o.home*.55 or o.incoming>o.home*.15 or otherThreat>o.home*2) then
@@ -2602,7 +2631,7 @@ function Actions.generate(frame,o,agent)
                 end
                 filtered.risk=(filtered.risk or 0)+1;continue
             end
-            if active>=home*1.5+recruit(p,3) then continue end
+            if active>=(finish and finish.total or home*1.5+recruit(p,3)) then continue end
         end
         if need<minimum then continue end
         if id>0 and need>ceiling then filtered.budget=(filtered.budget or 0)+1;continue end
@@ -2613,9 +2642,9 @@ function Actions.generate(frame,o,agent)
             if n>=minimum and not Weapons.hazard(s,g.tile,0,3) then
                 local amountBias=bias-(j-1)*.2
                 add({kind=id==0 and 'expand' or 'attack',intent={type='attack',tile=g.tile,ratio=n/math.max(1,o.home)},
-                    reserve=reserve,bias=amountBias,channel=counter and 'counterattack' or ('attack:'..id),cooldown=counter and 1 or 3,
-                    label=counter and 'Proportional counterattack; retain at least 42% capacity' or id==0 and 'Expanding into neutral land' or 'Taking a viable frontier and valuable assets',
-                    need=need,plan={amount=n,defensive_counter=counter,capacity_floor=counter and .42 or nil}})
+                    reserve=reserve,bias=amountBias,channel=counter and 'counterattack' or ('attack:'..id),cooldown=(counter or finish) and 1 or 3,
+                    label=counter and 'Proportional counterattack; retain at least 42% capacity' or finish and 'Finishing a weakened country for its remaining treasury' or id==0 and 'Expanding into neutral land' or 'Taking a viable frontier and valuable assets',
+                    need=need,plan={amount=n,defensive_counter=counter,capacity_floor=counter and .42 or nil,country_finish=finish or nil}})
             end
         end
     end
@@ -2950,7 +2979,7 @@ function Agent:rejected(reason)
     end
 end
 function Agent:report()
-    if not self.observation then return {version='3.2.0',schema=Schema.version,status='no observed match'} end
+    if not self.observation then return {version='3.2.1',schema=Schema.version,status='no observed match'} end
     local ranked={};for i,a in ipairs(self.candidates or {}) do table.insert(ranked,{kind=a.kind,score=self.logits[i],
         probability=self.probabilities and self.probabilities[i],intent=a.intent,label=a.label,plan=a.plan}) end
     table.sort(ranked,function(a,b) return a.score>b.score end)
@@ -2958,7 +2987,7 @@ function Agent:report()
         table.insert(diplomatic,{nation=id,allied=r.allied,same_team=r.same_team,friend=r.friend,
             outgoing_request=r.outgoing_request,incoming_request=r.incoming_request,expiry=r.expiry})
     end
-    return {version='3.2.0',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
+    return {version='3.2.1',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
         tick=self.state.tick,observation_tick=o.tick,observation_age_ticks=math.max(0,self.state.tick-o.tick),
         decision_interval_ticks=Schema.decision_ticks,me=self.me,own=self.state.owners[self.me],metrics=self.metrics,runtime=self.runtime,
         board=self.board,actions=self.history,candidates=ranked,filtered_by_risk=self.filtered,
@@ -3018,7 +3047,7 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(221, 231, 242)
-title.Text = "RoWorld 3.2.0 | observation agent"
+title.Text = "RoWorld 3.2.1 | observation agent"
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 local button = Instance.new("TextButton")

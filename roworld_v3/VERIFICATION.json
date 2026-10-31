@@ -1,5 +1,5 @@
 {
-  "version": "3.2.0",
+  "version": "3.2.1",
   "schema": "roworld-observation-v2",
   "behavior_scenarios": {
     "adapter": 23,
@@ -8,7 +8,8 @@
     "agent": 24,
     "coalition": 20,
     "military": 16,
-    "total": 116
+    "total": 122,
+    "country_finish": 6
   },
   "dashboard_friend_scatter_toggles_report_stop_reinjection": "passed",
   "standalone_generation_and_compilation": "passed",
@@ -66,5 +67,7 @@
     "Warships only cover connected water and accessible coasts; defensive fleet is bounded at 32, salvo at six launches.",
     "No entitlement is granted; a declared owned Scattershot enables ordinary attempts until an observed server inventory confirms or denies it.",
     "No original game source, private reports, engine bundle or trained weights are redistributed."
-  ]
+  ],
+  "country_finish": "Passed weak-country priority, land-cost top-up, sufficient-army suppression, large/strong/human/empty treasury exclusions, invasion/alliance safety, fixed campaign budget and send-time treasury recheck.",
+  "original_reward_rule": "Inspected supplied v111 Sim:_conquest_gold and Rules.conquer_gold: AI country treasury transfers in full to the credited conqueror and is zeroed; no fixed reward is invented."
 }

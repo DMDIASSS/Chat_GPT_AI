@@ -144,7 +144,7 @@ function Agent:rejected(reason)
     end
 end
 function Agent:report()
-    if not self.observation then return {version='3.2.0',schema=Schema.version,status='no observed match'} end
+    if not self.observation then return {version='3.2.1',schema=Schema.version,status='no observed match'} end
     local ranked={};for i,a in ipairs(self.candidates or {}) do table.insert(ranked,{kind=a.kind,score=self.logits[i],
         probability=self.probabilities and self.probabilities[i],intent=a.intent,label=a.label,plan=a.plan}) end
     table.sort(ranked,function(a,b) return a.score>b.score end)
@@ -152,7 +152,7 @@ function Agent:report()
         table.insert(diplomatic,{nation=id,allied=r.allied,same_team=r.same_team,friend=r.friend,
             outgoing_request=r.outgoing_request,incoming_request=r.incoming_request,expiry=r.expiry})
     end
-    return {version='3.2.0',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
+    return {version='3.2.1',schema=Schema.version,policy=self.modelStatus,competitive_strength_verified=false,
         tick=self.state.tick,observation_tick=o.tick,observation_age_ticks=math.max(0,self.state.tick-o.tick),
         decision_interval_ticks=Schema.decision_ticks,me=self.me,own=self.state.owners[self.me],metrics=self.metrics,runtime=self.runtime,
         board=self.board,actions=self.history,candidates=ranked,filtered_by_risk=self.filtered,

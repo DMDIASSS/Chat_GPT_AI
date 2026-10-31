@@ -140,7 +140,7 @@ function Adapter:findLiveClient()
 end
 
 function Adapter:diagnostics()
-    local caps, lines = self.capabilities, {"RoWorld Bot 3.2.0 - client access diagnostics"}
+    local caps, lines = self.capabilities, {"RoWorld Bot 3.2.1 - client access diagnostics"}
     for _, key in ipairs({"getidentity", "setidentity", "getgc", "getconnections", "getupvalues", "getupvalue", "getfenv", "getsenv", "getrenv"}) do
         table.insert(lines, key .. "=" .. type(caps[key]))
     end
@@ -272,6 +272,14 @@ function Adapter:send(action, frame)
             if kind == "boat" and (not live.map:is_coastal(intent.tile) or not live.ctx.borders:can_reach_by_sea(intent.tile)
                 or rules:transports() >= (s.rules.MAX_BOATS_PLAYER or 3)) then return false, "Sea route unavailable" end
             local troops = math.max(0, live.info.troops or 0)
+            local finish=(action.plan or {}).country_finish
+            if finish then
+                local p=s.owners[target]
+                if not p or not p.alive or p.kind~=0 or (p.gold or 0)<=0
+                    or (p.tiles or 0)>finish.remaining_tiles*1.2 or (p.troops or 0)>finish.defender_home*1.2+100 then
+                    return false,'Country finishing opportunity changed; recalculating'
+                end
+            end
             local incoming = 0
             for _, attack in pairs(s.attacks) do
                 if attack.target == me and not attack.retreating then incoming += attack.troops or 0 end

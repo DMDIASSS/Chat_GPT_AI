@@ -1,7 +1,7 @@
 # RoWorld 3.2 — experimental independent observation agent
 
 **Play now:** paste the complete [`RoWorld_V3.lua`](RoWorld_V3.lua) into JJSploit,
-execute in a multiplayer RoWorld match, then press **Start bot**. Confirm **3.2.0**
+execute in a multiplayer RoWorld match, then press **Start bot**. Confirm **3.2.1**
 in the panel. Extract the ZIP anywhere. No Python, model download or training is
 required for the built-in policy. Re-execution stops the previous v2/v3 instance.
 The friends toggle, F6, match-report button and ordinary multiplayer connection
@@ -23,6 +23,23 @@ There are two policy modes:
   those same proposals. PPO training, self-play workers, checkpoint resume,
   evaluation and a standalone Luau export are included. There is **no trained
   multiplayer champion bundled**. OpenFront checkpoints are incompatible.
+
+## New in 3.2.1: finish countries for their treasury
+
+Weak, small bordering AI countries with gold now receive a finishing priority
+above routine expansion and investment. The estimate budgets remaining land,
+defending troops and recruitment, then subtracts our existing attacking army.
+Top up only the missing amount; do not repeatedly fund an already sufficient
+attack. Keep at least 55% of the home bank and existing strategic reserves.
+Allies, protected friends, serious invasions, strong coalitions and unaffordable
+finishes retain their existing exclusions. Campaign budgets/deadlines remain
+fixed, so a promised payout cannot authorize unlimited reinforcement.
+
+Reports include `plan.country_finish`, estimated treasury and remaining land.
+Before dispatch, recheck the target and treasury. The supplied game transfers
+the country's **remaining treasury** to the credited conqueror on elimination;
+it is not a guaranteed flat bonus, and another attacker may get the credit.
+No training needed: replace the whole script and confirm **3.2.1**.
 
 ## New in 3.2: coastal economy, defended core and Scattershot salvos
 
@@ -74,7 +91,7 @@ There are two policy modes:
   `active_scatter_salvo` and `last_scatter_salvo` show these decisions locally.
 
 **No training is needed.** Extract this update anywhere, replace the complete
-`RoWorld_V3.lua`, execute it once and press **Start bot**. Confirm **3.2.0**.
+`RoWorld_V3.lua`, execute it once and press **Start bot**. Confirm **3.2.1**.
 The observation schema is now `roworld-observation-v2` with 49 action features.
 Old 3.0/3.1 learned JSON weights have a different shape and are rejected; preserve
 those checkpoints and start a new training run if you want a new learned policy.

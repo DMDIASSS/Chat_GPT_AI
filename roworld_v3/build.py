@@ -55,7 +55,7 @@ def modules_source():
 
 
 def source(weights=None):
-    header = "-- RoWorld 3.2.0 | independent observation / candidate policy\n"
+    header = "-- RoWorld 3.2.1 | independent observation / candidate policy\n"
     header += "-- No OpenFront weights; no external runtime downloads.\n"
     return header + modules_source() + "\nlocal ModelWeights=" + literal(weights) + "\nlocal Policy=Agent\n" + (ROOT / "client.lua").read_text(encoding="utf8")
 
