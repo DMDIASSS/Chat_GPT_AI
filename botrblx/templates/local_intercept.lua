@@ -22,7 +22,69 @@ end
 function Intercept.new(profile,arena,physics)
     return setmetatable({profile=profile,arena=arena,physics=physics},Intercept)
 end
-function Intercept:reset()self.side=nil;self.last=nil;self.padTarget=nil end
+function Intercept:reset()self.side=nil;self.last=nil;self.padTarget=nil;self.goalX=nil end
+
+-- Rank ground-shot lanes against the observed defenders. Constant-velocity
+-- projections are a short tactical estimate, not a prediction of their actions.
+function Intercept:shotLane(packet,future,seconds)
+    local extent=self.profile.arena
+    local attack=packet.team==0 and 1 or -1
+    local preferred=math.clamp(future[1]*.25,-extent.MOUTH_HALF_WIDTH*.55,extent.MOUTH_HALF_WIDTH*.55)
+    local half=extent.MOUTH_HALF_WIDTH-(packet.ball_radius or self.profile.physics.BALL_RADIUS)-120
+    local function cost(x)
+        local dx,dy=x-future[1],attack*extent.EXTENT_Y-future[2]
+        local length=max(1,sqrt(dx*dx+dy*dy))
+        local score=abs(x-preferred)*.015+(x-packet.car.position[1])^2*.000001
+        for _,other in ipairs(packet.other_cars or {})do
+            if(other.team==0 or other.team==1)and other.team~=packet.team and other.position and other.position[3]<250 then
+                local velocity=other.velocity or {0,0,0}
+                local px,py=other.position[1],other.position[2]
+                local u=math.clamp(((px-future[1])*dx+(py-future[2])*dy)/(length*length),0,1)
+                local time=min(2.5,seconds+u*length/2400)
+                px=px+velocity[1]*time;py=py+velocity[2]*time
+                u=math.clamp(((px-future[1])*dx+(py-future[2])*dy)/(length*length),0,1)
+                local gap=sqrt((px-future[1]-dx*u)^2+(py-future[2]-dy*u)^2)
+                score=score+max(0,460-gap)
+            end
+        end
+        return score
+    end
+    local best,bestCost=preferred,cost(preferred)
+    for _,x in ipairs({-half,0,half})do
+        local value=cost(x)
+        if value<bestCost then best,bestCost=x,value end
+    end
+    if self.goalX and abs(self.goalX)<=half and cost(self.goalX)<=bestCost+25 then best=self.goalX end
+    self.goalX=best
+    return best
+end
+
+function Intercept:support(packet,future,danger)
+    local attack=packet.team==0 and 1 or -1
+    if danger or(future[2]*attack< -1800 and packet.ball.velocity[2]*attack< -250)then return nil end
+    local function eta(body)
+        local dx,dy=unit(future[1]-body.position[1],future[2]-body.position[2])
+        local v=body.velocity or {0,0,0}
+        local speed=math.clamp(v[1]*dx+v[2]*dy+650,650,1800)
+        local heading=body.forward and abs(self:heading(body,future))or 0
+        return distance(body.position,future)/speed+heading*.3
+    end
+    local own=eta(packet.car)
+    local chosen,best=nil,own-.4
+    for _,other in ipairs(packet.other_cars or {})do
+        if other.team==packet.team and other.position and other.position[3]<150
+            and other.ground_estimate==true and(other.position[2]-future[2])*attack< -120
+            and distance(other.position,future)<2000 then
+            local arrival=eta(other)
+            if arrival<best then chosen,best=other,arrival end
+        end
+    end
+    if not chosen then return nil end
+    local side=sign(future[1]-chosen.position[1])
+    if abs(future[1]-chosen.position[1])<100 then side=sign(packet.car.position[1]-future[1])end
+    return {math.clamp(future[1]*.45+side*750,-self.profile.arena.EXTENT_X+700,self.profile.arena.EXTENT_X-700),
+        math.clamp(future[2]-attack*1500,-self.profile.arena.EXTENT_Y+650,self.profile.arena.EXTENT_Y-650),17},best
+end
 
 function Intercept:heading(car,target)
     local x,y=target[1]-car.position[1],target[2]-car.position[2]
@@ -112,8 +174,8 @@ function Intercept:step(packet,modelAction,now)
     end
     if not chosen then return nil end -- keep learned high-ball/wall decisions
     local future=chosen.position
-    local goalX=math.clamp(future[1]*.25,-arena.MOUTH_HALF_WIDTH*.55,arena.MOUTH_HALF_WIDTH*.55)
-    local dx,dy=unit(goalX-future[1],attack*(arena.EXTENT_Y+250)-future[2])
+    local goalX=self:shotLane(packet,future,chosen.time)
+    local dx,dy=unit(goalX-future[1],attack*arena.EXTENT_Y-future[2])
     local speed=sqrt(car.velocity[1]^2+car.velocity[2]^2)
     local preset=self.profile.car_presets[packet.car_preset or "standard"]or self.profile.car_presets.standard
     local front=preset.size[1]/2+preset.offset[1]
@@ -140,6 +202,8 @@ function Intercept:step(packet,modelAction,now)
             target={future[1]+dx*(radius+200),future[2]+dy*(radius+200),17}
         end
     end
+    local supportTarget,teammateETA=self:support(packet,future,danger)
+    if supportTarget then target=supportTarget;mode="support teammate";self.side=nil end
     target[1]=math.clamp(target[1],-arena.EXTENT_X+350,arena.EXTENT_X-350)
     target[2]=math.clamp(target[2],-arena.EXTENT_Y+180,arena.EXTENT_Y-180)
     -- Rounded corners have less driveable floor than a rectangular clamp.
@@ -148,7 +212,7 @@ function Intercept:step(packet,modelAction,now)
         if abs(n[3])>.7 or gap>=160 then break end
         target[1]=target[1]+n[1]*(160-gap);target[2]=target[2]+n[2]*(160-gap)
     end
-    local pad=self:routePad(packet,target,danger,behind,radius)
+    local pad=self:routePad(packet,target,danger or supportTarget~=nil,behind,radius)
     local driveTime=chosen.time
     if pad then
         target={pad.position[1],pad.position[2],17}
@@ -161,17 +225,20 @@ function Intercept:step(packet,modelAction,now)
     local steer=abs(headingError)>.055 and sign(headingError)or 0
     local forwardSpeed=dot(car.velocity,car.forward)
     local desired=min(self.profile.physics.CAR_MAX_SPEED,max(450,remaining/max(driveTime,.3)))
+    if supportTarget then desired=min(desired,1100)end
     desired=min(desired,500+1700*max(math.cos(angle),0)^2)
     if abs(angle)>1.1 then desired=min(desired,650)end
     local throttle=1
     if forwardSpeed>desired+180 then throttle=-1 end -- actual braking, no boost
+    if supportTarget and remaining<220 then throttle=forwardSpeed>180 and -1 or 0 end
     local boost=throttle==1 and abs(angle)<.12 and remaining>700
         and forwardSpeed<desired-150 and packet.boost>0 and 1 or 0
     local slide=abs(angle)>1.2 and speed>500 and speed<1400 and 1 or 0
     local action={throttle,steer,0,steer,0,0,boost,slide}
     self.last={mode=mode,target=target,ball=table.clone(future),time=chosen.time,
         reachable=bestGap<=0,danger=danger,heading=angle,desired_speed=desired,action=action,
-        boost_pad=pad and {position=table.clone(pad.position),is_big=pad.is_big}or nil}
+        boost_pad=pad and {position=table.clone(pad.position),is_big=pad.is_big}or nil,
+        goal_x=goalX,support=supportTarget~=nil,teammate_eta=teammateETA}
     self.physics.plan=self.last
     return action,mode
 end

@@ -1,4 +1,4 @@
-# TurboBall Roblox bot — Local v6.1
+# TurboBall Roblox bot — Local v6.2
 
 ## Local Lua mode: remove the file round trip
 
@@ -20,7 +20,7 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v6.1 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v6.2 ready | model self-test passed`**, then press **F6**.
    **Team: AUTO** identifies `Deadline_coolgun` from the match scoreboard and
    cross-checks the rendered nameplate relationship. It follows team changes.
    If the team cannot be identified, open the in-game scoreboard once. The
@@ -84,10 +84,42 @@ EXPORT_LOCAL_BOT.bat --workspace "C:\Users\almas\AppData\Roaming\jjsploit\worksp
 EXPORT_LOCAL_BOT.bat --model "D:\Models\update.pt"
 ```
 
+## Updated-place review and team tactics (local v6.2)
+
+The new Beta 10 export confirms all 54 numeric constants and curve entries used
+by this adapter's arena/physics profile. The existing calibration remains in use.
+Twelve ball/world scenarios were also compared with the updated exported solver,
+including its enabled fast geometry path. Ordinary surfaces remain close to the
+reference; curved goal-frame contacts retain the documented approximation limits.
+See `UPDATE_REVIEW.json` for the measured errors and source hashes.
+
+The export includes the normal bot's decision code and the SuperBot tier settings.
+The stronger tiers select `willo` and `wisp`; their model implementations were not
+found in the client export. This package keeps your existing model and adds
+independent ground tactics using the car poses the adapter already observes:
+
+- **Support teammate** leaves a goal-side teammate with a clearly earlier
+  estimated arrival to challenge, while covering behind the ball. Incoming
+  own-goal threats take priority. Opponents, unknown teams and airborne teammates
+  cannot trigger this support choice.
+- Ground-shot aiming compares several goal-mouth lanes with the observed
+  defenders' short constant-velocity projections. It retains the chosen lane
+  through small score changes to reduce switching. This is a tactical estimate;
+  opponents can change direction or jump after it is chosen.
+
+Close touches, jumps, aerials and wall play continue through the trained policy.
+No new model is trained or supplied. These changes have offline scenario and
+runtime coverage, but have not been live-tested in Roblox/JJSploit and are not a
+measured win-rate improvement.
+
+After replacing this folder, rerun **EXPORT_LOCAL_BOT.bat** and execute the newly
+generated private Lua file. The ready badge must show **LOCAL v6.2**. Exporting the
+place itself does not update a standalone script you already generated.
+
 ## Match pad detection and stop diagnostics (local v6.1)
 
 Rerun **EXPORT_LOCAL_BOT.bat** after updating this folder. Existing generated Lua
-scripts contain the previous runtime; the current ready badge is **v6.1**.
+scripts contain the previous runtime; the current ready badge is **v6.2**.
 
 The first live v6 report showed a measured standard ball radius and gravity close
 to the saved profile, but zero discovered boost pads throughout the run. The
@@ -227,7 +259,7 @@ change model weights or create a policy mesh input.
 
 Rerun **EXPORT_LOCAL_BOT.bat after installing this update**: the previous generated
 standalone script contains the previous adapter. No model weights are downloaded
-or retrained. The current package shows a **v6.1** badge after re-export.
+or retrained. The current package shows a **v6.2** badge after re-export.
 
 The game uses its own match teams. The new reader matches your name to the
 scoreboard row's team edge; it does not assume Roblox's `Player.Team` is the match

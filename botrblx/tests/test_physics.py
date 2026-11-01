@@ -144,6 +144,40 @@ local car={position={0,0,17},forward={1,0,0},up={0,0,1}}
 assert(planner:heading(car,{0,100,17})>0 and planner:heading(car,{0,-100,17})<0,'Native positive steer basis reversed')
 ''')
 
+    def test_supports_goal_side_teammate_and_returns_to_challenge_when_needed(self):
+        self.run_lua('''
+local p=packet({700,-3000,17},{0,500,93.15})
+p.other_cars={{team=0,position={0,-200,17},velocity={0,900,0},forward={0,1,0},up={0,0,1},ground_estimate=true}}
+local a,mode=planner:step(p,model,0)
+assert(a and mode=='support teammate' and planner.last.support,'Double-committed behind a better placed teammate')
+assert(planner.last.target[2]<planner.last.ball[2]-1000,'Support drove ahead of the ball')
+assert(planner.last.desired_speed<=1100 and not planner.last.boost_pad)
+p.other_cars[1].team=1;planner:step(p,model,.1)
+assert(not planner.last.support,'Yielded possession to an opponent')
+p.other_cars[1].team=0;p.other_cars[1].ground_estimate=false;planner:step(p,model,.2)
+assert(not planner.last.support,'Assumed an airborne teammate would cover the ground intercept')
+p.other_cars[1].ground_estimate=nil;planner:step(p,model,.25)
+assert(not planner.last.support,'Assumed unknown wheel contact was grounded')
+p.other_cars[1].ground_estimate=true;p.ball.position={0,-3400,93.15};p.ball.velocity={0,-1600,0}
+planner:step(p,model,.3)
+assert(planner.last.danger and not planner.last.support,'Yielded an incoming own-goal emergency')
+''')
+
+    def test_shot_lane_avoids_goalkeeper_and_mirrors_for_orange(self):
+        self.run_lua('''
+local p=packet({200,-1800,17},{0,0,93.15})
+p.other_cars={{team=1,position={0,4900,17},velocity={0,0,0}}}
+local x=planner:shotLane(p,{0,0,93.15},.8)
+assert(math.abs(x)>400,'Aimed directly at a central goalkeeper')
+assert(math.abs(x)<profile.arena.MOUTH_HALF_WIDTH-p.ball_radius,'Aimed outside the goal mouth')
+for i=1,20 do assert(planner:shotLane(p,{0,0,93.15},.8)==x,'Shot lane oscillated')end
+planner:reset();p.team=1;p.car.position[1]=-200
+p.other_cars[1].team=0;p.other_cars[1].position[2]=-4900
+assert(planner:shotLane(p,{0,0,93.15},.8)==-x,'Orange shot selection failed to mirror')
+planner:reset();p.other_cars[1].team=nil
+assert(planner:shotLane(p,{0,0,93.15},.8)==0,'Invented a defender from an unknown team')
+''')
+
     def test_defensive_intercept_and_field_safe_corner_target(self):
         self.run_lua('''
 local p=packet({800,-4500,17},{0,-3400,93.15},{0,-1600,0})
@@ -226,6 +260,6 @@ assert(#physics.trace<=150)
 p.ball.position={9000,0,93.15};physics:observe(p,2001/30)
 assert(physics.mismatch,'Outside geometry did not flag profile mismatch')
 local report=physics:report()
-assert(report.version=='local-6.1' and report.profile_mismatch and report.arena.EXTENT_X==4096)
+assert(report.version=='local-6.2' and report.profile_mismatch and report.arena.EXTENT_X==4096)
 assert(report.saved_physics.BALLWORLD_RESTITUTION==.6)
 ''')

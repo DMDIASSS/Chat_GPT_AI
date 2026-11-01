@@ -139,7 +139,7 @@ task.wait=function(dt)move(dt)end
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-6.1')
+assert(result.version=='local-6.2')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -318,7 +318,7 @@ inputKey('F6');for i=1,30 do move(1/30)end
 inputKey('F8');click('Save physics report')
 assert(savedName=='TurboBall_Physics_Report.json' and savedReport,'Report was not written')
 local report=encoded[savedReport]
-assert(report.version=='local-6.1' and report.physics_assist_enabled==false)
+assert(report.version=='local-6.2' and report.physics_assist_enabled==false)
 assert(report.place==101880234193261 and #report.model_sha256==64)
 assert(report.saved_from.enabled==false and report.saved_from.last_stop_reason=='STOPPED by F8. F6 starts again.')
 assert(#report.trace>0 and #report.trace<=150 and report.profile=='turbo_soccer_standard')

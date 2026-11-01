@@ -220,7 +220,7 @@ task.spawn(function()
         local period=math.max(1/15,peak*1.3)
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=("Update271 LOCAL v6.1 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nPhysics approach ON | AUTO team | F6 starts.")
+        label.Text=("Update271 LOCAL v6.2 ready | model self-test passed\nModel __MODEL_SHA__\nInference %.1f ms | target %.1f Hz\nPhysics approach ON | AUTO team | F6 starts.")
             :format(peak*1000,1/period)
         local lastTick,lastDecision,lastUi=os.clock(),-math.huge,-math.huge
         local busy=false
@@ -317,7 +317,7 @@ task.spawn(function()
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=("LOCAL v6.1 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=("LOCAL v6.2 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -344,4 +344,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.1"}
+return {started=true,version="local-6.2"}

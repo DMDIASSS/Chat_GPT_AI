@@ -1,0 +1,126 @@
+{
+  "version": "local-6.2",
+  "date": "2026-11-01",
+  "place_id": 101880234193261,
+  "export_sha256": "563c8aa597cbe77869b856e97139b9abdc197fd31f847c1b0274c63bb641169f",
+  "exported_script_entries": 879,
+  "inspection": {
+    "normal_bot_decision_source_found": true,
+    "superbot_tier_settings_found": true,
+    "stronger_brain_names": [
+      "willo",
+      "wisp"
+    ],
+    "stronger_brain_implementations_found_in_client_export": false,
+    "render_contract": "MatchView, Nametag/Plate, teammate Boost/Fill, BoostPads/PadHalo are still present",
+    "physics_profile_values_compared": 54,
+    "physics_profile_values_changed": 0
+  },
+  "reference_comparison": {
+    "model": "Independent ball/world predictor versus updated exported BallPrediction, Ball, Solver, RigidBody and ArenaGeom; native fast geometry path enabled by default",
+    "units": "Simulation units; one unit equals 0.1 Roblox studs",
+    "cases": [
+      {
+        "case": "free flight",
+        "samples": 31,
+        "max_position_error_sim_units": 0.0007524919346906245,
+        "final_position_error_sim_units": 0.0007524919346906245
+      },
+      {
+        "case": "floor bounce",
+        "samples": 46,
+        "max_position_error_sim_units": 0.0008501213742420077,
+        "final_position_error_sim_units": 0.0008501213742420077
+      },
+      {
+        "case": "side wall",
+        "samples": 25,
+        "max_position_error_sim_units": 0.0007325807819142938,
+        "final_position_error_sim_units": 0.0007325807819142938
+      },
+      {
+        "case": "ceiling",
+        "samples": 25,
+        "max_position_error_sim_units": 0.00032903836108744144,
+        "final_position_error_sim_units": 0.0003286843711975962
+      },
+      {
+        "case": "rolling spin",
+        "samples": 46,
+        "max_position_error_sim_units": 0.0008593827951699495,
+        "final_position_error_sim_units": 0.0008593827951699495
+      },
+      {
+        "case": "large ball",
+        "samples": 46,
+        "max_position_error_sim_units": 0.0003197981568519026,
+        "final_position_error_sim_units": 0.0002946961612906307
+      },
+      {
+        "case": "small ball",
+        "samples": 37,
+        "max_position_error_sim_units": 0.00028556774486787617,
+        "final_position_error_sim_units": 0.00028556774486787617
+      },
+      {
+        "case": "ramp",
+        "samples": 37,
+        "max_position_error_sim_units": 0.000738279428333044,
+        "final_position_error_sim_units": 0.0004977266653440893
+      },
+      {
+        "case": "corner",
+        "samples": 31,
+        "max_position_error_sim_units": 0.0009784679859876633,
+        "final_position_error_sim_units": 0.0007720404537394643
+      },
+      {
+        "case": "goal post",
+        "samples": 31,
+        "max_position_error_sim_units": 1.5945700407028198,
+        "final_position_error_sim_units": 0.9484479427337646
+      },
+      {
+        "case": "goal net",
+        "samples": 46,
+        "max_position_error_sim_units": 9.916152000427246,
+        "final_position_error_sim_units": 9.916152000427246
+      },
+      {
+        "case": "sleep",
+        "samples": 1,
+        "max_position_error_sim_units": 0.0,
+        "final_position_error_sim_units": 0.0
+      }
+    ],
+    "future_car_touches_simulated": false,
+    "live_game_comparison": false
+  },
+  "runtime_changes": [
+    "Support a grounded goal-side teammate with a clearly earlier estimated arrival; retain emergency own-goal challenge",
+    "Compare ground-shot goal-mouth lanes against observed defenders with bounded constant-velocity projection and lane hysteresis"
+  ],
+  "validation": {
+    "tests_passed": 141,
+    "tests_failed": 0,
+    "tests_skipped": 0,
+    "live_roblox_tested": false,
+    "live_executor_tested": false,
+    "measured_win_rate_improvement": false
+  },
+  "limits": [
+    "Stronger bot settings are not their model implementations; existing user model weights remain unchanged.",
+    "Ground travel, teammate arrival and opponent motion are estimates; no guarantee of a successful shot or save.",
+    "Curved goal-frame ball contacts are approximate; future car touches, input timing and network latency can change live outcomes."
+  ],
+  "source_hashes": {
+    "010830_Bot.lua": "1d84c067ed97ac1f8afa284172d94552cceb497c59141b6e607a2b72dbb8d2c2",
+    "011082_SuperBot.lua": "eb57346be368a182f31f46f9e7c8caf65f3a4f820f59979055f65884d9617305",
+    "011149_Const.lua": "af1e14996c7803715e2687504627474e0735f1e60fd3d04646168016d06a433b",
+    "011142_ArenaGeom.lua": "a842b156820a515489f06bba2a66162d5dd5c9e9cc2b01056627bd9f64bad53f",
+    "011145_Ball.lua": "1bd9f33205fb517ebc66bec2fcb8409662a6a564d922966779d41c7eb7ca2d1a",
+    "011175_Solver.lua": "7fdb7c3649d0c6cf3d02bad0415ea793d52f8887acabbc5a9e17c3f2a072ae0b",
+    "011170_RigidBody.lua": "b2caf2947a3297189e8657a16f33c8df3326ff86cf2335aeeb240676f77fe82a",
+    "011146_BallPrediction.lua": "e53b63d81500e7b84bf80f170caed6a33f9d234f6e1e3ad24e99bb94091bedbb"
+  }
+}
