@@ -10,12 +10,14 @@ Use freeplay so a match reset or another car does not disturb a capture.
 
 1. Park upright with the car centre over the field's centre spot.
 2. At the orange goal line, touch either **inner upright face** with the front
-   of the collision body. Point squarely sideways into the post and stop.
+   of the collision body. Point outward into the post and stop. Pitch/roll caused
+   by the concave surface is OK; the fit uses the full rotated collision box.
 3. Touch the other orange inner upright the same way.
 4. At the middle of the orange mouth, press F10 BEFORE jumping to arm an
    eight-second capture. Fly nose-up into the **underside of the crossbar**. Contact is recorded automatically; no hover
    or stationary pose is required. Touch the underside, not the top of the bar.
-5. Inside the orange net, face away from midfield and touch the **rear net wall**.
+5. Inside the orange net, touch the **rear net wall**. A nose-out contact or a
+   nose-up pose with wheels supported on its curve is accepted. Stop before capture.
 6. Repeat the first inner upright at the blue goal line.
 7. Capture the other blue inner upright.
 8. Arm with F10 and fly into the blue crossbar underside the same way.
@@ -29,7 +31,8 @@ candidate. The highest full collision-box support around that event supplies the
 height. Sampling and rendered-state smoothing limit precision; this is not a
 server collision event. Ordinary gravity/apex motion is rejected. If it times out,
 arm and retry; F10 while armed cancels. A gentle contact may not register, so fly
-upward with some speed. The two posts can be captured in either left/right order. **Back** lets
+upward with some speed. The two posts can be captured in either left/right order. At the field centre,
+your heading can face either goal; it does not rotate the calibration. **Back** lets
 you redo a point; later points can then be captured again. The tool does not
 teleport, hover or place the car for you.
 
@@ -61,7 +64,10 @@ Applied goal positions, opening widths and heights guide **Goal safety**. They
 also guide aiming and goal-threat checks when **Physics assist** is ON. Nexto
 starts with that broader ground assist OFF, so enabling it remains your choice.
 The rear-wall samples validate the net layout and are exported; nine landmarks
-do not identify the full curved net collision surface. The ball/world predictor
+do not identify the full curved net collision surface. Rear measurements use the
+outermost body support in the goal direction, not a nose point that may be facing
+up. Wall-supported captures are labelled approximate; suspension/wheel contact
+can extend beyond the body box. The ball/world predictor
 retains the saved analytic collision profile.
 
 **Save test file** writes `TurboBall_Calibration.json` in the executor workspace.
@@ -99,3 +105,17 @@ corrections remain uncertain. Toggle it OFF while paused for comparison.
 Press **F9 immediately after a bad decision**. The next physics report retains up
 to two marked windows, each containing the previous eight seconds, even after the
 normal rolling trace advances. Then pause and **Save physics report**.
+
+## Reusing tilted captures (local v6.7)
+
+Earlier validators rejected a post nose tilted by the concave surface, and rear
+wall captures with a near-vertical nose. This version checks horizontal post
+heading separately from slope pitch and accepts a correctly supported nose-up
+rear pose. The existing full rotated-box fit determines post support. Wrong
+horizontal heading still fails validation. Your complete v1 calibration files
+remain compatible: **Load test file**, then **Apply goal measurements**. A failed
+Apply in an older version does not require repeating the measurements.
+
+Landmarks constrain geometry, not the direction of an actual shot. For a repeated
+wide or high miss, press F9 immediately afterward and save the physics report.
+That trace contains ball/car motion and inputs needed to assess shot error.

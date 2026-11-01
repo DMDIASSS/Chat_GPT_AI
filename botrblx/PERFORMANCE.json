@@ -1,5 +1,5 @@
 {
-  "version": "local-6.6",
+  "version": "local-6.7",
   "date": "2026-11-01",
   "original_nexto": {
     "name": "Nexto",
@@ -97,7 +97,7 @@
     "measured_version": "local-6.3"
   },
   "validation": {
-    "tests_passed": 169,
+    "tests_passed": 173,
     "tests_failed": 0,
     "tests_skipped": 0,
     "prebuilt_luau_compile": true,
@@ -129,7 +129,8 @@
     "Use fitted goal planes and opening dimensions for goal guards and optional ground planner; preserve actor observations, masses and analytic world collision profile",
     "F9 incident marker retains up to two recent eight-second trace windows",
     "Identify unique source car dimensions even when hidden hitbox transform is stale; keep source-offset fallback explicit",
-    "Flying crossbar calibration: bounded F10-armed impact capture instead of an impossible stationary nose-up pose; retain stillness checks for ground landmarks"
+    "Flying crossbar calibration: bounded F10-armed impact capture instead of an impossible stationary nose-up pose; retain stillness checks for ground landmarks",
+    "Accept tilted concave post captures and supported nose-up rear-wall captures; keep rejection of incorrect horizontal headings and explicit Apply for existing files"
   ],
   "limits": [
     "Measured cloud speedups do not guarantee a particular FPS, decision rate or win rate on the user PC.",
@@ -137,25 +138,26 @@
     "Disabling our teammate-yield override does not retrain the learned actor or remove teammates from observations.",
     "Static landmarks cannot identify car/ball masses, contact restitution or all handling parameters. Manual contact scatter and the assumed rounded profile limit accuracy.",
     "The goal guards cover selected low ground situations; they cannot guarantee goals or prevent every own goal. Future touches and server corrections remain uncertain.",
-    "The frozen actor does not consume custom goal geometry; measured goal overrides apply to the guards and optional ground planner only."
+    "The frozen actor does not consume custom goal geometry; measured goal overrides apply to the guards and optional ground planner only.",
+    "Static goal landmarks contain no shot trajectory or touch outcome and cannot establish a left/right shooting correction."
   ],
   "runtime_source_sha256": {
     "file_transport.lua": "6cea0e28784191461f21b2b425be96134e32b5a99cf4820d9ffc07e3b7e5d3d2",
     "http_compat.lua": "e2f86fdcf2d675f707467e6e101dd92b6d5c06c662ec1f65c5c1428c21a33dc5",
     "local_arena.lua": "b0cc75983cc9c5d0ee5fcb28655d786cad24823115495f4f6fdc1b8df1b70788",
-    "local_calibration.lua": "966b6907ecaeae6b622a9d0d5c57de4ecd823c8a988de6bb877205cf9fa3c61e",
+    "local_calibration.lua": "9df59f12daf77adb9464c5d16c23277e3aca36cd1a1db04b5b6683559a611fe7",
     "local_cars.lua": "5e72ca42274b11895e8164cdd6716fc8e656f21cea212e1ba84693efa5c1d983",
     "local_goal_safety.lua": "40a62eef476a69cb71488ba895dec0aed2b294ccac8aa490270cffeb5887abab",
     "local_intercept.lua": "c89e529a7be5db1e7ecec8410967da3100f5b92ce9b5211cb7f59d6de4122151",
     "local_keyboard.lua": "76f0f8eed707da8befdafd3248c0f60da7e8fa760248763b8a34ba9c9657ff4a",
     "local_kickoff.lua": "15488463581aaa45e51df05e1fcc7aaeb210e3c4b8f1ef9f411c6b550a855014",
     "local_pads.lua": "8df26791b386d58d114b195b865c6bf2e744a011d1f3de40f3e04003a2083b97",
-    "local_physics.lua": "cbf8a1c8b97521b5aba046eb1f4ee569095dde3b4368e63932d3db9cfe14589b",
+    "local_physics.lua": "506c1a611394eb06a3b1de4c49d0b6db6fa0a5c98872acf0c3703bdc4ddb9e2d",
     "local_policy.lua": "cfddae893ef58bb5688938411bb5c6c417544a710aa543f64bb4aab69f6804be",
     "local_teams.lua": "68ca4ee0794ad9297cf1fe6f1f9140ea02dcc74f2538e0a95ddd4cb28f427b4a",
     "local_timing.lua": "ff6b98140431f3046ebdb4a80f0e2255d79600b550609275681a63197f14d3e0",
     "local_window.lua": "76dcad27ff4901dc15b6af81c8de566a9e1b0575ac177bc0868bb7699d5d1487",
-    "standalone.lua": "d15ed3f57320d4ba4ebef2d60d852af1e921eda85f930dd411da4a73133c17fe"
+    "standalone.lua": "5fde992ddc990e272710881a4148d35cc20aef1b1d65ab0f1304db8039874464"
   },
   "jump_mapping": {
     "ground_estimate_previously_changed_pitch_in_actions": 12,
@@ -201,6 +203,11 @@
       "requires_stationary_car": false,
       "impact_check": "Abrupt vertical velocity loss beyond ordinary gravity; highest box support around candidate contact",
       "limits": "Rendered sampling and smoothing limit height accuracy; soft impacts may not register; not a server collision event."
-    }
+    },
+    "sloped_post_heading": "Validate outward horizontal heading separately from pitch; retain full rotated box support.",
+    "rear_wall_supported_pose": "Accept nose-up pose with wheels facing the rear wall; record outermost body support as approximate layout depth, not exact wall geometry.",
+    "centre_heading_affects_fit": false,
+    "uploaded_landmarks_replayed_locally": true,
+    "raw_uploaded_landmarks_in_public_package": false
   }
 }

@@ -1241,7 +1241,7 @@ function Physics:observe(packet,now)
 end
 
 function Physics:report()
-    return {version="local-6.6",profile=self.profile.name,units="simulation units; seconds",
+    return {version="local-6.7",profile=self.profile.name,units="simulation units; seconds",
         studs_per_unit=self.profile.roblox_studs_per_sim_unit,arena=self.profile.arena,
         saved_physics=self.profile.physics,gravity_used=self.gravity,observed_gravity=self.observedGravity,
         gravity_samples=#self.gravitySamples,flight_position_error_median=self.error,
@@ -1592,14 +1592,14 @@ local function vector(v)
 end
 Calibration.steps={
     {'center','Field centre','Place the centre of your car over the centre spot, upright on the floor.'},
-    {'orange_a','Orange: first inner post','At the goal line, point your nose sideways into either INNER post face. Touch it and stop.'},
-    {'orange_b','Orange: other inner post','Touch the OTHER inner post face with your nose at the goal line. Stop moving.'},
+    {'orange_a','Orange: first inner post','At the goal line, point your nose sideways into either INNER post face. A slope-induced tilt is OK; keep pointing outward and stop.'},
+    {'orange_b','Orange: other inner post','Touch the OTHER inner post face at the goal line. Tilt on the rounded surface is OK. Stop moving.'},
     {'orange_top','Orange: underside of crossbar','At the middle of the goal mouth, Press F10 to arm, then fly nose-up into the UNDERSIDE at the middle of the mouth. Contact is captured automatically.'},
-    {'orange_back','Orange: back of net','Inside the net, face away from midfield. Touch the REAR wall with your nose.'},
+    {'orange_back','Orange: back of net','Inside the net, touch the REAR wall. Nose-out or nose-up on the curved wall is OK. Stop moving.'},
     {'blue_a','Blue: first inner post','Touch either INNER post face with your nose, sideways at the goal line.'},
     {'blue_b','Blue: other inner post','Touch the OTHER inner post face with your nose at the goal line.'},
     {'blue_top','Blue: underside of crossbar','At the middle of the goal mouth, Press F10 to arm, then fly nose-up into the UNDERSIDE at the middle of the mouth. Contact is captured automatically.'},
-    {'blue_back','Blue: back of net','Inside the blue net, face away from midfield and touch the REAR wall with your nose.'}}
+    {'blue_back','Blue: back of net','Inside the blue net, touch the REAR wall. Nose-out or nose-up on the curved wall is OK. Stop moving.'}}
 function Calibration.new(profile)
     return setmetatable({profile=profile,points={},index=1,history={},reference='bumper',tab='geometry'},Calibration)
 end
@@ -1735,8 +1735,8 @@ function Calibration:fit()
     end
     local centre=self.points.center.point
     local floor=0 -- fixed vertical origin of the saved standard soccer arena
-    local out={version=1,centre=table.clone(centre),floor=floor,goals={},
-        note='Centre measures XY; floor zero comes from the saved standard arena. Front-face contacts use source hitbox offsets; rounded-corner correction uses the saved fillet. Marker mode uses the car root directly.'}
+    local out={version=1,centre=table.clone(centre),floor=floor,goals={},warnings={},
+        note='Centre measures XY; floor zero comes from the saved standard arena. Front-face contacts use source hitbox offsets; rounded-corner correction uses the saved fillet. Marker mode uses the car root directly. Sloped post captures use the full rotated box. Rear body support is a layout check, not the curved wall surface.'}
     for team,name in ipairs({'blue','orange'})do
         local a,b,top,back=self.points[name..'_a'],self.points[name..'_b'],self.points[name..'_top'],self.points[name..'_back']
         local dx,dy=b.point[1]-a.point[1],b.point[2]-a.point[2]
@@ -1755,17 +1755,33 @@ function Calibration:fit()
         if top.reference=='bumper'then for _,v in ipairs(self:corners(top))do height=max(height,v[3]-floor)end end
         assert(height>350 and height<900,name..': crossbar height is implausible')
         local backDepth=dot(sub(back.point,origin),normal)
+        local backMethod='marker'
+        if back.reference=='bumper'then
+            backMethod='body_support'
+            backDepth=-math.huge
+            for _,v in ipairs(self:corners(back))do backDepth=max(backDepth,dot(sub(v,origin),normal))end
+        end
         assert(backDepth>300 and backDepth<1400,name..': touch the back of the net, not the field backwall')
         assert(abs(dot(sub(back.point,origin),side))<width*.4,name..': use the middle of the rear net wall')
         for _,p in ipairs({a,b})do
             assert(p.point[3]-floor>0 and p.point[3]-floor<height,name..': post contact must be below the crossbar')
             if p.reference=='bumper'then
                 local sign=dot(sub(p.point,origin),side)>0 and 1 or -1
-                assert(dot(p.forward,side)*sign>.9,name..': point the nose sideways into the inner post face')
+                local horizontal=sqrt(p.forward[1]^2+p.forward[2]^2)
+                assert(horizontal>.2 and dot(p.forward,side)*sign/horizontal>.9,name..': point the nose outward into the inner post face; slope tilt is OK')
             end
         end
         if top.reference=='bumper'then assert(top.forward[3]>.9,name..': point the nose up into the crossbar underside')end
-        if back.reference=='bumper'then assert(dot(back.forward,normal)>.9,name..': point the nose into the rear net wall')end
+        if back.reference=='bumper'then
+            local horizontal=sqrt(back.forward[1]^2+back.forward[2]^2)
+            local noseOut=horizontal>.2 and dot(back.forward,normal)/horizontal>.9
+            local wallSupported=dot(back.up,normal)<-.85 and back.forward[3]>.8
+            assert(noseOut or wallSupported,name..': touch the rear wall nose-out, or nose-up with wheels supported on its curve')
+            if wallSupported then
+                backMethod='wall_supported_body'
+                out.warnings[#out.warnings+1]=name..': rear capture is wall-supported; body support depth is approximate, not the exact curved wall surface'
+            end
+        end
         local r=self.profile.arena.MOUTH_FILLET
         local function rounded(z)
             local dz=max(0,r-min(z,height-z))
@@ -1784,7 +1800,7 @@ function Calibration:fit()
         local ca,cb=correction(a,-1),correction(b,1)
         width=width+ca+cb
         for i=1,2 do origin[i]=origin[i]+side[i]*(cb-ca)/2 end
-        out.goals[team]={origin=origin,side=side,normal=normal,half_width=width/2,height=height,back_depth=backDepth,fillet=r}
+        out.goals[team]={origin=origin,side=side,normal=normal,half_width=width/2,height=height,back_depth=backDepth,fillet=r,back_reference=backMethod}
     end
     local blue,orange=out.goals[1],out.goals[2]
     assert(dot(blue.normal,orange.normal)<-.97,'The two goals must face opposite field ends')
@@ -1792,6 +1808,7 @@ function Calibration:fit()
     assert(abs(blue.half_width-orange.half_width)<min(blue.half_width,orange.half_width)*.12,'Goal widths disagree; recapture the inner faces')
     assert(abs(blue.height-orange.height)<min(blue.height,orange.height)*.12,'Crossbar heights disagree')
     out.summary=string.format('Blue %.1f x %.1f studs | Orange %.1f x %.1f studs',blue.half_width*.2,blue.height*.1,orange.half_width*.2,orange.height*.1)
+    if #out.warnings>0 then out.summary=out.summary..' | rear-wall depth approximate'end
     return out
 end
 function Calibration:apply()self.candidate=self:fit();self.active=copy(self.candidate);return self.active end
@@ -2048,7 +2065,7 @@ local connections={}
 local function connect(signal,callback)
     local connection=signal:Connect(callback);connections[#connections+1]=connection
 end
-local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.6 | F4 minimize')
+local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.7 | F4 minimize')
 local panel=window.panel
 local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
 local label=Instance.new("TextLabel",main)
@@ -2674,7 +2691,7 @@ task.spawn(function()
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=(MODEL_NAME.." LOCAL v6.6 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
+        label.Text=(MODEL_NAME.." LOCAL v6.7 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
             :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")
         local lastTick,lastUi=os.clock(),-math.huge
         local busy=false
@@ -2834,7 +2851,7 @@ task.spawn(function()
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=(MODEL_NAME.." v6.6 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=(MODEL_NAME.." v6.7 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -2861,4 +2878,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.6"}
+return {started=true,version="local-6.7"}

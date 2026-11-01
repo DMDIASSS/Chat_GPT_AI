@@ -224,3 +224,68 @@ assert(not calibration.crossbar and calibration.index==4 and not calibration.poi
 calibration:capture();assert(calibration.crossbar)
 calibration:capture();assert(not calibration.crossbar and calibration.index==4,'Could not cancel capture')
 ''')
+
+    def test_sloped_post_captures_use_rotated_box_support_and_either_post_order(self):
+        self.run_lua('''
+calibration.points=landmarks()
+local cfg=profile.car_presets.standard
+for _,name in ipairs({'blue','orange'})do
+ for i,id in ipairs({'a','b'})do
+  local p=calibration.points[name..'_'..id];local sign=id=='a'and -1 or 1
+  local angle=math.rad(i==1 and 45 or 57);local c,s=math.cos(angle),math.sin(angle)
+  p.forward={sign*c,0,s};p.up={-sign*s,0,c}
+  -- At mid-height the mouth sides are flat. The front lower box corner,
+  -- rather than its face centre, touches the known +/-896 inner boundary.
+  p.root={100+sign*(896-c*(cfg.offset[1]+cfg.size[1]/2)+s*(cfg.offset[3]-cfg.size[3]/2)),p.point[2],300}
+  p.point={p.root[1]+p.forward[1]*(cfg.offset[1]+cfg.size[1]/2)+p.up[1]*cfg.offset[3],p.root[2],
+   p.root[3]+p.forward[3]*(cfg.offset[1]+cfg.size[1]/2)+p.up[3]*cfg.offset[3]}
+ end
+end
+calibration.points.orange_a,calibration.points.orange_b=calibration.points.orange_b,calibration.points.orange_a
+local fit=calibration:apply()
+for _,g in ipairs(fit.goals)do
+ assert(math.abs(g.half_width-896)<.001,'Tilted body changed known opening width')
+ assert(math.abs(g.origin[1]-100)<.001,'Asymmetric tilt shifted the goal centre')
+end
+local other=Calibration.new(profile);other:load(calibration:export())
+assert(other.candidate and not other.active,'Tilt-compatible load silently applied geometry')
+''')
+
+    def test_sloped_post_does_not_accept_wrong_horizontal_heading(self):
+        self.run_lua('''
+calibration.points=landmarks();calibration:apply();local active=calibration.active
+local p=calibration.points.orange_a
+p.forward={0,1,0};p.up={0,0,1}
+assert(not pcall(function()calibration:apply()end),'Accepted a nose facing along the goal line')
+p.forward={1,0,0}
+assert(not pcall(function()calibration:apply()end),'Accepted a nose facing away from the inner post')
+assert(calibration.active==active,'Rejected orientation replaced active calibration')
+''')
+
+    def test_wall_supported_rear_pose_is_approximate_body_depth_not_nose_contact(self):
+        self.run_lua('''
+calibration.points=landmarks();local cfg=profile.car_presets.standard
+for _,pair in ipairs({{'blue',-1},{'orange',1}})do
+ local name,sign=pair[1],pair[2];local p=calibration.points[name..'_back']
+ local y=50+sign*5120
+ p.forward={0,0,1};p.up={0,-sign,0};p.root={100,y+sign*850,230}
+ p.point={100,p.root[2]-sign*cfg.offset[3],230+cfg.offset[1]+cfg.size[1]/2}
+end
+local fit=calibration:apply()
+assert(#fit.warnings==2)
+for _,g in ipairs(fit.goals)do
+ assert(g.back_reference=='wall_supported_body')
+ assert(math.abs(g.back_depth-(850-cfg.offset[3]+cfg.size[3]/2))<.001,'Treated vertical nose as the rear contact surface')
+ assert(g.height==620,'Rear wall riding changed opening height')
+end
+''')
+
+    def test_centre_heading_does_not_rotate_or_shift_goal_fit(self):
+        self.run_lua('''
+calibration.points=landmarks();local first=calibration:fit()
+calibration.points.center.forward={0,-1,0};local second=calibration:fit()
+for i=1,2 do
+ assert(first.goals[i].half_width==second.goals[i].half_width)
+ for j=1,3 do assert(first.goals[i].origin[j]==second.goals[i].origin[j] and first.goals[i].normal[j]==second.goals[i].normal[j])end
+end
+''')
