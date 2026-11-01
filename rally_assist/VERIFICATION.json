@@ -1,0 +1,106 @@
+{
+  "version": "1.0.0",
+  "date": "2026-11-01",
+  "unit_tests": {
+    "passed": 14,
+    "failed": 0,
+    "scope": [
+      "GUI drag, minimize, close and reinjection",
+      "verified key input, stale delivery and late presses",
+      "native analog input and handling restoration",
+      "wet/surface grip and native speed preview",
+      "independent ghost decoder and capture rejection",
+      "saved collision road alignment",
+      "generated script byte consistency, compilation and no direct score/network/teleport calls"
+    ]
+  },
+  "luau_compile": true,
+  "live_roblox_tested": false,
+  "live_executor_tested": false,
+  "saved_collision_road_samples": 46,
+  "planar_driving": {
+    "model": "Independent planar bicycle; actuator lag and grip cap; no Roblox suspension/collisions/networking",
+    "results": [
+      {
+        "stage": "AlpinePass",
+        "hz": 60,
+        "seconds": 98.01666666666667,
+        "max_center_deviation": 6.049436638280641,
+        "complete": true
+      },
+      {
+        "stage": "FrozenLake",
+        "hz": 60,
+        "seconds": 137.03333333333333,
+        "max_center_deviation": 5.2853192820976735,
+        "complete": true
+      },
+      {
+        "stage": "PineForest",
+        "hz": 60,
+        "seconds": 86.61666666666666,
+        "max_center_deviation": 6.516841401968767,
+        "complete": true
+      },
+      {
+        "stage": "SakuraPass",
+        "hz": 60,
+        "seconds": 95.15,
+        "max_center_deviation": 6.133493074712999,
+        "complete": true
+      },
+      {
+        "stage": "RiverbendCanyon",
+        "hz": 60,
+        "seconds": 164.78333333333333,
+        "max_center_deviation": 7.088331407528993,
+        "complete": true
+      },
+      {
+        "stage": "CoastalCliffs",
+        "hz": 60,
+        "seconds": 116.73333333333333,
+        "max_center_deviation": 5.449902250752878,
+        "complete": true
+      },
+      {
+        "stage": "SafariRaid",
+        "hz": 60,
+        "seconds": 209.29999999999998,
+        "max_center_deviation": 7.242068449928249,
+        "complete": true
+      },
+      {
+        "stage": "PineForest",
+        "hz": 30,
+        "seconds": 86.26666666666667,
+        "max_center_deviation": 6.2795561344779145,
+        "complete": true
+      },
+      {
+        "stage": "PineForest",
+        "hz": 120,
+        "seconds": 86.8,
+        "max_center_deviation": 6.638881606481861,
+        "complete": true
+      }
+    ],
+    "all_complete": true
+  },
+  "limits": [
+    "Planar checks are not native Roblox physics or race-time benchmarks.",
+    "Collisions, suspension, networking and server validation require live testing.",
+    "Menu showcase runs are not verified world records.",
+    "Personal ghost use depends on data the game already loads."
+  ],
+  "sources_sha256": {
+    "route.lua": "b203df951e8d9c6af6f66017af75c06edb687c4751cb4bb60151da707cd0db47",
+    "controller.lua": "5c5247610b184270b0f475a3e8b4c7b46de1579735b1bbaca8a82eadd6d6ef3a",
+    "input.lua": "11a7f39787490e7916b13aa8da4cb57ccb2fd51b008bf261ac718c8494b04762",
+    "adapter.lua": "5c5638107a1acef1c60091b57ea39819087d36a937e17ce0d9a9d1a4aa7521a4",
+    "ghost.lua": "2b98a76b9a4fce5c6f6c92b188fee762e5f59597a48ad77d4382638fb2384602",
+    "client.lua": "9735e5d7da7e928c6e8fdcda534321ad48d3113b8b5a767475a72d73f78dd0c6",
+    "stage_profiles.json": "6bb4e0d76c2997c68a34001fb6040e31be9221520ce743578386c148ac2aec30",
+    "showcase_lines.json": "6529d774d19e1523a748eb3a25f96c346057a3062977288054e17055fe7ad5c2"
+  }
+}

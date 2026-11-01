@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+BackseatRally_Report.json
+BackseatRally_Ghosts.json
