@@ -1,6 +1,6 @@
 # Validation — 2 November 2026
 
-- 38 automated tests passed using the Luau CLI and Python unittest.
+- 42 automated tests passed using the Luau CLI and Python unittest.
 - Every authored Luau source compiles.
 - Road continuity, grade and curve bounds checked across 1,000 seeds.
 - Manual control simulation reaches a finite finish and updates a personal best.
@@ -12,8 +12,8 @@
 - The full RBXL preserves all 82,861 original instances and original hierarchy relationships.
 - Every original INST, PROP, SSTR and metadata chunk is byte identical.
 - An independent robloxapi/rbxfile decoder reads all 82,861 original instances unchanged,
-  followed by the 24 additions. Original script counts remain 490 ModuleScripts,
-  6 Scripts and 4 LocalScripts; the expansion adds 12, 1 and 1 respectively.
+  followed by the 25 additions. Original script counts remain 490 ModuleScripts,
+  6 Scripts and 4 LocalScripts; the expansion adds 13, 1 and 1 respectively.
 - Artifact hashes and embedded sources are checked against the reviewable source files.
 
 - Default startup reaches the working menu and creates a road without the original garage.
@@ -35,3 +35,8 @@ No Studio GUI or live Roblox server is available in this environment. Renderer/d
 behavior, permissions for reused mesh/audio assets, production DataStores and real
 multiplayer latency still require a Studio playtest. The supplied original server
 scripts are placeholders; the new modes use their own authored backend.
+
+All 15 recovered profiles are checked through the same solver. New checks cover axle
+load contact poses, deterministic bumps/climate, and suspension pose replay round trips.
+The old Sakura renderer has not been reproduced in Studio; overlap/rebase changes
+apply to the new rally renderer. See ASSET_EXPORT_GUIDE.md for calibration limits.

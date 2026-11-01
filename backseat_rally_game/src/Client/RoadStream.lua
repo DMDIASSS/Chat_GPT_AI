@@ -18,7 +18,7 @@ function Stream:part(parent,name,size,cf,tint,material,shape)
 end
 function Stream:release(chunk)
  for _,p in ipairs(chunk:GetChildren())do
-  if p:IsA('BasePart')and #self.pool<400 then p.Parent=nil;self.pool[#self.pool+1]=p else p:Destroy()end
+  if p:IsA('BasePart')and #self.pool<400 then p:ClearAllChildren();p.Parent=nil;self.pool[#self.pool+1]=p else p:Destroy()end
  end
  chunk:Destroy()
 end
@@ -32,7 +32,7 @@ function Stream:shift(originZ)
  local delta=Vector3.new(0,0,originZ-self.originZ)
  for _,entry in pairs(self.chunks)do
   -- Jobs resume with the new origin, so unfinished chunks are rebuilt.
-  if entry.done then entry.model:PivotTo(entry.model:GetPivot()+delta)else entry.cancel=true end
+  if entry.done then for _,part in ipairs(entry.model:GetDescendants())do if part:IsA('BasePart')then part.CFrame+=delta end end else entry.cancel=true end
  end
  self.originZ=originZ
 end
@@ -84,8 +84,10 @@ function Stream:build(index,entry)
   local normal=Vector3.new(-slope,1,p.dx*slope-p.dy).Unit
   local frame=CFrame.lookAt(pos,pos+dir,normal)
   frame=frame-frame.UpVector*.35
-  local length=dir.Magnitude+2.4;local biome=C.Biomes[p.biome]
+  local length=dir.Magnitude+.04;local biome=C.Biomes[p.biome]
   self:part(model,'Road',Vector3.new(p.width,.7,length),frame,biome.road,p.surface=='tarmac'and Enum.Material.Asphalt or Enum.Material.Ground)
+  local seam=CFrame.lookAt(Vector3.new(b.x,b.y-.362,b.z)+offset,Vector3.new(b.x+b.dx,b.y-.362+b.dy,b.z+1)+offset,normal)
+  self:part(model,'Road seam',Vector3.new(p.width,.7,math.max(.12,p.width*math.abs(b.heading-a.heading)+.12)),seam,biome.road,p.surface=='tarmac'and Enum.Material.Asphalt or Enum.Material.Ground)
   for _,side in ipairs({-1,1})do
    self:part(model,'Shoulder',Vector3.new(3,.5,length),frame*CFrame.new(side*(p.width/2+1.5),-.18,0),biome.ground,Enum.Material.Ground)
    if p.bridge or p.tunnel then
@@ -104,6 +106,11 @@ function Stream:build(index,entry)
    self:part(model,'Tunnel roof',Vector3.new(p.width+4,2,35),frame*CFrame.new(0,13,0),{.30,.32,.32},Enum.Material.Concrete)
    for _,side in ipairs({-1,1})do self:part(model,'Tunnel wall',Vector3.new(1,12,35),frame*CFrame.new(side*(p.width/2+1.5),6,0),{.31,.33,.32},Enum.Material.Concrete)end
    self:part(model,'Tunnel strip',Vector3.new(.3,.15,14),frame*CFrame.new(0,11.8,0),{.9,.77,.48},Enum.Material.Neon)
+  end
+  if z>=0 and z%128==0 and math.abs(p.curvature)>.0013 then
+   local sign=self:part(model,'Turn marker',Vector3.new(3.5,3,.2),frame*CFrame.new(p.width/2+5,3,0),{.94,.72,.22})
+   local face=Instance.new('SurfaceGui');face.Face=Enum.NormalId.Back;face.CanvasSize=Vector2.new(120,120);face.Parent=sign
+   local text=Instance.new('TextLabel');text.Size=UDim2.fromScale(1,1);text.BackgroundTransparency=1;text.Text=p.curvature>0 and '←'or '→';text.TextScaled=true;text.TextColor3=Color3.fromRGB(25,30,25);text.Parent=face
   end
   if z>=0 and (z%C.Checkpoint==0 or z==route.length and route.length>0)then
    for _,side in ipairs({-1,1})do self:part(model,'Timing post',Vector3.new(.4,7,.4),frame*CFrame.new(side*(p.width/2+2),3.5,0),{.95,.72,.29})end

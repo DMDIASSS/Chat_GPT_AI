@@ -5,9 +5,9 @@ LUAU=os.environ.get('LUAU_BIN')or shutil.which('luau')or 'luau'
 COMPILE=os.environ.get('LUAU_COMPILE_BIN')or shutil.which('luau-compile')or 'luau-compile'
 
 def pure(extra=''):
-    text=''
+    text='local Catalog=(function()\n'+(APP/'src/Shared/VehicleCatalog.lua').read_text()+'\nend)()\n'
     for name in ['Config','Route','Dynamics','Replay']:
-        text+='local '+('C'if name=='Config'else 'D'if name=='Dynamics'else name)+'=(function()\n'+(APP/'src/Shared'/f'{name}.lua').read_text()+'\nend)()\n'
+        text+='local '+('C'if name=='Config'else 'D'if name=='Dynamics'else name)+'=(function()\n'+(APP/'src/Shared'/f'{name}.lua').read_text().replace('require(script.Parent.VehicleCatalog)','Catalog')+'\nend)()\n'
     return text+extra
 
 def roblox(extra='',client=False,server=True,before_client='',before_server=''):
@@ -15,7 +15,7 @@ def roblox(extra='',client=False,server=True,before_client='',before_server=''):
     roots={'Shared':"services.ReplicatedStorage",'Server':'services.ServerScriptService','Client':'sps'}
     text+="local replicated=Instance.new('Folder',services.ReplicatedStorage);replicated.Name='BackseatExpedition'\n"
     text+="local shared=Instance.new('Folder',replicated);shared.Name='Shared'\nlocal remotes=Instance.new('Folder',replicated);remotes.Name='Remotes'\n"
-    for name,cls in [('Action','RemoteEvent'),('Request','RemoteFunction'),('State','UnreliableRemoteEvent'),('Input','UnreliableRemoteEvent')]:
+    for name,cls in [('Action','RemoteEvent'),('Request','RemoteFunction'),('State','RemoteEvent'),('Input','UnreliableRemoteEvent')]:
         text+=f"local obj=Instance.new('{cls}',remotes);obj.Name='{name}'\n"
     for group,parent in [('Shared','shared'),('Server','services.ServerScriptService'),('Client','sps')]:
         text+=f"local folder=Instance.new('Folder',{parent});folder.Name='{group}'\n"if group!='Shared'else 'local folder=shared\n'

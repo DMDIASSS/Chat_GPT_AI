@@ -11,7 +11,7 @@ local function safeClone(model,maxParts)
  return clone
 end
 function ImportAssets.harvest(root)
- if not root:FindFirstChild('ImportedAudio')then
+ if require(script.Parent.Config).ExternalAudio and not root:FindFirstChild('ImportedAudio')then
   local audio=Instance.new('Folder');audio.Name='ImportedAudio';audio.Parent=root
   -- Idle, mid-load and high-load loops referenced by the supplied car audio bank.
   for i,id in ipairs({'rbxassetid://79745038579097','rbxassetid://112975795144083','rbxassetid://99444077339790'})do
@@ -26,14 +26,22 @@ function ImportAssets.harvest(root)
  local carFolder=Instance.new('Folder');carFolder.Name='ImportedCars';carFolder.Parent=root
  local propFolder=Instance.new('Folder');propFolder.Name='ImportedProps';propFolder.Parent=root
  local originals=assets:FindFirstChild('Cars')
- for _,name in ipairs({'Hatch','OrsoSafari','Coupe'})do
+ local names={};for _,car in ipairs(require(script.Parent.Config).Cars)do names[#names+1]=car.template end
+ -- Keep Hatch as a compatible source for older installed payloads.
+ if not table.find(names,'Hatch')then names[#names+1]='Hatch'end
+ for _,name in ipairs(names)do
   local source=originals and originals:FindFirstChild(name)
   local exterior=source and source:FindFirstChild('Exterior');local body=source and source:FindFirstChild('Body')
   if exterior and body and body:IsA('BasePart')then
-   local clone=safeClone(exterior,180)
+   local clone=safeClone(exterior,600)
    if clone then
+    local interior=source:FindFirstChild('Interior');if interior then local cabin=safeClone(interior,600);if cabin then cabin.Parent=clone end end
     clone.Name=name;local reference=body:Clone();reference.Name='SkinRoot';reference.Transparency=1;reference.Anchored=true;reference.CanCollide=false
-    reference:ClearAllChildren();reference.Parent=clone;clone.PrimaryPart=reference;clone:PivotTo(CFrame.identity);clone.Parent=carFolder;cars+=1
+    reference:ClearAllChildren()
+    local wheels=source:FindFirstChild('Wheels');local centre=Vector3.zero;local count=0
+    if wheels then for _,wheel in ipairs(wheels:GetChildren())do if wheel:IsA('Model')or wheel:IsA('BasePart')then centre+=wheel:GetPivot().Position;count+=1 end end end
+    if count==4 then reference.CFrame=CFrame.new(centre/4)*body.CFrame.Rotation end
+    reference.Parent=clone;clone.PrimaryPart=reference;clone:PivotTo(CFrame.identity);clone.Parent=carFolder;cars+=1
    end
   end
  end

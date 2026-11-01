@@ -7,7 +7,7 @@ roblox=harness.roblox
 SKIN = '''
 local C=require(nodes['Shared/Config.lua']);local Assets=require(nodes['Shared/Assets.lua'])
 local library=Instance.new('Folder',replicated);library.Name='ImportedCars'
-local template=Instance.new('Model',library);template.Name='Hatch'
+local template=Instance.new('Model',library);template.Name=C.Cars[1].template
 local anchor=Instance.new('Part',template);anchor.Name='SkinRoot';anchor.Transparency=1;template.PrimaryPart=anchor
 local shell=Instance.new('MeshPart',template);shell.Name='Shell';shell.MeshId='rbxassetid://123456789';shell.Transparency=0
 '''
@@ -89,7 +89,7 @@ class StartupAssetTests(unittest.TestCase):
     assert(#content.calls==1,'The same template was preloaded repeatedly')
     assert(a.model:GetAttribute('VisualSource')=='Original'and b.model:GetAttribute('VisualSource')=='Original')
     local skin=a.model:FindFirstChild('Original exterior');assert(skin and a.model.Chassis.Transparency==1)
-    assert((skin.PrimaryPart.Position-target.Position).Magnitude<.001,'Late skin attached at the old origin')
+    assert((skin.PrimaryPart.Position-(target*CFrame.new(0,0,-C.Cars[1].wheelbase*(C.Cars[1].rearShare-.5))).Position).Magnitude<.001,'Late skin attached at the old origin')
     for _,wheel in ipairs(a.wheels)do assert(wheel.tyre.Transparency==0,'Skin hid the animated tyres')end
     assert(shell.Parent==template and shell.Transparency==0)
     '''))

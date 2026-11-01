@@ -51,9 +51,11 @@ function UI.new(callbacks)
   label(b,mode.tag,14,35,268,32,12,palette.muted);self.modeButtons[i]=b
  end
  label(menu,'YOUR GARAGE',36,463,600,22,12,palette.gold)
+ local garage=Instance.new('ScrollingFrame');garage.Name='AllCars';garage.Position=UDim2.fromOffset(36,494);garage.Size=UDim2.fromOffset(625,55)
+ garage.BackgroundTransparency=1;garage.BorderSizePixel=0;garage.ScrollingDirection=Enum.ScrollingDirection.X;garage.ScrollBarThickness=6;garage.CanvasSize=UDim2.fromOffset(#C.Cars*210,0);garage.Parent=menu
  self.carButtons={}
  for i,car in ipairs(C.Cars)do
-  local b=button(menu,car.name,36+(i-1)*210,494,196,48,function()self.car=car;self:selection()end);self.carButtons[i]=b
+  local b=button(garage,car.name,(i-1)*210,0,196,48,function()self.car=car;self:selection()end);self.carButtons[i]=b
  end
  self.carDescription=label(menu,'',36,549,625,28,13,palette.muted)
  local seed=Instance.new('TextBox');seed.Name='CourseSeed';seed.Position=UDim2.fromOffset(36,600);seed.Size=UDim2.fromOffset(155,42)
@@ -147,7 +149,7 @@ function UI:selection()
  if self.previewWorld and self.previewCarId~=self.car.id then
   if self.previewCar then self.previewCar.model:Destroy()end
   -- Show a complete car immediately, independently of external mesh permissions.
-  self.previewCar=Assets.car(self.previewWorld,self.car,false,false)
+  self.previewCar=Assets.car(self.previewWorld,self.car,false,C.ImportedVisuals)
   self.previewCarId=self.car.id
  end
  for i,b in ipairs(self.modeButtons)do b.BackgroundColor3=C.Modes[i]==self.mode and Color3.fromRGB(61,85,63)or palette.card end
@@ -155,7 +157,7 @@ function UI:selection()
   local car=C.Cars[i];b.BackgroundColor3=car==self.car and Color3.fromRGB(61,85,63)or palette.card
   b.Text=car.name..(self.xp<car.unlock and ' · '..car.unlock..' XP'or '')
  end
- self.carDescription.Text=self.car.description
+ self.carDescription.Text=string.format('%d kg · %d hp · %d Nm · %d:%d balance · %.1f studs wheelbase',self.car.mass,self.car.power,self.car.torque,(1-self.car.rearShare)*100,self.car.rearShare*100,self.car.wheelbase)
  self.modeTitle.Text=self.mode.name
  self.modeDetail.Text=self.mode.length==0 and 'An endless road. Bank at any point.\nEvery completed run keeps its replay.'or string.format('%.1f km · finishable seeded stage\nCheckpoint recovery adds 5 seconds.',self.mode.length*C.StudMetres/1000)
 end
@@ -196,8 +198,9 @@ function UI:saved(data)
  if self.resultMeta and self.resultMeta.id==data.id then self.resultReady=true;self.resultSaved.Text=data.status;self.watchButton.Text='WATCH REPLAY'end
 end
 function UI:runInfo(run,s,route,clock)
- self.runSummary.Text=(run.mode or 'replay'):upper()..' / SEED '..run.seed..'\n'..C.Biomes[route:point(s.z).biome].name
- self.note.Text=run.missed and 'MISSED CHECKPOINT · press R'or route:note(s.z+math.abs(s.v))
+ local climate=route:conditions(s.z)
+ self.runSummary.Text=(run.mode or 'replay'):upper()..' / SEED '..run.seed..'\n'..C.Biomes[route:point(s.z).biome].name..string.format(' · %d°C · wet %d%%',climate.temperature,climate.wetness*100)
+ self.note.Text=run.missed and 'MISSED CHECKPOINT · press R'or route:call(s.z,s.v)
  self.timer.Text=UI.time(clock);self.speed.Text=tostring(math.floor(math.abs(s.v)*C.StudMetres*3.6+.5))
  local progress=run.length and run.length>0 and string.format('%.2f / %.2f km',math.max(0,s.z)*C.StudMetres/1000,run.length*C.StudMetres/1000)or string.format('%.2f km',math.max(0,s.z)*C.StudMetres/1000)
  self.telemetry.Text=string.format('THROTTLE %3d%%   BRAKE %3d%%   STEER %+3d%%\n%s   ·   BODY %d%%   ·   R recover / B mark / C camera',

@@ -152,7 +152,7 @@ def add_expansion(data: bytes, src: Path):
     shared_modules = add("Folder", "Shared", shared)
     remotes = add("Folder", "Remotes", shared)
     for name, cls in (("Action", "RemoteEvent"), ("Request", "RemoteFunction"),
-                      ("State", "UnreliableRemoteEvent"), ("Input", "UnreliableRemoteEvent")):
+                      ("State", "RemoteEvent"), ("Input", "UnreliableRemoteEvent")):
         add(cls, name, remotes)
     server = add("Folder", "BackseatExpeditionServer", sss)
     client = add("Folder", "BackseatExpeditionClient", sps)

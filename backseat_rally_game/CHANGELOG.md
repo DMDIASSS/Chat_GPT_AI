@@ -1,3 +1,15 @@
+# DM / Expedition 1.3.0
+
+- Recover 15 vehicle profiles from uploaded Cars, CarSelect and Parts.Rating.Rig tables.
+- Share one configurable handling solver across all cars; enable original visual reuse.
+- Add torque curves, gearing, mass/power limits, axle traction and combined grip demand.
+- Add sprung body motion, wet/thermal grip, wind and weather telemetry.
+- Add short-wave road bumps, advance turn arrows and roadside turn markers.
+- Record sprung pose in replay frames; increment road generation to 2.
+- Reduce road slab overlap and shift completed chunk parts directly on origin rebases.
+- Normalize imported bodies about wheel geometry and include suitable interiors.
+- Preserve original scenes and provide a guide for complete authorized asset exports.
+
 # DM / Expedition 1.2.0
 
 - Fix server startup when GetDataStore throws or the place is unpublished.

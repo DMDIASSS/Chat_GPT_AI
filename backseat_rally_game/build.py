@@ -30,7 +30,7 @@ def tree(parent,disabled=False):
     shared=item(replicated,'Folder','Shared')
     for p in sorted((APP/'src/Shared').glob('*.lua')):source(shared,p)
     remotes=item(replicated,'Folder','Remotes')
-    for name,cls in [('Action','RemoteEvent'),('Request','RemoteFunction'),('State','UnreliableRemoteEvent'),('Input','UnreliableRemoteEvent')]:item(remotes,cls,name)
+    for name,cls in [('Action','RemoteEvent'),('Request','RemoteFunction'),('State','RemoteEvent'),('Input','UnreliableRemoteEvent')]:item(remotes,cls,name)
     server=item(parent,'Folder','BackseatExpeditionServer')
     for p in sorted((APP/'src/Server').glob('*.lua')):source(server,p,disabled)
     client=item(parent,'Folder','BackseatExpeditionClient')
@@ -94,7 +94,7 @@ def main():
     for name in ['Backseat_Rally_Expedition.rbxlx','Backseat_Rally_Expansion.rbxmx',standalone,standalone_binary]+extras:contents[name]=(downloads/name).read_bytes()
     contents['START_HERE.txt']=(
         f'1. Open {standalone_binary} directly in Roblox Studio.\n'
-        '2. Press Play. Keep Trail Hatch selected, then click TAKE THE ROAD.\n'
+        '2. Press Play. Keep the first car selected, then click TAKE THE ROAD.\n'
         '3. Use W/A/S/D to drive, Space for the handbrake, R to recover.\n\n'
         'This clean place uses its own server and native car/map geometry.\n'
         'Publishing, cloud-save access and private imported assets are optional.\n'

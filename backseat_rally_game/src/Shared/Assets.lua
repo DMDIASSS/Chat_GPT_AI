@@ -40,8 +40,8 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
  end
  local wheels={}
  for _,front in ipairs({true,false})do for _,sign in ipairs({-1,1})do
-  local tyre=Assets.part(model,'Tyre',Vector3.new(.8,2.4,2.4),CFrame.new(sign*3,-1,front and -3.8 or 3.8),dark,Enum.Material.SmoothPlastic,Enum.PartType.Cylinder)
-  local rim=Assets.part(model,'Wheel',Vector3.new(.83,1.4,1.4),tyre.CFrame,metal,Enum.Material.Metal,Enum.PartType.Cylinder)
+  local tyre=Assets.part(model,'Tyre',Vector3.new(.8,car.radius*2,car.radius*2),CFrame.new(sign*3,car.radius-2.2,front and -car.wheelbase*car.rearShare or car.wheelbase*(1-car.rearShare)),dark,Enum.Material.SmoothPlastic,Enum.PartType.Cylinder)
+  local rim=Assets.part(model,'Wheel',Vector3.new(.83,car.radius*1.16,car.radius*1.16),tyre.CFrame,metal,Enum.Material.Metal,Enum.PartType.Cylinder)
   wheels[#wheels+1]={tyre=tyre,rim=rim,side=sign,front=front}
  end end
  local root=game:GetService('ReplicatedStorage'):FindFirstChild('BackseatExpedition')
@@ -60,13 +60,14 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
  end end
  model.Parent=parent
  model:SetAttribute('VisualSource','BuiltIn')
- local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds}
+ local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds,car=car,skinStatus=template and 'loading'or 'missing'}
  if template and not ghost then
   Loader.check(template,function(ready)
+   visual.skinStatus=ready and 'loaded'or 'unavailable'
    if not ready or not model.Parent then return end
    local skin=template:Clone()
    if not skin.PrimaryPart then skin:Destroy();return end
-   skin.Name='Original exterior';skin:PivotTo(model:GetPivot())
+   skin.Name='Original exterior';skin:PivotTo(model:GetPivot()*CFrame.new(0,0,-car.wheelbase*((car.rearShare or .5)-.5)))
    for _,part in ipairs(skin:GetDescendants())do if part:IsA('BasePart')then
     part.Anchored=true;part.CanCollide=false;part.CanTouch=false;part.CanQuery=false
    end end
@@ -82,14 +83,15 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
 end
 function Assets.pose(visual,s,route,offset,dt)
  local D=require(script.Parent.Dynamics)
- local y,pitch,roll=D.pose(s,route)
+ local y,pitch,roll=D.pose(s,route,visual.car)
  local cf=CFrame.new(Vector3.new(s.x,y,s.z)+offset)*CFrame.Angles(0,math.pi+s.yaw,0)*CFrame.Angles(pitch,0,roll)
- visual.model:PivotTo(cf);visual.spin=(visual.spin+s.v*(dt or 0)/1.2)%(math.pi*2)
+ visual.model:PivotTo(cf);visual.spin=(visual.spin+s.v*(dt or 0)/visual.car.radius)%(math.pi*2)
  for _,wheel in ipairs(visual.wheels)do
-  local z=wheel.front and -3.8 or 3.8
+  local wb=visual.car.wheelbase;local com=wb*((visual.car.rearShare or .5)-.5)
+  local z=(wheel.front and -wb/2 or wb/2)-com
   local pos=cf:PointToWorldSpace(Vector3.new(wheel.side*3,0,z))
   local localPos=pos-offset;local ground=route:ground(localPos.X,localPos.Z)
-  local at=Vector3.new(pos.X,ground+1.2+offset.Y,pos.Z)
+  local at=Vector3.new(pos.X,ground+visual.car.radius+offset.Y,pos.Z)
   local wc=CFrame.new(at)*cf.Rotation*CFrame.Angles(0,wheel.front and -s.steer*.32 or 0,0)*CFrame.Angles(visual.spin,0,0)
   wheel.tyre.CFrame=wc;wheel.rim.CFrame=wc
  end

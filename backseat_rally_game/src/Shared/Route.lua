@@ -23,8 +23,10 @@ function Route:point(z)
  -- Fade elevation into a flat starting apron, with zero derivative at z=0.
  local fade=math.clamp(z/160,0,1);local ease=fade*fade*(3-2*fade)
  local dease=(z>0 and z<160)and 6*fade*(1-fade)/160 or 0
- local raw=11*sin(z/280+self.p3)-self.y0+5*sin(z/510)
- local dy=(11/280*cos(z/280+self.p3)+5/510*cos(z/510))*ease+raw*dease
+ local rough=.35*sin(z/14+self.p1)+.2*sin(z/23+self.p2)
+ local roughSlope=.35/14*cos(z/14+self.p1)+.2/23*cos(z/23+self.p2)
+ local raw=rough+11*sin(z/280+self.p3)-self.y0+5*sin(z/510)
+ local dy=(roughSlope+11/280*cos(z/280+self.p3)+5/510*cos(z/510))*ease+raw*dease
  local x=a*sin(f*z+self.p1)+b*sin(g*z+self.p2)-self.x0
  local dx=a*f*cos(f*z+self.p1)+b*g*cos(g*z+self.p2)
  local ddx=-a*f*f*sin(f*z+self.p1)-b*g*g*sin(g*z+self.p2)
@@ -40,6 +42,19 @@ function Route:ground(x,z)
  local p=self:point(z);local lateral=(x-p.x)/sqrt(1+p.dx*p.dx)
  local shoulder=math.max(0,math.abs(lateral)-p.width/2)
  return p.y+lateral*math.tan(p.bank)-math.min(shoulder*.13,3),lateral,p
+end
+function Route:conditions(z)
+ local biome=self:point(z).biome
+ local cfg=self.config.Climate or {dryWetness=.08,rainWetness=.45,wetGripLoss=.24,windSpeed=3}
+ local wet=self.seed%3==0 and cfg.rainWetness or cfg.dryWetness
+ return {temperature=biome==2 and -3 or(biome==3 and 32 or 18),wetness=wet,
+  wind=math.sin(self.p1+z/1800)*cfg.windSpeed,friction=(biome==2 and .82 or 1)*(1-wet*cfg.wetGripLoss)}
+end
+function Route:call(z,speed)
+ local lead=math.max(55,math.abs(speed or 0)*2.5)
+ local at=z+lead;local p=self:point(at)
+ local direction=math.abs(p.curvature)<.0013 and '↑'or(p.curvature>0 and '←'or '→')
+ return direction..'  '..self:note(at-100)..string.format(' · %d m',math.floor(lead*.28+.5))
 end
 function Route:note(z)
  local p=self:point(z+100);local k=p.curvature

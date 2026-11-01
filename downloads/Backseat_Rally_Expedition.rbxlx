@@ -171,8 +171,8 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
  end
  local wheels={}
  for _,front in ipairs({true,false})do for _,sign in ipairs({-1,1})do
-  local tyre=Assets.part(model,'Tyre',Vector3.new(.8,2.4,2.4),CFrame.new(sign*3,-1,front and -3.8 or 3.8),dark,Enum.Material.SmoothPlastic,Enum.PartType.Cylinder)
-  local rim=Assets.part(model,'Wheel',Vector3.new(.83,1.4,1.4),tyre.CFrame,metal,Enum.Material.Metal,Enum.PartType.Cylinder)
+  local tyre=Assets.part(model,'Tyre',Vector3.new(.8,car.radius*2,car.radius*2),CFrame.new(sign*3,car.radius-2.2,front and -car.wheelbase*car.rearShare or car.wheelbase*(1-car.rearShare)),dark,Enum.Material.SmoothPlastic,Enum.PartType.Cylinder)
+  local rim=Assets.part(model,'Wheel',Vector3.new(.83,car.radius*1.16,car.radius*1.16),tyre.CFrame,metal,Enum.Material.Metal,Enum.PartType.Cylinder)
   wheels[#wheels+1]={tyre=tyre,rim=rim,side=sign,front=front}
  end end
  local root=game:GetService('ReplicatedStorage'):FindFirstChild('BackseatExpedition')
@@ -191,13 +191,14 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
  end end
  model.Parent=parent
  model:SetAttribute('VisualSource','BuiltIn')
- local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds}
+ local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds,car=car,skinStatus=template and 'loading'or 'missing'}
  if template and not ghost then
   Loader.check(template,function(ready)
+   visual.skinStatus=ready and 'loaded'or 'unavailable'
    if not ready or not model.Parent then return end
    local skin=template:Clone()
    if not skin.PrimaryPart then skin:Destroy();return end
-   skin.Name='Original exterior';skin:PivotTo(model:GetPivot())
+   skin.Name='Original exterior';skin:PivotTo(model:GetPivot()*CFrame.new(0,0,-car.wheelbase*((car.rearShare or .5)-.5)))
    for _,part in ipairs(skin:GetDescendants())do if part:IsA('BasePart')then
     part.Anchored=true;part.CanCollide=false;part.CanTouch=false;part.CanQuery=false
    end end
@@ -213,14 +214,15 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
 end
 function Assets.pose(visual,s,route,offset,dt)
  local D=require(script.Parent.Dynamics)
- local y,pitch,roll=D.pose(s,route)
+ local y,pitch,roll=D.pose(s,route,visual.car)
  local cf=CFrame.new(Vector3.new(s.x,y,s.z)+offset)*CFrame.Angles(0,math.pi+s.yaw,0)*CFrame.Angles(pitch,0,roll)
- visual.model:PivotTo(cf);visual.spin=(visual.spin+s.v*(dt or 0)/1.2)%(math.pi*2)
+ visual.model:PivotTo(cf);visual.spin=(visual.spin+s.v*(dt or 0)/visual.car.radius)%(math.pi*2)
  for _,wheel in ipairs(visual.wheels)do
-  local z=wheel.front and -3.8 or 3.8
+  local wb=visual.car.wheelbase;local com=wb*((visual.car.rearShare or .5)-.5)
+  local z=(wheel.front and -wb/2 or wb/2)-com
   local pos=cf:PointToWorldSpace(Vector3.new(wheel.side*3,0,z))
   local localPos=pos-offset;local ground=route:ground(localPos.X,localPos.Z)
-  local at=Vector3.new(pos.X,ground+1.2+offset.Y,pos.Z)
+  local at=Vector3.new(pos.X,ground+visual.car.radius+offset.Y,pos.Z)
   local wc=CFrame.new(at)*cf.Rotation*CFrame.Angles(0,wheel.front and -s.steer*.32 or 0,0)*CFrame.Angles(visual.spin,0,0)
   wheel.tyre.CFrame=wc;wheel.rim.CFrame=wc
  end
@@ -260,8 +262,9 @@ return Assets
             <string name="Name">Config</string>
             <ProtectedString name="Source">-- Backseat Rally: Expedition. Authored game systems, not an executor script.
 return {
- Version='1.2.0', AutoOpen=true, ImportedVisuals=false, ExternalAudio=false, Generation=1, WorldX=100000, LaneSpacing=1800, StudMetres=.28, Step=1/60, StateRate=12, InputRate=20,
- Chunk=256, RoadStep=16, RoadWidth=28, Checkpoint=768, MaxPlayers=8,
+ Version='1.3.0', AutoOpen=true, ImportedVisuals=true, ExternalAudio=false, Generation=2, WorldX=12000, LaneSpacing=1800, StudMetres=.28, Step=1/60, StateRate=12, InputRate=20,
+ Climate={dryWetness=.08,rainWetness=.45,wetGripLoss=.24,windSpeed=3},
+ Chunk=256, RoadStep=8, RoadWidth=28, Checkpoint=768, MaxPlayers=8,
  ReplayRate=10, ReplayPage=500, ReplayPending=4, LibrarySize=12, BestSize=8,
  Modes={
   {id='sprint',name='Rally Sprint',tag='A road with an ending',length=6144,weather='clear',xp=240},
@@ -269,11 +272,7 @@ return {
   {id='daily',name='Daily Roadbook',tag='The same new road for everyone today',length=8192,weather='dusk',xp=340},
   {id='endless',name='Endless Journey',tag='Keep going. Bank the run whenever you want.',length=0,weather='clear',xp=0},
  },
- Cars={
-  {id='hatch',name='Trail Hatch',template='Hatch',unlock=0,top=138,accel=33,grip=1,wheelbase=7.6,color={.89,.36,.16},description='Light, lively, and happy on gravel.'},
-  {id='scout',name='Safari Scout',template='OrsoSafari',unlock=500,top=128,accel=30,grip=1.12,wheelbase=8,color={.64,.72,.43},description='A planted chassis for the long way home.'},
-  {id='coupe',name='Ridge Coupe',template='Coupe',unlock=1400,top=151,accel=35,grip=.91,wheelbase=8.2,color={.28,.62,.76},description='A quick nose; treat the rear with respect.'},
- },
+ Cars=require(script.Parent.VehicleCatalog),
  Biomes={
   {name='Pine Country',ground={.29,.36,.24},road={.39,.34,.27},accent={.88,.66,.28},trees=true},
   {name='Alpine Pass',ground={.56,.60,.57},road={.40,.43,.43},accent={.72,.86,.91},snow=true},
@@ -301,25 +300,53 @@ function D.copy(s)local out={};for k,v in pairs(s)do out[k]=v end;return out end
 function D.step(s,input,route,car,dt)
  dt=math.clamp(dt,0,1/30);local p=route:point(s.z)
  local _,offset=route:ground(s.x,s.z);local off=math.abs(offset)&gt;p.width/2+1
- local grip=car.grip*(p.surface=='tarmac'and 1.22 or 1)*(off and .63 or 1)
- s.steer=approach(s.steer,math.clamp(input.steer or 0,-1,1),9,dt)
+ local climate=route:conditions(s.z)
+ local thermal=math.clamp(1-math.abs((s.tyreTemperature or climate.temperature)-55)*.0015,.8,1)
+ local grip=thermal*climate.friction*car.grip*(p.surface=='tarmac'and 1.22 or 1)*(off and .63 or 1)
+ s.steer=approach(s.steer,math.clamp(input.steer or 0,-1,1),car.steering and car.steering.Rate or 9,dt)
  local throttle=math.clamp(input.throttle or 0,-1,1);local brake=math.clamp(input.brake or 0,0,1)
  local accel=throttle*car.accel*math.max(.72,1-s.damage*.003)*(1-.35*math.min(math.abs(s.v)/car.top,.94))
+ if car.mass and car.torque then
+  local ms=math.abs(s.v)*.28;local radius=(car.radius or 1.2)*.28
+  local gear=math.clamp(s.gear or 1,1,#car.ratios)
+  local rpm=ms/radius*car.ratios[gear]*60/(2*math.pi)
+  if rpm&gt;(car.shiftRpm or 6000)and gear&lt;#car.ratios then gear+=1
+  elseif rpm&lt;2200 and gear&gt;1 then gear-=1 end
+  rpm=math.max(850,ms/radius*car.ratios[gear]*60/(2*math.pi));s.gear=gear;s.rpm=rpm
+  local fraction=1
+  if car.curve then
+   fraction=car.curve[1][2]
+   for i=2,#car.curve do local a,b=car.curve[i-1],car.curve[i]
+    if rpm&gt;=a[1]then fraction=a[2]+(b[2]-a[2])*math.clamp((rpm-a[1])/(b[1]-a[1]),0,1)end
+   end
+  end
+  local force=car.torque*fraction*car.ratios[gear]*.88/radius
+  force=math.min(force,car.power*745.7*.88/math.max(ms,3))
+  local weight=(car.driveFront or 0)*(1-(car.rearShare or .5))+(1-(car.driveFront or 0))*(car.rearShare or .5)
+  force=math.min(force,car.mass*9.81*weight*1.2*climate.friction*thermal)
+  accel=throttle*force/car.mass/.28*math.max(.72,1-s.damage*.003)
+ end
  if throttle&lt;0 and s.v&gt;2 then accel=-58 end
  if throttle&gt;0 and s.v&lt; -2 then accel=45 end
- local drag=(.72+.0011*s.v*s.v+(off and 8 or 0))*(s.v&lt;0 and -1 or 1)
+ local drag=(.72+.0011*(car.drag and car.drag.Air/.00024 or 1)*s.v*s.v+(off and 8 or 0))*(s.v&lt;0 and -1 or 1)
  if math.abs(s.v)&lt;.3 and throttle==0 then s.v=0;drag=0 end
  s.throttle=throttle;s.brake=brake;s.handbrake=input.handbrake==true
- local braking=brake*66*(s.v&lt;0 and -1 or 1)
+ local braking=brake*math.min(car.brakes and car.brakes.Force or 66,grip*9.81/.28)*(s.v&lt;0 and -1 or 1)
  local nextV=s.v+(accel-drag-braking-p.dy*20)*dt
  if brake&gt;0 and (math.abs(s.v)&lt;1.5 or s.v*nextV&lt;0)then nextV=0 end
  s.v=math.clamp(nextV,-23,car.top*(off and .68 or 1))
- local steerAngle=s.steer*math.rad(31)/(1+math.abs(s.v)/95)
- local yawRate=s.v/car.wheelbase*math.tan(steerAngle)
- local limit=grip*48/math.max(math.abs(s.v),10)
+ local steerAngle=s.steer*math.rad(car.steering and car.steering.MaxAngle or 31)/(1+math.abs(s.v)/95)
+ local balance=car.rearShare or .5
+ local transfer=math.clamp((accel-braking)*.28*.55/(9.81*car.wheelbase*.28),-.12,.12)
+ local frontLoad=math.clamp(1-balance-transfer,.2,.8)
+ local response=math.clamp(frontLoad/(1-balance),.7,1.25)
+ local yawRate=s.v/car.wheelbase*math.tan(steerAngle)*response
+ local demand=math.clamp(math.abs(accel-braking)/(grip*48),0,.95)
+ local limit=grip*48*math.sqrt(1-demand*demand)/math.max(math.abs(s.v),10)
  local excess=yawRate-math.clamp(yawRate,-limit,limit)
  yawRate=math.clamp(yawRate,-limit,limit)+excess*.12
  s.lateralV=approach(s.lateralV,excess*math.abs(s.v)*.22,input.handbrake and 2.1 or 5*grip,dt)
+ s.lateralV+=climate.wind*.002*dt
  if input.handbrake then yawRate*=1.2;s.v*=math.exp(-.65*dt) end
  s.yaw=wrap(s.yaw-yawRate*dt)
  local forwardX,forwardZ=math.sin(s.yaw),math.cos(s.yaw)
@@ -339,19 +366,34 @@ function D.step(s,input,route,car,dt)
  elseif math.abs(lateral)&gt;newPoint.width/2+14 then
   s.v*=math.exp(-1.8*dt)
  end
+ local ty,pt,rl=D.contactPose(s,route,car)
+ local suspension=car.suspension or {};local travel=suspension.Travel or 1.2
+ local omega=9/(1+travel*.3);local damping=math.clamp(((suspension.Bump or .4)+(suspension.Rebound or .55))*.8,.4,1)
+ s.bodyY=s.bodyY or ty;s.bodyV=s.bodyV or 0
+ s.bodyV+=(omega*omega*(ty-s.bodyY)-2*damping*omega*s.bodyV)*dt
+ s.bodyY=math.clamp(s.bodyY+s.bodyV*dt,ty-travel*.4,ty+travel*.65)
+ s.pitch=approach(s.pitch or pt,pt+math.clamp((accel-braking)*.0006,-.06,.06),omega,dt)
+ s.roll=approach(s.roll or rl,rl+math.clamp(yawRate*s.v*.0007,-.07,.07),omega,dt)
+ s.tyreTemperature=approach(s.tyreTemperature or climate.temperature,climate.temperature+math.abs(s.v)*.3+math.abs(excess)*8,.08,dt)
  s.distance+=math.abs(s.v)*dt
  return s
 end
-function D.pose(s,route)
- local y=route:ground(s.x,s.z);local fX,fZ=math.sin(s.yaw),math.cos(s.yaw)
- local front=route:ground(s.x+fX*3.8,s.z+fZ*3.8)
- local back=route:ground(s.x-fX*3.8,s.z-fZ*3.8)
+function D.contactPose(s,route,car)
+ local wb=car and car.wheelbase or 7.6;local rearShare=car and car.rearShare or .5
+ local fX,fZ=math.sin(s.yaw),math.cos(s.yaw)
+ local frontArm=wb*rearShare;local backArm=wb*(1-rearShare)
+ local front=route:ground(s.x+fX*frontArm,s.z+fZ*frontArm)
+ local back=route:ground(s.x-fX*backArm,s.z-fZ*backArm)
  local left=route:ground(s.x+fZ*2.8,s.z-fX*2.8)
  local right=route:ground(s.x-fZ*2.8,s.z+fX*2.8)
- return y+2.2,math.atan2(front-back,7.6),math.atan2(right-left,5.6)
+ return front*(1-rearShare)+back*rearShare+2.2,math.atan2(front-back,wb),math.atan2(right-left,5.6)
+end
+function D.pose(s,route,car)
+ if s.bodyY then return s.bodyY,s.pitch or 0,s.roll or 0 end
+ return D.contactPose(s,route,car)
 end
 function D.reset(s,route,z)
- local p=route:point(z);s.x=p.x;s.z=z;s.yaw=p.heading;s.v=0;s.lateralV=0;s.steer=0;s.impact=0
+ local p=route:point(z);s.x=p.x;s.z=z;s.yaw=p.heading;s.v=0;s.lateralV=0;s.steer=0;s.impact=0;s.bodyY=nil;s.bodyV=0;s.pitch=nil;s.roll=nil
 end
 return D
 </ProtectedString>
@@ -373,7 +415,7 @@ local function safeClone(model,maxParts)
  return clone
 end
 function ImportAssets.harvest(root)
- if not root:FindFirstChild('ImportedAudio')then
+ if require(script.Parent.Config).ExternalAudio and not root:FindFirstChild('ImportedAudio')then
   local audio=Instance.new('Folder');audio.Name='ImportedAudio';audio.Parent=root
   -- Idle, mid-load and high-load loops referenced by the supplied car audio bank.
   for i,id in ipairs({'rbxassetid://79745038579097','rbxassetid://112975795144083','rbxassetid://99444077339790'})do
@@ -388,14 +430,22 @@ function ImportAssets.harvest(root)
  local carFolder=Instance.new('Folder');carFolder.Name='ImportedCars';carFolder.Parent=root
  local propFolder=Instance.new('Folder');propFolder.Name='ImportedProps';propFolder.Parent=root
  local originals=assets:FindFirstChild('Cars')
- for _,name in ipairs({'Hatch','OrsoSafari','Coupe'})do
+ local names={};for _,car in ipairs(require(script.Parent.Config).Cars)do names[#names+1]=car.template end
+ -- Keep Hatch as a compatible source for older installed payloads.
+ if not table.find(names,'Hatch')then names[#names+1]='Hatch'end
+ for _,name in ipairs(names)do
   local source=originals and originals:FindFirstChild(name)
   local exterior=source and source:FindFirstChild('Exterior');local body=source and source:FindFirstChild('Body')
   if exterior and body and body:IsA('BasePart')then
-   local clone=safeClone(exterior,180)
+   local clone=safeClone(exterior,600)
    if clone then
+    local interior=source:FindFirstChild('Interior');if interior then local cabin=safeClone(interior,600);if cabin then cabin.Parent=clone end end
     clone.Name=name;local reference=body:Clone();reference.Name='SkinRoot';reference.Transparency=1;reference.Anchored=true;reference.CanCollide=false
-    reference:ClearAllChildren();reference.Parent=clone;clone.PrimaryPart=reference;clone:PivotTo(CFrame.identity);clone.Parent=carFolder;cars+=1
+    reference:ClearAllChildren()
+    local wheels=source:FindFirstChild('Wheels');local centre=Vector3.zero;local count=0
+    if wheels then for _,wheel in ipairs(wheels:GetChildren())do if wheel:IsA('Model')or wheel:IsA('BasePart')then centre+=wheel:GetPivot().Position;count+=1 end end end
+    if count==4 then reference.CFrame=CFrame.new(centre/4)*body.CFrame.Rotation end
+    reference.Parent=clone;clone.PrimaryPart=reference;clone:PivotTo(CFrame.identity);clone.Parent=carFolder;cars+=1
    end
   end
  end
@@ -424,7 +474,9 @@ local R={}
 local function round(n)return math.floor(n+.5)end
 function R.frame(t,s,flags,input)
  input=input or {}
- return {round(t*1000),round(s.x*20),round(s.z*20),round(s.yaw*10000),round(s.v*10),round(s.steer*1000),round(s.damage*10),flags or 0,round((input.throttle or 0)*1000),round((input.brake or 0)*1000),input.handbrake and 1 or 0}
+ local f={round(t*1000),round(s.x*20),round(s.z*20),round(s.yaw*10000),round(s.v*10),round(s.steer*1000),round(s.damage*10),flags or 0,round((input.throttle or 0)*1000),round((input.brake or 0)*1000),input.handbrake and 1 or 0}
+ if s.bodyY then f[12]=round(s.bodyY*1000);f[13]=round((s.pitch or 0)*10000);f[14]=round((s.roll or 0)*10000)end
+ return f
 end
 function R.encode(frames)
  local rows={}
@@ -436,7 +488,7 @@ function R.decode(text)
  local frames={};local previous=-1
  for line in text:gmatch('[^\n]+')do
   local f={};for value in line:gmatch('[^,]+')do f[#f+1]=tonumber(value)end
-  assert(#f==11,'Invalid replay frame')
+  assert(#f==11 or #f==14,'Invalid replay frame')
   for _,n in ipairs(f)do assert(n==n and math.abs(n)&lt;1e12 and n==math.floor(n),'Invalid replay number')end
   assert(f[1]&gt;=previous and f[8]&gt;=0 and f[8]&lt;=1,'Invalid replay chronology')
   assert(math.abs(f[9])&lt;=1000 and f[10]&gt;=0 and f[10]&lt;=1000 and (f[11]==0 or f[11]==1),'Invalid recorded controls')
@@ -445,7 +497,9 @@ function R.decode(text)
  return frames
 end
 function R.state(f)
- return {x=f[2]/20,z=f[3]/20,yaw=f[4]/10000,v=f[5]/10,steer=f[6]/1000,damage=f[7]/10,lateralV=0,distance=0,crashes=0,impact=0,throttle=f[9]/1000,brake=f[10]/1000,handbrake=f[11]==1}
+ local s={x=f[2]/20,z=f[3]/20,yaw=f[4]/10000,v=f[5]/10,steer=f[6]/1000,damage=f[7]/10,lateralV=0,distance=0,crashes=0,impact=0,throttle=f[9]/1000,brake=f[10]/1000,handbrake=f[11]==1}
+ if f[12]then s.bodyY=f[12]/1000;s.pitch=f[13]/10000;s.roll=f[14]/10000 end
+ return s
 end
 function R.sample(frames,t)
  if #frames==0 then return nil end
@@ -456,6 +510,7 @@ function R.sample(frames,t)
  local f=math.clamp((ms-a[1])/math.max(1,b[1]-a[1]),0,1)
  local s=R.state(a);local nextState=R.state(b)
  for _,k in ipairs({'x','z','v','steer','damage'})do s[k]+=(nextState[k]-s[k])*f end
+ for _,k in ipairs({'bodyY','pitch','roll'})do if s[k]and nextState[k]then s[k]+=(nextState[k]-s[k])*f end end
  local delta=(nextState.yaw-s.yaw+math.pi)%(2*math.pi)-math.pi;s.yaw+=delta*f
  return s
 end
@@ -491,8 +546,10 @@ function Route:point(z)
  -- Fade elevation into a flat starting apron, with zero derivative at z=0.
  local fade=math.clamp(z/160,0,1);local ease=fade*fade*(3-2*fade)
  local dease=(z&gt;0 and z&lt;160)and 6*fade*(1-fade)/160 or 0
- local raw=11*sin(z/280+self.p3)-self.y0+5*sin(z/510)
- local dy=(11/280*cos(z/280+self.p3)+5/510*cos(z/510))*ease+raw*dease
+ local rough=.35*sin(z/14+self.p1)+.2*sin(z/23+self.p2)
+ local roughSlope=.35/14*cos(z/14+self.p1)+.2/23*cos(z/23+self.p2)
+ local raw=rough+11*sin(z/280+self.p3)-self.y0+5*sin(z/510)
+ local dy=(roughSlope+11/280*cos(z/280+self.p3)+5/510*cos(z/510))*ease+raw*dease
  local x=a*sin(f*z+self.p1)+b*sin(g*z+self.p2)-self.x0
  local dx=a*f*cos(f*z+self.p1)+b*g*cos(g*z+self.p2)
  local ddx=-a*f*f*sin(f*z+self.p1)-b*g*g*sin(g*z+self.p2)
@@ -509,6 +566,19 @@ function Route:ground(x,z)
  local shoulder=math.max(0,math.abs(lateral)-p.width/2)
  return p.y+lateral*math.tan(p.bank)-math.min(shoulder*.13,3),lateral,p
 end
+function Route:conditions(z)
+ local biome=self:point(z).biome
+ local cfg=self.config.Climate or {dryWetness=.08,rainWetness=.45,wetGripLoss=.24,windSpeed=3}
+ local wet=self.seed%3==0 and cfg.rainWetness or cfg.dryWetness
+ return {temperature=biome==2 and -3 or(biome==3 and 32 or 18),wetness=wet,
+  wind=math.sin(self.p1+z/1800)*cfg.windSpeed,friction=(biome==2 and .82 or 1)*(1-wet*cfg.wetGripLoss)}
+end
+function Route:call(z,speed)
+ local lead=math.max(55,math.abs(speed or 0)*2.5)
+ local at=z+lead;local p=self:point(at)
+ local direction=math.abs(p.curvature)&lt;.0013 and '↑'or(p.curvature&gt;0 and '←'or '→')
+ return direction..'  '..self:note(at-100)..string.format(' · %d m',math.floor(lead*.28+.5))
+end
 function Route:note(z)
  local p=self:point(z+100);local k=p.curvature
  if p.tunnel then return 'TUNNEL · keep the line' end
@@ -522,27 +592,1981 @@ return Route
 </ProtectedString>
           </Properties>
         </Item>
+        <Item class="ModuleScript" referent="RBX00000017">
+          <Properties>
+            <string name="Name">VehicleCatalog</string>
+            <ProtectedString name="Source">-- Uploaded CarSelect and Cars data with Parts.Rating.Rig axle settings.
+-- One editable profile per car; Dynamics is shared by every profile.
+return {
+ [10]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=52,
+   ["FrontShare"]=0.6
+  },
+  ["color"]={
+   [1]=0.10980392156862745,
+   [2]=0.10980392156862745,
+   [3]=0.11764705882352941
+  },
+  ["curve"]={
+   [10]={
+    [1]=7800,
+    [2]=0.8
+   },
+   [11]={
+    [1]=8100,
+    [2]=0.72
+   },
+   [1]={
+    [1]=800,
+    [2]=0.28
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.34
+   },
+   [3]={
+    [1]=3000,
+    [2]=0.42
+   },
+   [4]={
+    [1]=3800,
+    [2]=0.52
+   },
+   [5]={
+    [1]=4300,
+    [2]=0.78
+   },
+   [6]={
+    [1]=4800,
+    [2]=0.96
+   },
+   [7]={
+    [1]=5400,
+    [2]=1
+   },
+   [8]={
+    [1]=6600,
+    [2]=0.97
+   },
+   [9]={
+    [1]=7400,
+    [2]=0.88
+   }
+  },
+  ["description"]="A short, boxy monster from the most dangerous era of rallying: a turbo five that does nothing, then everything, and four-wheel drive that barely keeps up. The nose pushes when you're on the power; flick the handbrake and the short tail comes round. Wild, but you can hold it.",
+  ["drag"]={
+   ["Air"]=0.00025,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=0.44,
+  ["grip"]=1,
+  ["id"]="GroupB",
+  ["mass"]=1090,
+  ["name"]="Brenner S1",
+  ["power"]=470,
+  ["radius"]=1.15,
+  ["ratios"]={
+   [1]=14.6,
+   [2]=9.9,
+   [3]=7.45,
+   [4]=5.95,
+   [5]=4.85
+  },
+  ["rearShare"]=0.53,
+  ["redline"]=7800,
+  ["shiftRpm"]=7550,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.66,
+   ["AssistMax"]=22,
+   ["BetaFree"]=9,
+   ["BetaStability"]=5.4,
+   ["GripOverlap"]=1.3,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.38,
+   ["MaxAngle"]=36,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4.8,
+   ["ReturnRate"]=7,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=3.1,
+   ["WheelRatio"]=8,
+   ["YawGripOverlap"]=1.22,
+   ["YawSlack"]=0.12
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.54,
+    ["Rear"]=0.34
+   },
+   ["Bump"]=0.42,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.6,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.51,
+    ["Rear"]=0.45
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="GroupB",
+  ["top"]=193.67756771615424,
+  ["torque"]=490,
+  ["tyres"]={
+   ["DriftWindow"]=21,
+   ["ForceLift"]=0.55,
+   ["HandbrakeDrag"]=0.72,
+   ["HandbrakeGrip"]=0.45,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.63,
+   ["LiftOff"]={
+    ["Grip"]=0.86,
+    ["MinSpeed"]=30,
+    ["Peak"]=0.3,
+    ["Time"]=0.6
+   },
+   ["LongitudinalGrip"]=0.68,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=6.2,
+   ["Plateau"]=0.91,
+   ["Tail"]=0.73
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=8.3
+ },
+ [11]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=54,
+   ["FrontShare"]=0.6
+  },
+  ["color"]={
+   [1]=0.0784313725490196,
+   [2]=0.1568627450980392,
+   [3]=0.43137254901960786
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.5
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.7
+   },
+   [3]={
+    [1]=3000,
+    [2]=0.86
+   },
+   [4]={
+    [1]=4000,
+    [2]=0.96
+   },
+   [5]={
+    [1]=5000,
+    [2]=1
+   },
+   [6]={
+    [1]=6200,
+    [2]=1
+   },
+   [7]={
+    [1]=7000,
+    [2]=0.93
+   },
+   [8]={
+    [1]=7600,
+    [2]=0.84
+   },
+   [9]={
+    [1]=8000,
+    [2]=0.74
+   }
+  },
+  ["description"]="The other works hybrid: longer and calmer than the Kumo, built for fast flowing gravel. It settles into a slide and holds it, pulls hardest at the top of the revs and keeps going on the straights. The battery's boost lasts a little longer out of every corner.",
+  ["drag"]={
+   ["Air"]=0.00023,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=0.4,
+  ["grip"]=1.0317460317460319,
+  ["id"]="Crossover",
+  ["mass"]=1260,
+  ["name"]="Ocelot R1",
+  ["power"]=510,
+  ["radius"]=1.25,
+  ["ratios"]={
+   [1]=15.62,
+   [2]=10.52,
+   [3]=7.81,
+   [4]=6.14,
+   [5]=4.96
+  },
+  ["rearShare"]=0.48,
+  ["redline"]=7800,
+  ["shiftRpm"]=7550,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.62,
+   ["AssistMax"]=22,
+   ["BetaFree"]=8,
+   ["BetaStability"]=5.8,
+   ["GripOverlap"]=1.22,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.5,
+   ["MaxAngle"]=34,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4.6,
+   ["ReturnRate"]=7,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=3.9,
+   ["WheelRatio"]=8,
+   ["YawGripOverlap"]=1.12,
+   ["YawSlack"]=0.1
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.46,
+    ["Rear"]=0.44
+   },
+   ["Bump"]=0.4,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.58,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.56,
+    ["Rear"]=0.54
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="Crossover",
+  ["top"]=205.8503250840086,
+  ["torque"]=500,
+  ["tyres"]={
+   ["DriftWindow"]=24,
+   ["ForceLift"]=0.55,
+   ["HandbrakeDrag"]=0.75,
+   ["HandbrakeGrip"]=0.6,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.65,
+   ["LongitudinalGrip"]=0.69,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=6.8,
+   ["Plateau"]=0.93,
+   ["Tail"]=0.78
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=10.2
+ },
+ [12]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=50,
+   ["FrontShare"]=0.62
+  },
+  ["color"]={
+   [1]=0.0784313725490196,
+   [2]=0.17254901960784313,
+   [3]=0.47058823529411764
+  },
+  ["curve"]={
+   [1]={
+    [1]=0,
+    [2]=1
+   },
+   [2]={
+    [1]=3300,
+    [2]=1
+   },
+   [3]={
+    [1]=4290,
+    [2]=0.769
+   },
+   [4]={
+    [1]=5610,
+    [2]=0.588
+   },
+   [5]={
+    [1]=7590,
+    [2]=0.435
+   },
+   [6]={
+    [1]=9900,
+    [2]=0.333
+   },
+   [7]={
+    [1]=12540,
+    [2]=0.263
+   },
+   [8]={
+    [1]=15180,
+    [2]=0.217
+   },
+   [9]={
+    [1]=18000,
+    [2]=0.183
+   }
+  },
+  ["description"]="A big electric SUV on lifted all-terrain tyres. Every bit of its torque arrives the moment you touch the throttle, with no gears to change: nothing else here leaves the line like it. It weighs as much as two rally cars, so brake early and let it settle. Overdrive a corner and it runs wide.",
+  ["drag"]={
+   ["Air"]=0.000245,
+   ["Rolling"]=0.6
+  },
+  ["driveFront"]=0.42,
+  ["grip"]=0.9523809523809523,
+  ["id"]="Electric",
+  ["mass"]=2200,
+  ["name"]="Volta X",
+  ["power"]=1020,
+  ["radius"]=1.35,
+  ["ratios"]={
+   [1]=10.5
+  },
+  ["rearShare"]=0.473,
+  ["redline"]=17500,
+  ["shiftRpm"]=17600,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.6,
+   ["AssistMax"]=22,
+   ["BetaFree"]=7,
+   ["BetaStability"]=6.4,
+   ["GripOverlap"]=1.1,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.44,
+   ["MaxAngle"]=33,
+   ["MinAngle"]=4.5,
+   ["Rate"]=3.9,
+   ["ReturnRate"]=6.2,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=4.4,
+   ["WheelRatio"]=3,
+   ["YawGripOverlap"]=1,
+   ["YawSlack"]=0.1
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.6,
+    ["Rear"]=0.36
+   },
+   ["Bump"]=0.44,
+   ["BumpStopFrom"]=0.86,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.64,
+   ["Roughness"]=0.1,
+   ["Sag"]={
+    ["Front"]=0.63,
+    ["Rear"]=0.61
+   },
+   ["Travel"]=1.4
+  },
+  ["template"]="Electric",
+  ["top"]=235.6194490192345,
+  ["torque"]=1420,
+  ["tyres"]={
+   ["DriftWindow"]=20,
+   ["ForceLift"]=0.62,
+   ["HandbrakeDrag"]=0.8,
+   ["HandbrakeGrip"]=0.5,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.6,
+   ["LongitudinalGrip"]=0.68,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=7.2,
+   ["Plateau"]=0.9,
+   ["Tail"]=0.74
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=10.35
+ },
+ [13]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=48,
+   ["FrontShare"]=0.62
+  },
+  ["color"]={
+   [1]=0.08627450980392157,
+   [2]=0.1568627450980392,
+   [3]=0.43137254901960786
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.66
+   },
+   [2]={
+    [1]=1500,
+    [2]=0.8
+   },
+   [3]={
+    [1]=2500,
+    [2]=0.92
+   },
+   [4]={
+    [1]=3500,
+    [2]=1
+   },
+   [5]={
+    [1]=4500,
+    [2]=0.99
+   },
+   [6]={
+    [1]=5500,
+    [2]=0.93
+   },
+   [7]={
+    [1]=6200,
+    [2]=0.85
+   },
+   [8]={
+    [1]=6800,
+    [2]=0.75
+   }
+  },
+  ["description"]="A desert trophy truck: a big V8, rear-wheel drive and more suspension travel than anything else here. It's heavy in the tight stuff, so brake early and let the tail come round on the power. Rocks, riverbeds and big jumps are where it flies.",
+  ["drag"]={
+   ["Air"]=0.00027,
+   ["Rolling"]=0.6
+  },
+  ["driveFront"]=0,
+  ["grip"]=1.0476190476190477,
+  ["id"]="Trophy",
+  ["mass"]=2200,
+  ["name"]="Mirage TT",
+  ["power"]=850,
+  ["radius"]=1.65,
+  ["ratios"]={
+   [1]=14,
+   [2]=8.4,
+   [3]=5.55
+  },
+  ["rearShare"]=0.482,
+  ["redline"]=6500,
+  ["shiftRpm"]=6300,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.66,
+   ["AssistMax"]=26,
+   ["BetaFree"]=9,
+   ["BetaStability"]=5,
+   ["GripOverlap"]=1.05,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.5,
+   ["MaxAngle"]=31,
+   ["MinAngle"]=4,
+   ["Rate"]=3.4,
+   ["ReturnRate"]=5.8,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=3.6,
+   ["WheelRatio"]=11,
+   ["YawGripOverlap"]=1.15,
+   ["YawSlack"]=0.12
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.42,
+    ["Rear"]=0.3
+   },
+   ["Bump"]=0.4,
+   ["BumpStopFrom"]=0.92,
+   ["BumpStopRate"]=7,
+   ["Rebound"]=0.6,
+   ["Roughness"]=0.06,
+   ["Sag"]={
+    ["Front"]=0.86,
+    ["Rear"]=0.84
+   },
+   ["Travel"]=2.1
+  },
+  ["template"]="Trophy",
+  ["top"]=202.3638511096128,
+  ["torque"]=940,
+  ["tyres"]={
+   ["DriftWindow"]=26,
+   ["ForceLift"]=0.38,
+   ["HandbrakeDrag"]=0.8,
+   ["HandbrakeGrip"]=0.5,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.66,
+   ["LiftOff"]={
+    ["Grip"]=0.9,
+    ["MinSpeed"]=30,
+    ["Peak"]=0.3,
+    ["Time"]=0.7
+   },
+   ["LongitudinalGrip"]=0.8,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=8,
+   ["Plateau"]=0.92,
+   ["Tail"]=0.78
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=11
+ },
+ [14]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=44,
+   ["FrontShare"]=0.55
+  },
+  ["color"]={
+   [1]=0.5882352941176471,
+   [2]=0.09411764705882353,
+   [3]=0.11764705882352941
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.42
+   },
+   [2]={
+    [1]=1500,
+    [2]=0.6
+   },
+   [3]={
+    [1]=2000,
+    [2]=0.8
+   },
+   [4]={
+    [1]=2500,
+    [2]=0.95
+   },
+   [5]={
+    [1]=3000,
+    [2]=1
+   },
+   [6]={
+    [1]=3800,
+    [2]=1
+   },
+   [7]={
+    [1]=4500,
+    [2]=0.94
+   },
+   [8]={
+    [1]=5100,
+    [2]=0.86
+   },
+   [9]={
+    [1]=5800,
+    [2]=0.74
+   }
+  },
+  ["description"]="A raid bug: a round little shell on a tube frame, lifted sky high on long travel, with a turbo-diesel boxer behind your back. It's light and floats over crests. Lift mid-corner and the tail swings wide, so catch it on the throttle. Sand, rocks and jumps are where it flies.",
+  ["drag"]={
+   ["Air"]=0.00028,
+   ["Rolling"]=0.55
+  },
+  ["driveFront"]=0,
+  ["grip"]=0.9841269841269841,
+  ["id"]="Bug",
+  ["mass"]=1050,
+  ["name"]="Scarab",
+  ["power"]=310,
+  ["radius"]=1.65,
+  ["ratios"]={
+   [1]=16.3,
+   [2]=11,
+   [3]=8.2,
+   [4]=6.5,
+   [5]=5.3
+  },
+  ["rearShare"]=0.616,
+  ["redline"]=5600,
+  ["shiftRpm"]=5400,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.7,
+   ["AssistMax"]=28,
+   ["BetaFree"]=10,
+   ["BetaStability"]=4.8,
+   ["GripOverlap"]=1.25,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.45,
+   ["MaxAngle"]=36,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4.6,
+   ["ReturnRate"]=7,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=2.6,
+   ["WheelRatio"]=10,
+   ["YawGripOverlap"]=1.25,
+   ["YawSlack"]=0.14
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.46,
+    ["Rear"]=0.36
+   },
+   ["Bump"]=0.34,
+   ["BumpStopFrom"]=0.9,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.5,
+   ["Roughness"]=0.07,
+   ["Sag"]={
+    ["Front"]=0.99,
+    ["Rear"]=0.66
+   },
+   ["Travel"]=1.9
+  },
+  ["template"]="Bug",
+  ["top"]=182.56802590672757,
+  ["torque"]=520,
+  ["tyres"]={
+   ["DriftWindow"]=26,
+   ["ForceLift"]=0.4,
+   ["HandbrakeDrag"]=0.65,
+   ["HandbrakeGrip"]=0.48,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.62,
+   ["LiftOff"]={
+    ["Grip"]=0.8,
+    ["MinSpeed"]=26,
+    ["Peak"]=0.28,
+    ["Time"]=0.85
+   },
+   ["LongitudinalGrip"]=0.76,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=7.5,
+   ["Plateau"]=0.9,
+   ["Tail"]=0.74
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=8.85
+ },
+ [15]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=52,
+   ["FrontShare"]=0.56
+  },
+  ["color"]={
+   [1]=0.10196078431372549,
+   [2]=0.12549019607843137,
+   [3]=0.1803921568627451
+  },
+  ["curve"]={
+   [10]={
+    [1]=7800,
+    [2]=0.95
+   },
+   [11]={
+    [1]=8600,
+    [2]=0.86
+   },
+   [12]={
+    [1]=9000,
+    [2]=0.8
+   },
+   [13]={
+    [1]=9300,
+    [2]=0.72
+   },
+   [1]={
+    [1]=800,
+    [2]=0.3
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.4
+   },
+   [3]={
+    [1]=2800,
+    [2]=0.5
+   },
+   [4]={
+    [1]=3400,
+    [2]=0.7
+   },
+   [5]={
+    [1]=4000,
+    [2]=0.74
+   },
+   [6]={
+    [1]=4500,
+    [2]=0.78
+   },
+   [7]={
+    [1]=5000,
+    [2]=0.94
+   },
+   [8]={
+    [1]=5600,
+    [2]=1
+   },
+   [9]={
+    [1]=6800,
+    [2]=1
+   }
+  },
+  ["description"]="A twin-turbo flat six hung out the back and four-wheel drive that knows where to send it. The first turbo wakes up, the second one takes the horizon. The fastest thing here, and somehow it still lets you drive it.",
+  ["drag"]={
+   ["Air"]=0.000205,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=0.35,
+  ["grip"]=1.0158730158730158,
+  ["id"]="Super",
+  ["mass"]=1150,
+  ["name"]="Orkan 9S",
+  ["power"]=450,
+  ["radius"]=1.2,
+  ["ratios"]={
+   [1]=16.2,
+   [2]=11.1,
+   [3]=8.5,
+   [4]=6.85,
+   [5]=5.8,
+   [6]=4.95
+  },
+  ["rearShare"]=0.55,
+  ["redline"]=9000,
+  ["shiftRpm"]=8650,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.68,
+   ["AssistMax"]=22,
+   ["BetaFree"]=8.5,
+   ["BetaStability"]=6.2,
+   ["GripOverlap"]=1.15,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.26,
+   ["MaxAngle"]=34,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4.6,
+   ["ReturnRate"]=7,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=4,
+   ["WheelRatio"]=8.5,
+   ["YawGripOverlap"]=1.04,
+   ["YawSlack"]=0.1
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.58,
+    ["Rear"]=0.33
+   },
+   ["Bump"]=0.44,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.62,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.48,
+    ["Rear"]=0.45
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="Super",
+  ["top"]=228.4794657156213,
+  ["torque"]=500,
+  ["tyres"]={
+   ["DriftWindow"]=22,
+   ["ForceLift"]=0.55,
+   ["HandbrakeDrag"]=0.72,
+   ["HandbrakeGrip"]=0.37,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.64,
+   ["LongitudinalGrip"]=0.68,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=6.4,
+   ["Plateau"]=0.92,
+   ["Tail"]=0.75
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=8.4
+ },
+ [1]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=38,
+   ["FrontShare"]=0.66
+  },
+  ["color"]={
+   [1]=0.1803921568627451,
+   [2]=0.18823529411764706,
+   [3]=0.21176470588235294
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.55
+   },
+   [2]={
+    [1]=1500,
+    [2]=0.7
+   },
+   [3]={
+    [1]=2500,
+    [2]=0.85
+   },
+   [4]={
+    [1]=3500,
+    [2]=0.97
+   },
+   [5]={
+    [1]=4200,
+    [2]=1
+   },
+   [6]={
+    [1]=5000,
+    [2]=0.96
+   },
+   [7]={
+    [1]=5800,
+    [2]=0.86
+   },
+   [8]={
+    [1]=6300,
+    [2]=0.72
+   }
+  },
+  ["description"]="A tall little box on big mud tyres, with a spare on the roof and not much under the bonnet. It leans, it bounces, it slides slowly and says sorry. The place to learn.",
+  ["drag"]={
+   ["Air"]=0.00027,
+   ["Rolling"]=0.55
+  },
+  ["driveFront"]=0,
+  ["grip"]=1,
+  ["id"]="City",
+  ["mass"]=830,
+  ["name"]="Orso 4",
+  ["power"]=75,
+  ["radius"]=1.25,
+  ["ratios"]={
+   [1]=16.5,
+   [2]=10.6,
+   [3]=7.7,
+   [4]=6.2,
+   [5]=5.3
+  },
+  ["rearShare"]=0.52,
+  ["redline"]=6000,
+  ["shiftRpm"]=5800,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.78,
+   ["AssistMax"]=26,
+   ["BetaFree"]=7,
+   ["BetaStability"]=6.8,
+   ["GripOverlap"]=1.15,
+   ["HandbrakeRelease"]=0.45,
+   ["HandbrakeStability"]=0.55,
+   ["MaxAngle"]=36,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4,
+   ["ReturnRate"]=7,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=4.6,
+   ["WheelRatio"]=10,
+   ["YawGripOverlap"]=0.92,
+   ["YawSlack"]=0.1
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.44,
+    ["Rear"]=0.24
+   },
+   ["Bump"]=0.3,
+   ["BumpStopFrom"]=0.9,
+   ["BumpStopRate"]=5,
+   ["Rebound"]=0.42,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.7,
+    ["Rear"]=0.64
+   },
+   ["Travel"]=1.45
+  },
+  ["template"]="City",
+  ["top"]=148.18833271649967,
+  ["torque"]=110,
+  ["tyres"]={
+   ["DriftWindow"]=30,
+   ["ForceLift"]=0.45,
+   ["HandbrakeDrag"]=0.6,
+   ["HandbrakeGrip"]=0.48,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.63,
+   ["LongitudinalGrip"]=0.6,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=7.5,
+   ["Plateau"]=0.93,
+   ["Tail"]=0.82
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=8.4
+ },
+ [2]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=38,
+   ["FrontShare"]=0.66
+  },
+  ["color"]={
+   [1]=0.5882352941176471,
+   [2]=0.47843137254901963,
+   [3]=0.3058823529411765
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.55
+   },
+   [2]={
+    [1]=1500,
+    [2]=0.7
+   },
+   [3]={
+    [1]=2500,
+    [2]=0.85
+   },
+   [4]={
+    [1]=3500,
+    [2]=0.97
+   },
+   [5]={
+    [1]=4200,
+    [2]=1
+   },
+   [6]={
+    [1]=5000,
+    [2]=0.96
+   },
+   [7]={
+    [1]=5800,
+    [2]=0.86
+   },
+   [8]={
+    [1]=6300,
+    [2]=0.72
+   }
+  },
+  ["description"]="The Orso 4 kitted out for the savanna: a bull bar with spot lamps, a snorkel, a loaded roof rack and chunky all-terrain tyres on white steel wheels. Still slow, still soft, still kind, with a little more bite on gravel, dirt and sand.",
+  ["drag"]={
+   ["Air"]=0.0003,
+   ["Rolling"]=0.58
+  },
+  ["driveFront"]=0,
+  ["grip"]=1,
+  ["id"]="OrsoSafari",
+  ["mass"]=900,
+  ["name"]="Orso Safari",
+  ["power"]=75,
+  ["radius"]=1.3,
+  ["ratios"]={
+   [1]=17.16,
+   [2]=11.02,
+   [3]=8.01,
+   [4]=6.45,
+   [5]=5.51
+  },
+  ["rearShare"]=0.52,
+  ["redline"]=6000,
+  ["shiftRpm"]=5800,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.78,
+   ["AssistMax"]=26,
+   ["BetaFree"]=7,
+   ["BetaStability"]=6.8,
+   ["GripOverlap"]=1.15,
+   ["HandbrakeRelease"]=0.45,
+   ["HandbrakeStability"]=0.55,
+   ["MaxAngle"]=36,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4,
+   ["ReturnRate"]=7,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=4.6,
+   ["WheelRatio"]=10,
+   ["YawGripOverlap"]=0.92,
+   ["YawSlack"]=0.1
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.44,
+    ["Rear"]=0.24
+   },
+   ["Bump"]=0.3,
+   ["BumpStopFrom"]=0.9,
+   ["BumpStopRate"]=5,
+   ["Rebound"]=0.44,
+   ["RideOffset"]=0.2,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.74,
+    ["Rear"]=0.68
+   },
+   ["Travel"]=1.6
+  },
+  ["template"]="OrsoSafari",
+  ["top"]=148.24212158499932,
+  ["torque"]=110,
+  ["tyres"]={
+   ["DriftWindow"]=30,
+   ["ForceLift"]=0.43,
+   ["HandbrakeDrag"]=0.6,
+   ["HandbrakeGrip"]=0.48,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.63,
+   ["LongitudinalGrip"]=0.6,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=7.5,
+   ["Plateau"]=0.93,
+   ["Tail"]=0.82
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=8.4
+ },
+ [3]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=42,
+   ["FrontShare"]=0.64
+  },
+  ["color"]={
+   [1]=0.13333333333333333,
+   [2]=0.10196078431372549,
+   [3]=0.10980392156862745
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.45
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.62
+   },
+   [3]={
+    [1]=3000,
+    [2]=0.76
+   },
+   [4]={
+    [1]=4000,
+    [2]=0.88
+   },
+   [5]={
+    [1]=5000,
+    [2]=0.97
+   },
+   [6]={
+    [1]=5800,
+    [2]=1
+   },
+   [7]={
+    [1]=6600,
+    [2]=0.95
+   },
+   [8]={
+    [1]=7200,
+    [2]=0.85
+   },
+   [9]={
+    [1]=7400,
+    [2]=0.76
+   }
+  },
+  ["description"]="A light little coupe from the sixties with a high-revving V4 and the front wheels doing everything. It pulls itself out of corners, pushes wide if you're greedy, and tucks its nose in when you lift. The Saetta's grandfather.",
+  ["drag"]={
+   ["Air"]=0.00018,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=1,
+  ["grip"]=0.9841269841269841,
+  ["id"]="Coupe",
+  ["mass"]=880,
+  ["name"]="Freccia HF",
+  ["power"]=130,
+  ["radius"]=1.15,
+  ["ratios"]={
+   [1]=15.5,
+   [2]=10.4,
+   [3]=7.7,
+   [4]=6.1,
+   [5]=4.95
+  },
+  ["rearShare"]=0.56,
+  ["redline"]=7200,
+  ["shiftRpm"]=7000,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.65,
+   ["AssistMax"]=22,
+   ["BetaFree"]=9,
+   ["BetaStability"]=4.8,
+   ["GripOverlap"]=1.15,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.4,
+   ["MaxAngle"]=35,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4.4,
+   ["ReturnRate"]=6.5,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=2.3,
+   ["WheelRatio"]=9,
+   ["YawGripOverlap"]=1.35,
+   ["YawSlack"]=0.16
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.48,
+    ["Rear"]=0.44
+   },
+   ["Bump"]=0.4,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.56,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.57,
+    ["Rear"]=0.46
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="Coupe",
+  ["top"]=175.1675903819763,
+  ["torque"]=160,
+  ["tyres"]={
+   ["DriftWindow"]=22,
+   ["ForceLift"]=0.42,
+   ["FrontGrip"]={
+    ["Lateral"]=1.08,
+    ["Longitudinal"]=1.3
+   },
+   ["HandbrakeDrag"]=0.65,
+   ["HandbrakeGrip"]=0.46,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.62,
+   ["LiftOff"]={
+    ["Grip"]=0.82,
+    ["MinSpeed"]=30,
+    ["Peak"]=0.3,
+    ["Time"]=0.7
+   },
+   ["LongitudinalGrip"]=0.8,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=7,
+   ["Plateau"]=0.9,
+   ["Tail"]=0.74
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=9
+ },
+ [4]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=44,
+   ["FrontShare"]=0.66
+  },
+  ["color"]={
+   [1]=0.11764705882352941,
+   [2]=0.08627450980392157,
+   [3]=0.09411764705882353
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.5
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.68
+   },
+   [3]={
+    [1]=3000,
+    [2]=0.82
+   },
+   [4]={
+    [1]=4000,
+    [2]=0.93
+   },
+   [5]={
+    [1]=5000,
+    [2]=1
+   },
+   [6]={
+    [1]=5800,
+    [2]=0.99
+   },
+   [7]={
+    [1]=6500,
+    [2]=0.92
+   },
+   [8]={
+    [1]=7000,
+    [2]=0.84
+   },
+   [9]={
+    [1]=7200,
+    [2]=0.76
+   }
+  },
+  ["description"]="A tiny box with a wheel at each corner and a rev-happy little four driving the front. It darts into corners, tucks its nose in when you lift and makes the big cars look clumsy in the tight stuff. Out of breath on the long straights.",
+  ["drag"]={
+   ["Air"]=0.0003,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=1,
+  ["grip"]=1.0476190476190477,
+  ["id"]="Compact",
+  ["mass"]=690,
+  ["name"]="Rascal S",
+  ["power"]=110,
+  ["radius"]=1,
+  ["ratios"]={
+   [1]=12.6,
+   [2]=8.3,
+   [3]=6.05,
+   [4]=4.7
+  },
+  ["rearShare"]=0.53,
+  ["redline"]=7000,
+  ["shiftRpm"]=6850,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.65,
+   ["AssistMax"]=22,
+   ["BetaFree"]=9,
+   ["BetaStability"]=5,
+   ["GripOverlap"]=1.25,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.75,
+   ["MaxAngle"]=36,
+   ["MinAngle"]=4.5,
+   ["Rate"]=5.2,
+   ["ReturnRate"]=6.5,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=2.3,
+   ["WheelRatio"]=8,
+   ["YawGripOverlap"]=1.4,
+   ["YawSlack"]=0.16
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.46,
+    ["Rear"]=0.5
+   },
+   ["Bump"]=0.42,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.58,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.54,
+    ["Rear"]=0.48
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="Compact",
+  ["top"]=155.96559273140818,
+  ["torque"]=120,
+  ["tyres"]={
+   ["DriftWindow"]=22,
+   ["ForceLift"]=0.45,
+   ["FrontGrip"]={
+    ["Lateral"]=1.06,
+    ["Longitudinal"]=1.25
+   },
+   ["HandbrakeDrag"]=0.65,
+   ["HandbrakeGrip"]=0.68,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.66,
+   ["LiftOff"]={
+    ["Grip"]=0.78,
+    ["MinSpeed"]=28,
+    ["Peak"]=0.3,
+    ["Time"]=0.6
+   },
+   ["LongitudinalGrip"]=0.82,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=6.5,
+   ["Plateau"]=0.9,
+   ["Tail"]=0.74
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=8
+ },
+ [5]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=44,
+   ["FrontShare"]=0.62
+  },
+  ["color"]={
+   [1]=0.47058823529411764,
+   [2]=0.10980392156862745,
+   [3]=0.13333333333333333
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.5
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.72
+   },
+   [3]={
+    [1]=3000,
+    [2]=0.86
+   },
+   [4]={
+    [1]=4200,
+    [2]=0.98
+   },
+   [5]={
+    [1]=5200,
+    [2]=1
+   },
+   [6]={
+    [1]=6200,
+    [2]=0.95
+   },
+   [7]={
+    [1]=7000,
+    [2]=0.84
+   },
+   [8]={
+    [1]=7600,
+    [2]=0.7
+   }
+  },
+  ["description"]="A short-wheelbase turbo hatch built for loose roads. Four-wheel drive pulls it out of hairpins, the handbrake swings it in. Forgiving on gravel, nervous on a crest.",
+  ["drag"]={
+   ["Air"]=0.00024,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=0.45,
+  ["grip"]=0.85,
+  ["id"]="Hatch",
+  ["mass"]=1200,
+  ["name"]="Saetta HF",
+  ["power"]=215,
+  ["radius"]=1.2,
+  ["ratios"]={
+   [1]=17,
+   [2]=11.4,
+   [3]=8.67,
+   [4]=7.09,
+   [5]=6.04,
+   [6]=5.35
+  },
+  ["rearShare"]=0.5,
+  ["redline"]=7400,
+  ["shiftRpm"]=7050,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.6,
+   ["AssistMax"]=22,
+   ["BetaFree"]=8,
+   ["BetaStability"]=5,
+   ["GripOverlap"]=1.15,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.25,
+   ["MaxAngle"]=34,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4.2,
+   ["ReturnRate"]=6.5,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=3.2,
+   ["WheelRatio"]=9,
+   ["YawGripOverlap"]=1.05,
+   ["YawSlack"]=0.1
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.55,
+    ["Rear"]=0.32
+   },
+   ["Bump"]=0.38,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.55,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.5,
+    ["Rear"]=0.54
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="Hatch",
+  ["top"]=173.81521971263155,
+  ["torque"]=300,
+  ["tyres"]={
+   ["DriftWindow"]=22,
+   ["ForceLift"]=0.5,
+   ["HandbrakeDrag"]=0.75,
+   ["HandbrakeGrip"]=0.38,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.5,
+   ["LongitudinalGrip"]=0.52,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=6.5,
+   ["Plateau"]=0.9,
+   ["Tail"]=0.7
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=9
+ },
+ [6]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=44,
+   ["FrontShare"]=0.64
+  },
+  ["color"]={
+   [1]=0.06274509803921569,
+   [2]=0.27450980392156865,
+   [3]=0.25882352941176473
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.5
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.66
+   },
+   [3]={
+    [1]=3000,
+    [2]=0.78
+   },
+   [4]={
+    [1]=4000,
+    [2]=0.9
+   },
+   [5]={
+    [1]=4800,
+    [2]=0.98
+   },
+   [6]={
+    [1]=5800,
+    [2]=1
+   },
+   [7]={
+    [1]=6800,
+    [2]=0.96
+   },
+   [8]={
+    [1]=7600,
+    [2]=0.88
+   },
+   [9]={
+    [1]=8250,
+    [2]=0.78
+   }
+  },
+  ["description"]="A boxy two-door with flared arches, a screaming four and only the rear wheels driving. Lean on the throttle and the tail comes round; lift and the nose tucks in. Not the quickest in a straight line, the most fun everywhere else.",
+  ["drag"]={
+   ["Air"]=0.00023,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=0,
+  ["grip"]=0.888888888888889,
+  ["id"]="Saloon",
+  ["mass"]=1150,
+  ["name"]="Falke E3",
+  ["power"]=230,
+  ["radius"]=1.15,
+  ["ratios"]={
+   [1]=15.6,
+   [2]=10.5,
+   [3]=8,
+   [4]=6.5,
+   [5]=5.45
+  },
+  ["rearShare"]=0.52,
+  ["redline"]=8000,
+  ["shiftRpm"]=7700,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.68,
+   ["AssistMax"]=26,
+   ["BetaFree"]=9,
+   ["BetaStability"]=4.6,
+   ["GripOverlap"]=1.25,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.55,
+   ["MaxAngle"]=35,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4.2,
+   ["ReturnRate"]=6.5,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=2.5,
+   ["WheelRatio"]=9,
+   ["YawGripOverlap"]=1.3,
+   ["YawSlack"]=0.14
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.5,
+    ["Rear"]=0.4
+   },
+   ["Bump"]=0.4,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.56,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.53,
+    ["Rear"]=0.49
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="Saloon",
+  ["top"]=176.77463249557243,
+  ["torque"]=240,
+  ["tyres"]={
+   ["DriftWindow"]=26,
+   ["ForceLift"]=0.45,
+   ["HandbrakeDrag"]=0.7,
+   ["HandbrakeGrip"]=0.54,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.56,
+   ["LiftOff"]={
+    ["Grip"]=0.88,
+    ["MinSpeed"]=30,
+    ["Peak"]=0.3,
+    ["Time"]=0.6
+   },
+   ["LongitudinalGrip"]=0.6,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=7,
+   ["Plateau"]=0.92,
+   ["Tail"]=0.76
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=9.15
+ },
+ [7]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=46,
+   ["FrontShare"]=0.62
+  },
+  ["color"]={
+   [1]=0.08627450980392157,
+   [2]=0.1803921568627451,
+   [3]=0.47058823529411764
+  },
+  ["curve"]={
+   [10]={
+    [1]=7250,
+    [2]=0.7
+   },
+   [1]={
+    [1]=800,
+    [2]=0.42
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.55
+   },
+   [3]={
+    [1]=2800,
+    [2]=0.66
+   },
+   [4]={
+    [1]=3400,
+    [2]=0.86
+   },
+   [5]={
+    [1]=4000,
+    [2]=0.98
+   },
+   [6]={
+    [1]=4600,
+    [2]=1
+   },
+   [7]={
+    [1]=5600,
+    [2]=0.98
+   },
+   [8]={
+    [1]=6400,
+    [2]=0.88
+   },
+   [9]={
+    [1]=7000,
+    [2]=0.78
+   }
+  },
+  ["description"]="A four-door with a turbo flat-four and a rear-biased four-wheel drive. Heavier and calmer than the hatch, it plants itself at speed and pulls hard once the turbo wakes up.",
+  ["drag"]={
+   ["Air"]=0.00023,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=0.38,
+  ["grip"]=0.9841269841269841,
+  ["id"]="Sedan",
+  ["mass"]=1350,
+  ["name"]="Kaze RS",
+  ["power"]=300,
+  ["radius"]=1.2,
+  ["ratios"]={
+   [1]=16,
+   [2]=10.9,
+   [3]=8.3,
+   [4]=6.6,
+   [5]=5.5,
+   [6]=4.65
+  },
+  ["rearShare"]=0.5,
+  ["redline"]=7000,
+  ["shiftRpm"]=6750,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.6,
+   ["AssistMax"]=22,
+   ["BetaFree"]=8,
+   ["BetaStability"]=4.8,
+   ["GripOverlap"]=1.3,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.3,
+   ["MaxAngle"]=32,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4.2,
+   ["ReturnRate"]=6.5,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=2.6,
+   ["WheelRatio"]=9,
+   ["YawGripOverlap"]=1.3,
+   ["YawSlack"]=0.1
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.48,
+    ["Rear"]=0.42
+   },
+   ["Bump"]=0.42,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.6,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.52,
+    ["Rear"]=0.55
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="Sedan",
+  ["top"]=189.17117053874023,
+  ["torque"]=400,
+  ["tyres"]={
+   ["DriftWindow"]=22,
+   ["ForceLift"]=0.5,
+   ["HandbrakeDrag"]=0.72,
+   ["HandbrakeGrip"]=0.42,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.62,
+   ["LongitudinalGrip"]=0.66,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=6.8,
+   ["Plateau"]=0.9,
+   ["Tail"]=0.7
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=9
+ },
+ [8]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=50,
+   ["FrontShare"]=0.58
+  },
+  ["color"]={
+   [1]=0.20392156862745098,
+   [2]=0.13333333333333333,
+   [3]=0.09411764705882353
+  },
+  ["curve"]={
+   [10]={
+    [1]=8250,
+    [2]=0.7
+   },
+   [1]={
+    [1]=800,
+    [2]=0.35
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.45
+   },
+   [3]={
+    [1]=3000,
+    [2]=0.55
+   },
+   [4]={
+    [1]=3600,
+    [2]=0.78
+   },
+   [5]={
+    [1]=4200,
+    [2]=0.97
+   },
+   [6]={
+    [1]=5000,
+    [2]=1
+   },
+   [7]={
+    [1]=6000,
+    [2]=0.98
+   },
+   [8]={
+    [1]=7000,
+    [2]=0.9
+   },
+   [9]={
+    [1]=8000,
+    [2]=0.78
+   }
+  },
+  ["description"]="A prototype from the class that never raced: a turbo four behind your back, four-wheel drive leaning on the rear. Lag, then everything at once. One of the fastest cars here, and the one that bites.",
+  ["drag"]={
+   ["Air"]=0.00022,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=0.36,
+  ["grip"]=0.9523809523809523,
+  ["id"]="Prototype",
+  ["mass"]=1000,
+  ["name"]="Raijin GS",
+  ["power"]=500,
+  ["radius"]=1.2,
+  ["ratios"]={
+   [1]=15.5,
+   [2]=10.6,
+   [3]=8.1,
+   [4]=6.6,
+   [5]=5.6,
+   [6]=4.9
+  },
+  ["rearShare"]=0.52,
+  ["redline"]=8000,
+  ["shiftRpm"]=7700,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.65,
+   ["AssistMax"]=22,
+   ["BetaFree"]=9,
+   ["BetaStability"]=5.7,
+   ["GripOverlap"]=1.2,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.22,
+   ["MaxAngle"]=36,
+   ["MinAngle"]=4.5,
+   ["Rate"]=4.8,
+   ["ReturnRate"]=7,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=3.7,
+   ["WheelRatio"]=8,
+   ["YawGripOverlap"]=1.08,
+   ["YawSlack"]=0.1
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.56,
+    ["Rear"]=0.34
+   },
+   ["Bump"]=0.42,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.6,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.47,
+    ["Rear"]=0.43
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="Prototype",
+  ["top"]=205.16523452014974,
+  ["torque"]=500,
+  ["tyres"]={
+   ["DriftWindow"]=21,
+   ["ForceLift"]=0.55,
+   ["HandbrakeDrag"]=0.75,
+   ["HandbrakeGrip"]=0.34,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.6,
+   ["LongitudinalGrip"]=0.64,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=6,
+   ["Plateau"]=0.91,
+   ["Tail"]=0.73
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=8.2
+ },
+ [9]={
+  ["accel"]=33,
+  ["brakes"]={
+   ["Force"]=56,
+   ["FrontShare"]=0.6
+  },
+  ["color"]={
+   [1]=0.10196078431372549,
+   [2]=0.09411764705882353,
+   [3]=0.10980392156862745
+  },
+  ["curve"]={
+   [1]={
+    [1]=800,
+    [2]=0.55
+   },
+   [2]={
+    [1]=2000,
+    [2]=0.8
+   },
+   [3]={
+    [1]=3000,
+    [2]=0.95
+   },
+   [4]={
+    [1]=3500,
+    [2]=1
+   },
+   [5]={
+    [1]=5500,
+    [2]=1
+   },
+   [6]={
+    [1]=6500,
+    [2]=0.94
+   },
+   [7]={
+    [1]=7200,
+    [2]=0.85
+   },
+   [8]={
+    [1]=7800,
+    [2]=0.74
+   }
+  },
+  ["description"]="A modern works car: a small turbo four, four-wheel drive and a hybrid battery that charges every time you brake, then adds 134 hp of boost out of the next corner. The most grip and the best brakes here. It rewards a clean line more than bravery.",
+  ["drag"]={
+   ["Air"]=0.00026,
+   ["Rolling"]=0.5
+  },
+  ["driveFront"]=0.42,
+  ["grip"]=1.0476190476190477,
+  ["id"]="Hybrid",
+  ["mass"]=1260,
+  ["name"]="Kumo R1",
+  ["power"]=514,
+  ["radius"]=1.25,
+  ["ratios"]={
+   [1]=16.2,
+   [2]=10.9,
+   [3]=8.1,
+   [4]=6.35,
+   [5]=5.06
+  },
+  ["rearShare"]=0.5,
+  ["redline"]=7600,
+  ["shiftRpm"]=7350,
+  ["steering"]={
+   ["Ackermann"]=0.12,
+   ["Assist"]=0.62,
+   ["AssistMax"]=22,
+   ["BetaFree"]=8,
+   ["BetaStability"]=5.6,
+   ["GripOverlap"]=1.3,
+   ["HandbrakeRelease"]=0.7,
+   ["HandbrakeStability"]=0.55,
+   ["MaxAngle"]=35,
+   ["MinAngle"]=4.5,
+   ["Rate"]=5,
+   ["ReturnRate"]=7.5,
+   ["SlipAllowance"]=1.1,
+   ["Stability"]=3.4,
+   ["WheelRatio"]=8,
+   ["YawGripOverlap"]=1.25,
+   ["YawSlack"]=0.1
+  },
+  ["suspension"]={
+   ["AntiRoll"]={
+    ["Front"]=0.5,
+    ["Rear"]=0.44
+   },
+   ["Bump"]=0.42,
+   ["BumpStopFrom"]=0.88,
+   ["BumpStopRate"]=6,
+   ["Rebound"]=0.6,
+   ["Roughness"]=0.11,
+   ["Sag"]={
+    ["Front"]=0.52,
+    ["Rear"]=0.52
+   },
+   ["Travel"]=1.15
+  },
+  ["template"]="Hybrid",
+  ["top"]=196.60823589659444,
+  ["torque"]=450,
+  ["tyres"]={
+   ["DriftWindow"]=20,
+   ["ForceLift"]=0.55,
+   ["HandbrakeDrag"]=0.75,
+   ["HandbrakeGrip"]=0.62,
+   ["Hold"]=0.3,
+   ["HoldBelow"]=1.5,
+   ["LateralGrip"]=0.66,
+   ["LongitudinalGrip"]=0.7,
+   ["LowSpeed"]=5,
+   ["PeakSlip"]=6.2,
+   ["Plateau"]=0.92,
+   ["Tail"]=0.76
+  },
+  ["unlock"]=0,
+  ["wheelbase"]=9.4
+ }
+}
+</ProtectedString>
+          </Properties>
+        </Item>
       </Item>
-      <Item class="Folder" referent="RBX00000017">
+      <Item class="Folder" referent="RBX00000018">
         <Properties>
           <string name="Name">Remotes</string>
         </Properties>
-        <Item class="RemoteEvent" referent="RBX00000018">
+        <Item class="RemoteEvent" referent="RBX00000019">
           <Properties>
             <string name="Name">Action</string>
           </Properties>
         </Item>
-        <Item class="RemoteFunction" referent="RBX00000019">
+        <Item class="RemoteFunction" referent="RBX0000001A">
           <Properties>
             <string name="Name">Request</string>
           </Properties>
         </Item>
-        <Item class="UnreliableRemoteEvent" referent="RBX0000001A">
+        <Item class="RemoteEvent" referent="RBX0000001B">
           <Properties>
             <string name="Name">State</string>
           </Properties>
         </Item>
-        <Item class="UnreliableRemoteEvent" referent="RBX0000001B">
+        <Item class="UnreliableRemoteEvent" referent="RBX0000001C">
           <Properties>
             <string name="Name">Input</string>
           </Properties>
@@ -554,11 +2578,11 @@ return Route
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="RBX0000001C">
+    <Item class="Folder" referent="RBX0000001D">
       <Properties>
         <string name="Name">BackseatExpeditionServer</string>
       </Properties>
-      <Item class="Script" referent="RBX0000001D">
+      <Item class="Script" referent="RBX0000001E">
         <Properties>
           <string name="Name">Main</string>
           <ProtectedString name="Source">local Players=game:GetService('Players')
@@ -581,7 +2605,7 @@ end
 local function broadcastRun(run,kind,data)for _,p in ipairs(participants(run))do tell(p,kind,data)end end
 local function origin(run)return Vector3.new(C.WorldX+run.slot*C.LaneSpacing,0,-math.floor(run.s.z/4096)*4096)end
 local function worldFrame(run)
- local y,pitch,roll=D.pose(run.s,run.route)
+ local y,pitch,roll=D.pose(run.s,run.route,run.car)
  return CFrame.new(Vector3.new(run.s.x,y,run.s.z)+origin(run))*CFrame.Angles(0,math.pi+run.s.yaw,0)*CFrame.Angles(pitch,0,roll)
 end
 local function seatPlayer(player,seat)
@@ -746,7 +2770,7 @@ RunService.Heartbeat:Connect(function(dt)
    run.model:PivotTo(worldFrame(run));Assets.pose(run.serverVisual,run.s,run.route,origin(run),1/C.StateRate);list[#list+1]=packet(run)
    if not run.model.Driver.Occupant and os.clock()-run.created&gt;2 then seatPlayer(run.player,run.model.Driver)end
   end
-  if #list&gt;0 then stateEvent:FireAllClients({time=Workspace:GetServerTimeNow(),runs=list})end
+  for _,run in pairs(runs)do for _,p in ipairs(participants(run))do stateEvent:FireClient(p,{time=Workspace:GetServerTimeNow(),runs={packet(run)}})end end
  end
 end)
 Players.PlayerAdded:Connect(function(player)storage:load(player.UserId)end)
@@ -772,7 +2796,7 @@ root:SetAttribute('ServerReady',true)
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="RBX0000001E">
+      <Item class="ModuleScript" referent="RBX0000001F">
         <Properties>
           <string name="Name">Persistence</string>
           <ProtectedString name="Source">-- Immutable replay pages + small manifests. No DataStore work on the simulation thread.
@@ -953,11 +2977,11 @@ return P
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="RBX0000001F">
+      <Item class="Folder" referent="RBX00000020">
         <Properties>
           <string name="Name">BackseatExpeditionClient</string>
         </Properties>
-        <Item class="LocalScript" referent="RBX00000020">
+        <Item class="LocalScript" referent="RBX00000021">
           <Properties>
             <string name="Name">Main</string>
             <ProtectedString name="Source">local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage')
@@ -1246,6 +3270,7 @@ RunService.RenderStepped:Connect(function(dt)
  uiAt+=dt
  if uiAt&gt;.1 then
   uiAt=0;ui:runInfo(run,predicted,route,clock)
+  if C.ImportedVisuals and visual then ui.telemetry.Text..='\nOriginal body: '..visual.skinStatus end
   if mode=='replay'then
    ui.playhead.Size=UDim2.fromScale(math.clamp(replayTime/math.max(1,replayPlayer.meta.duration),0,1),1)
    ui.replayLabel.Text=UI.time(replayTime)..' / '..UI.time(replayPlayer.meta.duration)..'   '..cameraNames[cameraMode]..' CAMERA   ·   '..(replayPlayer.meta.storage or '')
@@ -1265,7 +3290,7 @@ end)
             <bool name="Disabled">false</bool>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000021">
+        <Item class="ModuleScript" referent="RBX00000022">
           <Properties>
             <string name="Name">Presence</string>
             <ProtectedString name="Source">-- Local, reversible ownership of the view while the optional expansion is open.
@@ -1359,7 +3384,7 @@ return Presence
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000022">
+        <Item class="ModuleScript" referent="RBX00000023">
           <Properties>
             <string name="Name">ReplayPlayer</string>
             <ProtectedString name="Source">local root=game:GetService('ReplicatedStorage'):WaitForChild('BackseatExpedition')
@@ -1409,7 +3434,7 @@ return Player
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000023">
+        <Item class="ModuleScript" referent="RBX00000024">
           <Properties>
             <string name="Name">RoadStream</string>
             <ProtectedString name="Source">-- Bounded chunk window; generation jobs yield frequently and recycle parts.
@@ -1432,7 +3457,7 @@ function Stream:part(parent,name,size,cf,tint,material,shape)
 end
 function Stream:release(chunk)
  for _,p in ipairs(chunk:GetChildren())do
-  if p:IsA('BasePart')and #self.pool&lt;400 then p.Parent=nil;self.pool[#self.pool+1]=p else p:Destroy()end
+  if p:IsA('BasePart')and #self.pool&lt;400 then p:ClearAllChildren();p.Parent=nil;self.pool[#self.pool+1]=p else p:Destroy()end
  end
  chunk:Destroy()
 end
@@ -1446,7 +3471,7 @@ function Stream:shift(originZ)
  local delta=Vector3.new(0,0,originZ-self.originZ)
  for _,entry in pairs(self.chunks)do
   -- Jobs resume with the new origin, so unfinished chunks are rebuilt.
-  if entry.done then entry.model:PivotTo(entry.model:GetPivot()+delta)else entry.cancel=true end
+  if entry.done then for _,part in ipairs(entry.model:GetDescendants())do if part:IsA('BasePart')then part.CFrame+=delta end end else entry.cancel=true end
  end
  self.originZ=originZ
 end
@@ -1498,8 +3523,10 @@ function Stream:build(index,entry)
   local normal=Vector3.new(-slope,1,p.dx*slope-p.dy).Unit
   local frame=CFrame.lookAt(pos,pos+dir,normal)
   frame=frame-frame.UpVector*.35
-  local length=dir.Magnitude+2.4;local biome=C.Biomes[p.biome]
+  local length=dir.Magnitude+.04;local biome=C.Biomes[p.biome]
   self:part(model,'Road',Vector3.new(p.width,.7,length),frame,biome.road,p.surface=='tarmac'and Enum.Material.Asphalt or Enum.Material.Ground)
+  local seam=CFrame.lookAt(Vector3.new(b.x,b.y-.362,b.z)+offset,Vector3.new(b.x+b.dx,b.y-.362+b.dy,b.z+1)+offset,normal)
+  self:part(model,'Road seam',Vector3.new(p.width,.7,math.max(.12,p.width*math.abs(b.heading-a.heading)+.12)),seam,biome.road,p.surface=='tarmac'and Enum.Material.Asphalt or Enum.Material.Ground)
   for _,side in ipairs({-1,1})do
    self:part(model,'Shoulder',Vector3.new(3,.5,length),frame*CFrame.new(side*(p.width/2+1.5),-.18,0),biome.ground,Enum.Material.Ground)
    if p.bridge or p.tunnel then
@@ -1518,6 +3545,11 @@ function Stream:build(index,entry)
    self:part(model,'Tunnel roof',Vector3.new(p.width+4,2,35),frame*CFrame.new(0,13,0),{.30,.32,.32},Enum.Material.Concrete)
    for _,side in ipairs({-1,1})do self:part(model,'Tunnel wall',Vector3.new(1,12,35),frame*CFrame.new(side*(p.width/2+1.5),6,0),{.31,.33,.32},Enum.Material.Concrete)end
    self:part(model,'Tunnel strip',Vector3.new(.3,.15,14),frame*CFrame.new(0,11.8,0),{.9,.77,.48},Enum.Material.Neon)
+  end
+  if z&gt;=0 and z%128==0 and math.abs(p.curvature)&gt;.0013 then
+   local sign=self:part(model,'Turn marker',Vector3.new(3.5,3,.2),frame*CFrame.new(p.width/2+5,3,0),{.94,.72,.22})
+   local face=Instance.new('SurfaceGui');face.Face=Enum.NormalId.Back;face.CanvasSize=Vector2.new(120,120);face.Parent=sign
+   local text=Instance.new('TextLabel');text.Size=UDim2.fromScale(1,1);text.BackgroundTransparency=1;text.Text=p.curvature&gt;0 and '←'or '→';text.TextScaled=true;text.TextColor3=Color3.fromRGB(25,30,25);text.Parent=face
   end
   if z&gt;=0 and (z%C.Checkpoint==0 or z==route.length and route.length&gt;0)then
    for _,side in ipairs({-1,1})do self:part(model,'Timing post',Vector3.new(.4,7,.4),frame*CFrame.new(side*(p.width/2+2),3.5,0),{.95,.72,.29})end
@@ -1563,7 +3595,7 @@ return Stream
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000024">
+        <Item class="ModuleScript" referent="RBX00000025">
           <Properties>
             <string name="Name">UI</string>
             <ProtectedString name="Source">local UI={};UI.__index=UI
@@ -1619,9 +3651,11 @@ function UI.new(callbacks)
   label(b,mode.tag,14,35,268,32,12,palette.muted);self.modeButtons[i]=b
  end
  label(menu,'YOUR GARAGE',36,463,600,22,12,palette.gold)
+ local garage=Instance.new('ScrollingFrame');garage.Name='AllCars';garage.Position=UDim2.fromOffset(36,494);garage.Size=UDim2.fromOffset(625,55)
+ garage.BackgroundTransparency=1;garage.BorderSizePixel=0;garage.ScrollingDirection=Enum.ScrollingDirection.X;garage.ScrollBarThickness=6;garage.CanvasSize=UDim2.fromOffset(#C.Cars*210,0);garage.Parent=menu
  self.carButtons={}
  for i,car in ipairs(C.Cars)do
-  local b=button(menu,car.name,36+(i-1)*210,494,196,48,function()self.car=car;self:selection()end);self.carButtons[i]=b
+  local b=button(garage,car.name,(i-1)*210,0,196,48,function()self.car=car;self:selection()end);self.carButtons[i]=b
  end
  self.carDescription=label(menu,'',36,549,625,28,13,palette.muted)
  local seed=Instance.new('TextBox');seed.Name='CourseSeed';seed.Position=UDim2.fromOffset(36,600);seed.Size=UDim2.fromOffset(155,42)
@@ -1715,7 +3749,7 @@ function UI:selection()
  if self.previewWorld and self.previewCarId~=self.car.id then
   if self.previewCar then self.previewCar.model:Destroy()end
   -- Show a complete car immediately, independently of external mesh permissions.
-  self.previewCar=Assets.car(self.previewWorld,self.car,false,false)
+  self.previewCar=Assets.car(self.previewWorld,self.car,false,C.ImportedVisuals)
   self.previewCarId=self.car.id
  end
  for i,b in ipairs(self.modeButtons)do b.BackgroundColor3=C.Modes[i]==self.mode and Color3.fromRGB(61,85,63)or palette.card end
@@ -1723,7 +3757,7 @@ function UI:selection()
   local car=C.Cars[i];b.BackgroundColor3=car==self.car and Color3.fromRGB(61,85,63)or palette.card
   b.Text=car.name..(self.xp&lt;car.unlock and ' · '..car.unlock..' XP'or '')
  end
- self.carDescription.Text=self.car.description
+ self.carDescription.Text=string.format('%d kg · %d hp · %d Nm · %d:%d balance · %.1f studs wheelbase',self.car.mass,self.car.power,self.car.torque,(1-self.car.rearShare)*100,self.car.rearShare*100,self.car.wheelbase)
  self.modeTitle.Text=self.mode.name
  self.modeDetail.Text=self.mode.length==0 and 'An endless road. Bank at any point.\nEvery completed run keeps its replay.'or string.format('%.1f km · finishable seeded stage\nCheckpoint recovery adds 5 seconds.',self.mode.length*C.StudMetres/1000)
 end
@@ -1764,8 +3798,9 @@ function UI:saved(data)
  if self.resultMeta and self.resultMeta.id==data.id then self.resultReady=true;self.resultSaved.Text=data.status;self.watchButton.Text='WATCH REPLAY'end
 end
 function UI:runInfo(run,s,route,clock)
- self.runSummary.Text=(run.mode or 'replay'):upper()..' / SEED '..run.seed..'\n'..C.Biomes[route:point(s.z).biome].name
- self.note.Text=run.missed and 'MISSED CHECKPOINT · press R'or route:note(s.z+math.abs(s.v))
+ local climate=route:conditions(s.z)
+ self.runSummary.Text=(run.mode or 'replay'):upper()..' / SEED '..run.seed..'\n'..C.Biomes[route:point(s.z).biome].name..string.format(' · %d°C · wet %d%%',climate.temperature,climate.wetness*100)
+ self.note.Text=run.missed and 'MISSED CHECKPOINT · press R'or route:call(s.z,s.v)
  self.timer.Text=UI.time(clock);self.speed.Text=tostring(math.floor(math.abs(s.v)*C.StudMetres*3.6+.5))
  local progress=run.length and run.length&gt;0 and string.format('%.2f / %.2f km',math.max(0,s.z)*C.StudMetres/1000,run.length*C.StudMetres/1000)or string.format('%.2f km',math.max(0,s.z)*C.StudMetres/1000)
  self.telemetry.Text=string.format('THROTTLE %3d%%   BRAKE %3d%%   STEER %+3d%%\n%s   ·   BODY %d%%   ·   R recover / B mark / C camera',

@@ -76,7 +76,7 @@ class PlaceTests(unittest.TestCase):
             verify_addition(base, bad)
 
     def test_clean_standalone_has_native_floor_correct_script_container_and_no_imported_assets(self):
-        path=next((APP.parent/'downloads').glob('DM_Rally_Standalone_v1.2.0.rbxl'))
+        path=next((APP.parent/'downloads').glob('DM_Rally_Standalone_v1.3.0.rbxl'))
         standalone=Place(path.read_bytes())
         classes={ref:cls for cls,refs,_ in standalone.classes.values()for ref in refs}
         self.assertNotIn('MeshPart',classes.values())

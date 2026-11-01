@@ -284,6 +284,7 @@ RunService.RenderStepped:Connect(function(dt)
  uiAt+=dt
  if uiAt>.1 then
   uiAt=0;ui:runInfo(run,predicted,route,clock)
+  if C.ImportedVisuals and visual then ui.telemetry.Text..='\nOriginal body: '..visual.skinStatus end
   if mode=='replay'then
    ui.playhead.Size=UDim2.fromScale(math.clamp(replayTime/math.max(1,replayPlayer.meta.duration),0,1),1)
    ui.replayLabel.Text=UI.time(replayTime)..' / '..UI.time(replayPlayer.meta.duration)..'   '..cameraNames[cameraMode]..' CAMERA   ·   '..(replayPlayer.meta.storage or '')

@@ -18,7 +18,7 @@ end
 local function broadcastRun(run,kind,data)for _,p in ipairs(participants(run))do tell(p,kind,data)end end
 local function origin(run)return Vector3.new(C.WorldX+run.slot*C.LaneSpacing,0,-math.floor(run.s.z/4096)*4096)end
 local function worldFrame(run)
- local y,pitch,roll=D.pose(run.s,run.route)
+ local y,pitch,roll=D.pose(run.s,run.route,run.car)
  return CFrame.new(Vector3.new(run.s.x,y,run.s.z)+origin(run))*CFrame.Angles(0,math.pi+run.s.yaw,0)*CFrame.Angles(pitch,0,roll)
 end
 local function seatPlayer(player,seat)
@@ -183,7 +183,7 @@ RunService.Heartbeat:Connect(function(dt)
    run.model:PivotTo(worldFrame(run));Assets.pose(run.serverVisual,run.s,run.route,origin(run),1/C.StateRate);list[#list+1]=packet(run)
    if not run.model.Driver.Occupant and os.clock()-run.created>2 then seatPlayer(run.player,run.model.Driver)end
   end
-  if #list>0 then stateEvent:FireAllClients({time=Workspace:GetServerTimeNow(),runs=list})end
+  for _,run in pairs(runs)do for _,p in ipairs(participants(run))do stateEvent:FireClient(p,{time=Workspace:GetServerTimeNow(),runs={packet(run)}})end end
  end
 end)
 Players.PlayerAdded:Connect(function(player)storage:load(player.UserId)end)

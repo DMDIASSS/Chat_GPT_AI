@@ -5,15 +5,15 @@ Solo play with an optional human co-driver, four game modes, continuous seeded r
 checkpoint recovery, a replay library, and saved personal-best ghosts. It contains no
 executor code or live-game injection. The full DM place retains the supplied original content.
 
-## Download and play (1.2.0)
+## Download and play (1.3.0)
 
-Start with **DM_Rally_Standalone_v1.2.0.rbxl**. It contains only the new driving game,
-native car/map geometry and its own server logic. Open it directly in Studio, press
-**Play**, keep **Trail Hatch** selected, then **Take the Road**. Publishing, cloud-save
+Start with **DM_Rally_Standalone_v1.3.0.rbxl**. It contains only the new driving game,
+fallback car/map geometry and its own server logic. Open it directly in Studio, press
+**Play**, keep **Orso 4** selected, then **Take the Road**. Publishing, cloud-save
 access and imported meshes are optional. The same file is available as `.rbxlx`.
 
-**DM_Sakura_Pass_v1.2.0.rbxl** adds this driving system to the latest Sakura Pass upload,
-preserving all 132,961 original objects. **DM_Backseat_Rally_v1.2.0.rbxl** does the same
+**DM_Sakura_Pass_v1.3.0.rbxl** adds this driving system to the latest Sakura Pass upload,
+preserving all 132,961 original objects. **DM_Backseat_Rally_v1.3.0.rbxl** does the same
 for the earlier Backseat Rally upload. Both start the new rally menu automatically.
 The procedural road appears when a run starts. **Return to Original** restores the
 supplied scene and UI; its absent original backend is not reconstructed.
@@ -65,7 +65,7 @@ It cannot reconstruct the old game's missing backend. The original assets and sc
 remain present. The original map's performance is unchanged; the new road renderer
 uses the bounded streaming system described below.
 
-## Spawning without cloud or asset access (1.2.0)
+## Spawning without cloud or asset access (1.3.0)
 
 The previous build opened DataStores before connecting spawn handlers. An unpublished
 place can throw during `GetDataStore`, aborting that server script. Initialization now
@@ -79,9 +79,9 @@ its input directly through ContextActionService, including events marked process
 the default controls. Start requests have a visible failure message and reset the
 button if no car is acknowledged.
 
-Imported visual skins and external audio are **off by default**. Cars, scenery and
+Imported visual skins are **on by default**; external audio stays off. Cars, scenery and
 road geometry are built from native parts. The original source assets stay untouched.
-To opt into available original skins later, set `ImportedVisuals=true` in Config;
+To keep only native fallback skins, set `ImportedVisuals=false` in Config;
 external audio has its own flag. No private-asset permission change is needed to drive.
 
 ## Startup and visual assets (1.1.1)
@@ -160,3 +160,11 @@ streaming limits, additive installation, automatic startup, failed/slow mesh dow
 optional installation, lighting isolation and restoration to the original.
 Actual Studio rendering, device controls, asset loading, production DataStores and
 multiplayer latency still need a Studio/Roblox playtest; headless tests do not measure FPS.
+
+## Vehicle and asset update
+
+Version 1.3.0 uses all 15 uploaded vehicle profiles through one configurable solver.
+See ASSET_EXPORT_GUIDE.md for supported physics effects, current approximations, and
+which Studio folders to export for a closer visual match. Original private assets
+remain dependent on their permissions. The original Sakura renderer still needs a
+Studio Output trace to diagnose any remaining disappearing-scene errors.

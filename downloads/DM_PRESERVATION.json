@@ -1,9 +1,9 @@
 {
   "base_sha256": "be6b8add4aff71085492872588a7440427438bbec01710e1d2b3a61dad90ef93",
-  "result_sha256": "a671ff90be5d3f3861e1bb98d1deb76b4c94b1a463ebd8057f64157c53b28c5b",
+  "result_sha256": "ea94634b09b95a15e514bafb4db58d985c23b77e49e7ab04da7ecbf8330fdd22",
   "original_instances": 82861,
-  "result_instances": 82885,
-  "added_instances": 24,
+  "result_instances": 82886,
+  "added_instances": 25,
   "original_class_and_property_chunks_byte_identical": true,
   "original_parent_relationships_unchanged": true,
   "existing_scripts_disabled_moved_or_deleted": 0,
@@ -46,7 +46,7 @@
     },
     {
       "ref": 82867,
-      "cls": "UnreliableRemoteEvent",
+      "cls": "RemoteEvent",
       "name": "State",
       "parent": 82864
     },
@@ -112,42 +112,48 @@
     },
     {
       "ref": 82878,
+      "cls": "ModuleScript",
+      "name": "VehicleCatalog",
+      "parent": 82863
+    },
+    {
+      "ref": 82879,
       "cls": "Script",
       "name": "Main",
       "parent": 82869
     },
     {
-      "ref": 82879,
+      "ref": 82880,
       "cls": "ModuleScript",
       "name": "Persistence",
       "parent": 82869
     },
     {
-      "ref": 82880,
+      "ref": 82881,
       "cls": "LocalScript",
       "name": "Main",
       "parent": 82870
     },
     {
-      "ref": 82881,
+      "ref": 82882,
       "cls": "ModuleScript",
       "name": "Presence",
       "parent": 82870
     },
     {
-      "ref": 82882,
+      "ref": 82883,
       "cls": "ModuleScript",
       "name": "ReplayPlayer",
       "parent": 82870
     },
     {
-      "ref": 82883,
+      "ref": 82884,
       "cls": "ModuleScript",
       "name": "RoadStream",
       "parent": 82870
     },
     {
-      "ref": 82884,
+      "ref": 82885,
       "cls": "ModuleScript",
       "name": "UI",
       "parent": 82870
