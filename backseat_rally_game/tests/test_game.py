@@ -10,7 +10,7 @@ def pure(extra=''):
         text+='local '+('C'if name=='Config'else 'D'if name=='Dynamics'else name)+'=(function()\n'+(APP/'src/Shared'/f'{name}.lua').read_text()+'\nend)()\n'
     return text+extra
 
-def roblox(extra='',client=False,server=True,before_client=''):
+def roblox(extra='',client=False,server=True,before_client='',before_server=''):
     text=(APP/'tests/roblox_mock.luau').read_text()+'\nlocal nodes={}\n'
     roots={'Shared':"services.ReplicatedStorage",'Server':'services.ServerScriptService','Client':'sps'}
     text+="local replicated=Instance.new('Folder',services.ReplicatedStorage);replicated.Name='BackseatExpedition'\n"
@@ -24,7 +24,7 @@ def roblox(extra='',client=False,server=True,before_client=''):
             text+=f"nodes[{json.dumps(key)}]=Instance.new('{cls}',folder);nodes[{json.dumps(key)}].Name={json.dumps(p.name.split('.')[0])}\n"
     for p in sorted((APP/'src').glob('*/*.lua')):
         key=str(p.relative_to(APP/'src'));text+='modules[nodes['+json.dumps(key)+']]=function(script)\n'+p.read_text()+'\nend\n'
-    if server:text+="modules[nodes['Server/Main.server.lua']](nodes['Server/Main.server.lua'])\nadvance(.1)\n"
+    if server:text+=before_server+"\nmodules[nodes['Server/Main.server.lua']](nodes['Server/Main.server.lua'])\nadvance(.1)\n"
     if client:text+=before_client+"\nmodules[nodes['Client/Main.client.lua']](nodes['Client/Main.client.lua'])\nadvance(.2,true)\n"
     return text+extra
 

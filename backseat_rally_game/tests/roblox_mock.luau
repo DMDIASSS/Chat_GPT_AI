@@ -89,7 +89,7 @@ local function subclass(cls,base)
  return false
 end
 function Instance.new(cls,parent)
- local props={ClassName=cls,Name=cls,children={},attrs={},signals={},Enabled=true,CFrame=CFrame.identity,Size=V.new(1,1,1),Transparency=0,Visible=true,Text='',Disabled=false}
+ local props={ClassName=cls,Name=cls,children={},attrs={},signals={},Enabled=true,CFrame=CFrame.identity,Size=V.new(1,1,1),Transparency=0,LocalTransparencyModifier=0,Visible=true,Text='',Disabled=false}
  local obj
  obj=setmetatable({p=props},{__index=function(_,k)
   if methods[k]then return methods[k]end
@@ -123,6 +123,7 @@ function methods:GetPivot()return self.PrimaryPart and self.PrimaryPart.CFrame o
 function methods:PivotTo(target)
  local delta=target*self:GetPivot():Inverse()
  for _,p in ipairs(self:GetDescendants())do if p:IsA('BasePart')then p.CFrame=delta*p.CFrame end end
+ if self.PrimaryPart then self.PrimaryPart.CFrame=target end
  self.WorldPivot=target
 end
 function methods:GetBoundingBox()return self:GetPivot(),V.new(6,6,10)end
@@ -142,7 +143,7 @@ function methods:Clone()
 end
 function methods:Sit(h)self.Occupant=h;h.SeatPart=self;h.Sit=true end
 function methods:Play()self.Playing=true end
-local services={};local game={}
+local services={};local game={GameId=123,PlaceId=456}
 function game:GetService(name)local result=assert(services[name],'Missing service '..name);return result end
 function game:BindToClose(fn)self.onClose=fn end
 local function service(name)local s=Instance.new(name);s.Name=name;services[name]=s;return s end

@@ -71,7 +71,7 @@ local function start(player,data)
  if runs[player]or viewing[player]then return end
  local car=getCar(data.car);local profile=storage:load(player.UserId)
  if profile.xp<car.unlock then tell(player,'notice','This car unlocks at '..car.unlock..' XP.');return end
- if profile.loading then tell(player,'notice','Loading your garage save; try again in a moment.');return end
+ if profile.loading and car.unlock>0 then tell(player,'notice','Loading your unlocked cars; try again in a moment.');return end
  local numeric=tonumber(data.seed);if not numeric or numeric~=numeric or math.abs(numeric)>1e12 then numeric=math.random(1,999999999)end
  local mode=getMode(data.mode);local seed=math.floor(numeric)%1000000000
  if mode.id=='daily'then seed=math.floor(os.time()/86400)end
@@ -86,6 +86,8 @@ local function start(player,data)
  for _,best in ipairs(profile.bests)do if best.course==run.record.meta.course then run.ghost=best;break end end
  local model=Instance.new('Model');model.Name='Rally_'..player.UserId
  local body=Instance.new('Part');body.Name='Root';body.Size=Vector3.new(6,2,10);body.Transparency=1;body.Anchored=true;body.CanCollide=false;body.Parent=model;model.PrimaryPart=body
+ local serverVisual=Assets.car(model,car,false,false,false);serverVisual.model.Name='NativeCar';run.serverVisual=serverVisual
+ model:SetAttribute('ExpeditionCar',true)
  for i,name in ipairs({'Driver','CoDriver'})do
   local seat=Instance.new('Seat');seat.Name=name;seat.Size=Vector3.new(2,1,2);seat.Transparency=1;seat.Anchored=true;seat.CanCollide=false
   seat.CFrame=CFrame.new(i==1 and -1.3 or 1.3,.25,0);seat.Parent=model
@@ -178,7 +180,7 @@ RunService.Heartbeat:Connect(function(dt)
  if network>=1/C.StateRate then
   network=0;local list={}
   for _,run in pairs(runs)do
-   run.model:PivotTo(worldFrame(run));list[#list+1]=packet(run)
+   run.model:PivotTo(worldFrame(run));Assets.pose(run.serverVisual,run.s,run.route,origin(run),1/C.StateRate);list[#list+1]=packet(run)
    if not run.model.Driver.Occupant and os.clock()-run.created>2 then seatPlayer(run.player,run.model.Driver)end
   end
   if #list>0 then stateEvent:FireAllClients({time=Workspace:GetServerTimeNow(),runs=list})end
@@ -198,6 +200,8 @@ game:BindToClose(function()
 end)
 -- Reuse visual templates in the expansion namespace without changing the source assets.
 task.spawn(function()
+ if not C.ImportedVisuals and not C.ExternalAudio then return end
  local ok,reason=pcall(function()require(root.Shared.ImportAssets).harvest(root)end)
  if not ok then warn('Optional original visual templates unavailable: '..tostring(reason))end
 end)
+root:SetAttribute('ServerReady',true)

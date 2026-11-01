@@ -5,20 +5,23 @@ Solo play with an optional human co-driver, four game modes, continuous seeded r
 checkpoint recovery, a replay library, and saved personal-best ghosts. It contains no
 executor code or live-game injection. The full DM place retains the supplied original content.
 
-## Download and play
+## Download and play (1.2.0)
 
-Open **DM_Backseat_Rally_v1.1.1.rbxl** (or the identical **DM_Backseat_Rally.rbxl**
-inside the ZIP) in Roblox Studio. This is the uploaded place with the
-expansion appended. Press **Play**: the working rally menu opens automatically. Select
-a mode, car and optional numeric seed, then **Take the Road**. No installer command is
-needed for this file. The procedural road appears when you start a run, not in Edit mode. **Return to Original**
-banks/retires an active run and restores the original UI, camera, lighting and
-character location. Bots and other files in the repository are unchanged.
+Start with **DM_Rally_Standalone_v1.2.0.rbxl**. It contains only the new driving game,
+native car/map geometry and its own server logic. Open it directly in Studio, press
+**Play**, keep **Trail Hatch** selected, then **Take the Road**. Publishing, cloud-save
+access and imported meshes are optional. The same file is available as `.rbxlx`.
 
-**DM_Backseat_Rally.zip** contains the ready place, standalone preview, Studio
-installer, source code, tests, hashes and preservation report. Extract it first.
-**Backseat_Rally_Expedition.rbxlx** is an additional preview with lightweight fallback
-assets and the same automatic start menu. No plugin or HTTP access is needed.
+**DM_Sakura_Pass_v1.2.0.rbxl** adds this driving system to the latest Sakura Pass upload,
+preserving all 132,961 original objects. **DM_Backseat_Rally_v1.2.0.rbxl** does the same
+for the earlier Backseat Rally upload. Both start the new rally menu automatically.
+The procedural road appears when a run starts. **Return to Original** restores the
+supplied scene and UI; its absent original backend is not reconstructed.
+
+**DM_Sakura_Pass.zip** / **DM_Backseat_Rally.zip** include the respective preserved place,
+clean standalone files, installer, sources, tests, hashes and preservation report.
+The Studio `.lock` file is not needed. Existing bots and other repository files remain
+unchanged. No installer command is needed for a ready-to-open place.
 
 - **Rally Sprint:** a 1.72 km stage with a final timing gate.
 - **Expedition:** 4.59 km across pine, alpine, mesa and coastal scenery.
@@ -61,6 +64,25 @@ instead of original server code; this update supplies the new modes' server syst
 It cannot reconstruct the old game's missing backend. The original assets and scripts
 remain present. The original map's performance is unchanged; the new road renderer
 uses the bounded streaming system described below.
+
+## Spawning without cloud or asset access (1.2.0)
+
+The previous build opened DataStores before connecting spawn handlers. An unpublished
+place can throw during `GetDataStore`, aborting that server script. Initialization now
+skips cloud storage for unpublished places and catches store-creation errors elsewhere.
+The starter car can also spawn while a published game's profile is still loading.
+Replays and rewards remain usable in this server when cloud saves are unavailable.
+
+The server now creates a visible native car model and seats the driver. Client visuals
+smooth its movement; they are not the only evidence of a spawned car. Driving captures
+its input directly through ContextActionService, including events marked processed by
+the default controls. Start requests have a visible failure message and reset the
+button if no car is acknowledged.
+
+Imported visual skins and external audio are **off by default**. Cars, scenery and
+road geometry are built from native parts. The original source assets stay untouched.
+To opt into available original skins later, set `ImportedVisuals=true` in Config;
+external audio has its own flag. No private-asset permission change is needed to drive.
 
 ## Startup and visual assets (1.1.1)
 
@@ -126,10 +148,11 @@ From the repository root:
 ```sh
 python -m pip install -r backseat_rally_game/requirements-build.txt
 python backseat_rally_game/build.py --base-place "/path/to/original.rbxl"
+python backseat_rally_game/build.py --name Sakura_Pass --base-place "/path/to/Sakura Pass.rbxl"
 LUAU_BIN=/path/to/luau LUAU_COMPILE_BIN=/path/to/luau-compile python -m unittest discover -s backseat_rally_game/tests -v
 ```
 
-Omit `--base-place` to rebuild only the standalone preview and installer. An already
+Omit `--base-place` to rebuild the clean standalone files and installer. An already
 extended base is rejected. `--output-dir` selects a different artifact directory.
 The original file is read without modification. Tests cover 1,000 seeded routes,
 manual driving to a finish, replay and persistent ghost retrieval, storage failures,

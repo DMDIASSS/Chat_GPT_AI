@@ -1,6 +1,6 @@
 # Validation — 2 November 2026
 
-- 32 automated tests passed using the Luau CLI and Python unittest.
+- 38 automated tests passed using the Luau CLI and Python unittest.
 - Every authored Luau source compiles.
 - Road continuity, grade and curve bounds checked across 1,000 seeds.
 - Manual control simulation reaches a finite finish and updates a personal best.
@@ -8,7 +8,7 @@
 - Replay seeking, recovery gaps, controls, bookmarks and bounded stream/cache behavior checked.
 - Storage failures preserve session access and are not reported as confirmed cloud saves.
 - Studio installation preserves existing scripts, bot models, service children and settings.
-- The launcher is opt in; closing restores original UI, camera, controls, lighting and location.
+- Ready places open the new menu automatically; optional installations and closing restore the original view.
 - The full RBXL preserves all 82,861 original instances and original hierarchy relationships.
 - Every original INST, PROP, SSTR and metadata chunk is byte identical.
 - An independent robloxapi/rbxfile decoder reads all 82,861 original instances unchanged,
@@ -21,6 +21,15 @@
 - Failed and timed-out meshes preserve a complete body; successful late skins align to the current pose.
 - Imported scenery failures retain generated trees and a continuous road.
 - Legacy fog, atmosphere and blur are isolated during a run and restored on return.
+
+- An unpublished place initializes and spawns a complete visible server car without calling store APIs.
+- A throwing GetDataStore call cannot abort server setup or spawning.
+- A slow cloud profile does not block the starter car.
+- Offline input capture drives the car, then banking and replay playback work in session.
+- Missing-server requests display a visible start failure and release the button.
+- The clean binary standalone has a native floor/spawn, the proper LocalScript container,
+  and no imported mesh or sound instances.
+- The Sakura Pass build retains all 132,961 original instances and their hierarchy.
 
 No Studio GUI or live Roblox server is available in this environment. Renderer/device
 behavior, permissions for reused mesh/audio assets, production DataStores and real

@@ -1,3 +1,14 @@
+# DM / Expedition 1.2.0
+
+- Fix server startup when GetDataStore throws or the place is unpublished.
+- Keep spawning independent from slow cloud profile reads for the starter car.
+- Spawn a complete visible car on the server and seat the driver.
+- Capture driving input even when default controls mark the event processed.
+- Display spawn errors in the garage and reset unacknowledged start requests.
+- Use native geometry by default; imported skins and external audio are optional.
+- Add clean standalone RBXL/RBXLX files and a preserved Sakura Pass build.
+- Verify offline driving, banking and replay playback with store APIs disabled.
+
 # DM / Expedition 1.1.1
 
 - Open the working rally menu automatically in the ready-to-open place and preview.

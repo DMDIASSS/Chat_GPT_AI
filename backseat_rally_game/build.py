@@ -1,7 +1,7 @@
 """Build the optional expansion and, with --base-place, an additive Roblox place."""
 from pathlib import Path
 import argparse,hashlib,json,re,zipfile,xml.etree.ElementTree as ET
-from tools.rbxl_addon import add_expansion
+from tools.rbxl_addon import add_expansion,standalone_base
 APP=Path(__file__).resolve().parent
 ROOT=APP.parent
 counter=0
@@ -50,7 +50,11 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base-place',type=Path,help='Original RBXL to preserve and extend')
     parser.add_argument('--output-dir',type=Path,default=ROOT/'downloads')
+    parser.add_argument('--name',default='Backseat_Rally',help='Artifact label, e.g. Sakura_Pass')
     args=parser.parse_args()
+    if not re.fullmatch(r'[A-Za-z0-9_]+',args.name):parser.error('--name must contain letters, numbers or underscores')
+    stem='DM_'+args.name
+    version=re.search(r"Version='([^']+)'",(APP/'src/Shared/Config.lua').read_text()).group(1)
     downloads=args.output_dir;downloads.mkdir(parents=True,exist_ok=True)
     place=xml_root()
     world=item(place,'Workspace','Workspace',[('bool','StreamingEnabled',True),('float','Gravity',130)])
@@ -67,25 +71,42 @@ def main():
     temp=ET.Element('Temp');shared,server,client=tree(temp)
     rs.append(shared);sss.append(server);sps.append(client)
     write(downloads/'Backseat_Rally_Expedition.rbxlx',place)
+    standalone=f'DM_Rally_Standalone_v{version}.rbxlx'
+    write(downloads/standalone,place)
+    standalone_binary=f'DM_Rally_Standalone_v{version}.rbxl'
+    binary,_=add_expansion(standalone_base(),APP/'src')
+    (downloads/standalone_binary).write_bytes(binary)
     model=xml_root();top=item(model,'Model','BackseatRallyExpansion');source(top,APP/'src/Installer.lua')
     payload=item(top,'Folder','Payload');tree(payload,True)
     write(downloads/'Backseat_Rally_Expansion.rbxmx',model)
     extras=[];aliases=[]
     if args.base_place:
         result,report=add_expansion(args.base_place.read_bytes(),APP/'src')
-        (downloads/'DM_Backseat_Rally.rbxl').write_bytes(result)
-        version=re.search(r"Version='([^']+)'",(APP/'src/Shared/Config.lua').read_text()).group(1)
-        aliases=[f'DM_Backseat_Rally_v{version}.rbxl']
+        place_name=stem+'.rbxl'
+        report_name='DM_PRESERVATION.json'if args.name=='Backseat_Rally'else stem+'_PRESERVATION.json'
+        (downloads/place_name).write_bytes(result)
+        aliases=[f'{stem}_v{version}.rbxl']
         (downloads/aliases[0]).write_bytes(result)
-        (downloads/'DM_PRESERVATION.json').write_text(json.dumps(report,indent=2)+'\n')
-        extras=['DM_Backseat_Rally.rbxl','DM_PRESERVATION.json']
+        (downloads/report_name).write_text(json.dumps(report,indent=2)+'\n')
+        extras=[place_name,report_name]
     paths=sorted(p for p in APP.rglob('*')if p.is_file()and 'private'not in p.relative_to(APP).parts and '__pycache__'not in p.parts and p.suffix!='.pyc'and p.name!='SOURCE_HASHES.json')
     contents={str(p.relative_to(ROOT)):p.read_bytes()for p in paths}
-    for name in ['Backseat_Rally_Expedition.rbxlx','Backseat_Rally_Expansion.rbxmx']+extras:contents[name]=(downloads/name).read_bytes()
+    for name in ['Backseat_Rally_Expedition.rbxlx','Backseat_Rally_Expansion.rbxmx',standalone,standalone_binary]+extras:contents[name]=(downloads/name).read_bytes()
+    contents['START_HERE.txt']=(
+        f'1. Open {standalone_binary} directly in Roblox Studio.\n'
+        '2. Press Play. Keep Trail Hatch selected, then click TAKE THE ROAD.\n'
+        '3. Use W/A/S/D to drive, Space for the handbrake, R to recover.\n\n'
+        'This clean place uses its own server and native car/map geometry.\n'
+        'Publishing, cloud-save access and private imported assets are optional.\n'
+        'Offline replays last for this server session.\n\n'
+        f'{stem}.rbxl contains the preserved uploaded scene plus the same new driving system.\n'
+        'The old exported garage has no original server backend. Use the new rally menu to drive.\n'
+    ).encode()
     hashes={name:hashlib.sha256(data).hexdigest()for name,data in contents.items()}
     contents['SOURCE_HASHES.json']=(json.dumps(hashes,indent=2)+'\n').encode()
-    with zipfile.ZipFile(downloads/'DM_Backseat_Rally.zip','w',zipfile.ZIP_DEFLATED,compresslevel=9)as z:
+    zip_name=stem+'.zip'
+    with zipfile.ZipFile(downloads/zip_name,'w',zipfile.ZIP_DEFLATED,compresslevel=9)as z:
         for name,data in contents.items():
             entry=zipfile.ZipInfo(name,(2026,11,2,0,0,0));entry.compress_type=zipfile.ZIP_DEFLATED;entry.external_attr=0o100644<<16;z.writestr(entry,data)
-    print(json.dumps({n:{'bytes':(downloads/n).stat().st_size,'sha256':hashlib.sha256((downloads/n).read_bytes()).hexdigest()}for n in ['Backseat_Rally_Expedition.rbxlx','Backseat_Rally_Expansion.rbxmx','DM_Backseat_Rally.zip']+extras+aliases},indent=2))
+    print(json.dumps({n:{'bytes':(downloads/n).stat().st_size,'sha256':hashlib.sha256((downloads/n).read_bytes()).hexdigest()}for n in ['Backseat_Rally_Expedition.rbxlx','Backseat_Rally_Expansion.rbxmx',standalone,standalone_binary,zip_name]+extras+aliases},indent=2))
 if __name__=='__main__':main()

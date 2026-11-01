@@ -4,10 +4,18 @@ local HttpService=game:GetService('HttpService')
 local P={};P.__index=P
 local function fresh()return {version=1,xp=0,records={},bests={},applied={}}end
 function P.new(config)
- return setmetatable({config=config,profiles=DataStoreService:GetDataStore('BRExpeditionProfiles_v1'),
-  replays=DataStoreService:GetDataStore('BRExpeditionReplays_v1'),users={},cache={},order={},status={},warned=false},P)
+ local self=setmetatable({config=config,users={},cache={},order={},status={},warned=false},P)
+ -- Opening a downloaded place is valid. Storage must never abort server startup.
+ if game.GameId~=0 then
+  local ok,profiles,replays=pcall(function()
+   return DataStoreService:GetDataStore('BRExpeditionProfiles_v1'),DataStoreService:GetDataStore('BRExpeditionReplays_v1')
+  end)
+  if ok then self.profiles=profiles;self.replays=replays end
+ end
+ return self
 end
 function P:request(store,method,key,value)
+ if not store then return false,'Session only'end
  local last
  for attempt=1,3 do
   local ok,result=pcall(function()
@@ -24,6 +32,9 @@ end
 function P:load(userId)
  if self.users[userId]then return self.users[userId]end
  local profile=fresh();profile.loading=true;self.users[userId]=profile;self.status[userId]='Loading save…'
+ if not self.profiles then
+  profile.loading=false;self.status[userId]='Session only · ready to drive';return profile
+ end
  task.spawn(function()
   local ok,data=self:request(self.profiles,'GetAsync','u:'..userId)
   if ok and type(data)=='table'and data.version==1 then
@@ -95,7 +106,7 @@ function P:finish(record,reward,notify)
    local profile=self:load(userId)
    add(profile,meta,reward,self.config)
    local savedProfile
-   local ok=pcall(function()
+   local ok=self.profiles and pcall(function()
     savedProfile=self.profiles:UpdateAsync('u:'..userId,function(old)
      old=type(old)=='table'and old.version==1 and old or fresh()
      return add(old,meta,reward,self.config,true)
@@ -110,8 +121,9 @@ function P:finish(record,reward,notify)
     for _,r in ipairs(profile.bests)do if not r.saved and not courses[r.course]then table.insert(savedProfile.bests,r);courses[r.course]=true end end
     while #savedProfile.bests>self.config.BestSize do table.remove(savedProfile.bests)end
     self.users[userId]=savedProfile
+   elseif not self.profiles then meta.saved=false;meta.storage='Session only'
    elseif not ok then meta.saved=false;meta.storage='Session only · save index unconfirmed'end
-   self.status[userId]=(meta.saved and ok)and 'Cloud save ready'or 'Session only · save was not confirmed'
+   self.status[userId]=(meta.saved and ok)and 'Cloud save ready'or(not self.profiles and 'Session only · replay ready'or 'Session only · save was not confirmed')
    if notify then notify(userId,meta,self.status[userId])end
   end
   record.done=true

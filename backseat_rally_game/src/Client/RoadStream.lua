@@ -47,7 +47,7 @@ function Stream:decor(model,index)
   local p=route:point(z);local side=i%2==0 and 1 or -1;local x=p.x+side*(p.width/2+20+Route.random(route.seed,i+index*33)*65)
   local at=Vector3.new(x,p.y-2,z)+offset
   local height=8+Route.random(route.seed,i*71+index)*10
-  local template=biome.trees and #templates>0 and self.quality~='low'and templates[(i-1)%#templates+1]
+  local template=C.ImportedVisuals and biome.trees and #templates>0 and self.quality~='low'and templates[(i-1)%#templates+1]
   if template and Loader.ready(template)then
    local prop=template:Clone();prop.Parent=model;prop:PivotTo(CFrame.new(at)*CFrame.Angles(0,r*6,0))
    coroutine.yield()

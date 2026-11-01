@@ -236,7 +236,7 @@ function Assets.park(parent)
  local ground=Assets.part(parent,'Service park',Vector3.new(160,2,150),CFrame.new(0,-1,0),{.21,.25,.22},Enum.Material.Asphalt)
  ground.CanCollide=true;ground.CanQuery=true
  for i,car in ipairs(require(script.Parent.Config).Cars)do
-  local visual=Assets.car(parent,car,false,true)
+  local visual=Assets.car(parent,car,false,require(script.Parent.Config).ImportedVisuals)
   visual.model:PivotTo(CFrame.new((i-2)*20,2.2,-12)*CFrame.Angles(0,math.pi,0))
  end
  Assets.part(parent,'Workshop',Vector3.new(64,14,22),CFrame.new(0,7,-42),{.24,.30,.29},Enum.Material.WoodPlanks)
@@ -260,7 +260,7 @@ return Assets
             <string name="Name">Config</string>
             <ProtectedString name="Source">-- Backseat Rally: Expedition. Authored game systems, not an executor script.
 return {
- Version='1.1.1', AutoOpen=true, Generation=1, WorldX=100000, LaneSpacing=1800, StudMetres=.28, Step=1/60, StateRate=12, InputRate=20,
+ Version='1.2.0', AutoOpen=true, ImportedVisuals=false, ExternalAudio=false, Generation=1, WorldX=100000, LaneSpacing=1800, StudMetres=.28, Step=1/60, StateRate=12, InputRate=20,
  Chunk=256, RoadStep=16, RoadWidth=28, Checkpoint=768, MaxPlayers=8,
  ReplayRate=10, ReplayPage=500, ReplayPending=4, LibrarySize=12, BestSize=8,
  Modes={
@@ -634,7 +634,7 @@ local function start(player,data)
  if runs[player]or viewing[player]then return end
  local car=getCar(data.car);local profile=storage:load(player.UserId)
  if profile.xp&lt;car.unlock then tell(player,'notice','This car unlocks at '..car.unlock..' XP.');return end
- if profile.loading then tell(player,'notice','Loading your garage save; try again in a moment.');return end
+ if profile.loading and car.unlock&gt;0 then tell(player,'notice','Loading your unlocked cars; try again in a moment.');return end
  local numeric=tonumber(data.seed);if not numeric or numeric~=numeric or math.abs(numeric)&gt;1e12 then numeric=math.random(1,999999999)end
  local mode=getMode(data.mode);local seed=math.floor(numeric)%1000000000
  if mode.id=='daily'then seed=math.floor(os.time()/86400)end
@@ -649,6 +649,8 @@ local function start(player,data)
  for _,best in ipairs(profile.bests)do if best.course==run.record.meta.course then run.ghost=best;break end end
  local model=Instance.new('Model');model.Name='Rally_'..player.UserId
  local body=Instance.new('Part');body.Name='Root';body.Size=Vector3.new(6,2,10);body.Transparency=1;body.Anchored=true;body.CanCollide=false;body.Parent=model;model.PrimaryPart=body
+ local serverVisual=Assets.car(model,car,false,false,false);serverVisual.model.Name='NativeCar';run.serverVisual=serverVisual
+ model:SetAttribute('ExpeditionCar',true)
  for i,name in ipairs({'Driver','CoDriver'})do
   local seat=Instance.new('Seat');seat.Name=name;seat.Size=Vector3.new(2,1,2);seat.Transparency=1;seat.Anchored=true;seat.CanCollide=false
   seat.CFrame=CFrame.new(i==1 and -1.3 or 1.3,.25,0);seat.Parent=model
@@ -741,7 +743,7 @@ RunService.Heartbeat:Connect(function(dt)
  if network&gt;=1/C.StateRate then
   network=0;local list={}
   for _,run in pairs(runs)do
-   run.model:PivotTo(worldFrame(run));list[#list+1]=packet(run)
+   run.model:PivotTo(worldFrame(run));Assets.pose(run.serverVisual,run.s,run.route,origin(run),1/C.StateRate);list[#list+1]=packet(run)
    if not run.model.Driver.Occupant and os.clock()-run.created&gt;2 then seatPlayer(run.player,run.model.Driver)end
   end
   if #list&gt;0 then stateEvent:FireAllClients({time=Workspace:GetServerTimeNow(),runs=list})end
@@ -761,9 +763,11 @@ game:BindToClose(function()
 end)
 -- Reuse visual templates in the expansion namespace without changing the source assets.
 task.spawn(function()
+ if not C.ImportedVisuals and not C.ExternalAudio then return end
  local ok,reason=pcall(function()require(root.Shared.ImportAssets).harvest(root)end)
  if not ok then warn('Optional original visual templates unavailable: '..tostring(reason))end
 end)
+root:SetAttribute('ServerReady',true)
 </ProtectedString>
           <bool name="Disabled">false</bool>
         </Properties>
@@ -777,10 +781,18 @@ local HttpService=game:GetService('HttpService')
 local P={};P.__index=P
 local function fresh()return {version=1,xp=0,records={},bests={},applied={}}end
 function P.new(config)
- return setmetatable({config=config,profiles=DataStoreService:GetDataStore('BRExpeditionProfiles_v1'),
-  replays=DataStoreService:GetDataStore('BRExpeditionReplays_v1'),users={},cache={},order={},status={},warned=false},P)
+ local self=setmetatable({config=config,users={},cache={},order={},status={},warned=false},P)
+ -- Opening a downloaded place is valid. Storage must never abort server startup.
+ if game.GameId~=0 then
+  local ok,profiles,replays=pcall(function()
+   return DataStoreService:GetDataStore('BRExpeditionProfiles_v1'),DataStoreService:GetDataStore('BRExpeditionReplays_v1')
+  end)
+  if ok then self.profiles=profiles;self.replays=replays end
+ end
+ return self
 end
 function P:request(store,method,key,value)
+ if not store then return false,'Session only'end
  local last
  for attempt=1,3 do
   local ok,result=pcall(function()
@@ -797,6 +809,9 @@ end
 function P:load(userId)
  if self.users[userId]then return self.users[userId]end
  local profile=fresh();profile.loading=true;self.users[userId]=profile;self.status[userId]='Loading save…'
+ if not self.profiles then
+  profile.loading=false;self.status[userId]='Session only · ready to drive';return profile
+ end
  task.spawn(function()
   local ok,data=self:request(self.profiles,'GetAsync','u:'..userId)
   if ok and type(data)=='table'and data.version==1 then
@@ -868,7 +883,7 @@ function P:finish(record,reward,notify)
    local profile=self:load(userId)
    add(profile,meta,reward,self.config)
    local savedProfile
-   local ok=pcall(function()
+   local ok=self.profiles and pcall(function()
     savedProfile=self.profiles:UpdateAsync('u:'..userId,function(old)
      old=type(old)=='table'and old.version==1 and old or fresh()
      return add(old,meta,reward,self.config,true)
@@ -883,8 +898,9 @@ function P:finish(record,reward,notify)
     for _,r in ipairs(profile.bests)do if not r.saved and not courses[r.course]then table.insert(savedProfile.bests,r);courses[r.course]=true end end
     while #savedProfile.bests&gt;self.config.BestSize do table.remove(savedProfile.bests)end
     self.users[userId]=savedProfile
+   elseif not self.profiles then meta.saved=false;meta.storage='Session only'
    elseif not ok then meta.saved=false;meta.storage='Session only · save index unconfirmed'end
-   self.status[userId]=(meta.saved and ok)and 'Cloud save ready'or 'Session only · save was not confirmed'
+   self.status[userId]=(meta.saved and ok)and 'Cloud save ready'or(not self.profiles and 'Session only · replay ready'or 'Session only · save was not confirmed')
    if notify then notify(userId,meta,self.status[userId])end
   end
   record.done=true
@@ -955,8 +971,9 @@ local held={};local gamepad={steer=0,throttle=0,brake=0};local seq=0;local sent=
 local cameraMode=1;local cameraNames={'CHASE','HOOD','ORBIT','FREE'};local orbitAngle,orbitPitch,orbitDistance=0,.35,20
 local freeFrame;local readySent=false;local noticeUntil=0;local lastFrame;local clockAt,clockValue=0,0
 local correction;local countdownUntil;local ui;local presence;local menuPark;local closing=false
+local serverParts={};local pendingStart=false;local startSerial=0
 local openExpansion,closeExpansion
-local function notice(text,seconds)if ui then ui.message.Text=tostring(text);noticeUntil=os.clock()+(seconds or 3)end end
+local function notice(text,seconds)if ui then ui.message.Text=tostring(text);ui.menuMessage.Text=tostring(text);noticeUntil=os.clock()+(seconds or 3)end end
 local function invoke(kind,data)
  local ok,response=pcall(function()return remotes.Request:InvokeServer(kind,data)end)
  if not ok then return {error='Connection interrupted; try again'}end
@@ -969,6 +986,7 @@ local function controls()
   brake=held.brake and not reversing and 1 or gamepad.brake,steer=held.left and -1 or (held.right and 1 or gamepad.steer),handbrake=held.handbrake==true}
 end
 local function clearScene()
+ for part,old in pairs(serverParts)do if part.Parent then part.LocalTransparencyModifier=old end end;serverParts={}
  if ghostPlayer then ghostPlayer:destroy();ghostPlayer=nil end
  if replayPlayer then replayPlayer:destroy();replayPlayer=nil end
  if stream then stream:destroy();stream=nil end
@@ -997,7 +1015,7 @@ local function setup(metadata,initial)
  clearScene();run=metadata;route=Route.new(metadata.seed,metadata.length,C)
  scene=Instance.new('Folder');scene.Name='ExpeditionLocal';scene.Parent=workspace
  stream=RoadStream.new(scene);stream.quality=ui.quality;stream:reset(route,metadata.slot or 1,metadata.originZ or 0)
- visual=Assets.car(scene,getCar(metadata.car),false,ui.quality~='low',true)
+ visual=Assets.car(scene,getCar(metadata.car),false,C.ImportedVisuals and ui.quality~='low',C.ExternalAudio)
  predicted=initial or D.new(route);readySent=false;accumulator=0;cameraMode=1;roadAt=0
  workspace.CurrentCamera.CameraType=Enum.CameraType.Scriptable;workspace.CurrentCamera.FieldOfView=72
  presence:time(metadata.mode=='daily'and 18.15 or 15.8)
@@ -1027,9 +1045,14 @@ ui=UI.new({
   if mode=='drive'then closing=true;remotes.Action:FireServer(run and run.owner~=player.UserId and 'leave'or 'retire');notice('Saving the run…')else closeExpansion()end
  end,
  start=function(modeId,carId,seed)
-  if mode=='drive'then return end
+  if mode=='drive'or pendingStart then return end
   if mode=='replay'then clearScene();mode='menu'end
-  remotes.Action:FireServer('start',{mode=modeId,car=carId,seed=seed});notice('Preparing your road…',2)
+  pendingStart=true;startSerial+=1;local serial=startSerial;ui.startButton.Text='STARTING…'
+  notice('Preparing your car and road…',8)
+  remotes.Action:FireServer('start',{mode=modeId,car=carId,seed=seed})
+  task.delay(8,function()if pendingStart and startSerial==serial then
+   pendingStart=false;ui.startButton.Text='TAKE THE ROAD →';notice('Unable to start the run. Please try again.',8)
+  end end)
  end,
  library=function()task.spawn(function()local data=invoke('library');if data.error then notice(data.error)else ui:library(data)end end)end,
  lobby=refreshLobby,quality=setQuality,
@@ -1061,6 +1084,15 @@ closeExpansion=function()
  presence:close()
 end
 local keyMap={W='throttle',S='brake',A='left',D='right',Space='handbrake',Down='reverse',Up='throttle',Left='left',Right='right'}
+presence.input=function(input,state)
+ if mode~='drive'and mode~='replay'then return end
+ local ended=state==Enum.UserInputState.End or state==Enum.UserInputState.Cancel
+ local key=keyMap[input.KeyCode.Name]
+ if key then held[key]=not ended
+ elseif input.KeyCode==Enum.KeyCode.Thumbstick1 then gamepad.steer=ended and 0 or input.Position.X
+ elseif input.KeyCode==Enum.KeyCode.ButtonR2 then gamepad.throttle=ended and 0 or input.Position.Z
+ elseif input.KeyCode==Enum.KeyCode.ButtonL2 then gamepad.brake=ended and 0 or input.Position.Z end
+end
 UIS.InputBegan:Connect(function(input,processed)
  if mode=='closed'or processed or UIS:GetFocusedTextBox()then return end
  local name=input.KeyCode.Name
@@ -1088,11 +1120,12 @@ end)
 UIS.WindowFocusReleased:Connect(function()held={};gamepad={steer=0,throttle=0,brake=0}end)
 remotes.Action.OnClientEvent:Connect(function(kind,data)
  if kind=='start'then
+  pendingStart=false;ui.startButton.Text='TAKE THE ROAD →'
   if not presence.active then openExpansion()end
   mode='drive';setup(data,D.copy(data.s));clockAt=os.clock();clockValue=data.clock;ui:show('drive');notice('Building the road ahead…',10);loadGhost(data.ghost)
  elseif kind=='countdown'then countdownUntil=os.clock()+3;notice('3 · get ready',3)
  elseif kind=='go'then countdownUntil=nil;if run then run.status='running'end;notice('GO · make it a good one',1.5)
- elseif kind=='notice'then notice(data)
+ elseif kind=='notice'then pendingStart=false;ui.startButton.Text='TAKE THE ROAD →';notice(data)
  elseif kind=='checkpoint'then notice('CHECKPOINT / '..UI.time(data.time),1.6)
  elseif kind=='result'then
   if closing then closeExpansion()else clearScene();mode='result';run=nil;menuCamera();ui:resultScreen(data)end
@@ -1152,7 +1185,7 @@ RunService.RenderStepped:Connect(function(dt)
  if mode=='closed'then return end
  ui:resize()
  if countdownUntil and os.clock()&lt;countdownUntil then ui.message.Text=tostring(math.ceil(countdownUntil-os.clock()))..' · GET READY'end
- if noticeUntil&gt;0 and os.clock()&gt;noticeUntil then ui.message.Text='';noticeUntil=0 end
+ if noticeUntil&gt;0 and os.clock()&gt;noticeUntil then ui.message.Text='';ui.menuMessage.Text='';noticeUntil=0 end
  if mode~='drive'and mode~='replay'then return end
  if not stream or not predicted then return end
  local input=controls();local speed=getCar(run.car)
@@ -1189,7 +1222,15 @@ RunService.RenderStepped:Connect(function(dt)
   end
  end
  roadAt+=dt
- if roadAt&gt;.10 then roadAt=0;stream:update(predicted.z)end
+ if roadAt&gt;.10 then
+  roadAt=0;stream:update(predicted.z)
+  if mode=='drive'and run then
+   local car=workspace:FindFirstChild('Rally_'..run.owner)
+   if car then for _,part in ipairs(car:GetDescendants())do if part:IsA('BasePart')and serverParts[part]==nil then
+    serverParts[part]=part.LocalTransparencyModifier;part.LocalTransparencyModifier=1
+   end end end
+  end
+ end
  stream:work(.0025)
  if mode=='drive'and not readySent and run.owner==player.UserId and stream:ready(predicted.z)then readySent=true;remotes.Action:FireServer('ready')end
  local cf=Assets.pose(visual,predicted,route,stream:offset(),dt*(mode=='replay'and (replayPaused and 0 or replayRate)or 1))
@@ -1232,6 +1273,7 @@ local Players=game:GetService('Players')
 local Lighting=game:GetService('Lighting')
 local RunService=game:GetService('RunService')
 local Context=game:GetService('ContextActionService')
+local UIS=game:GetService('UserInputService')
 local Presence={};Presence.__index=Presence
 local daylight={ClockTime=15.8,Brightness=2.2,Ambient=Color3.fromRGB(114,122,114),
  OutdoorAmbient=Color3.fromRGB(148,155,144),FogStart=800,FogEnd=6000,FogColor=Color3.fromRGB(195,213,219)}
@@ -1272,9 +1314,13 @@ function Presence:open()
  local pg=Players.LocalPlayer:WaitForChild('PlayerGui')
  for _,screen in ipairs(pg:GetChildren())do self:hide(screen)end
  self.connections[#self.connections+1]=pg.ChildAdded:Connect(function(screen)self:hide(screen)end)
- Context:BindActionAtPriority('ExpeditionControls',function()return Enum.ContextActionResult.Sink end,false,4000,
-  Enum.PlayerActions.CharacterForward,Enum.PlayerActions.CharacterBackward,Enum.PlayerActions.CharacterLeft,
-  Enum.PlayerActions.CharacterRight,Enum.PlayerActions.CharacterJump)
+ Context:BindActionAtPriority('ExpeditionControls',function(_,state,input)
+  if UIS:GetFocusedTextBox()and state~=Enum.UserInputState.End and state~=Enum.UserInputState.Cancel then return Enum.ContextActionResult.Pass end
+  if self.input then self.input(input,state)end
+  return Enum.ContextActionResult.Sink
+ end,false,4000,Enum.KeyCode.W,Enum.KeyCode.S,Enum.KeyCode.A,Enum.KeyCode.D,Enum.KeyCode.Space,
+  Enum.KeyCode.Up,Enum.KeyCode.Down,Enum.KeyCode.Left,Enum.KeyCode.Right,
+  Enum.KeyCode.Thumbstick1,Enum.KeyCode.ButtonR2,Enum.KeyCode.ButtonL2)
  RunService:BindToRenderStep('ExpeditionCamera',Enum.RenderPriority.Last.Value,function()
   if self.active then for object,entry in pairs(self.environment)do
    if object==Lighting or object.Parent then for property,value in pairs(entry.after)do
@@ -1415,7 +1461,7 @@ function Stream:decor(model,index)
   local p=route:point(z);local side=i%2==0 and 1 or -1;local x=p.x+side*(p.width/2+20+Route.random(route.seed,i+index*33)*65)
   local at=Vector3.new(x,p.y-2,z)+offset
   local height=8+Route.random(route.seed,i*71+index)*10
-  local template=biome.trees and #templates&gt;0 and self.quality~='low'and templates[(i-1)%#templates+1]
+  local template=C.ImportedVisuals and biome.trees and #templates&gt;0 and self.quality~='low'and templates[(i-1)%#templates+1]
   if template and Loader.ready(template)then
    local prop=template:Clone();prop.Parent=model;prop:PivotTo(CFrame.new(at)*CFrame.Angles(0,r*6,0))
    coroutine.yield()
@@ -1580,7 +1626,8 @@ function UI.new(callbacks)
  self.carDescription=label(menu,'',36,549,625,28,13,palette.muted)
  local seed=Instance.new('TextBox');seed.Name='CourseSeed';seed.Position=UDim2.fromOffset(36,600);seed.Size=UDim2.fromOffset(155,42)
  seed.Text='';seed.PlaceholderText='Seed · random';seed.ClearTextOnFocus=false;seed.TextColor3=palette.light;seed.PlaceholderColor3=palette.muted;seed.BackgroundColor3=palette.card;seed.TextSize=14;seed.Font=Enum.Font.Gotham;seed.Parent=menu;self.seed=seed
- button(menu,'TAKE THE ROAD →',205,600,269,42,function()callbacks.start(self.mode.id,self.car.id,tonumber(seed.Text))end,true)
+ self.startButton=button(menu,'TAKE THE ROAD →',205,600,269,42,function()callbacks.start(self.mode.id,self.car.id,tonumber(seed.Text))end,true)
+ self.menuMessage=label(menu,'',36,650,640,24,14,palette.gold)
  button(menu,'REPLAY LIBRARY',489,600,165,42,function()callbacks.library()end)
  local side=frame(menu,'Roadbook',708,75,438,566,palette.card)
  label(side,'ROADBOOK / NEXT DEPARTURE',24,21,390,25,12,palette.gold)

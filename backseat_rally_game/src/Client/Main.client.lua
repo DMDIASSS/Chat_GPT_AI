@@ -9,8 +9,9 @@ local held={};local gamepad={steer=0,throttle=0,brake=0};local seq=0;local sent=
 local cameraMode=1;local cameraNames={'CHASE','HOOD','ORBIT','FREE'};local orbitAngle,orbitPitch,orbitDistance=0,.35,20
 local freeFrame;local readySent=false;local noticeUntil=0;local lastFrame;local clockAt,clockValue=0,0
 local correction;local countdownUntil;local ui;local presence;local menuPark;local closing=false
+local serverParts={};local pendingStart=false;local startSerial=0
 local openExpansion,closeExpansion
-local function notice(text,seconds)if ui then ui.message.Text=tostring(text);noticeUntil=os.clock()+(seconds or 3)end end
+local function notice(text,seconds)if ui then ui.message.Text=tostring(text);ui.menuMessage.Text=tostring(text);noticeUntil=os.clock()+(seconds or 3)end end
 local function invoke(kind,data)
  local ok,response=pcall(function()return remotes.Request:InvokeServer(kind,data)end)
  if not ok then return {error='Connection interrupted; try again'}end
@@ -23,6 +24,7 @@ local function controls()
   brake=held.brake and not reversing and 1 or gamepad.brake,steer=held.left and -1 or (held.right and 1 or gamepad.steer),handbrake=held.handbrake==true}
 end
 local function clearScene()
+ for part,old in pairs(serverParts)do if part.Parent then part.LocalTransparencyModifier=old end end;serverParts={}
  if ghostPlayer then ghostPlayer:destroy();ghostPlayer=nil end
  if replayPlayer then replayPlayer:destroy();replayPlayer=nil end
  if stream then stream:destroy();stream=nil end
@@ -51,7 +53,7 @@ local function setup(metadata,initial)
  clearScene();run=metadata;route=Route.new(metadata.seed,metadata.length,C)
  scene=Instance.new('Folder');scene.Name='ExpeditionLocal';scene.Parent=workspace
  stream=RoadStream.new(scene);stream.quality=ui.quality;stream:reset(route,metadata.slot or 1,metadata.originZ or 0)
- visual=Assets.car(scene,getCar(metadata.car),false,ui.quality~='low',true)
+ visual=Assets.car(scene,getCar(metadata.car),false,C.ImportedVisuals and ui.quality~='low',C.ExternalAudio)
  predicted=initial or D.new(route);readySent=false;accumulator=0;cameraMode=1;roadAt=0
  workspace.CurrentCamera.CameraType=Enum.CameraType.Scriptable;workspace.CurrentCamera.FieldOfView=72
  presence:time(metadata.mode=='daily'and 18.15 or 15.8)
@@ -81,9 +83,14 @@ ui=UI.new({
   if mode=='drive'then closing=true;remotes.Action:FireServer(run and run.owner~=player.UserId and 'leave'or 'retire');notice('Saving the run…')else closeExpansion()end
  end,
  start=function(modeId,carId,seed)
-  if mode=='drive'then return end
+  if mode=='drive'or pendingStart then return end
   if mode=='replay'then clearScene();mode='menu'end
-  remotes.Action:FireServer('start',{mode=modeId,car=carId,seed=seed});notice('Preparing your road…',2)
+  pendingStart=true;startSerial+=1;local serial=startSerial;ui.startButton.Text='STARTING…'
+  notice('Preparing your car and road…',8)
+  remotes.Action:FireServer('start',{mode=modeId,car=carId,seed=seed})
+  task.delay(8,function()if pendingStart and startSerial==serial then
+   pendingStart=false;ui.startButton.Text='TAKE THE ROAD →';notice('Unable to start the run. Please try again.',8)
+  end end)
  end,
  library=function()task.spawn(function()local data=invoke('library');if data.error then notice(data.error)else ui:library(data)end end)end,
  lobby=refreshLobby,quality=setQuality,
@@ -115,6 +122,15 @@ closeExpansion=function()
  presence:close()
 end
 local keyMap={W='throttle',S='brake',A='left',D='right',Space='handbrake',Down='reverse',Up='throttle',Left='left',Right='right'}
+presence.input=function(input,state)
+ if mode~='drive'and mode~='replay'then return end
+ local ended=state==Enum.UserInputState.End or state==Enum.UserInputState.Cancel
+ local key=keyMap[input.KeyCode.Name]
+ if key then held[key]=not ended
+ elseif input.KeyCode==Enum.KeyCode.Thumbstick1 then gamepad.steer=ended and 0 or input.Position.X
+ elseif input.KeyCode==Enum.KeyCode.ButtonR2 then gamepad.throttle=ended and 0 or input.Position.Z
+ elseif input.KeyCode==Enum.KeyCode.ButtonL2 then gamepad.brake=ended and 0 or input.Position.Z end
+end
 UIS.InputBegan:Connect(function(input,processed)
  if mode=='closed'or processed or UIS:GetFocusedTextBox()then return end
  local name=input.KeyCode.Name
@@ -142,11 +158,12 @@ end)
 UIS.WindowFocusReleased:Connect(function()held={};gamepad={steer=0,throttle=0,brake=0}end)
 remotes.Action.OnClientEvent:Connect(function(kind,data)
  if kind=='start'then
+  pendingStart=false;ui.startButton.Text='TAKE THE ROAD →'
   if not presence.active then openExpansion()end
   mode='drive';setup(data,D.copy(data.s));clockAt=os.clock();clockValue=data.clock;ui:show('drive');notice('Building the road ahead…',10);loadGhost(data.ghost)
  elseif kind=='countdown'then countdownUntil=os.clock()+3;notice('3 · get ready',3)
  elseif kind=='go'then countdownUntil=nil;if run then run.status='running'end;notice('GO · make it a good one',1.5)
- elseif kind=='notice'then notice(data)
+ elseif kind=='notice'then pendingStart=false;ui.startButton.Text='TAKE THE ROAD →';notice(data)
  elseif kind=='checkpoint'then notice('CHECKPOINT / '..UI.time(data.time),1.6)
  elseif kind=='result'then
   if closing then closeExpansion()else clearScene();mode='result';run=nil;menuCamera();ui:resultScreen(data)end
@@ -206,7 +223,7 @@ RunService.RenderStepped:Connect(function(dt)
  if mode=='closed'then return end
  ui:resize()
  if countdownUntil and os.clock()<countdownUntil then ui.message.Text=tostring(math.ceil(countdownUntil-os.clock()))..' · GET READY'end
- if noticeUntil>0 and os.clock()>noticeUntil then ui.message.Text='';noticeUntil=0 end
+ if noticeUntil>0 and os.clock()>noticeUntil then ui.message.Text='';ui.menuMessage.Text='';noticeUntil=0 end
  if mode~='drive'and mode~='replay'then return end
  if not stream or not predicted then return end
  local input=controls();local speed=getCar(run.car)
@@ -243,7 +260,15 @@ RunService.RenderStepped:Connect(function(dt)
   end
  end
  roadAt+=dt
- if roadAt>.10 then roadAt=0;stream:update(predicted.z)end
+ if roadAt>.10 then
+  roadAt=0;stream:update(predicted.z)
+  if mode=='drive'and run then
+   local car=workspace:FindFirstChild('Rally_'..run.owner)
+   if car then for _,part in ipairs(car:GetDescendants())do if part:IsA('BasePart')and serverParts[part]==nil then
+    serverParts[part]=part.LocalTransparencyModifier;part.LocalTransparencyModifier=1
+   end end end
+  end
+ end
  stream:work(.0025)
  if mode=='drive'and not readySent and run.owner==player.UserId and stream:ready(predicted.z)then readySent=true;remotes.Action:FireServer('ready')end
  local cf=Assets.pose(visual,predicted,route,stream:offset(),dt*(mode=='replay'and (replayPaused and 0 or replayRate)or 1))

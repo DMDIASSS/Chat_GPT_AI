@@ -140,14 +140,14 @@ def add_expansion(data: bytes, src: Path):
         nodes.append(node)
         return node["ref"]
 
-    def service(name, parent=-1):
+    def service(name, parent=-1, is_service=True):
         ref = original.service(name)
-        return ref if ref is not None else add(name, name, parent, service=True)
+        return ref if ref is not None else add(name, name, parent, service=is_service)
 
     rs = service("ReplicatedStorage")
     sss = service("ServerScriptService")
     sp = service("StarterPlayer")
-    sps = service("StarterPlayerScripts", sp)
+    sps = service("StarterPlayerScripts", sp, is_service=False)
     shared = add("Folder", "BackseatExpedition", rs)
     shared_modules = add("Folder", "Shared", shared)
     remotes = add("Folder", "Remotes", shared)
@@ -224,3 +224,46 @@ def verify_addition(before, after):
         "original_parent_relationships_unchanged": True,
         "existing_scripts_disabled_moved_or_deleted": 0,
     }
+
+
+def standalone_base():
+    """Small native floor and spawn point; no imported scripts or asset references."""
+    def number(value):
+        bits = struct.unpack('<I', struct.pack('<f', value))[0]
+        return struct.pack('>I', ((bits << 1) | (bits >> 31)) & 0xFFFFFFFF)
+
+    def vector(x, y, z):
+        return number(x) + number(y) + number(z)
+
+    def frame(x, y, z):
+        return b'\x00' + struct.pack('<9f', 1, 0, 0, 0, 1, 0, 0, 0, 1) + vector(x, y, z)
+
+    blocks = []
+    for cid, cls, name, ref, is_service in (
+        (0, 'Workspace', 'Workspace', 0, True),
+        (1, 'Part', 'PreviewFloor', 1, False),
+        (2, 'SpawnLocation', 'PreviewSpawn', 2, False),
+    ):
+        payload = u32(cid) + string(cls) + bytes([is_service]) + u32(1) + references([ref])
+        if is_service:
+            payload += b'\x01'
+        blocks.append(chunk(b'INST', payload))
+        blocks.append(chunk(b'PROP', u32(cid) + string('Name') + b'\x01' + string(name)))
+
+    def prop(cid, name, kind, value):
+        blocks.append(chunk(b'PROP', u32(cid) + string(name) + bytes([kind]) + value))
+
+    prop(0, 'StreamingEnabled', 2, b'\x01')
+    prop(0, 'Gravity', 4, number(130))
+    for cid in (1, 2):
+        prop(cid, 'Anchored', 2, b'\x01')
+        prop(cid, 'CanCollide', 2, b'\x01')
+    prop(1, 'size', 14, vector(160, 2, 150))
+    prop(1, 'CFrame', 16, frame(0, -1, 0))
+    prop(2, 'size', 14, vector(10, 1, 8))
+    prop(2, 'CFrame', 16, frame(0, .5, 18))
+    prop(2, 'Transparency', 4, number(1))
+    prop(2, 'Neutral', 2, b'\x01')
+    blocks.append(chunk(b'PRNT', b'\x00' + u32(3) + references([0, 1, 2]) + references([-1, 0, 0])))
+    blocks.append(chunk(b'END\x00', b'</roblox>'))
+    return MAGIC + b'\x00\x00' + u32(3) + u32(3) + bytes(8) + b''.join(blocks)

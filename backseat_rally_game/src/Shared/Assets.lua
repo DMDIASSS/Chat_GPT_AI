@@ -105,7 +105,7 @@ function Assets.park(parent)
  local ground=Assets.part(parent,'Service park',Vector3.new(160,2,150),CFrame.new(0,-1,0),{.21,.25,.22},Enum.Material.Asphalt)
  ground.CanCollide=true;ground.CanQuery=true
  for i,car in ipairs(require(script.Parent.Config).Cars)do
-  local visual=Assets.car(parent,car,false,true)
+  local visual=Assets.car(parent,car,false,require(script.Parent.Config).ImportedVisuals)
   visual.model:PivotTo(CFrame.new((i-2)*20,2.2,-12)*CFrame.Angles(0,math.pi,0))
  end
  Assets.part(parent,'Workshop',Vector3.new(64,14,22),CFrame.new(0,7,-42),{.24,.30,.29},Enum.Material.WoodPlanks)

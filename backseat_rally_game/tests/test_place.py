@@ -75,6 +75,23 @@ class PlaceTests(unittest.TestCase):
         with self.assertRaises((ValueError, AssertionError, struct.error, UnicodeError)):
             verify_addition(base, bad)
 
+    def test_clean_standalone_has_native_floor_correct_script_container_and_no_imported_assets(self):
+        path=next((APP.parent/'downloads').glob('DM_Rally_Standalone_v1.2.0.rbxl'))
+        standalone=Place(path.read_bytes())
+        classes={ref:cls for cls,refs,_ in standalone.classes.values()for ref in refs}
+        self.assertNotIn('MeshPart',classes.values())
+        self.assertNotIn('SpecialMesh',classes.values())
+        self.assertNotIn('Sound',classes.values())
+        self.assertEqual(list(classes.values()).count('Script'),1)
+        self.assertEqual(list(classes.values()).count('LocalScript'),1)
+        player=standalone.service('StarterPlayer')
+        scripts=standalone.service('StarterPlayerScripts')
+        self.assertEqual(standalone.parent_map[scripts],player)
+        container=next(row for row in standalone.classes.values()if row[0]=='StarterPlayerScripts')
+        self.assertFalse(container[2],'StarterPlayerScripts must be a child container, not a GetService request')
+        self.assertIn('PreviewFloor',standalone.names.values())
+        self.assertIn('PreviewSpawn',standalone.names.values())
+
 
 if __name__ == '__main__':
     unittest.main()
