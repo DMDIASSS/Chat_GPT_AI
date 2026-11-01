@@ -1,0 +1,150 @@
+{
+  "base_sha256": "be6b8add4aff71085492872588a7440427438bbec01710e1d2b3a61dad90ef93",
+  "result_sha256": "93945196ad31297a497e340e3577cd4b988f6ce26609873c066f89ef5475f96e",
+  "original_instances": 82861,
+  "result_instances": 82884,
+  "added_instances": 23,
+  "original_class_and_property_chunks_byte_identical": true,
+  "original_parent_relationships_unchanged": true,
+  "existing_scripts_disabled_moved_or_deleted": 0,
+  "added_objects": [
+    {
+      "ref": 82861,
+      "cls": "ServerScriptService",
+      "name": "ServerScriptService",
+      "parent": -1
+    },
+    {
+      "ref": 82862,
+      "cls": "Folder",
+      "name": "BackseatExpedition",
+      "parent": 46390
+    },
+    {
+      "ref": 82863,
+      "cls": "Folder",
+      "name": "Shared",
+      "parent": 82862
+    },
+    {
+      "ref": 82864,
+      "cls": "Folder",
+      "name": "Remotes",
+      "parent": 82862
+    },
+    {
+      "ref": 82865,
+      "cls": "RemoteEvent",
+      "name": "Action",
+      "parent": 82864
+    },
+    {
+      "ref": 82866,
+      "cls": "RemoteFunction",
+      "name": "Request",
+      "parent": 82864
+    },
+    {
+      "ref": 82867,
+      "cls": "UnreliableRemoteEvent",
+      "name": "State",
+      "parent": 82864
+    },
+    {
+      "ref": 82868,
+      "cls": "UnreliableRemoteEvent",
+      "name": "Input",
+      "parent": 82864
+    },
+    {
+      "ref": 82869,
+      "cls": "Folder",
+      "name": "BackseatExpeditionServer",
+      "parent": 82861
+    },
+    {
+      "ref": 82870,
+      "cls": "Folder",
+      "name": "BackseatExpeditionClient",
+      "parent": 82160
+    },
+    {
+      "ref": 82871,
+      "cls": "ModuleScript",
+      "name": "Assets",
+      "parent": 82863
+    },
+    {
+      "ref": 82872,
+      "cls": "ModuleScript",
+      "name": "Config",
+      "parent": 82863
+    },
+    {
+      "ref": 82873,
+      "cls": "ModuleScript",
+      "name": "Dynamics",
+      "parent": 82863
+    },
+    {
+      "ref": 82874,
+      "cls": "ModuleScript",
+      "name": "ImportAssets",
+      "parent": 82863
+    },
+    {
+      "ref": 82875,
+      "cls": "ModuleScript",
+      "name": "Replay",
+      "parent": 82863
+    },
+    {
+      "ref": 82876,
+      "cls": "ModuleScript",
+      "name": "Route",
+      "parent": 82863
+    },
+    {
+      "ref": 82877,
+      "cls": "Script",
+      "name": "Main",
+      "parent": 82869
+    },
+    {
+      "ref": 82878,
+      "cls": "ModuleScript",
+      "name": "Persistence",
+      "parent": 82869
+    },
+    {
+      "ref": 82879,
+      "cls": "LocalScript",
+      "name": "Main",
+      "parent": 82870
+    },
+    {
+      "ref": 82880,
+      "cls": "ModuleScript",
+      "name": "Presence",
+      "parent": 82870
+    },
+    {
+      "ref": 82881,
+      "cls": "ModuleScript",
+      "name": "ReplayPlayer",
+      "parent": 82870
+    },
+    {
+      "ref": 82882,
+      "cls": "ModuleScript",
+      "name": "RoadStream",
+      "parent": 82870
+    },
+    {
+      "ref": 82883,
+      "cls": "ModuleScript",
+      "name": "UI",
+      "parent": 82870
+    }
+  ]
+}
