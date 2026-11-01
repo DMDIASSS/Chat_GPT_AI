@@ -1241,7 +1241,7 @@ function Physics:observe(packet,now)
 end
 
 function Physics:report()
-    return {version="local-6.5",profile=self.profile.name,units="simulation units; seconds",
+    return {version="local-6.6",profile=self.profile.name,units="simulation units; seconds",
         studs_per_unit=self.profile.roblox_studs_per_sim_unit,arena=self.profile.arena,
         saved_physics=self.profile.physics,gravity_used=self.gravity,observed_gravity=self.observedGravity,
         gravity_samples=#self.gravitySamples,flight_position_error_median=self.error,
@@ -1594,21 +1594,22 @@ Calibration.steps={
     {'center','Field centre','Place the centre of your car over the centre spot, upright on the floor.'},
     {'orange_a','Orange: first inner post','At the goal line, point your nose sideways into either INNER post face. Touch it and stop.'},
     {'orange_b','Orange: other inner post','Touch the OTHER inner post face with your nose at the goal line. Stop moving.'},
-    {'orange_top','Orange: underside of crossbar','At the middle of the goal mouth, point the nose straight UP and touch the underside of the crossbar.'},
+    {'orange_top','Orange: underside of crossbar','At the middle of the goal mouth, Press F10 to arm, then fly nose-up into the UNDERSIDE at the middle of the mouth. Contact is captured automatically.'},
     {'orange_back','Orange: back of net','Inside the net, face away from midfield. Touch the REAR wall with your nose.'},
     {'blue_a','Blue: first inner post','Touch either INNER post face with your nose, sideways at the goal line.'},
     {'blue_b','Blue: other inner post','Touch the OTHER inner post face with your nose at the goal line.'},
-    {'blue_top','Blue: underside of crossbar','At the middle of the goal mouth, point the nose UP and touch the underside of the crossbar.'},
+    {'blue_top','Blue: underside of crossbar','At the middle of the goal mouth, Press F10 to arm, then fly nose-up into the UNDERSIDE at the middle of the mouth. Contact is captured automatically.'},
     {'blue_back','Blue: back of net','Inside the blue net, face away from midfield and touch the REAR wall with your nose.'}}
 function Calibration.new(profile)
     return setmetatable({profile=profile,points={},index=1,history={},reference='bumper',tab='geometry'},Calibration)
 end
-function Calibration:begin()self.history={};self.index=1;self.points={};self.candidate=nil end
+function Calibration:begin()self.crossbar=nil;self.history={};self.index=1;self.points={};self.candidate=nil end
 function Calibration:observe(packet,now,keys,physics)
     if not packet then self.history={};return end
     self.latest=packet
     self.history[#self.history+1]={time=now,car=copy(packet.car),ground=packet.ground_estimate,on_ball=packet.ball_wheel_contacts or 0,preset=packet.car_preset or 'standard',verified=packet.car_size_verified,dimensions_verified=packet.car_dimensions_verified}
     while #self.history>1 and now-self.history[1].time>.6 do table.remove(self.history,1)end
+    if self.crossbar then self:observeCrossbar(now)end
     if self.recordingUntil and now<=self.recordingUntil and now-(self.motionAt or -math.huge)>=.09 then
         self.motionAt=now
         local row={time=now,car=copy(packet.car),ball=copy(packet.ball),ground=packet.ground_estimate,
@@ -1645,8 +1646,63 @@ function Calibration:corners(p)
     end end end
     return out
 end
+function Calibration:store(point)
+    self.points[Calibration.steps[self.index][1]]=point
+    self.index=self.index+1;self.candidate=nil;self.crossbar=nil
+    if self.index>#Calibration.steps then self.candidate=self:fit()end
+end
+-- Arm before jumping. Record the highest box support around an abrupt vertical
+-- stop, not an arbitrary midair pose or the average of a moving flight.
+function Calibration:observeCrossbar(now)
+    local sweep=self.crossbar
+    if self.reference~='bumper'then self.crossbar=nil;self.message='Crossbar capture cancelled: reference changed';return end
+    if sweep.contactAt and now-sweep.contactAt>=.2 then
+        local point=sweep.best;point.capture_mode='flying_contact';point.samples=sweep.samples
+        point.spread=sweep.high-sweep.low;point.contact_velocity_drop=sweep.drop
+        self:store(point);self.message='Flying crossbar contact captured. Continue with the next landmark.';return
+    end
+    if now>sweep.untilTime then
+        self.crossbar=nil;self.message='No clear crossbar impact detected. F10 to retry; fly upward into the underside, not over the bar.';return
+    end
+    local row=self.history[#self.history];if not row then return end
+    local a,b=self.points[sweep.goal..'_a'],self.points[sweep.goal..'_b']
+    local dx,dy=b.point[1]-a.point[1],b.point[2]-a.point[2];local width=sqrt(dx*dx+dy*dy)
+    if width<1000 then self.crossbar=nil;self.message='Recapture both inner posts first';return end
+    local x,y=row.car.position[1]-(a.point[1]+b.point[1])/2,row.car.position[2]-(a.point[2]+b.point[2])/2
+    local point=self:probe(row,Calibration.steps[self.index][1]);local height=-math.huge
+    for _,v in ipairs(self:corners(point))do height=max(height,v[3])end
+    local valid=(row.verified or row.dimensions_verified)and row.car.forward[3]>.9
+        and abs((x*dx+y*dy)/width)<200 and abs((-x*dy+y*dx)/width)<140
+        and height>350 and height<900
+    if not valid then sweep.previous=nil;return end
+    local old=sweep.previous;local vz=row.car.velocity[3]
+    if old and old.preset==row.preset then
+        local dt=row.time-old.time;local drop=old.vz-vz
+        if dt>0 and dt<.18 and old.vz>120 and drop>max(90,1800*dt)then
+            sweep.contactAt=sweep.contactAt or now;sweep.drop=max(sweep.drop or 0,drop)
+            if not sweep.best or old.height>sweep.high then sweep.best=old.point;sweep.high=old.height end
+            sweep.low=min(sweep.low or old.height,old.height);sweep.samples=(sweep.samples or 0)+1
+        end
+    end
+    if sweep.contactAt then
+        if not sweep.best or height>sweep.high then sweep.best=point;sweep.high=height end
+        sweep.low=min(sweep.low or height,height);sweep.samples=(sweep.samples or 0)+1
+    end
+    sweep.previous={time=row.time,vz=vz,height=height,point=point,preset=row.preset}
+end
 function Calibration:capture()
     assert(self.index<=#Calibration.steps,'All points captured; review and apply the result')
+    local key=Calibration.steps[self.index][1]
+    if key=='orange_top'or key=='blue_top'then
+        if self.crossbar then self.crossbar=nil;self.message='Flying capture cancelled; F10 arms again';return self.index end
+        assert(self.reference=='bumper','Use front bumper contact for flying crossbar capture')
+        local goal=key=='orange_top'and 'orange'or 'blue'
+        assert(self.points[goal..'_a']and self.points[goal..'_b'],'Capture both inner posts first')
+        local row=self.history[#self.history];assert(row,'Wait for a valid car pose')
+        self.crossbar={goal=goal,untilTime=row.time+8}
+        self.message='ARMED for 8 seconds: fly nose-up into the crossbar UNDERSIDE. F10 cancels.'
+        return self.index
+    end
     assert(#self.history>=3,'Hold the car still for half a second first')
     local latest=self.history[#self.history]
     assert(latest.time-self.history[1].time>=.25,'Hold still a little longer')
@@ -1656,7 +1712,6 @@ function Calibration:capture()
         assert(dot(r.car.velocity,r.car.velocity)<2500,'Car is still moving; stop and retry')
         assert(dot(r.car.angular_velocity or {0,0,0},r.car.angular_velocity or {0,0,0})<.08^2,'Car is rotating; hold still and retry')
     end
-    local key=Calibration.steps[self.index][1]
     if key~='center'and self.reference=='bumper'then assert(latest.verified or latest.dimensions_verified,'Collision body dimensions are unknown; use a supported car or explicit centre-marker mode')end
     if key=='center'then assert(latest.ground and latest.car.up[3]>.9 and latest.on_ball==0 and abs(latest.car.position[3]-self.profile.physics.CAR_SPAWN_REST_Z)<30,'Centre point must be upright on the field floor, not on the ball')end
     local point=self:probe(latest,key);local probes={}
@@ -1664,11 +1719,11 @@ function Calibration:capture()
     for j=1,3 do local values={};for _,p in ipairs(probes)do values[#values+1]=p[j]end;point.point[j]=median(values)end
     point.samples=#probes;point.spread=0
     for _,p in ipairs(probes)do point.spread=max(point.spread,distance(p,point.point))end
-    self.points[key]=point;self.index=self.index+1;self.candidate=nil
-    if self.index>#Calibration.steps then self.candidate=self:fit()end
+    self:store(point)
     return self.index
 end
 function Calibration:back()
+    self.crossbar=nil
     self.index=max(1,self.index-1);self.points[Calibration.steps[self.index][1]]=nil;self.candidate=nil
 end
 function Calibration:fit()
@@ -1814,7 +1869,7 @@ function Calibration:load(data)
         temporary:summarizeMotion();loadedMotion=temporary.motion
     end
     self.points=points;self.candidate=candidate;self.index=nextIndex
-    self.history={};self.recordingUntil=nil;self.motionAt=nil
+    self.history={};self.recordingUntil=nil;self.motionAt=nil;self.crossbar=nil
     if loadedMotion then self.motion=loadedMotion end
     if data.reference=='bumper'or data.reference=='center'then self.reference=data.reference end
 end
@@ -1993,7 +2048,7 @@ local connections={}
 local function connect(signal,callback)
     local connection=signal:Connect(callback);connections[#connections+1]=connection
 end
-local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.5 | F4 minimize')
+local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.6 | F4 minimize')
 local panel=window.panel
 local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
 local label=Instance.new("TextLabel",main)
@@ -2201,7 +2256,7 @@ do
     end
     local title=text(39,28,14);local instruction=text(70,92,12)
     button('Goal landmarks',10,4,220,function()calibration.tab='geometry';calibration.message=nil end)
-    button('Motion / physics test',240,4,230,function()calibration.tab='motion';calibration.message=nil end)
+    button('Motion / physics test',240,4,230,function()calibration.crossbar=nil;calibration.tab='motion';calibration.message=nil end)
     local reference=button('Reference: front bumper',10,166,460,function()
         calibration.reference=calibration.reference=='bumper'and 'center'or 'bumper'
     end)
@@ -2209,7 +2264,7 @@ do
         if calibration.tab=='motion'then
             if calibration.recordingUntil then calibration.recordingUntil=nil;calibration:summarizeMotion()
             else calibration:startMotion(os.clock())end
-        else calibration:capture()end
+        else calibration:capture();return end
         calibration.message=nil
     end
     local capture=button('Capture point',10,203,220,captureCalibration)
@@ -2245,7 +2300,7 @@ do
         calibration.message='Loaded measurements; review and Apply to use them'
     end)
     button('Close test',330,277,140,function()
-        calibration.recordingUntil=nil;if calibration.motion then calibration:summarizeMotion()end
+        calibration.crossbar=nil;calibration.recordingUntil=nil;if calibration.motion then calibration:summarizeMotion()end
         calibrating=false;controls()
     end)
     refreshCalibration=function(now)
@@ -2259,8 +2314,9 @@ do
             if calibration.reference=='center'and step and step[1]~='center'then message='Place the CAR CENTRE directly on the geometric marker; no bumper offset will be added.'end
             local last=calibration.history[#calibration.history]
             local body=last and ('\nBody: '..last.preset..(last.verified and ' verified'or ' / source offsets'))or ''
-            instruction.Text=message..body..'\n'..(calibration.message or 'Hold still. F10 captures; F4 minimizes this window.')
-            capture.Text='Capture point';apply.Text='Apply goal measurements'
+            local flying=step and (step[1]=='orange_top'or step[1]=='blue_top')
+            instruction.Text=message..body..'\n'..(calibration.message or (flying and 'F10 arms flying capture; F4 minimizes.'or 'Hold still. F10 captures; F4 minimizes this window.'))
+            capture.Text=flying and (calibration.crossbar and 'Cancel flying capture'or 'Arm flying capture / F10')or 'Capture point';apply.Text='Apply goal measurements'
         else
             title.Text='20-second manual physics recording'
             local result=calibration.motion and calibration.motion.summary
@@ -2618,7 +2674,7 @@ task.spawn(function()
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=(MODEL_NAME.." LOCAL v6.5 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
+        label.Text=(MODEL_NAME.." LOCAL v6.6 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
             :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")
         local lastTick,lastUi=os.clock(),-math.huge
         local busy=false
@@ -2626,7 +2682,7 @@ task.spawn(function()
         connect(game:GetService("RunService").Heartbeat,function()
             if not alive or busy then return end
             local now=os.clock()
-            local sampleDue,nextSample=Timing.due(now,sampleAt,enabled and 1/HZ or .1)
+            local sampleDue,nextSample=Timing.due(now,sampleAt,(enabled or (calibrating and calibration.crossbar))and 1/HZ or .1)
             if not sampleDue then return end
             sampleAt=nextSample
             local elapsed=now-lastTick;lastTick=now
@@ -2778,7 +2834,7 @@ task.spawn(function()
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=(MODEL_NAME.." v6.5 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=(MODEL_NAME.." v6.6 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -2805,4 +2861,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.5"}
+return {started=true,version="local-6.6"}

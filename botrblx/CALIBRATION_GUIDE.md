@@ -2,7 +2,7 @@
 
 Press **F8**, then **Calibration / physics test**. The bot stays paused while you
 place or drive the car. **F4** minimizes/restores the window. Drag the title bar
-while paused. **F10** captures the next landmark, including while minimized.
+while paused. **F10** captures ground landmarks or arms the flying crossbar test, including while minimized.
 
 Use freeplay so a match reset or another car does not disturb a capture.
 
@@ -12,17 +12,24 @@ Use freeplay so a match reset or another car does not disturb a capture.
 2. At the orange goal line, touch either **inner upright face** with the front
    of the collision body. Point squarely sideways into the post and stop.
 3. Touch the other orange inner upright the same way.
-4. At the middle of the orange mouth, point the nose straight up and touch the
-   **underside of the crossbar**. Capture while stationary; the arena ceiling is
-   a different surface.
+4. At the middle of the orange mouth, press F10 BEFORE jumping to arm an
+   eight-second capture. Fly nose-up into the **underside of the crossbar**. Contact is recorded automatically; no hover
+   or stationary pose is required. Touch the underside, not the top of the bar.
 5. Inside the orange net, face away from midfield and touch the **rear net wall**.
 6. Repeat the first inner upright at the blue goal line.
 7. Capture the other blue inner upright.
-8. Capture the blue crossbar underside.
+8. Arm with F10 and fly into the blue crossbar underside the same way.
 9. Capture the blue rear net wall.
 
-Hold still for at least half a second at each point and press F10 or **Capture
-point**. The two posts can be captured in either left/right order. **Back** lets
+For centre, posts and rear walls, hold still for at least half a second and press
+F10 or **Capture point**. For crossbars, **Arm flying capture / F10** starts an
+eight-second test at 30 pose samples/second. Point the nose up and hit the underside
+near the middle of the mouth; a sharp vertical slowdown identifies a contact
+candidate. The highest full collision-box support around that event supplies the
+height. Sampling and rendered-state smoothing limit precision; this is not a
+server collision event. Ordinary gravity/apex motion is rejected. If it times out,
+arm and retry; F10 while armed cancels. A gentle contact may not register, so fly
+upward with some speed. The two posts can be captured in either left/right order. **Back** lets
 you redo a point; later points can then be captured again. The tool does not
 teleport, hover or place the car for you.
 
@@ -35,7 +42,9 @@ Unknown collision dimensions block bumper captures. A unique dimension match can
 identify a preset even if its hidden debug part has a stale transform; the offset
 is then explicitly taken from that preset, not claimed as a live measurement.
 
-**Car centre on marker** is an alternative only when you can place the car's root
+Flying crossbar capture requires **front bumper contact**.
+
+**Car centre on marker** is an alternative for ground landmarks only when you can place the car's root
 centre directly on the geometric landmark. It adds no bumper offset. Each point
 stores its own reference, pose, preset and sample spread. Switching modes later
 does not reinterpret earlier points.

@@ -40,7 +40,7 @@ local connections={}
 local function connect(signal,callback)
     local connection=signal:Connect(callback);connections[#connections+1]=connection
 end
-local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.5 | F4 minimize')
+local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.6 | F4 minimize')
 local panel=window.panel
 local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
 local label=Instance.new("TextLabel",main)
@@ -248,7 +248,7 @@ do
     end
     local title=text(39,28,14);local instruction=text(70,92,12)
     button('Goal landmarks',10,4,220,function()calibration.tab='geometry';calibration.message=nil end)
-    button('Motion / physics test',240,4,230,function()calibration.tab='motion';calibration.message=nil end)
+    button('Motion / physics test',240,4,230,function()calibration.crossbar=nil;calibration.tab='motion';calibration.message=nil end)
     local reference=button('Reference: front bumper',10,166,460,function()
         calibration.reference=calibration.reference=='bumper'and 'center'or 'bumper'
     end)
@@ -256,7 +256,7 @@ do
         if calibration.tab=='motion'then
             if calibration.recordingUntil then calibration.recordingUntil=nil;calibration:summarizeMotion()
             else calibration:startMotion(os.clock())end
-        else calibration:capture()end
+        else calibration:capture();return end
         calibration.message=nil
     end
     local capture=button('Capture point',10,203,220,captureCalibration)
@@ -292,7 +292,7 @@ do
         calibration.message='Loaded measurements; review and Apply to use them'
     end)
     button('Close test',330,277,140,function()
-        calibration.recordingUntil=nil;if calibration.motion then calibration:summarizeMotion()end
+        calibration.crossbar=nil;calibration.recordingUntil=nil;if calibration.motion then calibration:summarizeMotion()end
         calibrating=false;controls()
     end)
     refreshCalibration=function(now)
@@ -306,8 +306,9 @@ do
             if calibration.reference=='center'and step and step[1]~='center'then message='Place the CAR CENTRE directly on the geometric marker; no bumper offset will be added.'end
             local last=calibration.history[#calibration.history]
             local body=last and ('\nBody: '..last.preset..(last.verified and ' verified'or ' / source offsets'))or ''
-            instruction.Text=message..body..'\n'..(calibration.message or 'Hold still. F10 captures; F4 minimizes this window.')
-            capture.Text='Capture point';apply.Text='Apply goal measurements'
+            local flying=step and (step[1]=='orange_top'or step[1]=='blue_top')
+            instruction.Text=message..body..'\n'..(calibration.message or (flying and 'F10 arms flying capture; F4 minimizes.'or 'Hold still. F10 captures; F4 minimizes this window.'))
+            capture.Text=flying and (calibration.crossbar and 'Cancel flying capture'or 'Arm flying capture / F10')or 'Capture point';apply.Text='Apply goal measurements'
         else
             title.Text='20-second manual physics recording'
             local result=calibration.motion and calibration.motion.summary
@@ -402,7 +403,7 @@ task.spawn(function()
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=(MODEL_NAME.." LOCAL v6.5 ready | model self-test passed\nModel __MODEL_SHA__\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
+        label.Text=(MODEL_NAME.." LOCAL v6.6 ready | model self-test passed\nModel __MODEL_SHA__\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
             :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")
         local lastTick,lastUi=os.clock(),-math.huge
         local busy=false
@@ -410,7 +411,7 @@ task.spawn(function()
         connect(game:GetService("RunService").Heartbeat,function()
             if not alive or busy then return end
             local now=os.clock()
-            local sampleDue,nextSample=Timing.due(now,sampleAt,enabled and 1/HZ or .1)
+            local sampleDue,nextSample=Timing.due(now,sampleAt,(enabled or (calibrating and calibration.crossbar))and 1/HZ or .1)
             if not sampleDue then return end
             sampleAt=nextSample
             local elapsed=now-lastTick;lastTick=now
@@ -562,7 +563,7 @@ task.spawn(function()
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=(MODEL_NAME.." v6.5 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=(MODEL_NAME.." v6.6 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -589,4 +590,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.5"}
+return {started=true,version="local-6.6"}

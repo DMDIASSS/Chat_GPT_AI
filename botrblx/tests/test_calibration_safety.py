@@ -186,3 +186,41 @@ for i=0,240 do calibration:observe(p,i*.1,{},physics)end
 assert(not calibration.recordingUntil and #calibration.motion.samples<=210)
 assert(calibration.motion.summary.samples>150 and not calibration.motion.summary.gravity_consistent,'Invented airborne gravity from a resting ball')
 ''')
+
+    def test_crossbar_flight_captures_impact_without_stationary_pose(self):
+        self.run_lua('''
+calibration.points=landmarks();calibration.index=4
+local p=packet({100,5170,500},{0,0,93.15})
+p.car.forward={0,0,1};p.car.up={0,-1,0};p.ground_estimate=false
+local cfg=profile.car_presets.standard;local front=cfg.offset[1]+cfg.size[1]/2
+p.car.position[3]=610-front;p.car.velocity={0,0,300}
+calibration:observe(p,0,{},physics);calibration:capture()
+assert(calibration.crossbar and calibration.index==4,'Did not arm flying capture')
+for i=1,8 do
+ local t=i*.05
+ p.car.position[3]=(i==1 and 625 or 640)-front
+ p.car.velocity={0,0,i==1 and 300 or 0}
+ calibration:observe(p,t,{},physics)
+end
+assert(calibration.index==5 and not calibration.crossbar,'Flying contact did not advance')
+local point=calibration.points.orange_top
+assert(point.capture_mode=='flying_contact'and point.contact_velocity_drop==300)
+assert(math.abs(point.point[3]-640)<.001,'Averaged moving flight instead of the highest contact pose')
+local fit=calibration:fit();assert(math.abs(fit.goals[2].height-640)<.001)
+''')
+
+    def test_crossbar_free_flight_times_out_and_can_be_cancelled(self):
+        self.run_lua('''
+calibration.points=landmarks();calibration.points.orange_top=nil;calibration.index=4
+local p=packet({100,5170,500},{0,0,93.15})
+p.car.forward={0,0,1};p.car.up={0,-1,0};p.ground_estimate=false
+calibration:observe(p,0,{},physics);calibration:capture()
+for i=1,165 do
+ local t=i*.05
+ p.car.velocity={0,0,300-650*t};p.car.position[3]=500
+ calibration:observe(p,t,{},physics)
+end
+assert(not calibration.crossbar and calibration.index==4 and not calibration.points.orange_top,'Accepted an ordinary airborne apex')
+calibration:capture();assert(calibration.crossbar)
+calibration:capture();assert(not calibration.crossbar and calibration.index==4,'Could not cancel capture')
+''')

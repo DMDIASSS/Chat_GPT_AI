@@ -1,4 +1,4 @@
-# TurboBall Roblox bot — Local v6.5
+# TurboBall Roblox bot — Local v6.6
 
 ## Ready-to-run original Nexto
 
@@ -16,7 +16,7 @@ are in `NEXTO_NOTICE.md` and `NEXTO_LICENSE.txt`.
    loadstring(readfile("TurboBall_Nexto.lua"))()
    ```
 
-4. Wait for **Nexto LOCAL v6.5 ready**, then press **F6**. **F8** stops.
+4. Wait for **Nexto LOCAL v6.6 ready**, then press **F6**. **F8** stops.
 
 Nexto starts with **Physics assist: OFF** and **Yield to teammate: OFF**. The actor
 chooses its actions, with the existing kickoff, bounded stuck recovery, and the
@@ -31,7 +31,7 @@ workspace, using the existing project Python. `EXPORT_LOCAL_BOT.bat` continues t
 export your private Update271 checkpoint separately. Both builds identify the
 model by name and SHA256 in diagnostics.
 
-## Movable window, goal calibration and physics recording (local v6.5)
+## Movable window, goal calibration and physics recording (local v6.6)
 
 **F4** minimizes/restores the window during play. Pause with **F8** to drag its
 title bar. Open **Calibration / physics test** while paused; the bot stays paused
@@ -39,8 +39,10 @@ while you position or drive the car.
 
 The **Goal landmarks** wizard records nine points: field centre, then both inner
 posts, the crossbar underside and the rear net wall at orange and blue. Touch the
-specified face with the front collision body, hold still, and press **F10** to
-capture, including while minimized. The tool accounts for the car's source box
+specified face with the front collision body. At ground landmarks, hold still
+and press **F10**. At each crossbar, press **F10** to arm, then fly nose-up into
+the underside; the tool records the impact without requiring a hover. Capture
+works while minimized. The tool accounts for the car's source box
 and offset, checks stillness, and validates the fitted dimensions. **Apply goal
 measurements** activates the fit; **Save test file** writes
 `TurboBall_Calibration.json`. Loading also requires review and Apply. Partial
@@ -166,7 +168,7 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v6.5 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v6.6 ready | model self-test passed`**, then press **F6**.
    **Team: AUTO** identifies `Deadline_coolgun` from the match scoreboard and
    cross-checks the rendered nameplate relationship. It follows team changes.
    If the team cannot be identified, open the in-game scoreboard once. The
@@ -259,13 +261,13 @@ runtime coverage, but have not been live-tested in Roblox/JJSploit and are not a
 measured win-rate improvement.
 
 After replacing this folder, rerun **EXPORT_LOCAL_BOT.bat** and execute the newly
-generated private Lua file. The ready badge must show **LOCAL v6.5** for a private export. Exporting the
+generated private Lua file. The ready badge must show **LOCAL v6.6** for a private export. Exporting the
 place itself does not update a standalone script you already generated.
 
 ## Match pad detection and stop diagnostics (local v6.1)
 
 Rerun **EXPORT_LOCAL_BOT.bat** after updating this folder. Existing generated Lua
-scripts contain the previous runtime; the current ready badge is **v6.5**.
+scripts contain the previous runtime; the current ready badge is **v6.6**.
 
 The first live v6 report showed a measured standard ball radius and gravity close
 to the saved profile, but zero discovered boost pads throughout the run. The
@@ -405,7 +407,7 @@ change model weights or create a policy mesh input.
 
 Rerun **EXPORT_LOCAL_BOT.bat after installing this update**: the previous generated
 standalone script contains the previous adapter. No model weights are downloaded
-or retrained. The current package shows a **v6.5** badge after re-export.
+or retrained. The current package shows a **v6.6** badge after re-export.
 
 The game uses its own match teams. The new reader matches your name to the
 scoreboard row's team edge; it does not assume Roblox's `Player.Team` is the match
