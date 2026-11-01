@@ -1,0 +1,287 @@
+{
+  "scope": "Engineering comparison, not competitive evaluation. Synthetic coastal map and original supplied country/tribe simulator; no human opponents. Seeds used during development, not a held-out strength test.",
+  "baseline_commit": "a299e2ef145b2e82f6f6cce68ead0d722d79fcc0",
+  "setup": {
+    "map_width": 128,
+    "map_height": 96,
+    "k_lin": 4,
+    "countries": 6,
+    "tribes": 12,
+    "difficulty": 1,
+    "decide_every_ticks": 6,
+    "seeds": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "runs": [
+    {
+      "duration_seconds": 180,
+      "version": "1.9.0",
+      "seed": 1,
+      "alive": true,
+      "land": 4005,
+      "troops": 1266372,
+      "gold": 84450,
+      "orders": 51,
+      "buildings": 4,
+      "host_policy_time": {
+        "median_ms": 3.1411509989993647,
+        "p95_ms": 4.063766005856451,
+        "max_ms": 5.778167003882118
+      }
+    },
+    {
+      "duration_seconds": 180,
+      "version": "2.0.0",
+      "seed": 1,
+      "alive": true,
+      "land": 3330,
+      "troops": 554749,
+      "gold": 36800,
+      "orders": 47,
+      "buildings": 3,
+      "host_policy_time": {
+        "median_ms": 3.1312470018747263,
+        "p95_ms": 6.28107700322289,
+        "max_ms": 7.918452000012621
+      }
+    },
+    {
+      "duration_seconds": 180,
+      "version": "1.9.0",
+      "seed": 2,
+      "alive": true,
+      "land": 2104,
+      "troops": 412045,
+      "gold": 8250,
+      "orders": 66,
+      "buildings": 4,
+      "host_policy_time": {
+        "median_ms": 2.9348640018724836,
+        "p95_ms": 3.755530997295864,
+        "max_ms": 4.380698999739252
+      }
+    },
+    {
+      "duration_seconds": 180,
+      "version": "2.0.0",
+      "seed": 2,
+      "alive": true,
+      "land": 3246,
+      "troops": 431482,
+      "gold": 153500,
+      "orders": 51,
+      "buildings": 3,
+      "host_policy_time": {
+        "median_ms": 3.030065003258642,
+        "p95_ms": 5.996445004711859,
+        "max_ms": 7.8625129972351715
+      }
+    },
+    {
+      "duration_seconds": 180,
+      "version": "1.9.0",
+      "seed": 3,
+      "alive": true,
+      "land": 4877,
+      "troops": 983106,
+      "gold": 224750,
+      "orders": 51,
+      "buildings": 3,
+      "host_policy_time": {
+        "median_ms": 2.955896001367364,
+        "p95_ms": 3.448966999712866,
+        "max_ms": 4.737266994197853
+      }
+    },
+    {
+      "duration_seconds": 180,
+      "version": "2.0.0",
+      "seed": 3,
+      "alive": true,
+      "land": 3193,
+      "troops": 774777,
+      "gold": 110150,
+      "orders": 51,
+      "buildings": 3,
+      "host_policy_time": {
+        "median_ms": 3.0612679984187707,
+        "p95_ms": 7.024496000667568,
+        "max_ms": 12.967260998266283
+      }
+    },
+    {
+      "duration_seconds": 180,
+      "version": "1.9.0",
+      "seed": 4,
+      "alive": true,
+      "land": 4147,
+      "troops": 362555,
+      "gold": 15850,
+      "orders": 58,
+      "buildings": 4,
+      "host_policy_time": {
+        "median_ms": 2.9323609996936284,
+        "p95_ms": 3.6053209987585433,
+        "max_ms": 6.544766998558771
+      }
+    },
+    {
+      "duration_seconds": 180,
+      "version": "2.0.0",
+      "seed": 4,
+      "alive": true,
+      "land": 3048,
+      "troops": 365084,
+      "gold": 133539,
+      "orders": 55,
+      "buildings": 4,
+      "host_policy_time": {
+        "median_ms": 3.159812004014384,
+        "p95_ms": 6.084093001845758,
+        "max_ms": 8.167325999238528
+      }
+    },
+    {
+      "duration_seconds": 540,
+      "version": "1.9.0",
+      "seed": 1,
+      "alive": true,
+      "land": 3040,
+      "troops": 1229892,
+      "gold": 308113,
+      "orders": 101,
+      "buildings": 7,
+      "host_policy_time": {
+        "median_ms": 3.2640959980199113,
+        "p95_ms": 4.309885996917728,
+        "max_ms": 9.62037800491089
+      }
+    },
+    {
+      "duration_seconds": 540,
+      "version": "2.0.0",
+      "seed": 1,
+      "alive": true,
+      "land": 9122,
+      "troops": 2690714,
+      "gold": 186800,
+      "orders": 86,
+      "buildings": 30,
+      "host_policy_time": {
+        "median_ms": 2.995547001773957,
+        "p95_ms": 6.938986000022851,
+        "max_ms": 13.70039400353562
+      }
+    },
+    {
+      "duration_seconds": 540,
+      "version": "1.9.0",
+      "seed": 2,
+      "alive": true,
+      "land": 2221,
+      "troops": 1473536,
+      "gold": 270561,
+      "orders": 101,
+      "buildings": 9,
+      "host_policy_time": {
+        "median_ms": 2.849595002771821,
+        "p95_ms": 3.6190409955452196,
+        "max_ms": 9.015245996124577
+      }
+    },
+    {
+      "duration_seconds": 540,
+      "version": "2.0.0",
+      "seed": 2,
+      "alive": true,
+      "land": 2831,
+      "troops": 1657996,
+      "gold": 315480,
+      "orders": 81,
+      "buildings": 7,
+      "host_policy_time": {
+        "median_ms": 2.8087149985367432,
+        "p95_ms": 6.864472001325339,
+        "max_ms": 11.131748993648216
+      }
+    },
+    {
+      "duration_seconds": 540,
+      "version": "1.9.0",
+      "seed": 3,
+      "alive": true,
+      "land": 4500,
+      "troops": 1302742,
+      "gold": 306823,
+      "orders": 97,
+      "buildings": 9,
+      "host_policy_time": {
+        "median_ms": 2.934652002295479,
+        "p95_ms": 3.666570999484975,
+        "max_ms": 8.358979001059197
+      }
+    },
+    {
+      "duration_seconds": 540,
+      "version": "2.0.0",
+      "seed": 3,
+      "alive": true,
+      "land": 3475,
+      "troops": 2543242,
+      "gold": 354461,
+      "orders": 95,
+      "buildings": 12,
+      "host_policy_time": {
+        "median_ms": 3.1284709984902292,
+        "p95_ms": 7.425953001074959,
+        "max_ms": 10.843502001080196
+      }
+    },
+    {
+      "duration_seconds": 540,
+      "version": "1.9.0",
+      "seed": 4,
+      "alive": true,
+      "land": 7622,
+      "troops": 4273494,
+      "gold": 1379750,
+      "orders": 118,
+      "buildings": 18,
+      "host_policy_time": {
+        "median_ms": 2.7506650003488176,
+        "p95_ms": 3.4204219991806895,
+        "max_ms": 5.755740996391978
+      }
+    },
+    {
+      "duration_seconds": 540,
+      "version": "2.0.0",
+      "seed": 4,
+      "alive": true,
+      "land": 7967,
+      "troops": 3938530,
+      "gold": 928539,
+      "orders": 98,
+      "buildings": 32,
+      "host_policy_time": {
+        "median_ms": 3.228461995604448,
+        "p95_ms": 7.513456999731716,
+        "max_ms": 12.579265996464528
+      }
+    }
+  ],
+  "atlas_host_microbenchmark": {
+    "map_cells": 2000000,
+    "own_cells": 100000,
+    "update_work_budget": 16384,
+    "updates_to_complete": 129,
+    "median_ms": 1.050684,
+    "p95_ms": 6.610173,
+    "maximum_ms": 14.685801
+  },
+  "competitive_strength_verified": false
+}

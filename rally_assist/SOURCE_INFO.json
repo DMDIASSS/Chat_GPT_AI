@@ -1,0 +1,83 @@
+{
+  "version": "1.1.0",
+  "entrypoint": "Backseat_Rally_Assist.lua",
+  "place_id": 94278659624110,
+  "uploaded_place_sha256": "be6b8add4aff71085492872588a7440427438bbec01710e1d2b3a61dad90ef93",
+  "reference": "Numeric stage geometry and menu showcase samples from the user-provided place. Not a verified world record.",
+  "includes_original_game_sources": false,
+  "includes_personal_ghosts": false,
+  "files": {
+    "Backseat_Rally_Assist.lua": {
+      "sha256": "8abb1a85b74a2b5a15d91a7673db2e9ca87cf77347e19a212da72652f33a4a98",
+      "bytes": 542774
+    },
+    "README.md": {
+      "sha256": "1ea44b196fdea3aaf934f64de8aed1b30752d3a3fb3a47a28aca6ac35ba86a85",
+      "bytes": 8533
+    },
+    "VERIFICATION.json": {
+      "sha256": "aa768bcbf34ef74284ea6e63fee6f3999a985c3a4fd25551f95952887c1b036a",
+      "bytes": 4561
+    },
+    "adapter.lua": {
+      "sha256": "552842a59d08f578eca43a70350821e838ce207f8b0c85abfeb8cfe06998b566",
+      "bytes": 13466
+    },
+    "build.py": {
+      "sha256": "66f2c34f3a89dddfe1667a123c264896aa35c271a6e9cbac1ac9f290e7e3b6a3",
+      "bytes": 1396
+    },
+    "client.lua": {
+      "sha256": "23864c56bbbf2e8775b2544aff36a05178a2211c5a4795baa4a2872ed8f1c5d0",
+      "bytes": 23391
+    },
+    "controller.lua": {
+      "sha256": "bd2eb6b3dbbd5e666caedb31bd3e42ec309f4f92db13c89d1546a34663cd8d83",
+      "bytes": 13681
+    },
+    "ghost.lua": {
+      "sha256": "2b98a76b9a4fce5c6f6c92b188fee762e5f59597a48ad77d4382638fb2384602",
+      "bytes": 3728
+    },
+    "input.lua": {
+      "sha256": "ae97c0c8567d3014699a1a25a6a7ef881869fb317139542efaa572dd7075bf80",
+      "bytes": 8064
+    },
+    "package.py": {
+      "sha256": "30e98fb1259fde50fc908065eff71f0dcaa933e4bb5088a1eadaff833a5c4c1c",
+      "bytes": 2224
+    },
+    "route.lua": {
+      "sha256": "b203df951e8d9c6af6f66017af75c06edb687c4751cb4bb60151da707cd0db47",
+      "bytes": 6020
+    },
+    "showcase_lines.json": {
+      "sha256": "6529d774d19e1523a748eb3a25f96c346057a3062977288054e17055fe7ad5c2",
+      "bytes": 436062
+    },
+    "stage_profiles.json": {
+      "sha256": "6bb4e0d76c2997c68a34001fb6040e31be9221520ce743578386c148ac2aec30",
+      "bytes": 69422
+    },
+    "tests/collision_reference.json": {
+      "sha256": "4d363382dd3f1c4256149518295558a58d40215be0a83b0708aaf43f445bfe4d",
+      "bytes": 7638
+    },
+    "tests/planar.lua": {
+      "sha256": "61c383b2d800e7ec5bd2fb458a1f45c368a5385224b01c702f7c22a65a9244d0",
+      "bytes": 3934
+    },
+    "tests/roblox_fixture.lua": {
+      "sha256": "791e2044bc742ebd7590da75836eda56edd485af94ca34e8f121797c34ae86e7",
+      "bytes": 12302
+    },
+    "tests/run_planar.py": {
+      "sha256": "d791ec0ae6ce2f74b20ce697ba35429f863000f3d4f2433c54572fb1ee1d7eae",
+      "bytes": 2015
+    },
+    "tests/test_assist.py": {
+      "sha256": "11e2a351999ed06328445f16068c88a2c7f8473cd36fc5017879c63b0345013d",
+      "bytes": 21813
+    }
+  }
+}

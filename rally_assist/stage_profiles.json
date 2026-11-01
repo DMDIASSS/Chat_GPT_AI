@@ -1,0 +1,4227 @@
+{
+  "AlpinePass": {
+    "Id": "AlpinePass",
+    "Name": "Alpine Pass",
+    "Origin": [
+      0,
+      112,
+      0
+    ],
+    "Heading": 0,
+    "Width": 18,
+    "Surface": "Gravel",
+    "StartAt": 40,
+    "FinishAt": 5640,
+    "StopAt": 5820,
+    "SpawnAt": 8,
+    "place_id": 83824333507247,
+    "segments": [
+      {
+        "Straight": 220,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 25,
+        "Radius": 300,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Rise": 3,
+        "Straight": 130,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 18,
+        "Radius": 260,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": 3,
+        "Straight": 110,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 40,
+        "Radius": 180,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 200,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 50,
+        "Radius": 140,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Rise": 6,
+        "Straight": 120,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 30,
+        "Radius": 240,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": 8,
+        "Straight": 240,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 60,
+        "Radius": 110,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Rise": 8,
+        "Straight": 160,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 70,
+        "Radius": 60,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 16,
+        "Straight": 180
+      },
+      {
+        "Angle": 170,
+        "Radius": 26,
+        "Rise": 7,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 16,
+        "Straight": 150
+      },
+      {
+        "Angle": 170,
+        "Radius": 26,
+        "Rise": 7,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 16,
+        "Straight": 150
+      },
+      {
+        "Angle": 165,
+        "Radius": 28,
+        "Rise": 6,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 14,
+        "Straight": 200
+      },
+      {
+        "Angle": 60,
+        "Radius": 90,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 8,
+        "Straight": 140
+      },
+      {
+        "Angle": 75,
+        "Radius": 70,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 10,
+        "Straight": 220
+      },
+      {
+        "Angle": 45,
+        "Radius": 130,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 6,
+        "Straight": 120
+      },
+      {
+        "Rise": 8,
+        "Straight": 160
+      },
+      {
+        "Angle": 55,
+        "Radius": 100,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 140
+      },
+      {
+        "Angle": 100,
+        "Radius": 45,
+        "Rise": 3,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 9,
+        "Straight": 120
+      },
+      {
+        "Rise": -11,
+        "Straight": 60
+      },
+      {
+        "Angle": 40,
+        "Radius": 160,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 200
+      },
+      {
+        "Angle": 70,
+        "Radius": 80,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 2,
+        "Straight": 160
+      },
+      {
+        "Angle": 25,
+        "Radius": 200,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 140
+      },
+      {
+        "Angle": 45,
+        "Radius": 120,
+        "Rise": 2,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 5,
+        "Straight": 160
+      },
+      {
+        "Angle": 80,
+        "Radius": 70,
+        "Rise": 4,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 6,
+        "Straight": 200
+      },
+      {
+        "Rise": -2,
+        "Straight": 60
+      },
+      {
+        "Rise": -10,
+        "Straight": 180
+      }
+    ],
+    "features": [
+      {
+        "From": 3660,
+        "Kind": "Snow",
+        "To": 3700
+      },
+      {
+        "From": 3820,
+        "Kind": "Snow",
+        "Side": "Left",
+        "To": 3843
+      },
+      {
+        "From": 3959,
+        "Kind": "Snow",
+        "Side": "Left",
+        "To": 4016
+      },
+      {
+        "From": 4090,
+        "Kind": "Snow",
+        "Side": "Left",
+        "To": 4115
+      },
+      {
+        "From": 4215,
+        "Kind": "Snow",
+        "To": 4240
+      },
+      {
+        "From": 4317,
+        "Kind": "Snow",
+        "To": 4372
+      },
+      {
+        "From": 4492,
+        "Kind": "Snow",
+        "To": 4539
+      },
+      {
+        "From": 4629,
+        "Kind": "Snow",
+        "To": 4675
+      },
+      {
+        "From": 4720,
+        "Kind": "Snow",
+        "Side": "Left",
+        "To": 4777
+      },
+      {
+        "From": 4886,
+        "Kind": "Snow",
+        "To": 4941
+      },
+      {
+        "From": 5052,
+        "Kind": "Snow",
+        "To": 5226
+      },
+      {
+        "From": 5257,
+        "Kind": "Snow",
+        "To": 5401
+      },
+      {
+        "From": 5438,
+        "Kind": "Snow",
+        "Side": "Left",
+        "To": 5555
+      },
+      {
+        "From": 5616,
+        "Kind": "Snow",
+        "To": 5751
+      },
+      {
+        "From": 5778,
+        "Kind": "Snow",
+        "To": 5881
+      },
+      {
+        "From": 2700,
+        "Kind": "Mud",
+        "To": 2760
+      },
+      {
+        "From": 3560,
+        "Kind": "Mud",
+        "To": 3620
+      },
+      {
+        "At": 170,
+        "Kind": "Puddle",
+        "Lateral": 3.5
+      },
+      {
+        "At": 300,
+        "Kind": "Puddle",
+        "Lateral": 4,
+        "Length": 14
+      },
+      {
+        "At": 1500,
+        "Kind": "Puddle",
+        "Lateral": -3
+      },
+      {
+        "At": 3320,
+        "Kind": "Puddle",
+        "Lateral": -3,
+        "Width": 5
+      },
+      {
+        "At": 2135,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 2362,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 2589,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 4180,
+        "Kind": "Hazard",
+        "Side": "Left"
+      },
+      {
+        "At": 2960,
+        "Kind": "Hazard",
+        "Side": "Right"
+      }
+    ]
+  },
+  "PineForest": {
+    "Id": "PineForest",
+    "Name": "Pine Forest",
+    "Origin": [
+      0,
+      60,
+      0
+    ],
+    "Heading": 0,
+    "Width": 18,
+    "Surface": "Gravel",
+    "StartAt": 40,
+    "FinishAt": 5440,
+    "StopAt": 5620,
+    "SpawnAt": 8,
+    "place_id": 94278659624110,
+    "segments": [
+      {
+        "Straight": 200
+      },
+      {
+        "Angle": 20,
+        "Radius": 340,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 300
+      },
+      {
+        "Angle": 34,
+        "Radius": 210,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 6,
+        "Straight": 220
+      },
+      {
+        "Angle": 40,
+        "Radius": 190,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 160
+      },
+      {
+        "Angle": 44,
+        "Radius": 125,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 24
+      },
+      {
+        "Angle": 50,
+        "Radius": 125,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -8,
+        "Straight": 330
+      },
+      {
+        "Angle": 72,
+        "Radius": 82,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 130
+      },
+      {
+        "Angle": 14,
+        "Radius": 450,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 3,
+        "Straight": 200
+      },
+      {
+        "Angle": 92,
+        "Radius": 46,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 50
+      },
+      {
+        "Angle": 165,
+        "Radius": 26,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 6,
+        "Straight": 78
+      },
+      {
+        "Angle": 160,
+        "Radius": 26,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 60
+      },
+      {
+        "Angle": 82,
+        "Radius": 42,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 9,
+        "Straight": 140
+      },
+      {
+        "Rise": 10,
+        "Straight": 90
+      },
+      {
+        "Rise": -13,
+        "Straight": 60
+      },
+      {
+        "Angle": 54,
+        "Radius": 110,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -4,
+        "Straight": 220
+      },
+      {
+        "Angle": 36,
+        "Radius": 160,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 40
+      },
+      {
+        "Angle": 40,
+        "Radius": 150,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 3,
+        "Straight": 180
+      },
+      {
+        "Angle": 80,
+        "Radius": 72,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 26
+      },
+      {
+        "Angle": 64,
+        "Radius": 70,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -10,
+        "Straight": 170
+      },
+      {
+        "Straight": 80,
+        "Surface": "Wood"
+      },
+      {
+        "Rise": 4,
+        "Straight": 70
+      },
+      {
+        "Angle": 44,
+        "Radius": 170,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 260
+      },
+      {
+        "Angle": 52,
+        "Radius": 120,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 3,
+        "Straight": 150
+      },
+      {
+        "Angle": 26,
+        "Radius": 260,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 320
+      },
+      {
+        "Straight": 180
+      }
+    ],
+    "features": [
+      {
+        "From": 4246,
+        "Kind": "Bridge",
+        "To": 4316,
+        "Width": 14
+      },
+      {
+        "From": 1940,
+        "Kind": "Mud",
+        "To": 1990
+      },
+      {
+        "From": 1990,
+        "Kind": "Ford",
+        "To": 2020
+      },
+      {
+        "From": 2020,
+        "Kind": "Mud",
+        "To": 2060
+      },
+      {
+        "From": 4140,
+        "Kind": "Mud",
+        "To": 4215
+      },
+      {
+        "At": 1120,
+        "Kind": "Puddle",
+        "Lateral": -3.2
+      },
+      {
+        "At": 2110,
+        "Kind": "Puddle",
+        "Lateral": 3.6,
+        "Length": 14
+      },
+      {
+        "At": 3405,
+        "Kind": "Puddle",
+        "Lateral": -3
+      },
+      {
+        "At": 4580,
+        "Kind": "Puddle",
+        "Lateral": -3.4
+      },
+      {
+        "At": 4720,
+        "Kind": "Puddle",
+        "Lateral": 2.8,
+        "Length": 16,
+        "Width": 8
+      },
+      {
+        "At": 5250,
+        "Kind": "Puddle",
+        "Lateral": -4,
+        "Length": 14
+      },
+      {
+        "At": 2482,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 3117,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 3993,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 3760,
+        "Kind": "Hazard",
+        "Side": "Right"
+      }
+    ]
+  },
+  "SakuraPass": {
+    "Id": "SakuraPass",
+    "Name": "Sakura Pass",
+    "Origin": [
+      0,
+      80,
+      0
+    ],
+    "Heading": 0,
+    "Width": 16,
+    "Surface": "Tarmac",
+    "StartAt": 40,
+    "FinishAt": 5300,
+    "StopAt": 5440,
+    "SpawnAt": 8,
+    "place_id": 109630907266375,
+    "segments": [
+      {
+        "Straight": 180
+      },
+      {
+        "Angle": 20,
+        "Radius": 260,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 160
+      },
+      {
+        "Angle": 35,
+        "Radius": 180,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 160
+      },
+      {
+        "Angle": 40,
+        "Radius": 150,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 140
+      },
+      {
+        "Angle": 50,
+        "Radius": 120,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 6,
+        "Straight": 100
+      },
+      {
+        "Angle": 30,
+        "Radius": 200,
+        "Rise": 3,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 5,
+        "Straight": 160
+      },
+      {
+        "Angle": 70,
+        "Radius": 60,
+        "Rise": 6,
+        "Turn": "Right"
+      },
+      {
+        "Angle": 75,
+        "Radius": 55,
+        "Rise": 6,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 6,
+        "Straight": 80
+      },
+      {
+        "Angle": 170,
+        "Radius": 24,
+        "Rise": 7,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 14,
+        "Straight": 150
+      },
+      {
+        "Angle": 165,
+        "Radius": 24,
+        "Rise": 7,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 12,
+        "Straight": 120
+      },
+      {
+        "Angle": 60,
+        "Radius": 70,
+        "Rise": 6,
+        "Turn": "Right"
+      },
+      {
+        "Angle": 70,
+        "Radius": 65,
+        "Rise": 6,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 10,
+        "Straight": 140
+      },
+      {
+        "Angle": 45,
+        "Radius": 90,
+        "Rise": 4,
+        "Surface": "Gravel",
+        "Turn": "Right"
+      },
+      {
+        "Rise": 3,
+        "Straight": 60,
+        "Surface": "Gravel"
+      },
+      {
+        "Rise": -4,
+        "Straight": 30,
+        "Surface": "Gravel"
+      },
+      {
+        "Straight": 30,
+        "Surface": "Gravel"
+      },
+      {
+        "Angle": 80,
+        "Radius": 50,
+        "Rise": 4,
+        "Surface": "Gravel",
+        "Turn": "Left"
+      },
+      {
+        "Angle": 80,
+        "Radius": 50,
+        "Rise": 3,
+        "Surface": "Gravel",
+        "Turn": "Right"
+      },
+      {
+        "Rise": 9,
+        "Straight": 100,
+        "Surface": "Gravel"
+      },
+      {
+        "Rise": -6,
+        "Straight": 40,
+        "Surface": "Gravel"
+      },
+      {
+        "Straight": 40,
+        "Surface": "Gravel"
+      },
+      {
+        "Angle": 40,
+        "Radius": 110,
+        "Rise": 5,
+        "Surface": "Gravel",
+        "Turn": "Left"
+      },
+      {
+        "Rise": 12,
+        "Straight": 80,
+        "Surface": "Gravel"
+      },
+      {
+        "Rise": -16,
+        "Straight": 40,
+        "Surface": "Gravel"
+      },
+      {
+        "Straight": 100,
+        "Surface": "Gravel"
+      },
+      {
+        "Angle": 60,
+        "Radius": 70,
+        "Rise": 4,
+        "Surface": "Gravel",
+        "Turn": "Right"
+      },
+      {
+        "Angle": 35,
+        "Radius": 140,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 200
+      },
+      {
+        "Angle": 25,
+        "Radius": 220,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 3,
+        "Straight": 180
+      },
+      {
+        "Angle": 55,
+        "Radius": 90,
+        "Turn": "Left"
+      },
+      {
+        "Angle": 60,
+        "Radius": 85,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 160
+      },
+      {
+        "Angle": 160,
+        "Radius": 26,
+        "Rise": 6,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 8,
+        "Straight": 140
+      },
+      {
+        "Angle": 50,
+        "Radius": 120,
+        "Rise": 4,
+        "Turn": "Right"
+      },
+      {
+        "Angle": 65,
+        "Radius": 80,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 6,
+        "Straight": 180
+      },
+      {
+        "Angle": 40,
+        "Radius": 140,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 140
+      },
+      {
+        "Angle": 70,
+        "Radius": 60,
+        "Rise": 5,
+        "Turn": "Right"
+      },
+      {
+        "Angle": 45,
+        "Radius": 100,
+        "Rise": 5,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 220
+      },
+      {
+        "Straight": 160
+      }
+    ],
+    "features": [
+      {
+        "From": 335,
+        "Kind": "Bridge",
+        "To": 375,
+        "Width": 16
+      },
+      {
+        "At": 1675,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 1895,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 4157,
+        "Kind": "DontCut"
+      }
+    ]
+  },
+  "RiverbendCanyon": {
+    "Id": "RiverbendCanyon",
+    "Name": "Riverbend Canyon",
+    "Origin": [
+      0,
+      60,
+      0
+    ],
+    "Heading": 0,
+    "Width": 18,
+    "Surface": "Gravel",
+    "StartAt": 40,
+    "FinishAt": 10340,
+    "StopAt": 10560,
+    "SpawnAt": 8,
+    "place_id": 119746839957917,
+    "segments": [
+      {
+        "Straight": 200
+      },
+      {
+        "Angle": 20,
+        "Radius": 320,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 1,
+        "Straight": 150
+      },
+      {
+        "Angle": 42,
+        "Radius": 200,
+        "Rise": 1,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 1,
+        "Straight": 150
+      },
+      {
+        "Angle": 34,
+        "Radius": 260,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 220
+      },
+      {
+        "Angle": 48,
+        "Radius": 150,
+        "Rise": 2,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 1,
+        "Straight": 120
+      },
+      {
+        "Angle": 58,
+        "Radius": 110,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 200
+      },
+      {
+        "Angle": 30,
+        "Radius": 240,
+        "Rise": 1,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 1,
+        "Straight": 160
+      },
+      {
+        "Angle": 26,
+        "Radius": 180,
+        "Rise": 1,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 260
+      },
+      {
+        "Angle": 80,
+        "Radius": 90,
+        "Rise": 3,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 90
+      },
+      {
+        "Rise": 5,
+        "Straight": 50
+      },
+      {
+        "Angle": 30,
+        "Radius": 140,
+        "Rise": 5,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 5,
+        "Straight": 110
+      },
+      {
+        "Angle": 52,
+        "Radius": 120,
+        "Rise": 4,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 3,
+        "Straight": 90
+      },
+      {
+        "Angle": 30,
+        "Radius": 160,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 6,
+        "Straight": 200
+      },
+      {
+        "Angle": 25,
+        "Radius": 200,
+        "Rise": 5,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 110
+      },
+      {
+        "Angle": 50,
+        "Radius": 90,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 8,
+        "Straight": 70
+      },
+      {
+        "Rise": -3,
+        "Straight": 30
+      },
+      {
+        "Straight": 40
+      },
+      {
+        "Angle": 65,
+        "Radius": 70,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 5,
+        "Straight": 140
+      },
+      {
+        "Angle": 20,
+        "Radius": 130,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 6,
+        "Straight": 180
+      },
+      {
+        "Angle": 160,
+        "Radius": 28,
+        "Rise": 7,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 12,
+        "Radius": 220,
+        "Rise": 5,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 38
+      },
+      {
+        "Angle": 24,
+        "Radius": 220,
+        "Rise": 14,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 38
+      },
+      {
+        "Angle": 12,
+        "Radius": 220,
+        "Rise": 5,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 165,
+        "Radius": 28,
+        "Rise": 7,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 12,
+        "Radius": 220,
+        "Rise": 5,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 38
+      },
+      {
+        "Angle": 24,
+        "Radius": 220,
+        "Rise": 14,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 38
+      },
+      {
+        "Angle": 12,
+        "Radius": 220,
+        "Rise": 5,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 165,
+        "Radius": 28,
+        "Rise": 7,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 12,
+        "Radius": 200,
+        "Rise": 5,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 2,
+        "Straight": 26
+      },
+      {
+        "Angle": 24,
+        "Radius": 200,
+        "Rise": 14,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 26
+      },
+      {
+        "Angle": 12,
+        "Radius": 200,
+        "Rise": 5,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 90,
+        "Radius": 90,
+        "Rise": 6,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 120,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 60,
+        "Radius": 180,
+        "Rise": 2,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": 5,
+        "Straight": 140,
+        "Surface": "Tarmac"
+      },
+      {
+        "Rise": -6,
+        "Straight": 40,
+        "Surface": "Tarmac"
+      },
+      {
+        "Straight": 40,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 110,
+        "Radius": 200,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 230,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 40,
+        "Radius": 200,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Angle": 20,
+        "Radius": 160,
+        "Rise": -2,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": 12,
+        "Straight": 90,
+        "Surface": "Tarmac"
+      },
+      {
+        "Rise": -16,
+        "Straight": 40,
+        "Surface": "Tarmac"
+      },
+      {
+        "Straight": 120,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 20,
+        "Radius": 180,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Angle": 90,
+        "Radius": 100,
+        "Rise": -2,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Straight": 25,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 14,
+        "Radius": 300,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": -2,
+        "Straight": 30,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 28,
+        "Radius": 300,
+        "Rise": -15,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Rise": -2,
+        "Straight": 30,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 14,
+        "Radius": 300,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Straight": 22,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 165,
+        "Radius": 28,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Straight": 25,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 14,
+        "Radius": 300,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Rise": -2,
+        "Straight": 30,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 28,
+        "Radius": 300,
+        "Rise": -15,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": -2,
+        "Straight": 30,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 14,
+        "Radius": 300,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Straight": 22,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 165,
+        "Radius": 28,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Straight": 25,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 14,
+        "Radius": 300,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": -2,
+        "Straight": 30,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 28,
+        "Radius": 300,
+        "Rise": -15,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Rise": -2,
+        "Straight": 30,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 14,
+        "Radius": 300,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Straight": 22,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 165,
+        "Radius": 45,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Straight": 25,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 14,
+        "Radius": 300,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Rise": -2,
+        "Straight": 30,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 28,
+        "Radius": 300,
+        "Rise": -15,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": -2,
+        "Straight": 30,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 14,
+        "Radius": 300,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Straight": 22,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 165,
+        "Radius": 28,
+        "Rise": -7,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": -24,
+        "Straight": 240,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 20,
+        "Radius": 200,
+        "Rise": -10,
+        "Surface": "Tarmac",
+        "Turn": "Left"
+      },
+      {
+        "Rise": -7,
+        "Straight": 160,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 20,
+        "Radius": 180,
+        "Rise": -4,
+        "Surface": "Tarmac",
+        "Turn": "Right"
+      },
+      {
+        "Straight": 180
+      },
+      {
+        "Angle": 80,
+        "Radius": 120,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 130
+      },
+      {
+        "Angle": 100,
+        "Radius": 105,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 91
+      },
+      {
+        "Angle": 90,
+        "Radius": 60,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 68
+      }
+    ],
+    "features": [
+      {
+        "From": 643,
+        "Kind": "Bridge",
+        "To": 718,
+        "Width": 18
+      },
+      {
+        "From": 1550,
+        "Kind": "Ford",
+        "To": 1574
+      },
+      {
+        "From": 2480,
+        "Kind": "Ford",
+        "To": 2508
+      },
+      {
+        "From": 2696,
+        "Kind": "Bridge",
+        "To": 2726,
+        "Width": 18
+      },
+      {
+        "From": 3376,
+        "Kind": "Bridge",
+        "To": 3406,
+        "Width": 18
+      },
+      {
+        "From": 3834,
+        "Kind": "Bridge",
+        "To": 3864,
+        "Width": 18
+      },
+      {
+        "From": 10041,
+        "Kind": "Bridge",
+        "To": 10111,
+        "Width": 18
+      },
+      {
+        "At": 4114,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 4492,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 4874,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 7562,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 8044,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 8524,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 9090,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 3200,
+        "Kind": "Hazard",
+        "Side": "Left"
+      },
+      {
+        "At": 7760,
+        "Kind": "Hazard",
+        "Side": "Left"
+      }
+    ]
+  },
+  "CoastalCliffs": {
+    "Id": "CoastalCliffs",
+    "Name": "Costa Limone",
+    "Origin": [
+      0,
+      48,
+      0
+    ],
+    "Heading": 0,
+    "Width": 16,
+    "Surface": "Tarmac",
+    "StartAt": 40,
+    "FinishAt": 7100,
+    "StopAt": 7276,
+    "SpawnAt": 8,
+    "place_id": 106400020690133,
+    "segments": [
+      {
+        "Straight": 190
+      },
+      {
+        "Angle": 24,
+        "Radius": 220,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 110
+      },
+      {
+        "Angle": 46,
+        "Radius": 110,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 90
+      },
+      {
+        "Angle": 38,
+        "Radius": 80,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 70
+      },
+      {
+        "Angle": 20,
+        "Radius": 150,
+        "Rise": -1,
+        "Turn": "Left"
+      },
+      {
+        "Rise": -3.5,
+        "Straight": 70,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 20,
+        "Radius": 300,
+        "Surface": "Sand",
+        "Turn": "Left"
+      },
+      {
+        "Straight": 60,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 32,
+        "Radius": 280,
+        "Surface": "Sand",
+        "Turn": "Right"
+      },
+      {
+        "Straight": 50,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 18,
+        "Radius": 260,
+        "Surface": "Sand",
+        "Turn": "Left"
+      },
+      {
+        "Straight": 40,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 38,
+        "Radius": 120,
+        "Rise": 1.5,
+        "Surface": "Sand",
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 60,
+        "Surface": "Tarmac"
+      },
+      {
+        "Angle": 48,
+        "Radius": 110,
+        "Rise": 6,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 9,
+        "Straight": 100
+      },
+      {
+        "Angle": 6,
+        "Radius": 300,
+        "Rise": 1,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 12,
+        "Straight": 110
+      },
+      {
+        "Angle": 165,
+        "Radius": 31,
+        "Rise": 5,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 12,
+        "Radius": 220,
+        "Rise": 3,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 3,
+        "Straight": 60
+      },
+      {
+        "Angle": 24,
+        "Radius": 220,
+        "Rise": 10,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 10,
+        "Straight": 110
+      },
+      {
+        "Angle": 12,
+        "Radius": 220,
+        "Rise": 3,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 3,
+        "Straight": 60
+      },
+      {
+        "Angle": 165,
+        "Radius": 31,
+        "Rise": 5,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 12,
+        "Radius": 220,
+        "Rise": 3,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 3,
+        "Straight": 60
+      },
+      {
+        "Angle": 24,
+        "Radius": 220,
+        "Rise": 10,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 10,
+        "Straight": 110
+      },
+      {
+        "Angle": 12,
+        "Radius": 220,
+        "Rise": 3,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 3,
+        "Straight": 60
+      },
+      {
+        "Angle": 165,
+        "Radius": 31,
+        "Rise": 5,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 12,
+        "Radius": 220,
+        "Rise": 4,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 6,
+        "Straight": 60
+      },
+      {
+        "Rise": 5,
+        "Straight": 40
+      },
+      {
+        "Rise": -3,
+        "Straight": 30
+      },
+      {
+        "Angle": 33,
+        "Radius": 170,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 1,
+        "Straight": 50
+      },
+      {
+        "Angle": 50,
+        "Radius": 120,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 140
+      },
+      {
+        "Angle": 30,
+        "Radius": 150,
+        "Rise": 1,
+        "Turn": "Left"
+      },
+      {
+        "Angle": 30,
+        "Radius": 150,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 50
+      },
+      {
+        "Angle": 55,
+        "Radius": 110,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 40
+      },
+      {
+        "Straight": 110
+      },
+      {
+        "Straight": 40
+      },
+      {
+        "Angle": 77,
+        "Radius": 110,
+        "Rise": 2,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 3,
+        "Straight": 110
+      },
+      {
+        "Angle": 22,
+        "Radius": 220,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 80
+      },
+      {
+        "Angle": 48,
+        "Radius": 80,
+        "Turn": "Left"
+      },
+      {
+        "Angle": 44,
+        "Radius": 90,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 3,
+        "Straight": 180
+      },
+      {
+        "Angle": 20,
+        "Radius": 170,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Straight": 80
+      },
+      {
+        "Straight": 20
+      },
+      {
+        "Angle": 34,
+        "Radius": 130,
+        "Rise": 2,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 2,
+        "Straight": 90
+      },
+      {
+        "Angle": 70,
+        "Radius": 62,
+        "Rise": 3,
+        "Turn": "Right"
+      },
+      {
+        "Angle": 52,
+        "Radius": 72,
+        "Rise": 3,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 120
+      },
+      {
+        "Angle": 84,
+        "Radius": 95,
+        "Rise": 8,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 6,
+        "Straight": 100
+      },
+      {
+        "Angle": 90,
+        "Radius": 42,
+        "Rise": 2,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 1,
+        "Straight": 70
+      },
+      {
+        "Angle": 90,
+        "Radius": 40,
+        "Rise": 1,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 40
+      },
+      {
+        "Rise": 4,
+        "Straight": 28
+      },
+      {
+        "Rise": -4,
+        "Straight": 28
+      },
+      {
+        "Straight": 70
+      },
+      {
+        "Angle": 90,
+        "Radius": 44,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 30
+      },
+      {
+        "Straight": 60
+      },
+      {
+        "Angle": 90,
+        "Radius": 46,
+        "Rise": -1,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 2,
+        "Straight": 40
+      },
+      {
+        "Rise": -2,
+        "Straight": 20
+      },
+      {
+        "Angle": 36,
+        "Radius": 130,
+        "Rise": -4,
+        "Turn": "Right"
+      },
+      {
+        "Angle": 40,
+        "Radius": 150,
+        "Rise": -6,
+        "Turn": "Left"
+      },
+      {
+        "Rise": -9,
+        "Straight": 150
+      },
+      {
+        "Angle": 28,
+        "Radius": 190,
+        "Rise": -5,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -5,
+        "Straight": 110
+      },
+      {
+        "Angle": 28,
+        "Radius": 160,
+        "Rise": -3,
+        "Turn": "Left"
+      },
+      {
+        "Rise": -3,
+        "Straight": 140
+      },
+      {
+        "Rise": -2,
+        "Straight": 120
+      },
+      {
+        "Straight": 160
+      }
+    ],
+    "features": [
+      {
+        "From": 3860,
+        "Kind": "Bridge",
+        "To": 3970,
+        "Width": 16
+      },
+      {
+        "From": 5846,
+        "Kind": "Bridge",
+        "To": 5878,
+        "Width": 16
+      },
+      {
+        "At": 1826,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 2349,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 2873,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 5635,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 5771,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 6000,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 6159,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 4482,
+        "Kind": "Hazard",
+        "Side": "Left"
+      },
+      {
+        "At": 5832,
+        "Kind": "Hazard",
+        "Side": "Right"
+      }
+    ]
+  },
+  "FrozenLake": {
+    "Id": "FrozenLake",
+    "Name": "Frozen Lake",
+    "Origin": [
+      0,
+      0,
+      0
+    ],
+    "Heading": 0,
+    "Width": 18,
+    "Surface": "Snow",
+    "StartAt": 40,
+    "FinishAt": 8992,
+    "StopAt": 9358,
+    "SpawnAt": 8,
+    "place_id": 94359699091269,
+    "segments": [
+      {
+        "Straight": 220
+      },
+      {
+        "Angle": 40,
+        "Radius": 70,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 80
+      },
+      {
+        "Angle": 44,
+        "Radius": 110,
+        "Rise": 1,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 1,
+        "Straight": 110
+      },
+      {
+        "Angle": 16,
+        "Radius": 380,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 200
+      },
+      {
+        "Rise": 3,
+        "Straight": 150
+      },
+      {
+        "Rise": -2,
+        "Straight": 60
+      },
+      {
+        "Angle": 36,
+        "Radius": 280,
+        "Rise": 2,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 3,
+        "Straight": 180
+      },
+      {
+        "Angle": 30,
+        "Radius": 320,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 220
+      },
+      {
+        "Angle": 34,
+        "Radius": 220,
+        "Rise": 3,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 120
+      },
+      {
+        "Angle": 50,
+        "Radius": 200,
+        "Rise": 4,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 4,
+        "Straight": 120
+      },
+      {
+        "Angle": 40,
+        "Radius": 120,
+        "Rise": 5,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 8,
+        "Straight": 140
+      },
+      {
+        "Angle": 165,
+        "Radius": 34,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 10,
+        "Straight": 150
+      },
+      {
+        "Angle": 165,
+        "Radius": 34,
+        "Rise": 4,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 8,
+        "Straight": 130
+      },
+      {
+        "Angle": 26,
+        "Radius": 260,
+        "Rise": 3,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 180
+      },
+      {
+        "Angle": 16,
+        "Radius": 300,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 120
+      },
+      {
+        "Rise": 4,
+        "Straight": 150
+      },
+      {
+        "Rise": -12,
+        "Straight": 40
+      },
+      {
+        "Rise": -2,
+        "Straight": 160
+      },
+      {
+        "Angle": 38,
+        "Radius": 200,
+        "Rise": -6,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -10,
+        "Straight": 150
+      },
+      {
+        "Angle": 62,
+        "Radius": 150,
+        "Rise": -10,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -12,
+        "Straight": 160
+      },
+      {
+        "Angle": 20,
+        "Radius": 240,
+        "Rise": -8,
+        "Turn": "Left"
+      },
+      {
+        "Rise": -8,
+        "Straight": 160
+      },
+      {
+        "Angle": 44,
+        "Radius": 180,
+        "Rise": -8,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -2,
+        "Straight": 70
+      },
+      {
+        "Straight": 70
+      },
+      {
+        "Rise": -6,
+        "Straight": 80
+      },
+      {
+        "Angle": 26,
+        "Radius": 280,
+        "Rise": -2,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 31,
+        "Straight": 493.6
+      },
+      {
+        "Angle": 18,
+        "Radius": 300,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 140
+      },
+      {
+        "Angle": 24,
+        "Radius": 300,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 140
+      },
+      {
+        "Angle": 12,
+        "Radius": 300,
+        "Rise": 2,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 384.5
+      },
+      {
+        "Angle": 36,
+        "Radius": 260,
+        "Rise": -6,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -8,
+        "Straight": 324.5
+      },
+      {
+        "Angle": 18,
+        "Radius": 320,
+        "Rise": -8,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -10,
+        "Straight": 140
+      },
+      {
+        "Angle": 46,
+        "Radius": 150,
+        "Rise": -4,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 100,
+        "Surface": "Ice"
+      },
+      {
+        "Angle": 16,
+        "Radius": 420,
+        "Surface": "Ice",
+        "Turn": "Left"
+      },
+      {
+        "Straight": 200,
+        "Surface": "Ice"
+      },
+      {
+        "Angle": 40,
+        "Radius": 380,
+        "Surface": "Ice",
+        "Turn": "Right"
+      },
+      {
+        "Straight": 160.5,
+        "Surface": "Ice"
+      },
+      {
+        "Angle": 22,
+        "Radius": 400,
+        "Surface": "Ice",
+        "Turn": "Left"
+      },
+      {
+        "Straight": 100,
+        "Surface": "Ice"
+      },
+      {
+        "Angle": 98,
+        "Radius": 130,
+        "Rise": 4,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 520
+      }
+    ],
+    "features": [
+      {
+        "From": 4956,
+        "Kind": "Bridge",
+        "To": 5026,
+        "Width": 16
+      },
+      {
+        "From": 7513,
+        "Kind": "Ice",
+        "To": 8700
+      },
+      {
+        "At": 250,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 2612,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 2860,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 3639,
+        "Kind": "Hazard",
+        "Side": "Right"
+      }
+    ]
+  },
+  "SafariRaid": {
+    "Id": "SafariRaid",
+    "Name": "Safari Raid",
+    "Origin": [
+      0,
+      0,
+      0
+    ],
+    "Heading": 0,
+    "Width": 18,
+    "Surface": "Gravel",
+    "StartAt": 40,
+    "FinishAt": 18119,
+    "StopAt": 18515,
+    "SpawnAt": 8,
+    "place_id": 124203583809178,
+    "segments": [
+      {
+        "Straight": 260
+      },
+      {
+        "Angle": 24,
+        "Radius": 420,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 160
+      },
+      {
+        "Angle": 28,
+        "Radius": 520,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 2,
+        "Straight": 120
+      },
+      {
+        "Angle": 38,
+        "Radius": 460,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 1,
+        "Straight": 100
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.34,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.26,
+        "Straight": 6.7
+      },
+      {
+        "Angle": 22,
+        "Radius": 620,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 120
+      },
+      {
+        "Rise": -3,
+        "Straight": 120
+      },
+      {
+        "Angle": 44,
+        "Radius": 380,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 0.84,
+        "Straight": 12.9
+      },
+      {
+        "Rise": -0.56,
+        "Straight": 12.9
+      },
+      {
+        "Rise": 0.84,
+        "Straight": 12.9
+      },
+      {
+        "Rise": -0.56,
+        "Straight": 12.9
+      },
+      {
+        "Rise": 0.84,
+        "Straight": 12.9
+      },
+      {
+        "Rise": -0.56,
+        "Straight": 12.9
+      },
+      {
+        "Rise": 0.84,
+        "Straight": 12.9
+      },
+      {
+        "Rise": -0.56,
+        "Straight": 12.9
+      },
+      {
+        "Rise": 0.84,
+        "Straight": 12.9
+      },
+      {
+        "Rise": -0.56,
+        "Straight": 12.9
+      },
+      {
+        "Rise": 0.84,
+        "Straight": 12.9
+      },
+      {
+        "Rise": -0.56,
+        "Straight": 12.9
+      },
+      {
+        "Rise": 0.84,
+        "Straight": 12.9
+      },
+      {
+        "Rise": -0.56,
+        "Straight": 12.9
+      },
+      {
+        "Rise": -7,
+        "Straight": 70
+      },
+      {
+        "Straight": 60,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": 7,
+        "Straight": 70
+      },
+      {
+        "Angle": 26,
+        "Radius": 300,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 1.05,
+        "Straight": 13.3
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 13.3
+      },
+      {
+        "Rise": 1.05,
+        "Straight": 13.3
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 13.3
+      },
+      {
+        "Rise": 1.05,
+        "Straight": 13.3
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 13.3
+      },
+      {
+        "Rise": 1.05,
+        "Straight": 13.3
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 13.3
+      },
+      {
+        "Rise": 1.05,
+        "Straight": 13.3
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 13.3
+      },
+      {
+        "Rise": 1.05,
+        "Straight": 13.3
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 13.3
+      },
+      {
+        "Angle": 40,
+        "Radius": 340,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 8.6
+      },
+      {
+        "Rise": -0.38,
+        "Straight": 8.6
+      },
+      {
+        "Angle": 24,
+        "Radius": 320,
+        "Rise": 2,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 0.99,
+        "Straight": 13.8
+      },
+      {
+        "Rise": -0.61,
+        "Straight": 13.8
+      },
+      {
+        "Rise": 0.99,
+        "Straight": 13.8
+      },
+      {
+        "Rise": -0.61,
+        "Straight": 13.8
+      },
+      {
+        "Rise": 0.99,
+        "Straight": 13.8
+      },
+      {
+        "Rise": -0.61,
+        "Straight": 13.8
+      },
+      {
+        "Rise": 0.99,
+        "Straight": 13.8
+      },
+      {
+        "Rise": -0.61,
+        "Straight": 13.8
+      },
+      {
+        "Rise": 0.99,
+        "Straight": 13.8
+      },
+      {
+        "Rise": -0.61,
+        "Straight": 13.8
+      },
+      {
+        "Rise": 0.99,
+        "Straight": 13.8
+      },
+      {
+        "Rise": -0.61,
+        "Straight": 13.8
+      },
+      {
+        "Rise": 0.99,
+        "Straight": 13.8
+      },
+      {
+        "Rise": -0.61,
+        "Straight": 13.8
+      },
+      {
+        "Rise": 0.99,
+        "Straight": 13.8
+      },
+      {
+        "Rise": -0.61,
+        "Straight": 13.8
+      },
+      {
+        "Angle": 30,
+        "Radius": 170,
+        "Rise": 1,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 110
+      },
+      {
+        "Angle": 50,
+        "Radius": 150,
+        "Rise": 1,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 2,
+        "Straight": 120
+      },
+      {
+        "Angle": 44,
+        "Radius": 160,
+        "Rise": 1,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 140
+      },
+      {
+        "Angle": 34,
+        "Radius": 220,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Rise": 0.52,
+        "Straight": 7.7
+      },
+      {
+        "Rise": -0.28,
+        "Straight": 7.7
+      },
+      {
+        "Angle": 68,
+        "Radius": 180,
+        "Rise": 3,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 12,
+        "Straight": 160
+      },
+      {
+        "Rise": 14,
+        "Straight": 150
+      },
+      {
+        "Angle": 140,
+        "Radius": 36,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 18,
+        "Straight": 230
+      },
+      {
+        "Angle": 140,
+        "Radius": 36,
+        "Rise": 4,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 18,
+        "Straight": 230
+      },
+      {
+        "Angle": 22,
+        "Radius": 160,
+        "Rise": 4,
+        "Turn": "Left"
+      },
+      {
+        "Rise": 4,
+        "Straight": 180
+      },
+      {
+        "Angle": 88,
+        "Radius": 300,
+        "Rise": 1,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 8
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 14
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 14
+      },
+      {
+        "Angle": 22,
+        "Radius": 500,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 120
+      },
+      {
+        "Rise": 4,
+        "Straight": 70
+      },
+      {
+        "Rise": -8,
+        "Straight": 140
+      },
+      {
+        "Rise": -1,
+        "Straight": 80
+      },
+      {
+        "Angle": 28,
+        "Radius": 380,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": 0.4,
+        "Straight": 6.7
+      },
+      {
+        "Rise": -0.4,
+        "Straight": 6.7
+      },
+      {
+        "Angle": 40,
+        "Radius": 280,
+        "Rise": -6,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Rise": -0.1,
+        "Straight": 16
+      },
+      {
+        "Rise": -2.5,
+        "Straight": 16
+      },
+      {
+        "Angle": 22,
+        "Radius": 260,
+        "Rise": -6,
+        "Turn": "Left"
+      },
+      {
+        "Rise": -0.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -2.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -0.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -2.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -0.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -2.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -0.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -2.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -0.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -2.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -0.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -2.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -0.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -2.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -0.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -2.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -0.44,
+        "Straight": 16.7
+      },
+      {
+        "Rise": -2.44,
+        "Straight": 16.7
+      },
+      {
+        "Angle": 34,
+        "Radius": 300,
+        "Rise": -6,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -22,
+        "Straight": 260
+      },
+      {
+        "Rise": -6,
+        "Straight": 268.8
+      },
+      {
+        "Angle": 12,
+        "Radius": 380,
+        "Rise": -6,
+        "Turn": "Right"
+      },
+      {
+        "Rise": -6,
+        "Straight": 220
+      },
+      {
+        "Straight": 600
+      },
+      {
+        "Angle": 2,
+        "Radius": 1100,
+        "Turn": "Right"
+      },
+      {
+        "Straight": 480
+      },
+      {
+        "Angle": 12,
+        "Radius": 900,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 360
+      },
+      {
+        "Angle": 28,
+        "Radius": 520,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 3,
+        "Straight": 240
+      },
+      {
+        "Angle": 22,
+        "Radius": 420,
+        "Rise": 4,
+        "Surface": "Sand",
+        "Turn": "Right"
+      },
+      {
+        "Rise": 2,
+        "Straight": 80,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": 20,
+        "Straight": 160,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -16,
+        "Straight": 55,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -1,
+        "Straight": 50,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 28,
+        "Radius": 240,
+        "Surface": "Sand",
+        "Turn": "Left"
+      },
+      {
+        "Rise": 22,
+        "Straight": 140,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 36,
+        "Radius": 150,
+        "Rise": -4,
+        "Surface": "Sand",
+        "Turn": "Right"
+      },
+      {
+        "Rise": -16,
+        "Straight": 50,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -2,
+        "Straight": 60,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 30,
+        "Radius": 110,
+        "Rise": -2,
+        "Surface": "Sand",
+        "Turn": "Left"
+      },
+      {
+        "Straight": 60,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": 18,
+        "Straight": 130,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -16,
+        "Straight": 45,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -3,
+        "Straight": 120,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 48,
+        "Radius": 300,
+        "Rise": 4,
+        "Surface": "Sand",
+        "Turn": "Right"
+      },
+      {
+        "Rise": 26,
+        "Straight": 180,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -18,
+        "Straight": 60,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -1,
+        "Straight": 40,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 26,
+        "Radius": 200,
+        "Rise": -2,
+        "Surface": "Sand",
+        "Turn": "Left"
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": 1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -1.1,
+        "Straight": 16,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": 20,
+        "Straight": 140,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -18,
+        "Straight": 50,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": -2,
+        "Straight": 150,
+        "Surface": "Sand"
+      },
+      {
+        "Angle": 14,
+        "Radius": 300,
+        "Surface": "Sand",
+        "Turn": "Right"
+      },
+      {
+        "Rise": -2,
+        "Straight": 120,
+        "Surface": "Sand"
+      },
+      {
+        "Straight": 120
+      },
+      {
+        "Angle": 40,
+        "Radius": 500,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": 0.55,
+        "Straight": 7.9
+      },
+      {
+        "Rise": -0.55,
+        "Straight": 7.9
+      },
+      {
+        "Angle": 22,
+        "Radius": 600,
+        "Turn": "Left"
+      },
+      {
+        "Straight": 29.5
+      },
+      {
+        "Angle": 18,
+        "Radius": 420,
+        "Turn": "Left"
+      },
+      {
+        "Rise": -6,
+        "Straight": 70
+      },
+      {
+        "Straight": 60,
+        "Surface": "Sand"
+      },
+      {
+        "Rise": 6,
+        "Straight": 70
+      },
+      {
+        "Angle": 32,
+        "Radius": 400,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": -0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": 0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": -0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": 0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": -0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": 0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": -0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": 0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": -0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": 0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": -0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": 0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": -0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": 0.5,
+        "Straight": 8.8
+      },
+      {
+        "Rise": -0.5,
+        "Straight": 8.8
+      },
+      {
+        "Straight": 140
+      },
+      {
+        "Angle": 78,
+        "Radius": 320,
+        "Turn": "Right"
+      },
+      {
+        "Rise": 0.59,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -1.21,
+        "Straight": 14.4
+      },
+      {
+        "Rise": 0.59,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -1.21,
+        "Straight": 14.4
+      },
+      {
+        "Rise": 0.59,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -1.21,
+        "Straight": 14.4
+      },
+      {
+        "Rise": 0.59,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -1.21,
+        "Straight": 14.4
+      },
+      {
+        "Rise": 0.59,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -1.21,
+        "Straight": 14.4
+      },
+      {
+        "Rise": 0.59,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -1.21,
+        "Straight": 14.4
+      },
+      {
+        "Rise": 0.59,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -1.21,
+        "Straight": 14.4
+      },
+      {
+        "Rise": 0.59,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -1.21,
+        "Straight": 14.4
+      },
+      {
+        "Rise": 0.59,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -1.21,
+        "Straight": 14.4
+      },
+      {
+        "Rise": -5.55,
+        "Straight": 240
+      },
+      {
+        "Rise": 4,
+        "Straight": 70
+      },
+      {
+        "Rise": -8,
+        "Straight": 140
+      },
+      {
+        "Rise": -1,
+        "Straight": 100
+      },
+      {
+        "Straight": 560
+      }
+    ],
+    "features": [
+      {
+        "At": 5422,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 5740,
+        "Kind": "DontCut"
+      },
+      {
+        "At": 7502,
+        "Kind": "Hazard",
+        "Side": "Right"
+      },
+      {
+        "At": 17679,
+        "Kind": "Hazard",
+        "Side": "Right"
+      },
+      {
+        "From": 3260,
+        "Kind": "Sand",
+        "To": 3330
+      },
+      {
+        "From": 16605,
+        "Kind": "Sand",
+        "To": 16665
+      },
+      {
+        "From": 1555,
+        "Kind": "Sand",
+        "Side": "Left",
+        "To": 1595
+      },
+      {
+        "From": 9663,
+        "Kind": "Sand",
+        "Side": "Right",
+        "To": 9703
+      }
+    ]
+  }
+}

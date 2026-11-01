@@ -1,0 +1,8 @@
+{
+  "profile": "turbo_soccer_standard",
+  "profile_sha256": "3a9fe2a8459e66318a37d0f650bca46fd6127823d58cbe1687296c5e17527957",
+  "step_sim_units": 128,
+  "vertices": 21015,
+  "triangles": 42026,
+  "purpose": "Approximate inspection mesh; runtime uses exact analytic collision maths; not a model input"
+}

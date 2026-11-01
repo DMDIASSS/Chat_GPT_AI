@@ -1,5 +1,9 @@
 # GigaLearn_Project — separate C++ research workspace
 
+The newer tested setup is [Native_Backend/README.md](Native_Backend/README.md). It
+builds CPU C++ PPO, supports replay pretraining/reset banks and bounded/resumable
+runs. The older scaffold below remains separate.
+
 **This is an integration/bootstrap scaffold, not an already trained GigaLearn bot.** Unpacked here:
 
 `E:\Downloads\Chat_GPT_AI\GigaLearn_Project\`

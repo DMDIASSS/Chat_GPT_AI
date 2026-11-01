@@ -1,0 +1,27 @@
+{
+  "version": "1.1.0",
+  "date": "2026-10-31",
+  "implementation": "Kinematic client road following with continuous pose correction and teleport recovery",
+  "offline_checks": {
+    "luau_compile": true,
+    "rail_angle_up_to_75": true,
+    "armed_on_execute": true,
+    "reverse_and_rejoin_stay_running": true,
+    "open_road_turnaround": true,
+    "closed_loop_wrap": true,
+    "teleport_recovery": true,
+    "chat_and_countdown_pause": true,
+    "ownership_guard": true,
+    "stop_and_reinjection_cleanup": true,
+    "diagnostics_export": true
+  },
+  "legacy_modules": "Existing controller / road / lease / surrogate checks retained; they do not prove the new kinematic mode in Roblox.",
+  "live_roblox_tested": false,
+  "jjsploit_tested": false,
+  "limitations": [
+    "Follows available minimap, local map path, or active race data; cannot infer an arbitrary unmarked road.",
+    "Waits for a loaded road surface instead of teleporting into empty map geometry.",
+    "No live networking, server correction, collision or drift-scoring validation.",
+    "Direct position control and open-road turnarounds may be visibly abrupt."
+  ]
+}

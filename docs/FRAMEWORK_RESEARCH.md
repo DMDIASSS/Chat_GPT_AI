@@ -1,0 +1,33 @@
+# Framework choices supported by inspected source
+
+The highest-priority migration is preserving the capable attention actor while accelerating its collection and optimization. C++ versus Rust is secondary to architecture, observation/action/timing parity, accurate physics, correct trajectories and measured improvement per hour. RLGym is an environment API; it can be used with native RocketSim and Rust collection. Calling all RLGym training slow conflates several layers.
+
+| Inspected source | What it supplies | Fit for this project |
+| --- | --- | --- |
+| [GigaLearnCPP-Leak](https://github.com/ZealanL/GigaLearnCPP-Leak/tree/86e11c3881a21225a43c36b14af40f0b3c87e7dd) | C++ RocketSim environment collection, LibTorch PPO, shared-head MLPs, action masks and league infrastructure | Existing toolchain works. Add an attention policy/experience adapter and exact Nexto observations rather than replace update180 with the current MLP. |
+| [JPK314/rlgym-learn](https://github.com/JPK314/rlgym-learn/tree/250379331d21946afaed384dd0fadc857f3df6b6) | Rust/shared-memory environment orchestration with a generic Python AgentController | A plausible alternative that can retain PyTorch attention. Its Python controller, serializers and batched tuple-observation storage need adaptation and benchmarking. It is not Python-only collection. |
+| [rlgym-learn-algos](https://github.com/JPK314/rlgym-learn-algos/tree/466b8e30f911914602a5cb3ba6053eabc53ab0e3) | PyTorch actor/critic/PPO interfaces and Rust trajectory helpers | Inspect `python/rlgym_learn_algos/ppo/actor_critic/actor.py`, `ppo_agent_controller.py`, `ppo_learner.py`; implement a compatible attention actor/controller rather than instantiate the default MLP. |
+| [VirxEC/rlgymppo_rs](https://github.com/VirxEC/rlgymppo_rs/tree/71414eff865eecb18ebfad0e2f5623c874fb5841) | Rust/Burn PPO, RocketSim v3, self-play, skill tracking and a generated Nexto attention inference model | Particularly useful reference for `rlgymppo-nexto/nexto/nexto-model.rs`, observations and actions. Existing transfer-learning TeacherConfig still specifies flat MLP layer sizes/checkpoints. Arbitrary update180 weights are not automatically supported: conversion, forward parity and trainable-actor integration remain. |
+| [SubparN0va/GGLBot](https://github.com/SubparN0va/GGLBot/tree/d5d21daa7653f842699b590d6bf85597c617e4d8) | Small C++ RLBot v5 deployment runner for native models | Useful after a compatible model exists. It removes training/optimization code, so it cannot resolve learning failure by itself. |
+| [RLGym/rlgym-tools](https://github.com/RLGym/rlgym-tools/tree/0c63b2a8878233f34869b9ea1e32e19548a0cd16) | Replays, mutators, team-spirit rewards and mechanics helpers | Reuse version-tested components; inspect edge cases and state transitions. Equal-team replay starts cannot silently become valid 1v3 demonstrations. |
+| [RLCarInputSolver](https://github.com/ZealanL/RLCarInputSolver/tree/b31efbf8f414cf8b5cfb249b5106967237a61644) | C++ controller reconstruction between sequential car states | Worth validating against exact TAS traces for aerial labels. Its README explicitly documents ambiguous flip-cancel, stall, powerslide and collision cases. Reconstructed inputs are not original recorded controls. |
+| [replay-pretraining](https://github.com/Rolv-Arild/replay-pretraining/tree/8c15e847dc9ecf37ef8ad38d6c615b080772c959) | Replay imitation/pretraining design | Study sampling, alignment and confidence; it is historical RLGym v1 reference code, not a ready replacement for the current actor. |
+| [Prism](https://github.com/AechPro/Prism/tree/3f36ba85f05a2e5cd46e1b00cd7c27c7d9f74880) | Modular Q-learning and ablation patterns | Its published best combination was evaluated on MinAtar. It is not evidence that replacing this Rocket League PPO actor with that recipe produces a stronger bot. |
+
+The standalone project probe has actually verified C++ attention forward parity and gradients; see [ATTENTION_NATIVE_COMPATIBILITY.md](ATTENTION_NATIVE_COMPATIBILITY.md). No Rust learner was built or benchmarked in this audit. Public examples were read, not installed into the user's venv or substituted into active training. No untrusted third-party scripts were executed.
+
+## Reward and replay priorities
+
+There is no verified universal best reward in these sources. Keep goals/concessions dominant, use bounded progress shaping, record each component and its contribution, and compare actual game outcomes. Changing rewards, network, parser and curriculum together prevents identifying what helped. Contact/recovery practice is useful only when it transfers to scoring/defense.
+
+For coordinated teams, distinguish team-goal credit from individual action credit. The new worlds control one learner slot with frozen supporting teammates; a team goal can come from those teammates. They establish input/controller correctness and expose weaknesses, but they do not certify an entire learned squad. A later native collector should explicitly gather all learner-controlled agents with correct per-agent trajectories, opponent exclusion, team spirit and per-format retention.
+
+For imitation, verify recorded fields, inverse controls, time alignment and closed-loop execution. Use grouped replay splits, preserve the test set and cap low-confidence gradient contributions. Short goal-adjacent windows should include negative and defensive outcomes so the learner does not just reproduce attacking positions while lacking recovery and defense.
+
+## Authoritative documentation and access
+
+Direct requests to the two supplied rlgym.org cheat sheets returned a proxy 403 in this cloud session. Both were recovered from [RLGym/rlgym.github.io](https://github.com/RLGym/rlgym.github.io/tree/772e2bdce97935d6ee27e92836c844ba2bcdd3a9), at `docs/Cheatsheets/game_values.md` and `reinforcement_learning_terms.md`. The installed common_values agrees on the checked 120Hz tick rate, 91.25 ball radius, 2300 maximum car speed, 2200 supersonic threshold, goal dimensions and 33.3 boost consumption. Pin the actual simulator/library versions and units when porting, rather than copy constants from old chat snippets.
+
+PyPI rlgym metadata was accessible. GitHub source was accessed through the existing HTTPS git proxy. There is no need for another token, re-export or direct Discord login to repeat this research.
+
+The user clarified that the JuanDiego high-throughput framework is private. It cannot be inspected or independently benchmarked here. If a public release or reproducible benchmark becomes available, examine its physics/collision fidelity, hardware, unit definitions and policy/PPO workload. Until then, do not plan the trainer around an inaccessible speed claim or contact its author.

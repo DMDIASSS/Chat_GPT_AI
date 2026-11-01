@@ -1,0 +1,13 @@
+diff --git a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
+--- a/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
++++ b/GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp
+@@ -542,7 +542,8 @@
+ 					int oldVersionIdx = RocketSim::Math::RandInt(0, versionMgr->versions.size());
+ 					oldVersion = &versionMgr->versions[oldVersionIdx];
+ 
+-					Team oldVersionTeam = Team(RocketSim::Math::RandInt(0, 2)); 
++					Team oldVersionTeam = Team(RocketSim::Math::RandInt(0, 2));
++                    if(const char* fixed=std::getenv("SLATER_GL_FIXED_FROZEN_TEAM")){int team=std::atoi(fixed);if(team==0||team==1)oldVersionTeam=Team(team);} 
+ 					
+ 					newPlayerIndices.clear();
+ 					oldVersionPlayerMask.resize(numPlayers);

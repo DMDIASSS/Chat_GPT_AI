@@ -20,6 +20,8 @@ backup_before_grounded_*/
 # Generated reports
 benchmark_reports/
 model_tournament_reports/
+round_robin_reports/
+round_robin_smoke_reports/
 
 # Archives
 *.zip

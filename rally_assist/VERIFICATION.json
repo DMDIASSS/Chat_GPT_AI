@@ -1,0 +1,100 @@
+{
+  "version": "1.1.0",
+  "date": "2026-11-01",
+  "unit_tests": {
+    "passed": 22,
+    "failed": 0,
+    "scope": [
+      "GUI drag, minimize, close, reinjection, F9 road-assist toggle and brake entry",
+      "Verified key input, stale delivery and late presses; F8/focus/countdown/seat releases",
+      "Partial pedal averages and digital steering averages at 30/60/120 Hz, including small inputs",
+      "Native analog input and handling/brake restoration without multiplier compounding",
+      "Conservative fallback grip, wet/surface grip, native braking preview and high-grip rollover steering limits",
+      "Full rotated-car corridor envelope, boundary guard, upright damping and obstacle trajectory alternatives",
+      "Independent ghost decoder, capture rejection and saved collision-road alignment",
+      "Generated script byte consistency, Luau compilation and no direct score/network/teleport calls"
+    ]
+  },
+  "luau_compile": true,
+  "live_roblox_tested": false,
+  "live_executor_tested": false,
+  "saved_collision_road_samples": 46,
+  "planar_driving": {
+    "model": "Independent planar bicycle; actuator lag and grip cap; no Roblox suspension/collisions/networking",
+    "results": [
+      {
+        "stage": "PineForest",
+        "hz": 60,
+        "seconds": 76.16666666666667,
+        "max_center_deviation": 4.464311151127072,
+        "min_body_edge_clearance": 1.6218410244043362,
+        "complete": true
+      },
+      {
+        "stage": "RiverbendCanyon",
+        "hz": 60,
+        "seconds": 152.16666666666666,
+        "max_center_deviation": 4.912438023552965,
+        "min_body_edge_clearance": 1.2561751717769312,
+        "complete": true
+      },
+      {
+        "stage": "PineForest",
+        "hz": 30,
+        "seconds": 76.03333333333333,
+        "max_center_deviation": 4.712720336440281,
+        "min_body_edge_clearance": 1.418956302456937,
+        "complete": true
+      },
+      {
+        "stage": "PineForest",
+        "hz": 120,
+        "seconds": 76.65,
+        "max_center_deviation": 4.443537737970526,
+        "min_body_edge_clearance": 1.6634014757979467,
+        "complete": true
+      }
+    ],
+    "all_complete": true
+  },
+  "planar_setup": {
+    "grip_studs_per_second_squared": 42,
+    "braking_studs_per_second_squared": 39,
+    "car_half_width_studs": 2.8,
+    "car_half_length_studs": 5.15,
+    "road_margin_studs": 1.2,
+    "wheelbase_studs": {
+      "PineForest": 7.5,
+      "RiverbendCanyon": 8.3
+    },
+    "speed_cap_kmh": 180,
+    "steering": "Digital turn/return-rate approximation; no actual key-pulse channel",
+    "guard_forces_simulated": false,
+    "assertions": [
+      "Every case reaches the finish",
+      "Commands are finite and bounded",
+      "Entire rotated footprint stays within the numeric road, including narrower bridges"
+    ]
+  },
+  "limits": [
+    "Planar checks are approximate and are not native Roblox physics or race-time benchmarks.",
+    "Roblox collisions, suspension, roll dynamics, keyboard pulse timing, networking and server validation require live testing.",
+    "Road assist reduces risk; sparse obstacle rays and approximate vehicle/road data cannot guarantee collision or rollover prevention.",
+    "Full-stage planar driving was checked on Pine Forest and Riverbend Canyon; the other five profiles have geometry/reference checks only.",
+    "Menu showcase runs are not verified world records; personal ghost use depends on data the game already loads."
+  ],
+  "sources_sha256": {
+    "route.lua": "b203df951e8d9c6af6f66017af75c06edb687c4751cb4bb60151da707cd0db47",
+    "controller.lua": "bd2eb6b3dbbd5e666caedb31bd3e42ec309f4f92db13c89d1546a34663cd8d83",
+    "input.lua": "ae97c0c8567d3014699a1a25a6a7ef881869fb317139542efaa572dd7075bf80",
+    "adapter.lua": "552842a59d08f578eca43a70350821e838ce207f8b0c85abfeb8cfe06998b566",
+    "ghost.lua": "2b98a76b9a4fce5c6f6c92b188fee762e5f59597a48ad77d4382638fb2384602",
+    "client.lua": "23864c56bbbf2e8775b2544aff36a05178a2211c5a4795baa4a2872ed8f1c5d0",
+    "stage_profiles.json": "6bb4e0d76c2997c68a34001fb6040e31be9221520ce743578386c148ac2aec30",
+    "showcase_lines.json": "6529d774d19e1523a748eb3a25f96c346057a3062977288054e17055fe7ad5c2",
+    "build.py": "66f2c34f3a89dddfe1667a123c264896aa35c271a6e9cbac1ac9f290e7e3b6a3",
+    "tests/test_assist.py": "11e2a351999ed06328445f16068c88a2c7f8473cd36fc5017879c63b0345013d",
+    "tests/planar.lua": "61c383b2d800e7ec5bd2fb458a1f45c368a5385224b01c702f7c22a65a9244d0",
+    "tests/run_planar.py": "d791ec0ae6ce2f74b20ce697ba35429f863000f3d4f2433c54572fb1ee1d7eae"
+  }
+}

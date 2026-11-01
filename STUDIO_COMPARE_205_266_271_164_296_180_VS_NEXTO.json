@@ -1,0 +1,135 @@
+{
+  "selector_run": "compare_six_vs_nexto01",
+  "max_games": 1000,
+  "until": "screen",
+  "selector": {
+    "baseline": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt",
+    "anchors": {
+      "update205": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000205.pt",
+      "update266": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000266.pt",
+      "update271": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+      "update164": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000164.pt",
+      "update296": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000296.pt",
+      "update180": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt"
+    },
+    "families": {
+      "requested_mechanics": [
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000205.pt",
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000266.pt",
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000164.pt",
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000296.pt",
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt"
+      ]
+    },
+    "rivals": {
+      "nexto": "vendor/nexto/nexto-model.pt"
+    },
+    "device": "auto",
+    "worlds": 8,
+    "top_per_family": 6,
+    "refine_per_family": 6,
+    "uncertain_extra_per_family": 0,
+    "confirm_leaders": 6,
+    "learner_scripted_kickoff": false,
+    "frozen_scripted_kickoff": true,
+    "stages": {
+      "screen": {
+        "seeds": [
+          851000000,
+          851000997,
+          851001994,
+          851002991,
+          851003988,
+          851004985,
+          851005982,
+          851006979
+        ],
+        "seconds": 120,
+        "formats": [
+          "1v1"
+        ],
+        "rivals": [
+          "nexto"
+        ],
+        "team_policy": "fixed_reference",
+        "head_to_head_per_family": 0
+      },
+      "refine": {
+        "seeds": [
+          852000000,
+          852000997,
+          852001994,
+          852002991,
+          852003988,
+          852004985,
+          852005982,
+          852006979
+        ],
+        "seconds": 180,
+        "formats": [
+          "1v1"
+        ],
+        "rivals": [
+          "nexto"
+        ],
+        "team_policy": "fixed_reference",
+        "head_to_head_per_family": 0
+      },
+      "finalists": {
+        "seeds": [
+          853000000,
+          853000997,
+          853001994,
+          853002991,
+          853003988,
+          853004985,
+          853005982,
+          853006979,
+          853007976,
+          853008973,
+          853009970,
+          853010967
+        ],
+        "seconds": 300,
+        "formats": [
+          "1v1"
+        ],
+        "rivals": [
+          "nexto"
+        ],
+        "team_policy": "fixed_reference",
+        "head_to_head_per_family": 0
+      },
+      "confirm": {
+        "seeds": [
+          854000000,
+          854000997,
+          854001994,
+          854002991,
+          854003988,
+          854004985,
+          854005982,
+          854006979,
+          854007976,
+          854008973,
+          854009970,
+          854010967,
+          854011964,
+          854012961,
+          854013958,
+          854014955
+        ],
+        "seconds": 300,
+        "formats": [
+          "1v1"
+        ],
+        "rivals": [
+          "nexto"
+        ],
+        "team_policy": "fixed_reference",
+        "head_to_head_per_family": 0
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "selector_run": "nexto_rounds400_01",
+  "max_games": 100000,
+  "until": "screen",
+  "selector": {
+    "baseline": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt",
+    "anchors": {
+      "update180": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000180.pt"
+    },
+    "families": {
+      "original_mechanics": [
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_*.pt"
+      ]
+    },
+    "rivals": {
+      "nexto": "vendor/nexto/nexto-model.pt"
+    },
+    "device": "auto",
+    "worlds": 8,
+    "job_group": 128,
+    "learner_scripted_kickoff": true,
+    "frozen_scripted_kickoff": true,
+    "goal_race": {
+      "rounds_per_format": 40,
+      "timeout_seconds": 90,
+      "early_stop_streak": 10,
+      "seed_base": 881000000,
+      "formats": [
+        "1v1",
+        "2v2",
+        "3v3"
+      ]
+    },
+    "stages": {
+      "screen": {
+        "rivals": [
+          "nexto"
+        ],
+        "head_to_head_per_family": 0
+      },
+      "refine": {
+        "rivals": [
+          "nexto"
+        ],
+        "head_to_head_per_family": 0
+      },
+      "finalists": {
+        "rivals": [
+          "nexto"
+        ],
+        "head_to_head_per_family": 0
+      },
+      "confirm": {
+        "rivals": [
+          "nexto"
+        ],
+        "head_to_head_per_family": 0
+      }
+    }
+  }
+}

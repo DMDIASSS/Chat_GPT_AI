@@ -1,0 +1,160 @@
+{
+  "source": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+  "selection": "",
+  "build_dir": "",
+  "native_run": "studio_attention01",
+  "selector_run": "update271_nexto_quick01",
+  "campaign_run": "studio_campaign01",
+  "updates": 100,
+  "checkpoint": "",
+  "eval_seeds": 8,
+  "eval_seconds": 60.0,
+  "max_games": 1000,
+  "until": "screen",
+  "export_name": "StudioChampion01",
+  "export_kickoff": "both",
+  "native_profile": {
+    "games": 8,
+    "steps": 128,
+    "device": "auto",
+    "seed": 20261013,
+    "actor_lr": 3e-06,
+    "critic_lr": 0.0001,
+    "target_kl": 0.005,
+    "teacher_weight": 0.1,
+    "seconds": 12.0,
+    "eval_seeds": 2,
+    "routine": "match",
+    "formats": "1v1,2v2,3v3",
+    "selfplay_refresh": 10
+  },
+  "selector": {
+    "goal_race": {
+      "rounds_per_format": 30,
+      "timeout_seconds": 45,
+      "early_stop_streak": 8,
+      "seed_base": 202610140,
+      "formats": [
+        "1v1",
+        "2v2",
+        "3v3"
+      ]
+    },
+    "baseline": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+    "anchors": {
+      "update271": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt"
+    },
+    "families": {
+      "update271_quick": [
+        "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+        "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000010",
+        "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000020"
+      ]
+    },
+    "rivals": {
+      "nexto": "vendor/nexto/nexto-model.pt"
+    },
+    "device": "auto",
+    "worlds": 16,
+    "job_group": 128,
+    "top_per_family": 4,
+    "refine_per_family": 8,
+    "uncertain_extra_per_family": 4,
+    "confirm_leaders": 4,
+    "learner_scripted_kickoff": true,
+    "frozen_scripted_kickoff": true,
+    "stages": {
+      "screen": {
+        "seeds": [
+          730000000
+        ],
+        "seconds": 20.0,
+        "formats": [
+          "1v1"
+        ],
+        "rivals": [
+          "nexto"
+        ],
+        "team_policy": "fixed_reference"
+      },
+      "refine": {
+        "seeds": [
+          731000000,
+          731000997
+        ],
+        "seconds": 30.0,
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "team_policy": "fixed_reference",
+        "rivals": [
+          "nexto"
+        ]
+      },
+      "finalists": {
+        "seeds": [
+          732000000,
+          732000997,
+          732001994,
+          732002991
+        ],
+        "seconds": 45.0,
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "head_to_head_per_family": 1,
+        "team_policy": "candidate_squad",
+        "rivals": [
+          "nexto"
+        ]
+      },
+      "confirm": {
+        "seeds": [
+          733000000,
+          733000997,
+          733001994,
+          733002991,
+          733003988,
+          733004985,
+          733005982,
+          733006979
+        ],
+        "seconds": 60.0,
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "team_policy": "candidate_squad",
+        "rivals": [
+          "nexto"
+        ]
+      }
+    }
+  },
+  "campaign": {
+    "cycles": 8,
+    "chunk_updates": 20,
+    "branch_updates": 100,
+    "plateau_chunks": 3,
+    "screen_every": 5,
+    "max_minutes": 0.0,
+    "unlimited_until_paused": false
+  },
+  "replays": {
+    "inputs": "data/replays/ranked-duels",
+    "output": "data/isolated/studio_replays01",
+    "workers": 2,
+    "max_replays": 100,
+    "per_replay": 1024,
+    "max_samples": 100000,
+    "prepared": "data/isolated/event_curriculum/windows01",
+    "audit_checkpoint": "",
+    "raw_count": 4,
+    "audit_run": "studio_replay_audit01"
+  }
+}

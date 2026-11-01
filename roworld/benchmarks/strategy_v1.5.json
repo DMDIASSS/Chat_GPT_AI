@@ -1,0 +1,140 @@
+{
+  "scope": "Development regression comparison, not competitive strength or human-opponent validation",
+  "baseline_commit": "18c20103a5021830be28ea1b4e7ab4a13b28168e",
+  "new_policy_sha256": "4dc905f84644d1de88d661c92fdff18273e1f9ab35ed1f9cd678c714ca57f0ed",
+  "new_strategy_sha256": "73bbd5bd69e6e10446d77083fdee078434c4a3dc630418e535af404b58143930",
+  "engine": "Original supplied RoWorld Sim, difficulty 1; no game code redistributed",
+  "supplied_place_sha256": "8be1727d80e44d4c1b0045b7ff7f19c39f8251e58efedca18f2243676f988399",
+  "setup": {
+    "map_width": 128,
+    "map_height": 96,
+    "k_lin": 4,
+    "terrain": "Flat land with a 2-cell water border",
+    "nation_starts": [
+      [
+        20,
+        20
+      ],
+      [
+        60,
+        18
+      ],
+      [
+        100,
+        20
+      ],
+      [
+        20,
+        70
+      ],
+      [
+        100,
+        70
+      ],
+      [
+        105,
+        45
+      ]
+    ],
+    "tribes": 12,
+    "local_spawn": [
+      55,
+      48
+    ],
+    "seeds": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "warmup_ticks": 3,
+    "measured_ticks": 1800,
+    "decision_every_ticks": 6,
+    "observation": "Independent mirror updated from original Sim.snapshot and Sim.step deltas",
+    "human_opponents": false
+  },
+  "results": [
+    {
+      "version": "old",
+      "seed": 1,
+      "alive": true,
+      "land": 5056,
+      "troops": 911489,
+      "gold": 299530,
+      "orders": 58,
+      "buildings": 5
+    },
+    {
+      "version": "new",
+      "seed": 1,
+      "alive": true,
+      "land": 3155,
+      "troops": 1220946,
+      "gold": 192050,
+      "orders": 48,
+      "buildings": 3
+    },
+    {
+      "version": "old",
+      "seed": 2,
+      "alive": true,
+      "land": 4476,
+      "troops": 952622,
+      "gold": 147650,
+      "orders": 56,
+      "buildings": 4
+    },
+    {
+      "version": "new",
+      "seed": 2,
+      "alive": true,
+      "land": 4296,
+      "troops": 1164984,
+      "gold": 23100,
+      "orders": 49,
+      "buildings": 3
+    },
+    {
+      "version": "old",
+      "seed": 3,
+      "alive": true,
+      "land": 4966,
+      "troops": 837340,
+      "gold": 198850,
+      "orders": 60,
+      "buildings": 3
+    },
+    {
+      "version": "new",
+      "seed": 3,
+      "alive": true,
+      "land": 3403,
+      "troops": 1087054,
+      "gold": 242150,
+      "orders": 51,
+      "buildings": 3
+    },
+    {
+      "version": "old",
+      "seed": 4,
+      "alive": true,
+      "land": 2992,
+      "troops": 235826,
+      "gold": 75600,
+      "orders": 54,
+      "buildings": 3
+    },
+    {
+      "version": "new",
+      "seed": 4,
+      "alive": true,
+      "land": 4883,
+      "troops": 578871,
+      "gold": 182400,
+      "orders": 59,
+      "buildings": 2
+    }
+  ],
+  "interpretation": "Both policies survived all four short worlds. New retained larger home armies in four, held less land in three. More cautious behaviour trades expansion for reserves; no win-rate conclusion is supported.",
+  "country_model_check": "18 cases matched the original SimAI._defend conditional counterattack amount"
+}

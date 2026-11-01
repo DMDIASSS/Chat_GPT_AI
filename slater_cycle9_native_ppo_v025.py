@@ -237,6 +237,10 @@ def update(actor, teacher, critic, actor_opt, critic_opt, rows,
     ts['old_logp'] = torch.tensor(rows['old_logp'], device=device, dtype=torch.float32)
     ts['adv'] = torch.as_tensor(rows['adv'], device=device)
     ts['ret'] = torch.as_tensor(rows['ret'], device=device)
+    if 'task' in rows:
+        ts['task'] = torch.as_tensor(rows['task'],device=device,dtype=torch.long)
+    if 'anchor_weight' in rows:
+        ts['anchor_weight'] = torch.as_tensor(rows['anchor_weight'],device=device,dtype=torch.float32)
     ts['adv'] = (ts['adv'] - ts['adv'].mean()) / (ts['adv'].std(unbiased=False) + 1e-7)
     rng = np.random.default_rng(seed)
     losses = []
@@ -254,18 +258,20 @@ def update(actor, teacher, critic, actor_opt, critic_opt, rows,
             adv = ts['adv'][inds]
             surrogate = torch.minimum(ratio*adv, clipped*adv).mean()
             temp = 1.5
-            kl = F.kl_div(F.log_softmax(logits/temp, dim=-1),
+            per_state_kl = F.kl_div(F.log_softmax(logits/temp, dim=-1),
                           F.softmax(fixed_logits/temp, dim=-1),
-                          reduction='batchmean') * (temp*temp)
+                          reduction='none').sum(-1) * (temp*temp)
+            kl = per_state_kl.mean()
+            anchor_loss=(per_state_kl*ts['anchor_weight'][inds]).mean() if 'anchor_weight' in ts else teacher_weight*kl
             ent = dist.entropy().mean()
-            actor_loss = -surrogate + teacher_weight * kl - .003 * ent
+            actor_loss = -surrogate + anchor_loss - .003 * ent
             if not torch.isfinite(actor_loss):
                 raise FloatingPointError('Actor loss became nonfinite')
             actor_opt.zero_grad(set_to_none=True)
             actor_loss.backward()
             torch.nn.utils.clip_grad_norm_(actor.parameters(), .5)
             actor_opt.step()
-            value = critic(x)
+            value = critic.value_for_task(x,ts['task'][inds]) if 'task' in ts else critic(x)
             value_loss = F.smooth_l1_loss(value, ts['ret'][inds])
             if not torch.isfinite(value_loss):
                 raise FloatingPointError('Value loss became nonfinite')

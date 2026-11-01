@@ -1,0 +1,1200 @@
+{
+  "schema": "slater-freestyle-mechanics-v1",
+  "source_revision": "9302e5fb0cb1556e76f4317d62a18cd4ffb43004",
+  "sources": [
+    "https://github.com/0byte-coding/rocket_league_mechanics",
+    "https://0byte-coding.github.io/rocket_league_mechanics/",
+    "https://www.rocketleague-help.com/mechanics-by-rank",
+    "https://www.trophi.ai/post/rocket-league-mechanics-by-rank",
+    "https://prejump.com/rocket-league-mechanics"
+  ],
+  "source_access": "0byte public repository read; the four website requests were blocked by the cloud proxy.",
+  "notes": [
+    "Names and community aliases are not ground-truth reward definitions.",
+    "Implemented events and proxies are objectives, not proof that a trained policy mastered them.",
+    "Other listed mechanics are roadmap entries; they have no dedicated reward detector in this release."
+  ],
+  "mechanics": [
+    {
+      "id": "air-dribble",
+      "name": "Air Dribble",
+      "family": "air_dribble",
+      "aliases": [],
+      "status": "implemented_event",
+      "stage": "air_carry",
+      "verification": "Recent nose touches, sustained close aerial control and goalward ball progress; higher difficulty requires a finish."
+    },
+    {
+      "id": "air-nose-control",
+      "name": "Air nose control",
+      "family": "air_dribble",
+      "aliases": [],
+      "status": "implemented_event",
+      "stage": "air_carry",
+      "verification": "Actual recent learner ball touches with nose orientation and matching relative velocity."
+    },
+    {
+      "id": "wall-pop",
+      "name": "Wall roll and pop",
+      "family": "air_dribble",
+      "aliases": [],
+      "status": "implemented_event",
+      "stage": "contact_pop",
+      "verification": "Learner wall touch, outward ball pop and subsequent air contact; difficulty increases the required sequence."
+    },
+    {
+      "id": "bumps",
+      "name": "Bumps",
+      "family": "contact",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "demos",
+      "name": "Demos",
+      "family": "contact",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "180-dash",
+      "name": "180 Dash",
+      "family": "dash",
+      "aliases": [
+        "180° Dash"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "360-dash",
+      "name": "360 Dash",
+      "family": "dash",
+      "aliases": [
+        "360° Dash"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "astomo-wall-360-dash",
+      "name": "Astomo/Wall 360 Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "back-dashes",
+      "name": "Back Dashes",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "ceiling-dash",
+      "name": "Ceiling Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "curve-dash",
+      "name": "Curve Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "double-dash",
+      "name": "Double Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "double-zap-dash",
+      "name": "Double zap dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "haon-dash",
+      "name": "Haon Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "horse-dash",
+      "name": "Horse Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "reverse-ceiling-dash",
+      "name": "Reverse Ceiling Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "short-dash",
+      "name": "Short Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "side-entry-dash",
+      "name": "Side Entry Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "wall-dash",
+      "name": "Wall Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "proxy",
+      "stage": "walldash_proxy",
+      "verification": "Jump/flip sequence near a wall with speed gain; approximate recognizer, not certified walldash form."
+    },
+    {
+      "id": "zap-dash",
+      "name": "Zap Dash",
+      "family": "dash",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "fake",
+      "name": "Fake",
+      "family": "decision",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "360-dribble",
+      "name": "360° Dribble",
+      "family": "dribble",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "bounce-dribble",
+      "name": "Bounce dribble",
+      "family": "dribble",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "ground-dribble",
+      "name": "Ground Dribble",
+      "family": "dribble",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "two-wheel-drift",
+      "name": "Two Wheel Drift",
+      "family": "dribble",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "180-flick",
+      "name": "180 Flick",
+      "family": "dribble_flick",
+      "aliases": [
+        "180° Flick"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "180-wavedash-flick",
+      "name": "180 Wavedash Flick",
+      "family": "dribble_flick",
+      "aliases": [
+        "180° Wavedash Flick"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "270-flick",
+      "name": "270 Flick",
+      "family": "dribble_flick",
+      "aliases": [
+        "270° Flick"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "360-windmill",
+      "name": "360 Windmill",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "45-flick",
+      "name": "45 Flick",
+      "family": "dribble_flick",
+      "aliases": [
+        "45° Flick"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "90-flick",
+      "name": "90 Flick",
+      "family": "dribble_flick",
+      "aliases": [
+        "90° Flick"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "athena-flick",
+      "name": "Athena Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "not_a_goal_objective",
+      "stage": null,
+      "verification": "Commonly names a crossbar miss. Track the label if wanted; do not reward missing as successful scoring."
+    },
+    {
+      "id": "bismillah-flick",
+      "name": "Bismillah Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "breezi-flick",
+      "name": "Breezi Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "cabbage-muncher",
+      "name": "Cabbage Muncher",
+      "family": "dribble_flick",
+      "aliases": [
+        "Seba Flick"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "classy-flick",
+      "name": "Classy Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "dash-flick",
+      "name": "Dash Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "front-flip-flick",
+      "name": "Front-Flip Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "jzr-flick",
+      "name": "Jzr Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "luther-flick",
+      "name": "Luther flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "mawzky-flick",
+      "name": "Mawkzy Flick",
+      "family": "dribble_flick",
+      "aliases": [
+        "Mawzky Flick"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "musty-flick",
+      "name": "Musty Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "reverse-musty",
+      "name": "Reverse Musty",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "slingshot",
+      "name": "Slingshot",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "slingshot-flick",
+      "name": "Slingshot Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "suffo-flick",
+      "name": "Suffo Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "turtle-flick",
+      "name": "Turtle Flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "windmill",
+      "name": "Windmill",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "wizard-flick",
+      "name": "Wizard flick",
+      "family": "dribble_flick",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "360-maktuf",
+      "name": "360 Maktuf",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "amalix-jump",
+      "name": "Amalix Jump",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "arsenal-dash-reset",
+      "name": "Arsenal Dash Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "arsenal-reset",
+      "name": "Arsenal Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "backflip-cancel-reset",
+      "name": "Backflip Cancel",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "backwards-jerry-reset",
+      "name": "Backwards Jerry Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "car-reset",
+      "name": "Car Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "ceiling-shot",
+      "name": "Ceiling Shot",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "ceiling-shuffle",
+      "name": "Ceiling Shuffle",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "evample-reset",
+      "name": "Evample Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "flip-reset",
+      "name": "Flip Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "implemented_event",
+      "stage": "reset_acquire",
+      "verification": "All four wheel raycasts contact the ball and a spent flip/jump resource recharges, away from world surfaces."
+    },
+    {
+      "id": "front-flip-reset",
+      "name": "Front-flip Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "frontflip-cancel-reset",
+      "name": "Frontflip Cancel",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "ground-dash-reset",
+      "name": "Ground-Dash Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "hel-jump",
+      "name": "Hel Jump",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "heli-reset",
+      "name": "Heli Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "henko-reset",
+      "name": "Henko Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "hyd-reset",
+      "name": "HYD Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "jakze-reset",
+      "name": "Jakze Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "jerry-reset",
+      "name": "Jerry Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "jump-reset",
+      "name": "Jump Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "lix-jump",
+      "name": "Lix Jump",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "maktuf-reset",
+      "name": "Maktuf",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "multi-reset",
+      "name": "Multiple resets",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "implemented_event",
+      "stage": "multi_reset",
+      "verification": "At least two distinct ball-earned resets followed by timed flip use and ball contact without landing."
+    },
+    {
+      "id": "murie-cancel",
+      "name": "Murie Cancel",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "murie-pop",
+      "name": "Murie Pop",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "murie-reset",
+      "name": "Murie Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "musty-reset",
+      "name": "Musty Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "osuea-reset",
+      "name": "Osuea Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "pancake-reset",
+      "name": "Pancake",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "pop-reset",
+      "name": "Pop Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "pre-flip-reset",
+      "name": "Pre-flip Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "purple-shot",
+      "name": "Purple Shot",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "rapid-reset",
+      "name": "Rapid Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "reverse-ceiling-shuffle",
+      "name": "Reverse Ceiling Shuffle",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "reverse-pancake-reset",
+      "name": "Reverse Pancake Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "reverse-jakze-reset",
+      "name": "Reverse-Jakze Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "shay-reset",
+      "name": "Shay Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "side-flip-reset",
+      "name": "Side-Flip Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "spam-blitz-dash-reset",
+      "name": "Spam/Blitz Dash Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "squishy-reset",
+      "name": "Squishy Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "stall-reset",
+      "name": "Stall Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "tko-reset",
+      "name": "TKO Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "turtle-reset",
+      "name": "Turtle Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "wave-dash-reset",
+      "name": "Wave-Dash Reset",
+      "family": "flip_reset",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "fast-aerial",
+      "name": "Fast Aerial",
+      "family": "movement",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "half-flip",
+      "name": "Half Flip",
+      "family": "movement",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "hel-jump-multi-dash",
+      "name": "Hel Jump Multi Dash",
+      "family": "movement",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "speedflip",
+      "name": "Speedflip",
+      "family": "movement",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "stall",
+      "name": "Stall",
+      "family": "movement",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "94-action policy supports opposing yaw/roll plus jump; a stall-specific detector and drill remain planned."
+    },
+    {
+      "id": "wall-recovery",
+      "name": "Wall recovery",
+      "family": "movement",
+      "aliases": [],
+      "status": "implemented_event",
+      "stage": "wall_recovery",
+      "verification": "Stable wheel landing on ground/wall after a randomized unstable start with retained movement."
+    },
+    {
+      "id": "wave-dash",
+      "name": "Wavedash",
+      "family": "movement",
+      "aliases": [
+        "Wave Dash"
+      ],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "astral-pinch",
+      "name": "Astral Pinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "bbl-pinch",
+      "name": "BBL Pinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "ceiling-pinch",
+      "name": "Ceiling Pinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "ground-pinch",
+      "name": "Ground Pinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "kuxir-pinch",
+      "name": "Kuxir Pinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "generic-pinch",
+      "name": "Pinch (generic proxy)",
+      "family": "pinch",
+      "aliases": [],
+      "status": "proxy",
+      "stage": "pinch_proxy",
+      "verification": "Large attributed ball impulse near a surface with a fast goalward exit; does not classify named pinch variants."
+    },
+    {
+      "id": "post-pinch",
+      "name": "Post Pinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "team-astral-pinch",
+      "name": "Team Astral Pinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "team-ceiling-pinch",
+      "name": "Team Ceiling Pinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "team-groundpinch",
+      "name": "Team Groundpinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "team-pinch",
+      "name": "Team Pinch",
+      "family": "pinch",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "ceiling-pogo",
+      "name": "Ceiling Pogo",
+      "family": "pogo",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "flingshot",
+      "name": "Flingshot",
+      "family": "pogo",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "pogo",
+      "name": "Pogo",
+      "family": "pogo",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "reverse-pogo",
+      "name": "Reverse Pogo",
+      "family": "pogo",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "corner-psycho",
+      "name": "Corner Psycho",
+      "family": "redirect",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "corner-read",
+      "name": "Corner Read",
+      "family": "redirect",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "groundpinch-psycho",
+      "name": "Groundpinch Psycho",
+      "family": "redirect",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "musty-psycho",
+      "name": "Musty Psycho",
+      "family": "redirect",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "psycho",
+      "name": "Psycho",
+      "family": "redirect",
+      "aliases": [],
+      "status": "proxy",
+      "stage": "psycho_proxy",
+      "verification": "Attributed own-backboard rebound, airborne retouch and target-goal finish within a time window."
+    },
+    {
+      "id": "redirect",
+      "name": "Redirect (from pass)",
+      "family": "redirect",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "sidewall-redirect",
+      "name": "Sidewall Redirect",
+      "family": "redirect",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "squishy-save",
+      "name": "Squishy Save",
+      "family": "save",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "zen-touch",
+      "name": "Zen Touch",
+      "family": "save",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "ceiling-double",
+      "name": "Ceiling Double",
+      "family": "shot",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "double-tap",
+      "name": "Double Tap",
+      "family": "shot",
+      "aliases": [],
+      "status": "proxy",
+      "stage": "double_tap_proxy",
+      "verification": "Attributed recent touch, inferred backboard rebound and subsequent aerial retouch; score at higher difficulty."
+    },
+    {
+      "id": "ground-double",
+      "name": "Ground Double",
+      "family": "shot",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    },
+    {
+      "id": "triple-tap",
+      "name": "Triple Tap",
+      "family": "shot",
+      "aliases": [],
+      "status": "planned",
+      "stage": null,
+      "verification": "Needs a dedicated drill and a validated sequence detector."
+    }
+  ]
+}

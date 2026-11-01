@@ -81,6 +81,13 @@ class ExportTests(unittest.TestCase):
                 self.assertTrue((result/'bot.cfg').exists())
                 self.assertIn('hardcoded_kickoffs=False',(result/'bot.py').read_text())
                 with self.assertRaises(FileExistsError): ex.export(chk,'IntegrationTest')
+                scripted=ex.export(chk,'ScriptedIntegrationTest',scripted_kickoff=True)
+                self.assertIn('hardcoded_kickoffs=True',(scripted/'bot.py').read_text())
+                self.assertIn('stochastic_kickoffs=False',(scripted/'bot.py').read_text())
+                import json
+                self.assertTrue(json.loads((scripted/'EXPORT_INFO.json').read_text())['hardcoded_kickoffs'])
+                scripted_actor=torch.jit.load(str(scripted/'nexto-model.pt'),map_location='cpu')
+                self.assertTrue(all(torch.equal(v,scripted_actor.state_dict()[k]) for k,v in actor.state_dict().items()))
             finally:ex.OUTPUT=prev
 
 if __name__=='__main__':unittest.main()

@@ -1,0 +1,32 @@
+{
+  "version": "3.2.0",
+  "engine_sha256": "7a3debb39210ae3495b06db484588521272d5ce2d98f7a7877f419727905a491",
+  "trials": [
+    {
+      "sam_level": 1,
+      "destroyed": 11,
+      "seeds": 12,
+      "launches": 12,
+      "planned_launches": 12
+    },
+    {
+      "sam_level": 5,
+      "destroyed": 11,
+      "seeds": 12,
+      "launches": 24,
+      "planned_launches": 24
+    },
+    {
+      "sam_level": 10,
+      "destroyed": 12,
+      "seeds": 12,
+      "launches": 36,
+      "planned_launches": 36
+    }
+  ],
+  "centered_single_baseline": {
+    "destroyed": 0,
+    "seeds": 12
+  },
+  "scope": "Isolated synthetic original-engine trials; not multiplayer win rates"
+}

@@ -1,0 +1,22 @@
+{
+  "source_checkpoint": "data/isolated/v040_multirival_campaign01_u0070.pt",
+  "run_name": "mechanics01",
+  "opponents": {},
+  "n_envs": 4,
+  "steps_per_env": 256,
+  "actor_lr": 0.00001,
+  "critic_lr": 0.0001,
+  "epochs": 3,
+  "minibatch": 128,
+  "target_kl": 0.015,
+  "mechanic_anchor": 0.02,
+  "retention_anchor": 0.30,
+  "updates_per_stage": 200,
+  "eval_every": 20,
+  "mastery_seeds": 16,
+  "retention_seeds": 8,
+  "retention_seconds": 30,
+  "episode_seconds": 6,
+  "allowed_goal_diff_drop_per_minute": 0.25,
+  "seed": 20261012
+}

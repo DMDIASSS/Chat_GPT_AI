@@ -1,0 +1,197 @@
+{
+  "source": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+  "selection": "",
+  "build_dir": "",
+  "native_run": "u271_targets_training01",
+  "selector_run": "u271_targets_comparison01",
+  "campaign_run": "u271_targets01",
+  "updates": 100,
+  "checkpoint": "",
+  "eval_seeds": 8,
+  "eval_seconds": 60.0,
+  "max_games": 1000,
+  "until": "screen",
+  "export_name": "U271TargetsChampion",
+  "export_kickoff": "scripted",
+  "native_profile": {
+    "games": 8,
+    "steps": 128,
+    "device": "auto",
+    "seed": 20261013,
+    "actor_lr": 3e-06,
+    "critic_lr": 0.0001,
+    "target_kl": 0.005,
+    "teacher_weight": 0.1,
+    "seconds": 12.0,
+    "eval_seeds": 2,
+    "routine": "match",
+    "formats": "1v1,2v2,3v3",
+    "selfplay_refresh": 10,
+    "learner_scripted_kickoff": true,
+    "opponent_pool": "TRAINING_U271_FORMAT_OPPONENTS.json"
+  },
+  "selector": {
+    "baseline": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+    "anchors": {
+      "update271": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt"
+    },
+    "families": {
+      "new_training": [
+        "data/isolated/native_attention/runs/u271_targets_training01/checkpoints/checkpoint_*",
+        "data/isolated/native_attention/runs/u271_targets01_c*/checkpoints/checkpoint_*"
+      ]
+    },
+    "rivals": {
+      "update271": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+      "team14": "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000014/actor.pt",
+      "nexto": "vendor/nexto/nexto-model.pt"
+    },
+    "rivals_by_format": {
+      "1v1": [
+        "update271"
+      ],
+      "2v2": [
+        "update271"
+      ],
+      "3v3": [
+        "team14",
+        "nexto"
+      ]
+    },
+    "learner_scripted_kickoff": true,
+    "frozen_scripted_kickoff": true,
+    "worlds": 8,
+    "stages": {
+      "screen": {
+        "rivals": [
+          "update271",
+          "team14",
+          "nexto"
+        ],
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "team_policy": "candidate_squad",
+        "head_to_head_per_family": 0,
+        "seeds": [
+          2026101411,
+          2026101422,
+          2026101433,
+          2026101444
+        ],
+        "seconds": 30.0
+      },
+      "refine": {
+        "rivals": [
+          "update271",
+          "team14",
+          "nexto"
+        ],
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "team_policy": "candidate_squad",
+        "head_to_head_per_family": 0
+      },
+      "finalists": {
+        "rivals": [
+          "update271",
+          "team14",
+          "nexto"
+        ],
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "team_policy": "candidate_squad",
+        "head_to_head_per_family": 0
+      },
+      "confirm": {
+        "rivals": [
+          "update271",
+          "team14",
+          "nexto"
+        ],
+        "formats": [
+          "1v1",
+          "2v2",
+          "3v3"
+        ],
+        "team_policy": "candidate_squad",
+        "head_to_head_per_family": 0
+      }
+    }
+  },
+  "campaign": {
+    "cycles": 6,
+    "chunk_updates": 20,
+    "branch_updates": 100,
+    "screen_every": 20,
+    "plateau_chunks": 3,
+    "max_minutes": 0.0,
+    "unlimited_until_paused": false,
+    "routines": [
+      "match",
+      "defense",
+      "boost",
+      "air-control",
+      "bump-evasion",
+      "match"
+    ],
+    "rivals": {
+      "update271": "data/isolated/mechanics_curriculum/selected7_mechanics01/update_000271.pt",
+      "team14": "data/isolated/native_attention/runs/update_271_training/checkpoints/checkpoint_000014/actor.pt",
+      "nexto": "vendor/nexto/nexto-model.pt"
+    },
+    "formats": [
+      "1v1",
+      "2v2",
+      "3v3"
+    ],
+    "mode_weights": {
+      "1v1": 0.34,
+      "2v2": 0.33,
+      "3v3": 0.33
+    },
+    "screen_seeds": 2,
+    "screen_seconds": 20.0,
+    "confirm_seeds": 8,
+    "confirm_seconds": 60.0,
+    "worlds": 8,
+    "job_group": 128,
+    "min_improvement": 0.05,
+    "mode_regression_margin": 0.5,
+    "history_opponents": 4,
+    "rivals_by_format": {
+      "1v1": [
+        "update271"
+      ],
+      "2v2": [
+        "update271"
+      ],
+      "3v3": [
+        "team14",
+        "nexto"
+      ]
+    },
+    "learner_scripted_kickoff": true,
+    "require_target_advantage": false
+  },
+  "replays": {
+    "inputs": "data/replays/ranked-duels",
+    "output": "data/isolated/studio_replays01",
+    "workers": 2,
+    "max_replays": 100,
+    "per_replay": 1024,
+    "max_samples": 100000,
+    "prepared": "data/isolated/event_curriculum/windows01",
+    "audit_checkpoint": "",
+    "raw_count": 4,
+    "audit_run": "studio_replay_audit01"
+  }
+}
