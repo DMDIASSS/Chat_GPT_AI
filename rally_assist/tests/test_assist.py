@@ -78,10 +78,10 @@ local state={x=4,y=2,z=-75,vx=0,vz=-90,fx=0,fz=-1,yawRate=0,grounded=4,upY=1,
  wheelbase=7.5,halfWidth=2.5,grip=40,braking=26,maxAngle=28,runState='Running'}
 local driver=Driver.new();local c=Driver.step(driver,base,base,stage,state,cfg,1/30,1)
 assert(c.Brake>0 and c.Throttle==0,'Failed to brake for a slower corner')
-assert(math.abs(base:nearest(c.target).lateral)<=5.6,'Hazard offset left the safe lane')
+assert(c.prediction and c.predictedViolation>0,'Missing unsafe trajectory prediction')
 state.obstacle=3;state.vz=0
 for i=1,100 do c=Driver.step(driver,base,base,stage,state,cfg,1/30,1+i/30)end
-assert(driver.recoveryCooldown and driver.recoveryCooldown>0,'No bounded obstruction recovery')
+assert(c.Throttle==0 and c.Brake==1 and c.mode=='Obstacle: emergency braking','Did not stop for a close obstruction')
 state.runState='Countdown';c=Driver.step(driver,base,base,stage,state,cfg,1/30,6)
 assert(c.Brake==1 and c.Throttle==0 and c.mode=='Countdown')
 state.runState='Finished';c=Driver.step(driver,base,base,stage,state,cfg,1/30,7)
@@ -126,6 +126,118 @@ inputAdapter=Input.new(input)
 local ok=inputAdapter:probe(function()return false end,function()end)
 assert(not ok,'No-op input API counted as working')
 keypress=oldPress
+''',modules=(("Input","input.lua"),),fixture=True)
+
+    def test_predictive_search_full_throttle_and_room_to_avoid_obstacle(self):
+        self.run_lua('''
+local stage={Id='test',Origin={0,0,0},Heading=0,Width=24,StartAt=5,FinishAt=450,StopAt=490,
+ Surface='Gravel',segments={{Straight=500}},features={}}
+local base=Route.fromStage(stage)
+local s={x=0,y=2,z=-30,vx=0,vz=-25,fx=0,fz=-1,yawRate=0,grounded=4,upY=1,
+ wheelbase=8,halfWidth=2.8,halfLength=5,cgHeight=2.2,gravity=75,grip=42,braking=39,maxAngle=25,runState='Running'}
+local cfg={maxKmh=180,margin=1.2,brake=1.5}
+local d=Driver.new();local c
+for i=1,12 do c=Driver.step(d,base,base,stage,s,cfg,1/30,i/30)end
+assert(c.Throttle>.95 and c.Brake==0,'Did not use full throttle on clear straight')
+assert(c.prediction and #c.prediction==6 and c.predictedViolation<.1)
+s.obstacles={{x=0,z=-72,radius=1}}
+d=Driver.new()
+c=Driver.step(d,base,base,stage,s,cfg,1/30,1)
+assert(math.abs(c.Steer)>.01 or c.Brake>0,'Ignored obstacle in predicted path')
+assert(c.predictedViolation<.2,'Failed to find a collision-free alternative with room available')
+''',modules=(("Route","route.lua"),("Driver","controller.lua")))
+
+    def test_corridor_uses_rotated_full_car_and_assist_returns_inward(self):
+        self.run_lua('''
+local stage={Id='test',Origin={0,0,0},Heading=0,Width=18,StartAt=5,FinishAt=450,StopAt=490,
+ Surface='Gravel',segments={{Straight=500}},features={}}
+local base=Route.fromStage(stage)
+local s={x=4,y=2,z=-50,vx=5,vz=-35,fx=0,fz=-1,yawRate=0,grounded=4,upY=1,halfWidth=2.8,halfLength=5,grip=42}
+local tangent=base:at(50)
+assert(math.abs(Driver.envelope(s,tangent,1.2)-4)<.01)
+s.fx=1;s.fz=0
+assert(math.abs(Driver.envelope(s,tangent,1.2)-6.2)<.01,'Ignored car length when sideways')
+s.fx=0;s.fz=-1
+local g=Driver.assist(base,stage,s,{margin=1.2})
+assert(g.risk and g.lateralAccel<0 and g.Brake>0,'No inward correction before road exit')
+s.x=0;s.vx=0
+g=Driver.assist(base,stage,s,{margin=1.2})
+assert(not g.risk and g.lateralAccel==0,'Rail-locked a car safely inside the corridor')
+''',modules=(("Route","route.lua"),("Driver","controller.lua")))
+
+    def test_fallback_grip_is_not_inflated_and_brake_multiplier_applies(self):
+        self.run_lua('''
+local car,root=spawnCar()
+local adapter=Adapter.new(player,World,services.ReplicatedStorage,{})
+adapter:find();local cfg={speed=1,turn=1,grip=3,brake=3,roadAssist=true,maxKmh=180}
+adapter:tune(cfg,true)
+local state=adapter:measure()
+assert(state.grip==42,'Pretended slip damping tripled tyre grip')
+assert(state.braking==78 and state.maxAngle<28,'Fallback braking/steering estimates wrong')
+local guard={rightX=1,rightZ=0,lateralAccel=0,yawAccel=0,Brake=0}
+local before=math.abs(root.AssemblyLinearVelocity.Z)
+adapter:stabilize(state,cfg,guard,{Brake=1},1/60)
+assert(math.abs(root.AssemblyLinearVelocity.Z)<before-.8,'Brake multiplier supplied no extra braking')
+''',modules=(("Adapter","adapter.lua"),),fixture=True)
+
+    def test_high_grip_does_not_remove_rollover_steering_limit(self):
+        self.run_lua('''
+local s={wheelbase=8.3,halfWidth=2.8,cgHeight=3.2,gravity=75,grip=500}
+local angle=math.rad(28)
+local limit=Driver.steerLimit(s,90,angle)
+local lateral=90^2/s.wheelbase*math.tan(limit*angle)
+assert(limit<.1,'High grip removed rollover protection')
+assert(lateral<=75*2.8/3.2*.6+.01,'Steering exceeded conservative rollover acceleration')
+assert(Driver.steerLimit(s,8,angle)>limit,'Low-speed steering unnecessarily restricted')
+''',modules=(("Driver","controller.lua"),))
+
+    def test_upright_damping_toggle_and_no_position_writes(self):
+        self.run_lua('''
+local car,root=spawnCar()
+local adapter=Adapter.new(player,World,services.ReplicatedStorage,{})
+adapter:find();root.CFrame.UpVector=Vector3.new(.6,.8,0)
+local s=adapter:measure();local pos=root.Position
+local g={rightX=1,rightZ=0,lateralAccel=0,yawAccel=0,Brake=0}
+adapter:stabilize(s,{roadAssist=false,brake=1},g,{Brake=0},1/60)
+assert(root.AssemblyAngularVelocity.Magnitude==0,'Disabled stabilizer applied torque')
+adapter:stabilize(s,{roadAssist=true,brake=1},g,{Brake=0},1/60)
+assert(root.AssemblyAngularVelocity.Z>0,'Torque moved tilt away from upright')
+assert(root.Position==pos and not root.pivots,'Stability teleported the car')
+''',modules=(("Adapter","adapter.lua"),),fixture=True)
+
+    def test_keyboard_pedals_preserve_partial_command_average(self):
+        self.run_lua('''
+local driver=Input.new(input)
+assert(driver:probe(function()return false end,function()end))
+local count=0
+for i=1,120 do
+ assert(driver:write({Throttle=.25,Brake=0,Steer=0,Handbrake=false}))
+ if input.held.W then count+=1 end
+ now+=1/60
+end
+assert(count==30,'Quarter throttle became permanently held W')
+driver:release()
+''',modules=(("Input","input.lua"),),fixture=True)
+
+    def test_small_keyboard_steering_survives_faster_return_ramp(self):
+        self.run_lua('''
+local driver=Input.new(input)
+assert(driver:probe(function()return false end,function()end))
+driver.steerRate=4.8;driver.returnRate=7
+for _,hz in ipairs({30,60,120})do for _,desired in ipairs({.02,.12,-.12,.65})do
+ driver:release();local actual,total=0,0
+ for i=1,hz*6 do
+  driver:write({Throttle=0,Brake=0,Steer=desired,Handbrake=false})
+  local target=(input.held.D and 1 or 0)-(input.held.A and 1 or 0)
+  local rate=(target==0 or math.sign(target)~=math.sign(actual))and 7 or 4.8
+  actual=actual+math.clamp(target-actual,-rate/hz,rate/hz)
+  if i>hz then total+=actual end
+  now+=1/hz
+ end
+ assert(math.abs(total/(hz*5)-desired)<.025,'Digital steering lost desired average: '..total/(hz*5)..' vs '..desired)
+end
+end
+driver:release();assert(next(input.held)==nil)
 ''',modules=(("Input","input.lua"),),fixture=True)
 
     def test_late_executor_press_after_stop_is_released(self):
@@ -174,7 +286,7 @@ local adapter=Adapter.new(player,World,services.ReplicatedStorage,{})
 adapter:find();adapter.chassis=chassis;adapter.cfg={maxKmh=180}
 adapter.nativeRoute={Get=function()return {Nearest=function()return 1,500 end}end}
 adapter.nativePlan={Target=function(route,s,body,plan,finish)
- assert(s==500 and body==chassis and finish and plan.GripUse==.8)
+ assert(s==500 and body==chassis and finish and plan.GripUse==.76)
  return 12
 end}
 local state=adapter:measure()
@@ -190,9 +302,10 @@ local original={Gravity=75,Engine={Force=2},Steering={Rate=4,ReturnRate=6,MaxAng
 local chassis={Body=root,Tune=original}
 local adapter=Adapter.new(player,World,services.ReplicatedStorage,{})
 adapter.root=root;adapter.controller={GetChassis=function()return chassis end}
-local cfg={speed=2,turn=1.5,grip=2}
+local cfg={speed=2,turn=1.5,grip=2,brake=2.5,roadAssist=true}
 assert(adapter:tune(cfg,true))
 assert(chassis.Tune~=original and original.Engine.Force==2 and original.Gears.Ratios[1]==17)
+assert(chassis.Tune.Brakes.Force==110 and original.Brakes.Force==44,'Native brake multiplier changed its baseline')
 local applied=chassis.Tune
 for i=1,20 do assert(adapter:tune(cfg,true));assert(chassis.Tune==applied)end
 adapter:restore();assert(chassis.Tune==original)
@@ -228,6 +341,22 @@ assert(not app.alive and not app.enabled and env.__BackseatRallyAssist==nil)
 for _,c in ipairs(app.connections)do assert(not c.active,'Close left a connection active')end
 ''')
 
+    def test_gui_road_toggle_and_brake_control(self):
+        self.client('''
+local car,root=spawnCar()
+for i=1,4 do step()end
+findCreated('Master').Activated:Fire();step()
+assert(app.enabled and app.cfg.roadAssist)
+findCreated('RoadAssist').Activated:Fire();step()
+assert(not app.cfg.roadAssist and app.enabled,'Road toggle disabled unrelated boosts')
+input.InputBegan:Fire({KeyCode=Enum.KeyCode.F9},false);step()
+assert(app.cfg.roadAssist,'F9 did not restore road assist')
+local box=findCreated('Window'):FindFirstChild('Body'):FindFirstChild('brake'):FindFirstChild('Value')
+box.Text='2.5';box.FocusLost:Fire();step()
+assert(app.cfg.brake==2.5 and app.state.brakeForce==65,'Brake field did not update the handling model')
+app.destroy()
+''')
+
     def test_keyboard_autodrive_stops_for_f8_focus_countdown_and_co_driver(self):
         self.client('''
 local car,root,seat=spawnCar()
@@ -243,7 +372,7 @@ input.WindowFocusReleased:Fire()
 assert(not app.enabled and next(input.held)==nil,'Focus loss did not release')
 input.WindowFocused:Fire();car:SetAttribute('RunState','Countdown')
 app.start();for i=1,10 do step()end
-assert(app.command and app.command.Throttle==0 and app.command.Brake==1)
+assert(app.command and app.command.Throttle==0 and app.command.Handbrake and not input.held.S)
 seat.Name='CoDriver';step()
 assert(not app.autoReady and next(input.held)==nil,'Controlled the co-driver seat')
 app.destroy()

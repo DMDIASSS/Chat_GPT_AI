@@ -15,7 +15,7 @@ def main():
     (ROOT/"Backseat_Rally_Assist.lua").write_text(build.source(),encoding="utf-8",newline="\n")
     files=sorted(p for p in ROOT.rglob("*")if p.is_file()and p.suffix in {".lua",".py",".md",".json"}
                  and "__pycache__"not in p.parts and p.name not in {"SOURCE_INFO.json","BackseatRally_Report.json","BackseatRally_Ghosts.json"})
-    manifest={"version":"1.0.0","entrypoint":"Backseat_Rally_Assist.lua","place_id":94278659624110,
+    manifest={"version":"1.1.0","entrypoint":"Backseat_Rally_Assist.lua","place_id":94278659624110,
         "uploaded_place_sha256":"be6b8add4aff71085492872588a7440427438bbec01710e1d2b3a61dad90ef93",
         "reference":"Numeric stage geometry and menu showcase samples from the user-provided place. Not a verified world record.",
         "includes_original_game_sources":False,"includes_personal_ghosts":False,"files":{

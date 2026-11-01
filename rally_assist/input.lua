@@ -7,7 +7,7 @@ local order={"W","A","S","D","SPACE"}
 local vk={W=0x57,A=0x41,S=0x53,D=0x44,SPACE=0x20}
 local scan={W=0x11,A=0x1E,S=0x1F,D=0x20,SPACE=0x39}
 function Input.new(service)
-    return setmetatable({service=service,held={},heldAt={},owned={},name="waiting",steerAccumulator=0},Input)
+    return setmetatable({service=service,held={},heldAt={},owned={},name="waiting",steerAccumulator=0,pedals={W=0,S=0}},Input)
 end
 function Input:attach(module)
     if type(module)~="table"or type(module.Read)~="function"then return false end
@@ -35,7 +35,17 @@ function Input:releaseKeys()
     for _,entry in ipairs(self.owned)do
         for key in pairs(entry.keys)do if pcall(entry.backend.send,key,false)then entry.keys[key]=nil end end
     end
-    self.held={};self.heldAt={};self.steerAccumulator=0
+    self.held={};self.heldAt={};self.steerAccumulator=0;self.pedals={W=0,S=0};self.keySteer=0;self.steerAt=nil
+    self.steerError=0;self.steerDt=nil;self.lastSign=nil
+end
+function Input:estimateSteer()
+    local now=os.clock();local dt=self.steerAt and math.clamp(now-self.steerAt,0,.15)or 0;self.steerAt=now
+    if dt>.001 then self.steerDt=dt end
+    local target=(self.held.D and 1 or 0)-(self.held.A and 1 or 0)
+    local value=self.keySteer or 0
+    local rate=(target==0 or math.sign(target)~=math.sign(value))and(self.returnRate or 6.5)or(self.steerRate or 4.2)
+    self.keySteer=value+math.clamp(target-value,-rate*dt,rate*dt)
+    return self.keySteer
 end
 function Input:release()
     self.epoch=(self.epoch or 0)+1
@@ -111,16 +121,28 @@ function Input:write(command)
         end
     end
     local wanted={}
-    wanted.W=command.Throttle>.12
-    wanted.S=command.Brake>.12
-    -- At 60 Hz a pulse-density steering signal approximates analog control.
+    for key,value in pairs({W=command.Throttle,S=command.Brake})do
+        if value<=0 then self.pedals[key]=0;wanted[key]=false else
+            self.pedals[key]=self.pedals[key]+math.clamp(value,0,1)
+            wanted[key]=self.pedals[key]>=1
+            if wanted[key]then self.pedals[key]=self.pedals[key]-1 end
+        end
+    end
+    -- Match the game's digital rise/return ramps. A naive duty cycle cancels
+    -- small steering inputs because returning to center is faster than turning.
     local value=math.clamp(command.Steer,-1,1)
-    if self.lastSign and math.sign(value)~=self.lastSign then self.steerAccumulator=0 end
-    self.lastSign=math.sign(value)
-    self.steerAccumulator=self.steerAccumulator+math.abs(value)
-    local turn=self.steerAccumulator>=1
-    if turn then self.steerAccumulator=self.steerAccumulator-1 end
-    wanted.A=turn and value<0;wanted.D=turn and value>0
+    local estimate=self:estimateSteer()
+    local dt=math.clamp(self.steerDt or 1/60,1/240,.1)
+    if self.lastSign~=math.sign(value)then self.steerError=0 end;self.lastSign=math.sign(value)
+    self.steerError=math.clamp((self.steerError or 0)+(value-estimate)*dt,-.04,.04)
+    local function errorAfter(target)
+        local rate=(target==0 or math.sign(target)~=math.sign(estimate))and(self.returnRate or 6.5)or(self.steerRate or 4.2)
+        local nextValue=estimate+math.clamp(target-estimate,-rate*dt,rate*dt)
+        return math.abs(self.steerError+(value-nextValue)*dt)
+    end
+    local releaseError=errorAfter(0)
+    wanted.A=value<-.001 and errorAfter(-1)<releaseError
+    wanted.D=value>.001 and errorAfter(1)<releaseError
     wanted.SPACE=command.Handbrake==true
     for _,key in ipairs(order)do
         if self.held[key]and not wanted[key]then

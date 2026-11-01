@@ -1,4 +1,4 @@
--- Backseat Rally Assist 1.0.0 | F6 assists, F7 autodrive, F8 stop
+-- Backseat Rally Assist 1.1.0 | F6 assists, F7 autodrive, F8 stop, F9 road assist
 -- Independent controller; numeric stage/showcase reference, not a world-record claim.
 
 local Route=(function()
@@ -141,125 +141,242 @@ return Route
 end)()
 
 local Driver=(function()
--- Feedback driving follows geometry, never a wall-clock replay or car teleports.
+-- Receding-horizon corridor search, with steering lag, slip and braking limits.
 local Driver={}
 local abs,min,max,sqrt=math.abs,math.min,math.max,math.sqrt
-function Driver.wrap(x)return (x+math.pi)%(2*math.pi)-math.pi end
-function Driver.new()return {steer=0,throttle=0,brake=0,stuck=0,recoveryUntil=0}end
+function Driver.wrap(a)return (a+math.pi)%(2*math.pi)-math.pi end
+function Driver.new()return {steer=0,throttle=0,brake=0,model={accel=42,braking=26,yawGain=1},stuck=0}end
 local function approach(a,b,rate,dt)return a+math.clamp(b-a,-rate*dt,rate*dt)end
-function Driver.step(self,route,base,stage,state,cfg,dt,now)
-    dt=math.clamp(dt,1/240,.1)
-    local position={x=state.x,y=state.y,z=state.z}
-    local on=route:nearest(position,self.hint);self.hint=on.index
-    local road=base:nearest(position,self.baseHint);self.baseHint=road.index
-    local speed=sqrt(state.vx^2+state.vz^2)
-    local forward=state.vx*state.fx+state.vz*state.fz
-    local entry=road.s<stage.StartAt and road.distance<350
+function Driver.width(stage,s)
     local width=stage.Width or 18
-    local function stop(reason)
+    for _,f in ipairs(stage.features or {})do
+        if(f.Kind=='Bridge'or f.Kind=='Narrow')and f.From and f.To and f.Width and s>=f.From-5 and s<=f.To+5 then width=min(width,f.Width)end
+    end
+    return width
+end
+function Driver.envelope(state,tangent,margin)
+    local f=state.fx*tangent.fx+state.fz*tangent.fz
+    local side=state.fx*(-tangent.fz)+state.fz*tangent.fx
+    return abs(f)*(state.halfWidth or 2.5)+abs(side)*(state.halfLength or(state.wheelbase or 7.5)/2+1)+(margin or 1.2)
+end
+local function traction(state)
+    local roll=(state.gravity or 75)*(state.halfWidth or 2.5)/max(state.cgHeight or 2.2,1)*.6
+    return max(8,min((state.grip or 42)*.76,roll))
+end
+function Driver.steerLimit(state,speed,angle)
+    return min(1,math.atan(traction(state)*(state.wheelbase or 7.5)/max(speed^2,25))/max(angle,.01))
+end
+local function availableAngle(state,speed)
+    return math.clamp(math.deg(math.atan((state.grip or 42)*(state.wheelbase or 7.5)/max(speed^2,25)))*1.05+6,4.5,32)
+end
+local function observe(self,state,dt)
+    local speed=state.vx*state.fx+state.vz*state.fz
+    local old=self.observation
+    if old and dt>.002 and dt<.16 and state.grounded>=3 and state.upY>.9 then
+        local a=(speed-old.speed)/dt
+        if old.throttle>.85 and old.brake<.1 and a>2 and a<140 then self.model.accel=self.model.accel*.97+a*.03 end
+        if old.brake>.65 and speed>5 and a< -4 and a> -120 then self.model.braking=self.model.braking*.96-a*.04 end
+        if abs(self.steer)>.15 and abs(self.steer-old.steer)<.025 and speed>12 then
+            local expected=speed/(state.wheelbase or 7.5)*math.tan(self.steer*math.rad(state.maxAngle or 20))
+            local gain=abs(expected)>.1 and state.yawRate/expected or 0
+            if gain>.35 and gain<2 then self.model.yawGain=self.model.yawGain*.985+gain*.015 end
+        end
+    end
+    self.observation={speed=speed,throttle=self.throttle,brake=self.brake,steer=self.steer}
+end
+local function window(base,stage,state,road,cfg,braking)
+    local speed=sqrt(state.vx^2+state.vz^2)
+    local stop=speed^2/(2*braking)+speed*.4+65
+    local step=5
+    local first=max(0,road.s-20)
+    local last=min(base.length,road.s+math.clamp(stop+100,180,650))
+    local points={}
+    local grip=traction(state)
+    for s=first,last,step do
+        local p=base:at(s);p.width=Driver.width(stage,s)
+        p.limit=min(cfg.maxKmh/1.008,sqrt(grip/max(abs(p.k),.00001)))
+        if s>stage.FinishAt then p.limit=min(p.limit,sqrt(max(0,(stage.StopAt or base.length)-s)*2*braking))end
+        points[#points+1]=p
+    end
+    for i=#points-1,1,-1 do points[i].limit=min(points[i].limit,sqrt(points[i+1].limit^2+2*braking*step))end
+    return {points=points,first=first,step=step}
+end
+local function at(w,s)
+    return w.points[math.clamp(math.floor((s-w.first)/w.step+.5)+1,1,#w.points)]
+end
+local function locate(w,x,z,hint)
+    local best,dist=nil,math.huge
+    local index=math.clamp(math.floor(((hint or w.first)-w.first)/w.step)+1,1,#w.points-1)
+    for i=max(1,index-3),min(#w.points-1,index+12)do
+        local a,b=w.points[i],w.points[i+1]
+        local dx,dz=b.x-a.x,b.z-a.z
+        local t=math.clamp(((x-a.x)*dx+(z-a.z)*dz)/max(dx*dx+dz*dz,.00001),0,1)
+        local px,pz=a.x+dx*t,a.z+dz*t
+        local d=(x-px)^2+(z-pz)^2
+        if d<dist then dist=d;best={s=a.s+w.step*t,lateral=(x-px)*(-a.fz)+(z-pz)*a.fx,p=a}end
+    end
+    return best
+end
+local function collision(q,obstacles,state)
+    local fx,fz=math.sin(q.yaw),-math.cos(q.yaw)
+    for _,o in ipairs(obstacles or {})do
+        local dx,dz=o.x-q.x,o.z-q.z
+        if abs(dx*fx+dz*fz)<(state.halfLength or 5)+(o.radius or .8)+.6
+            and abs(dx*(-fz)+dz*fx)<(state.halfWidth or 2.5)+(o.radius or .8)+.6 then return true end
+    end
+    return false
+end
+local function rollout(self,w,state,cfg,road,offsetA,offsetB,power,braking,grip)
+    local q={x=state.x,z=state.z,yaw=math.atan2(state.fx,-state.fz),vx=state.vx,vz=state.vz,
+        rate=state.yawRate or 0,steer=state.steerInput or self.steer,command=self.steer,s=road.s}
+    local cost=0;local violation=0;local first;local trace={}
+    local dt=.09
+    local initialSpeed=sqrt(state.vx^2+state.vz^2)
+    local angleScale=math.clamp((state.maxAngle or 20)/availableAngle(state,initialSpeed),.65,1.6)
+    for tick=1,18 do
+        local n=locate(w,q.x,q.z,q.s);q.s=n.s
+        local v=sqrt(q.vx^2+q.vz^2)
+        local look=math.clamp(12+v*.42,12,48)
+        local target=at(w,q.s+look)
+        local offset=tick<9 and offsetA or offsetB
+        local usable=max(0,target.width*.5-(state.halfWidth or 2.5)-(cfg.margin or 1.2))
+        local lateral=offset*usable
+        local tx,tz=target.x-target.fz*lateral,target.z+target.fx*lateral
+        local fx,fz=math.sin(q.yaw),-math.cos(q.yaw)
+        local dx,dz=tx-q.x,tz-q.z
+        local heading=math.atan2(dx*(-fz)+dz*fx,dx*fx+dz*fz)
+        local angle=math.atan2(2*(state.wheelbase or 7.5)*math.sin(heading),max(sqrt(dx*dx+dz*dz),4))
+        local maxAngle=math.rad(max(4,availableAngle(state,v)*angleScale))
+        local steering=math.clamp((angle-q.rate*.045)/maxAngle,-1,1)
+        if abs(heading)>1.15 then steering=math.sign(heading)end
+        local steerLimit=Driver.steerLimit(state,v,maxAngle)
+        steering=math.clamp(steering,-steerLimit,steerLimit)
+        local throttle=power==1 and 1 or(power==2 and .25 or 0)
+        local brake=power==3 and .7 or(power==4 and 1 or 0)
+        local limit=n.p.limit
+        if state.nativePreview then limit=min(limit,state.nativePreview)end
+        if v>limit+1 then throttle=0;brake=max(brake,math.clamp((v-limit)/10,0,1))end
+        if not first then first={Throttle=throttle,Brake=brake,Steer=steering,Handbrake=false,Analog=true}end
+        q.command=approach(q.command,steering,3,dt)
+        if state.inputAnalog then q.steer=q.steer+(q.command-q.steer)*(1-math.exp(-18*dt))else
+            local rate=(abs(q.command)<.015 or math.sign(q.command)~=math.sign(q.steer))and(state.returnRate or 6.5)or(state.steerRate or 4.2)
+            q.steer=approach(q.steer,q.command,rate,dt)
+        end
+        local rate=v/(state.wheelbase or 7.5)*math.tan(q.steer*maxAngle)*self.model.yawGain
+        local physicalGrip=max(8,(state.grip or 42)*.9)
+        rate=math.clamp(rate,-physicalGrip/max(v,4),physicalGrip/max(v,4))
+        q.rate=q.rate+(rate-q.rate)*(1-math.exp(-7*dt));q.yaw=Driver.wrap(q.yaw+q.rate*dt)
+        fx,fz=math.sin(q.yaw),-math.cos(q.yaw)
+        local longitudinal=q.vx*fx+q.vz*fz
+        local side=q.vx*(-fz)+q.vz*fx
+        local sideAccel=math.clamp(-side*9,-physicalGrip,physicalGrip)
+        local acc=self.model.accel*throttle-braking*brake-.025*v
+        longitudinal=max(0,longitudinal+acc*dt);side=side+sideAccel*dt
+        q.vx=fx*longitudinal-fz*side;q.vz=fz*longitudinal+fx*side
+        q.x=q.x+q.vx*dt;q.z=q.z+q.vz*dt
+        local nn=locate(w,q.x,q.z,q.s);q.s=nn.s
+        local shape={fx=fx,fz=fz,halfWidth=state.halfWidth,halfLength=state.halfLength,wheelbase=state.wheelbase}
+        local clearance=nn.p.width*.5-Driver.envelope(shape,nn.p,cfg.margin)
+        local excess=max(0,abs(nn.lateral)-clearance)
+        violation=max(violation,excess)
+        local rollExcess=max(0,abs(q.rate)*v-grip)/grip
+        violation=max(violation,rollExcess*2)
+        cost=cost+rollExcess^2*10000
+        cost=cost+excess^2*1000+max(0,abs(nn.lateral)-max(0,clearance)*.7)^2*.25
+        cost=cost+max(0,v-limit)^2*.2+heading^2*.2+abs(steering-self.steer)*.03
+        if collision(q,state.obstacles,state)then violation=max(violation,20);cost=cost+400000 end
+        cost=cost-(q.s-road.s)*.1-throttle*.03
+        if tick%3==0 then trace[#trace+1]={x=q.x,y=state.y,z=q.z,s=q.s,lateral=nn.lateral,clearance=clearance}end
+    end
+    cost=cost-(q.s-road.s)*4+abs(offsetA-offsetB)*.5+(offsetA-(self.preference or 0))^2*(cfg.pace or 1)*.3
+    return first,cost,violation,trace
+end
+function Driver.assist(base,stage,state,cfg)
+    local road=base:nearest(state)
+    local p=base:at(road.s)
+    local speed=sqrt(state.vx^2+state.vz^2)
+    local clearance=Driver.width(stage,road.s)*.5-Driver.envelope(state,p,cfg.margin)
+    local lateralVelocity=state.vx*(-p.fz)+state.vz*p.fx
+    local predicted=road.lateral+lateralVelocity*.45
+    local excess=max(0,abs(predicted)-max(0,clearance-1))
+    local lateralAccel=excess>0 and math.clamp((-math.sign(predicted)*min(excess*5,18)-lateralVelocity)*6,-90,90)or 0
+    local heading=math.atan2(p.fx*(-state.fz)+p.fz*state.fx,p.fx*state.fx+p.fz*state.fz)
+    local yawAccel=excess>0 and math.clamp((heading*2-(state.yawRate or 0))*5,-5,5)or 0
+    if road.distance>25 or abs(road.height)>10 then
+        lateralAccel=0;yawAccel=0;excess=0
+    end
+    local brake=0
+    if excess>0 and speed>12 then brake=math.clamp(excess*.2,0,1)end
+    if(state.upright or state.upY)<.8 and speed>8 then brake=max(brake,.65)end
+    local cornerOver=max(0,abs(state.yawRate or 0)*speed/traction(state)-.9)
+    if cornerOver>0 then
+        brake=max(brake,min(1,cornerOver))
+        local limit=traction(state)/max(speed,4)
+        yawAccel=yawAccel+math.clamp((math.sign(state.yawRate)*limit-state.yawRate)*5,-4,4)
+    end
+    return {road=road,clearance=clearance,predictedLateral=predicted,lateralAccel=lateralAccel,
+        rightX=-p.fz,rightZ=p.fx,yawAccel=yawAccel,Brake=brake,risk=excess>0 or(state.upright or state.upY)<.8 or cornerOver>0}
+end
+function Driver.step(self,route,base,stage,state,cfg,dt,now)
+    dt=math.clamp(dt,1/240,.15);observe(self,state,dt)
+    if self.brakeSetting~=(cfg.brake or 1)then
+        self.brakeSetting=cfg.brake or 1;self.model.braking=max(8,(state.braking or 26)*.82)
+    end
+    local road=base:nearest(state,self.baseHint);self.baseHint=road.index
+    local function stop(mode)
         self.throttle=0;self.brake=1
-        return {Throttle=0,Brake=1,Steer=0,Handbrake=false,Analog=true,mode=reason,
-            progress=road.s,targetSpeed=0,lateral=road.lateral,remaining=route.length-on.s}
+        return {Throttle=0,Brake=1,Steer=0,Handbrake=false,Analog=true,mode=mode,progress=road.s,targetSpeed=0,lateral=road.lateral,remaining=base.length-road.s}
     end
-    if state.runState=="Countdown"then return stop("Countdown")end
-    if state.runState=="Finished"or road.s>=(stage.StopAt or base.length)-2 then return stop("Stage complete")end
-    if not entry and(road.distance>width*.5+14 or abs(road.height)>18)then return stop("Align car with the stage road")end
-    local maxSpeed=cfg.maxKmh/1.008
-    local lateralGrip=(state.grip or 42)*.82
-    local braking=(state.braking or 26)*.82
-    local desired=route:targetSpeed(on.s,maxSpeed,lateralGrip,braking,cfg.pace)
-    if state.nativePreview then desired=min(desired,state.nativePreview)end
-    local look=math.clamp(12+max(forward,0)*.5,12,58)
-    local curvature=abs(route:at(min(route.length,on.s+look)).k)
-    look=look*math.clamp(1-curvature*3.5,.72,1)
-    for _,f in ipairs(stage.features or {})do
-        if(f.Kind=="Bridge"or f.Kind=="Narrow")and f.From and f.To then
-            if road.s+look>=f.From-6 and road.s<=f.To+6 then
-                width=min(width,f.Width or width);desired=min(desired,65)
-            end
-        end
+    if state.runState=='Countdown'then return stop('Countdown')end
+    if state.runState=='Finished'or road.s>=(stage.StopAt or base.length)-2 then return stop('Stage complete')end
+    if abs(road.height)>18 or(road.distance>(stage.Width or 18)*.5+18 and road.s>stage.StartAt)then return stop('Align car with the stage road')end
+    if state.grounded<2 or(state.upright or state.upY)<.45 then
+        local c=stop('Stabilizing car');c.Brake=state.grounded>=2 and 1 or 0
+        self.steer=approach(self.steer,0,3,dt);c.Steer=self.steer;return c
     end
-    local target=route:at(on.s+look)
-    if entry and road.distance>width then
+    local braking=max(8,min(self.model.braking,state.braking or 26))
+    local speed=sqrt(state.vx^2+state.vz^2)
+    local emergency=state.obstacle and state.obstacle<(state.halfLength or 5)+speed*.12+2
+    if emergency then return stop('Obstacle: emergency braking')end
+    if road.s<stage.StartAt and road.distance>(stage.Width or 18)*.6 then
         local p=base:at(stage.StartAt)
-        target=p;desired=min(desired,16)
+        local dx,dz=p.x-state.x,p.z-state.z
+        local heading=math.atan2(dx*(-state.fz)+dz*state.fx,dx*state.fx+dz*state.fz)
+        local c=stop('Approaching stage start')
+        c.Steer=math.clamp(heading/math.rad(25),-1,1)
+        c.Throttle=speed<12 and .3 or 0;c.Brake=speed>14 and .5 or 0
+        return c
     end
-    -- Keep the path inside the collision road; a loaded ghost can contain a cut.
-    local targetRoad=base:nearest(target,road.index)
-    local margin=max(1,width*.5-(state.halfWidth or 2.5)-1)
-    if abs(targetRoad.lateral)>margin then
-        local p=base:at(targetRoad.s)
-        local side=math.clamp(targetRoad.lateral,-margin,margin)
-        target={x=p.x-p.fz*side,y=p.y,z=p.z+p.fx*side}
-    end
-    for _,f in ipairs(stage.features or {})do
-        local at=f.At or f.From
-        if at and abs(at-road.s-look)<max(18,look*.5)then
-            if f.Kind=="Hazard"and f.Side then
-                local p=base:at(road.s+look)
-                local side=f.Side=="Right"and -1 or 1
-                target.x=target.x-p.fz*side*min(margin,3)
-                target.z=target.z+p.fx*side*min(margin,3)
-                desired=min(desired,55)
-            elseif f.Kind=="Bridge"or f.Kind=="Narrow"then desired=min(desired,65)end
+    if not self.plannedAt or now-self.plannedAt>=.1 or not self.plan then
+        local began=os.clock()
+        local w=window(base,stage,state,road,cfg,braking)
+        self.preference=0
+        if route~=base then
+            local n=route:nearest(state,self.routeHint);self.routeHint=n.index
+            local preferred=route:at(n.s+max(15,speed*.8))
+            local r=base:nearest(preferred,road.index)
+            local usable=max(1,Driver.width(stage,r.s)*.5-(state.halfWidth or 2.5)-(cfg.margin or 1.2))
+            self.preference=math.clamp(r.lateral/usable,-.7,.7)
         end
+        local best,bestCost,bestViolation,bestTrace
+        for _,a in ipairs({-.7,0,.7})do for _,b in ipairs({-.7,0,.7})do for power=1,4 do
+            local c,cost,violation,trace=rollout(self,w,state,cfg,road,a,b,power,braking,traction(state))
+            if not bestCost or cost<bestCost then best,bestCost,bestViolation,bestTrace=c,cost,violation,trace end
+        end end end
+        self.plan=best;self.plannedAt=now;self.prediction=bestTrace;self.violation=bestViolation
+        self.speedLimit=at(w,road.s).limit
+        self.planMs=(os.clock()-began)*1000
+        -- If no rollout fits, prioritize braking and the least harmful escape.
+        if bestViolation>.2 then self.plan.Throttle=0;self.plan.Brake=1 end
     end
-    targetRoad=base:nearest(target,road.index)
-    if abs(targetRoad.lateral)>margin then
-        local p=base:at(targetRoad.s);local side=math.clamp(targetRoad.lateral,-margin,margin)
-        target={x=p.x-p.fz*side,y=p.y,z=p.z+p.fx*side}
-    end
-    local tangent=base:at(road.s)
-    local lateralVelocity=state.vx*(-tangent.fz)+state.vz*tangent.fx
-    local predictedLateral=road.lateral+lateralVelocity*.25
-    local edge=max(0,abs(predictedLateral)-margin*.65)
-    if edge>0 then
-        local center=base:at(road.s+look)
-        local blend=math.clamp(edge/3,0,.9)
-        target.x=target.x+(center.x-target.x)*blend
-        target.z=target.z+(center.z-target.z)*blend
-        desired=desired*math.clamp(1-edge*.12,.45,1)
-    end
-    local dx,dz=target.x-state.x,target.z-state.z
-    local rightX,rightZ=-state.fz,state.fx
-    local heading=math.atan2(dx*rightX+dz*rightZ,dx*state.fx+dz*state.fz)
-    local range=sqrt(dx*dx+dz*dz)
-    local wheelbase=state.wheelbase or 7.5
-    local wheelAngle=math.atan2(2*wheelbase*math.sin(heading),max(range,4))
-    if abs(heading)>1.2 then wheelAngle=math.sign(heading)*math.rad(state.maxAngle or 28)end
-    local steer=math.clamp((wheelAngle-(state.yawRate or 0)*.055)/math.rad(state.maxAngle or 28),-1,1)
-    if abs(heading)>1 then desired=min(desired,18)end
-    if abs(road.lateral)>margin then desired=min(desired,30)end
-    if state.obstacle then desired=min(desired,sqrt(max(0,state.obstacle-6)*2*braking))end
-    if road.s>stage.FinishAt then
-        desired=min(desired,sqrt(max(0,(stage.StopAt or base.length)-road.s)*2*braking))
-    end
-    local error=desired-forward
-    local throttle,brake=0,0
-    if error>1 then throttle=math.clamp(error/12,.12,1)
-    elseif error< -1.5 then brake=math.clamp(-error/12,.12,1)
-    else throttle=.12 end
-    if desired<1 then throttle=0;brake=1 end
-    if state.grounded<2 then
-        throttle=min(throttle,.25);brake=0;steer=self.steer
-    end
-    -- Short physical reverse to clear a barrier; it cannot repeat indefinitely.
-    local trying=throttle>.5 or(state.obstacle and state.obstacle<7)
-    if state.runState=="Running"and state.grounded>=3 and speed<1.5 and trying then
-        self.stuck=self.stuck+dt
-    else self.stuck=0 end
-    local mode="Following "..(route.meta.source or "route")
-    if self.stuck>2.5 and now>(self.recoveryCooldown or 0)then
-        self.recoveryUntil=now+.7;self.recoveryCooldown=now+5;self.stuck=0
-    end
-    if now<self.recoveryUntil then throttle=0;brake=1;steer=-math.sign(steer);mode="Clearing obstruction"end
-    self.steer=approach(self.steer,steer,2.4,dt)
-    self.throttle=approach(self.throttle,throttle,4,dt)
-    self.brake=approach(self.brake,brake,6,dt)
-    if self.brake>.15 then self.throttle=0 end
+    local c=self.plan
+    self.steer=approach(self.steer,c.Steer,3,dt)
+    self.brake=approach(self.brake,c.Brake,8,dt)
+    self.throttle=self.brake>.1 and 0 or approach(self.throttle,c.Throttle,6,dt)
     return {Throttle=self.throttle,Brake=self.brake,Steer=self.steer,Handbrake=false,Analog=true,
-        mode=mode,progress=road.s,targetSpeed=desired,lateral=road.lateral,target=target,
-        remaining=route.length-on.s,reference=route.meta.source}
+        mode=(self.violation or 0)>.2 and 'Braking: predicted corridor exit'or 'Predictive corridor driving',
+        progress=road.s,targetSpeed=self.speedLimit or speed,lateral=road.lateral,remaining=base.length-road.s,
+        prediction=self.prediction,predictedViolation=self.violation,reference='road corridor',model=self.model,planMilliseconds=self.planMs}
 end
 return Driver
 
@@ -351,7 +468,7 @@ local order={"W","A","S","D","SPACE"}
 local vk={W=0x57,A=0x41,S=0x53,D=0x44,SPACE=0x20}
 local scan={W=0x11,A=0x1E,S=0x1F,D=0x20,SPACE=0x39}
 function Input.new(service)
-    return setmetatable({service=service,held={},heldAt={},owned={},name="waiting",steerAccumulator=0},Input)
+    return setmetatable({service=service,held={},heldAt={},owned={},name="waiting",steerAccumulator=0,pedals={W=0,S=0}},Input)
 end
 function Input:attach(module)
     if type(module)~="table"or type(module.Read)~="function"then return false end
@@ -379,7 +496,17 @@ function Input:releaseKeys()
     for _,entry in ipairs(self.owned)do
         for key in pairs(entry.keys)do if pcall(entry.backend.send,key,false)then entry.keys[key]=nil end end
     end
-    self.held={};self.heldAt={};self.steerAccumulator=0
+    self.held={};self.heldAt={};self.steerAccumulator=0;self.pedals={W=0,S=0};self.keySteer=0;self.steerAt=nil
+    self.steerError=0;self.steerDt=nil;self.lastSign=nil
+end
+function Input:estimateSteer()
+    local now=os.clock();local dt=self.steerAt and math.clamp(now-self.steerAt,0,.15)or 0;self.steerAt=now
+    if dt>.001 then self.steerDt=dt end
+    local target=(self.held.D and 1 or 0)-(self.held.A and 1 or 0)
+    local value=self.keySteer or 0
+    local rate=(target==0 or math.sign(target)~=math.sign(value))and(self.returnRate or 6.5)or(self.steerRate or 4.2)
+    self.keySteer=value+math.clamp(target-value,-rate*dt,rate*dt)
+    return self.keySteer
 end
 function Input:release()
     self.epoch=(self.epoch or 0)+1
@@ -455,16 +582,28 @@ function Input:write(command)
         end
     end
     local wanted={}
-    wanted.W=command.Throttle>.12
-    wanted.S=command.Brake>.12
-    -- At 60 Hz a pulse-density steering signal approximates analog control.
+    for key,value in pairs({W=command.Throttle,S=command.Brake})do
+        if value<=0 then self.pedals[key]=0;wanted[key]=false else
+            self.pedals[key]=self.pedals[key]+math.clamp(value,0,1)
+            wanted[key]=self.pedals[key]>=1
+            if wanted[key]then self.pedals[key]=self.pedals[key]-1 end
+        end
+    end
+    -- Match the game's digital rise/return ramps. A naive duty cycle cancels
+    -- small steering inputs because returning to center is faster than turning.
     local value=math.clamp(command.Steer,-1,1)
-    if self.lastSign and math.sign(value)~=self.lastSign then self.steerAccumulator=0 end
-    self.lastSign=math.sign(value)
-    self.steerAccumulator=self.steerAccumulator+math.abs(value)
-    local turn=self.steerAccumulator>=1
-    if turn then self.steerAccumulator=self.steerAccumulator-1 end
-    wanted.A=turn and value<0;wanted.D=turn and value>0
+    local estimate=self:estimateSteer()
+    local dt=math.clamp(self.steerDt or 1/60,1/240,.1)
+    if self.lastSign~=math.sign(value)then self.steerError=0 end;self.lastSign=math.sign(value)
+    self.steerError=math.clamp((self.steerError or 0)+(value-estimate)*dt,-.04,.04)
+    local function errorAfter(target)
+        local rate=(target==0 or math.sign(target)~=math.sign(estimate))and(self.returnRate or 6.5)or(self.steerRate or 4.2)
+        local nextValue=estimate+math.clamp(target-estimate,-rate*dt,rate*dt)
+        return math.abs(self.steerError+(value-nextValue)*dt)
+    end
+    local releaseError=errorAfter(0)
+    wanted.A=value<-.001 and errorAfter(-1)<releaseError
+    wanted.D=value>.001 and errorAfter(1)<releaseError
     wanted.SPACE=command.Handbrake==true
     for _,key in ipairs(order)do
         if self.held[key]and not wanted[key]then
@@ -561,7 +700,7 @@ function Adapter:tune(cfg,enabled)
     if not enabled or not chassis then self:restore();return false end
     if chassis~=self.chassis then self:restore();self.chassis=chassis;self.baseline=chassis.Tune end
     if chassis.Tune~=self.applied and chassis.Tune~=self.baseline then self.baseline=chassis.Tune;self.signature=nil end
-    local signature=string.format("%.3f/%.3f/%.3f",cfg.speed,cfg.turn,cfg.grip)
+    local signature=string.format("%.3f/%.3f/%.3f/%.3f/%s/%s",cfg.speed,cfg.turn,cfg.grip,cfg.brake or 1,tostring(cfg.auto),tostring(cfg.roadAssist))
     if self.signature==signature and chassis.Tune==self.applied then return true end
     local base=self.baseline
     if type(base)~="table"or type(base.Engine)~="table"or type(base.Steering)~="table"or type(base.Tyres)~="table"then return false end
@@ -572,6 +711,8 @@ function Adapter:tune(cfg,enabled)
     end
     tune.Tyres.LateralGrip=base.Tyres.LateralGrip*cfg.grip
     tune.Tyres.LongitudinalGrip=base.Tyres.LongitudinalGrip*math.sqrt(cfg.grip)
+    if tune.Brakes then tune.Brakes.Force=base.Brakes.Force*(cfg.brake or 1)end
+    if cfg.auto or cfg.roadAssist then tune.RoadKeep=nil end -- avoid two steering controllers fighting
     tune.Steering.Rate=(base.Steering.Rate or 4)*cfg.turn
     tune.Steering.ReturnRate=(base.Steering.ReturnRate or 6)*math.sqrt(cfg.turn)
     tune.Steering.MaxAngle=math.min(48,(base.Steering.MaxAngle or 34)*math.sqrt(cfg.turn))
@@ -610,7 +751,15 @@ function Adapter:measure()
     if cfg and cfg.WetGrip then
         grip=grip*(1+((cfg.WetGrip[surface]or cfg.WetGrip.Default or 1)-1)*wetness)
     end
+    local brakeForce=cfg and cfg.Brakes and cfg.Brakes.Force or 26*(self.cfg and self.cfg.brake or 1)
+    local braking=brakeForce
+    if cfg and cfg.Tyres then
+        local wet=cfg.WetGrip and(1+((cfg.WetGrip[surface]or cfg.WetGrip.Default or 1)-1)*wetness)or 1
+        local longitudinal=cfg.Tyres.LongitudinalGrip*gravity*(material and material.Longitudinal or 1)*wet
+        braking=math.min(brakeForce,longitudinal*.9)
+    end
     local stage=car:GetAttribute("StageId")or self.world:GetAttribute("StageHere")or "PineForest"
+    local carId=car:GetAttribute("CarId")or "Hatch"
     if stage~=self.nativeStage then self.nativeHint=nil;self.nativeStage=stage end
     local preview
     if native and self.nativeRoute and self.nativePlan and self.cfg then
@@ -618,16 +767,27 @@ function Adapter:measure()
             local route=self.nativeRoute.Get(stage)
             local index,s=route:Nearest(p,self.nativeHint,30,60);self.nativeHint=index
             return self.nativePlan.Target(route,s,native,{MaxSpeed=self.cfg.maxKmh/1.008,
-                GripUse=.8,Braking=math.min(26,(cfg.Brakes and cfg.Brakes.Force or 26)*.82),PlanAhead=300},true)
+                GripUse=.76,Braking=math.min((cfg.Brakes and cfg.Brakes.Force or 26)*.82,
+                    (cfg.Tyres.LongitudinalGrip or .5)*gravity*.85),PlanAhead=500},true)
         end)
         if ok and type(value)=="number"and value==value and value>=0 and value<1000 then preview=value end
     end
+    local speed=math.sqrt(v.X^2+v.Z^2)
+    local maxAngle=native and native.MaxAngleNow or math.clamp(math.deg(math.atan(grip*wheelbase/math.max(speed^2,25)))*1.05+6,4.5,32)
+    local normal=Vector3.new(0,1,0)
+    local ground=self.world:Raycast(p+Vector3.new(0,1,0),Vector3.new(0,-9,0),params)
+    if ground and ground.Normal.Y>.3 then normal=ground.Normal end
     return {x=p.X,y=p.Y,z=p.Z,vx=v.X,vz=v.Z,vy=v.Y,fx=cf.LookVector.X,fz=cf.LookVector.Z,
         yawRate=-w.Y,upY=cf.UpVector.Y,grounded=grounded,wheelbase=wheelbase,halfWidth=halfWidth,
-        maxAngle=native and native.MaxAngleNow or(cfg and cfg.Steering and cfg.Steering.MaxAngle or 28),
-        grip=grip,braking=cfg and cfg.Brakes and cfg.Brakes.Force or 26,
+        halfLength=math.max(root.Size.Z*.5,wheelbase*.5+1),gravity=gravity,
+        normalX=normal.X,normalY=normal.Y,normalZ=normal.Z,nearGround=ground~=nil,upright=cf.UpVector:Dot(normal),
+        cgHeight=ground and math.clamp(ground.Distance-1,1,4)or 2.2,
+        steerInput=native and native.SteerInput or nil,maxAngle=math.max(4,maxAngle or 20),
+        steerRate=cfg and cfg.Steering.Rate or(carId=='GroupB'and 4.8 or 4.2),
+        returnRate=cfg and cfg.Steering.ReturnRate or(carId=='GroupB'and 7 or 6.5),
+        grip=grip,braking=braking,brakeForce=brakeForce,
         runState=car:GetAttribute("RunState")or "Idle",stage=stage,nativePreview=preview,
-        carId=car:GetAttribute("CarId")or "Hatch",surface=surface or "Gravel"}
+        carId=carId,surface=surface or "Gravel"}
 end
 function Adapter:obstacle(state)
     local root=self.root
@@ -635,6 +795,52 @@ function Adapter:obstacle(state)
     local direction=Vector3.new(state.fx,0,state.fz)*distance
     local hit=self.world:Raycast(root.Position+Vector3.new(0,.6,0),direction,self.groundParams)
     if hit and hit.Normal.Y<.65 then return hit.Distance end
+end
+function Adapter:scan(state)
+    local speed=math.sqrt(state.vx^2+state.vz^2)
+    local distance=math.clamp(speed^2/(2*math.max(state.braking,8))+speed*.4+20,30,550)
+    local points={};local nearest
+    for _,angle in ipairs({-.35,-.18,0,.18,.35})do
+        local c,s=math.cos(angle),math.sin(angle)
+        local dir=Vector3.new(state.fx*c-state.fz*s,0,state.fz*c+state.fx*s)
+        for _,height in ipairs({.3,1.4})do
+            local hit=self.world:Raycast(self.root.Position+Vector3.new(0,height,0),dir*distance,self.groundParams)
+            if hit and hit.Normal.Y<.55 then
+                points[#points+1]={x=hit.Position.X,z=hit.Position.Z,radius=.85}
+                if angle==0 then nearest=math.min(nearest or math.huge,hit.Distance)end
+            end
+        end
+    end
+    return points,nearest
+end
+function Adapter:stabilize(state,cfg,guard,command,dt)
+    if not cfg.roadAssist or self.root.Anchored then return end
+    local root=self.root;local mass=root.AssemblyMass
+    if mass<=0 or mass>1e7 then return end
+    local normal=Vector3.new(state.normalX or 0,state.normalY or 1,state.normalZ or 0)
+    local up=root.CFrame.UpVector
+    local w=root.AssemblyAngularVelocity
+    local inertia=mass*(state.wheelbase^2+(state.halfWidth*2)^2)/12
+    local axis=up:Cross(normal)
+    local alignment=up:Dot(normal)
+    if alignment<-.8 and axis.Magnitude<.1 then axis=root.CFrame.LookVector end
+    local tiltRate=w-normal*w:Dot(normal)
+    local angular=axis*12-tiltRate*9
+    root:ApplyAngularImpulse(angular*inertia*dt*.45)
+    if state.grounded>=2 and state.nearGround then
+        local lateral=Vector3.new(guard.rightX,0,guard.rightZ)*guard.lateralAccel
+        local yaw=-guard.yawAccel
+        root:ApplyImpulse(lateral*mass*dt)
+        root:ApplyAngularImpulse(Vector3.new(0,yaw*inertia*dt*.5,0))
+        -- Native braking already applies the multiplier; fallback needs extra force.
+        local extra=not self.applied and math.max(0,(cfg.brake or 1)-1)*26*(command.Brake or 0)or 0
+        extra=extra+(guard.Brake or 0)*math.min(40,state.braking)
+        local v=root.AssemblyLinearVelocity;local horizontal=Vector3.new(v.X,0,v.Z)
+        if horizontal.Magnitude>.1 and extra>0 then
+            root:ApplyImpulse(-horizontal.Unit*math.min(extra*dt,horizontal.Magnitude)*mass)
+        end
+        if alignment>.65 then root:ApplyImpulse(-normal*mass*math.min((state.vx^2+state.vz^2)*.0025,22)*dt)end
+    end
 end
 function Adapter:boost(state,cfg,command,dt)
     if self.applied or state.grounded<3 or state.upY<.65 or self.root.Anchored then return end
@@ -649,10 +855,15 @@ function Adapter:boost(state,cfg,command,dt)
     local damping=math.clamp(-side*(cfg.grip-1)*1.8,-45,45)
     local force=(cf.LookVector*acceleration+cf.RightVector*damping)*mass*dt
     root:ApplyImpulse(force)
-    if cfg.turn>1 and math.abs(steer)>.02 and math.abs(forward)>3 then
-        local extra=-steer*math.min(math.abs(forward)/12,5)*(cfg.turn-1)
+    if cfg.turn>1 and math.abs(forward)>3 then
+        local desired=steer*math.abs(forward)/state.wheelbase*math.tan(math.rad(state.maxAngle))*math.sqrt(cfg.turn)
+        local acceleration=math.clamp((desired-state.yawRate)*2*(cfg.turn-1),-4,4)
         local inertia=mass*(state.wheelbase^2+(state.halfWidth*2)^2)/12
-        root:ApplyAngularImpulse(Vector3.new(0,extra*inertia*dt,0))
+        root:ApplyAngularImpulse(Vector3.new(0,-acceleration*inertia*dt,0))
+    end
+    if not cfg.roadAssist and (cfg.brake or 1)>1 and (command.Brake or 0)>0 and math.abs(forward)>.1 then
+        local extra=math.min(math.abs(forward),26*((cfg.brake or 1)-1)*command.Brake*dt)
+        root:ApplyImpulse(-cf.LookVector*math.sign(forward)*extra*mass)
     end
 end
 function Adapter:destroy()self:restore();self:automatic(false)end
@@ -675,8 +886,8 @@ if old then
     local shutdown=old:FindFirstChild("Shutdown")
     if shutdown and shutdown:IsA("BindableEvent")then shutdown:Fire()else old:Destroy()end
 end
-local app={alive=true,enabled=false,version="1.0.0",connections={},status="Sit in the driver seat. F6 enables assists.",
-    cfg={speed=1.4,turn=1.2,grip=1.2,maxKmh=180,pace=1,auto=false,line="Showcase",learn=false},
+local app={alive=true,enabled=false,version="1.1.0",connections={},status="Sit in the driver seat. F6 enables assists.",
+    cfg={speed=1.4,turn=1.2,grip=1.2,brake=1.5,margin=1.2,roadAssist=true,maxKmh=180,pace=1,auto=false,line="Road",learn=false},
     trace={},routeCache={},driver=Driver.new(),ghost=Ghost.new(),input=Input.new(UIS)}
 app.adapter=Adapter.new(player,World,Replicated,app.input)
 local env=type(getgenv)=="function"and getgenv()or nil
@@ -709,6 +920,11 @@ function app.toggleAuto()
     if app.cfg.auto then app.enabled=true;app.status="Autodrive armed; waiting for driver seat"
     else app.status="Manual driving with assistance"end
 end
+function app.toggleRoadAssist()
+    if not app.enabled and app.cfg.roadAssist then app.start();return end
+    app.cfg.roadAssist=not app.cfg.roadAssist
+    if app.cfg.roadAssist and not app.enabled then app.start()end
+end
 local ghostLease,ghostBase
 local function learnGhost(on)
     app.cfg.learn=on
@@ -732,14 +948,16 @@ local panel=make("Frame",{Name="Window",Size=UDim2.fromOffset(444,676),Position=
     BackgroundColor3=palette.bg,BorderSizePixel=0,Active=true},gui)
 corner(panel,12);make("UIStroke",{Color=palette.edge,Thickness=1},panel)
 local scale=make("UIScale",{Scale=1},panel)
-local header=make("TextButton",{Name="Titlebar",Size=UDim2.new(1,-88,0,46),BackgroundTransparency=1,Text="  BACKSEAT / RALLY ASSIST",
+local header=make("TextButton",{Name="Titlebar",Size=UDim2.new(1,-88,0,46),BackgroundTransparency=1,Text="  BACKSEAT / RALLY 1.1",
     TextColor3=palette.text,TextXAlignment=Enum.TextXAlignment.Left,TextSize=15,Font=Enum.Font.GothamBold,AutoButtonColor=false},panel)
 local function button(name,text,x,y,w,h,parent,callback)
     local b=make("TextButton",{Name=name,Text=text,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),
         BackgroundColor3=palette.card,BorderSizePixel=0,TextColor3=palette.text,TextSize=13,Font=Enum.Font.GothamBold,AutoButtonColor=true},parent)
     corner(b,7);connect(b.Activated,callback);return b
 end
-local body=make("Frame",{Name="Body",BackgroundTransparency=1,Position=UDim2.fromOffset(14,48),Size=UDim2.new(1,-28,1,-58)},panel)
+local body=make("ScrollingFrame",{Name="Body",BackgroundTransparency=1,BorderSizePixel=0,
+    CanvasSize=UDim2.fromOffset(0,840),ScrollBarThickness=4,
+    Position=UDim2.fromOffset(14,48),Size=UDim2.new(1,-28,1,-58)},panel)
 local minimized=false
 local minimize=button("Minimize","–",354,9,32,28,panel,function()
     minimized=not minimized;body.Visible=not minimized
@@ -751,6 +969,7 @@ local status=make("TextLabel",{Name="Status",Size=UDim2.new(1,0,0,54),Background
 corner(status,7)
 local master=button("Master","Enable assists [F6]",0,64,204,34,body,function()if app.enabled then app.stop()else app.start()end end)
 local auto=button("AutoDrive","Autodrive OFF [F7]",212,64,204,34,body,app.toggleAuto)
+local roadButton=button("RoadAssist","Road assist: ON [F9]",0,106,416,32,body,app.toggleRoadAssist)
 local sliders={};local draggingSlider,draggingPanel
 local function slider(key,label,lo,hi,step,suffix,y)
     local row=make("Frame",{Name=key,BackgroundTransparency=1,Position=UDim2.fromOffset(0,y),Size=UDim2.new(1,0,0,53)},body)
@@ -780,16 +999,18 @@ local function slider(key,label,lo,hi,step,suffix,y)
     connect(value.FocusLost,function()local v=tonumber((value.Text:gsub("[^%d%.%-]","")));set(v or app.cfg[key])end)
     sliders[key]=set;set(app.cfg[key])
 end
-slider("speed","Speed / power boost",1,3,.05,"×",110)
-slider("turn","Turn response boost",1,2.5,.05,"×",166)
-slider("grip","Grip boost",1,3,.05,"×",222)
-slider("maxKmh","Autodrive speed cap",50,260,5," km/h",278)
-slider("pace","Reference pace",.6,1.25,.05,"×",334)
+slider("speed","Speed / power boost",1,3,.05,"×",150)
+slider("turn","Turn response boost",1,2.5,.05,"×",206)
+slider("grip","Grip boost",1,3,.05,"×",262)
+slider("brake","Brake force multiplier",1,4,.1,"×",318)
+slider("maxKmh","Autodrive speed cap",50,260,5," km/h",374)
+slider("margin","Extra road-edge clearance",.5,3.5,.1," studs",430)
+slider("pace","Reference preference",.6,1.25,.05,"×",486)
 local sources={"Showcase","Road","Personal ghost"}
-local lineButton=button("Line","Line: Showcase",0,395,416,32,body,function()
+local lineButton=button("Line","Line: Road",0,547,416,32,body,function()
     local index=table.find(sources,app.cfg.line)or 1;app.cfg.line=sources[index%#sources+1];app.driver=Driver.new()
 end)
-local learnButton=button("LearnGhost","Learn loaded ghost: OFF",0,435,416,32,body,function()learnGhost(not app.cfg.learn)end)
+local learnButton=button("LearnGhost","Learn loaded ghost: OFF",0,587,416,32,body,function()learnGhost(not app.cfg.learn)end)
 local function saveGhosts()
     assert(type(writefile)=="function","writefile is unavailable")
     writefile("BackseatRally_Ghosts.json",Http:JSONEncode({version=1,tracks=app.ghost.tracks}))
@@ -819,17 +1040,17 @@ end
 local function guarded(fn)
     return function()local ok,err=pcall(fn);if not ok then app.status=tostring(err)end end
 end
-button("SaveGhost","Save ghost lines",0,475,204,31,body,guarded(saveGhosts))
-button("LoadGhost","Load ghost lines",212,475,204,31,body,guarded(loadGhosts))
-button("Report","Save diagnostics",0,514,416,31,body,guarded(function()
+button("SaveGhost","Save ghost lines",0,627,204,31,body,guarded(saveGhosts))
+button("LoadGhost","Load ghost lines",212,627,204,31,body,guarded(loadGhosts))
+button("Report","Save diagnostics",0,666,416,31,body,guarded(function()
     assert(type(writefile)=="function","writefile is unavailable")
     writefile("BackseatRally_Report.json",Http:JSONEncode({version=app.version,settings=app.cfg,status=app.status,
         last_error=app.lastError,stage=app.stage,input=app.input.name,native_tune=app.adapter.applied~=nil,
         ghost_status=app.ghost.reason,trace=app.trace}))
     app.status="Saved BackseatRally_Report.json"
 end))
-make("TextLabel",{Position=UDim2.fromOffset(0,554),Size=UDim2.new(1,0,0,44),BackgroundTransparency=1,
-    Text="Showcase = recorded game driving line.\nPersonal ghost = best run loaded by the game. F8 stops.",TextWrapped=true,
+make("TextLabel",{Position=UDim2.fromOffset(0,706),Size=UDim2.new(1,0,0,64),BackgroundTransparency=1,
+    Text="Road assist: lane guard + roll stability.\nAutodrive searches predicted paths inside the road.\nF8 stops; F9 toggles road assist.",TextWrapped=true,
     TextColor3=palette.dim,TextSize=11,Font=Enum.Font.Gotham},body)
 local function resize()
     local camera=World.CurrentCamera
@@ -860,6 +1081,7 @@ connect(UIS.InputBegan,function(input,processed)
     elseif not processed and not UIS:GetFocusedTextBox()then
         if input.KeyCode==Enum.KeyCode.F6 then if app.enabled then app.stop()else app.start()end
         elseif input.KeyCode==Enum.KeyCode.F7 then app.toggleAuto()end
+        if input.KeyCode==Enum.KeyCode.F9 then app.toggleRoadAssist()end
     end
 end)
 connect(UIS.WindowFocusReleased,function()focused=false;app.stop("Paused: Roblox lost focus")end)
@@ -914,7 +1136,7 @@ if ghostNet and ghostNet:IsA("RemoteEvent")then
     end)
 end
 local lastUi,lastTrace,lastObstacle=-math.huge,-math.huge,-math.huge
-local obstacle,previousCar,previousStage,previousLine
+local obstacle,obstacles,previousCar,previousStage,previousLine
 local probing=false
 connect(Run.Heartbeat,function(dt)
     if not app.alive then return end
@@ -932,6 +1154,12 @@ connect(Run.Heartbeat,function(dt)
             if car~=previousCar then release();previousCar=car;app.ghost.capture=nil end
             app.adapter:tune(app.cfg,app.enabled)
             local state=app.adapter:measure();app.stage=state.stage
+            state.inputAnalog=app.input.name=='analog'
+            if not state.inputAnalog then
+                app.input.steerRate=state.steerRate;app.input.returnRate=state.returnRate
+                local estimate=app.input:estimateSteer()
+                if state.steerInput~=nil then app.input.keySteer=state.steerInput else state.steerInput=estimate end
+            end
             if not PROFILES[state.stage]then release();app.status="No route profile for this stage";return end
             if state.stage~=previousStage then app.driver=Driver.new();previousStage=state.stage end
             if app.cfg.learn then
@@ -969,14 +1197,19 @@ connect(Run.Heartbeat,function(dt)
                     if app.autoReady then
                         local line,base=lineFor(state.stage,state.carId,state.halfWidth)
                         if line~=previousLine then app.driver=Driver.new();previousLine=line end
-                        if now-lastObstacle>.1 then obstacle=app.adapter:obstacle(state);lastObstacle=now end
-                        state.obstacle=obstacle
-                        if not app.adapter.applied then state.grip=state.grip*app.cfg.grip end
+                        if now-lastObstacle>.12 then obstacles,obstacle=app.adapter:scan(state);lastObstacle=now end
+                        state.obstacle=obstacle;state.obstacles=obstacles
                         local command=Driver.step(app.driver,line,base,PROFILES[state.stage],state,app.cfg,dt,now)
+                        if command.Brake>.25 and command.Throttle==0 and state.vx^2+state.vz^2<2.25 then
+                            command.Brake=0;command.Handbrake=true -- held S otherwise selects reverse
+                        end
                         local written,why=app.input:write(command)
                         if not app.alive or not app.enabled or not app.cfg.auto then app.input:release();return end
                         assert(written,why)
                         app.adapter:boost(state,app.cfg,command,dt)
+                        local guard=Driver.assist(base,PROFILES[state.stage],state,app.cfg)
+                        app.adapter:stabilize(state,app.cfg,guard,command,dt)
+                        command.guard=guard
                         app.command=command;app.status=command.mode
                         if app.cfg.line=="Personal ghost"and line.meta.source~="personal ghost"then
                             app.status=app.status.." (personal ghost not loaded)"
@@ -984,8 +1217,15 @@ connect(Run.Heartbeat,function(dt)
                     end
                 else
                     app.input:release();app.adapter:automatic(false)
-                    app.adapter:boost(state,app.cfg,app.input:manualState(),dt)
-                    app.status="Manual assist"
+                    local manual=app.input:manualState()
+                    app.adapter:boost(state,app.cfg,manual,dt)
+                    if app.cfg.roadAssist then
+                        local _,base=lineFor(state.stage,state.carId,state.halfWidth)
+                        local guard=Driver.assist(base,PROFILES[state.stage],state,app.cfg)
+                        app.adapter:stabilize(state,app.cfg,guard,manual,dt)
+                        app.command={mode='Manual road assist',guard=guard}
+                    end
+                    app.status=app.cfg.roadAssist and "Manual road assist"or "Manual boosts"
                 end
             end
             app.state=state
@@ -1002,6 +1242,7 @@ connect(Run.Heartbeat,function(dt)
             master.TextColor3=app.enabled and palette.bg or palette.text
             auto.Text=app.cfg.auto and(app.enabled and "Autodrive ON [F7]"or "Resume autodrive [F7]")or "Autodrive OFF [F7]"
             lineButton.Text="Line: "..app.cfg.line
+            roadButton.Text="Road assist: "..(app.cfg.roadAssist and "ON [F9]"or "OFF [F9]")
             local capture=app.ghost.capture
             local learning=not app.cfg.learn and "OFF"or(capture and(capture.invalid and "start a fresh run"or(#capture.rows.." points"))or "waiting for ghost")
             learnButton.Text="Learn loaded ghost: "..learning

@@ -15,7 +15,7 @@ def literal(value):
 
 
 def source():
-    text="-- Backseat Rally Assist 1.0.0 | F6 assists, F7 autodrive, F8 stop\n"
+    text="-- Backseat Rally Assist 1.1.0 | F6 assists, F7 autodrive, F8 stop, F9 road assist\n"
     text+="-- Independent controller; numeric stage/showcase reference, not a world-record claim.\n"
     for name,file in (("Route","route.lua"),("Driver","controller.lua"),("Ghost","ghost.lua"),
                       ("Input","input.lua"),("Adapter","adapter.lua")):

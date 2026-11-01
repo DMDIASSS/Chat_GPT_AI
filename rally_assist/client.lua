@@ -11,8 +11,8 @@ if old then
     local shutdown=old:FindFirstChild("Shutdown")
     if shutdown and shutdown:IsA("BindableEvent")then shutdown:Fire()else old:Destroy()end
 end
-local app={alive=true,enabled=false,version="1.0.0",connections={},status="Sit in the driver seat. F6 enables assists.",
-    cfg={speed=1.4,turn=1.2,grip=1.2,maxKmh=180,pace=1,auto=false,line="Showcase",learn=false},
+local app={alive=true,enabled=false,version="1.1.0",connections={},status="Sit in the driver seat. F6 enables assists.",
+    cfg={speed=1.4,turn=1.2,grip=1.2,brake=1.5,margin=1.2,roadAssist=true,maxKmh=180,pace=1,auto=false,line="Road",learn=false},
     trace={},routeCache={},driver=Driver.new(),ghost=Ghost.new(),input=Input.new(UIS)}
 app.adapter=Adapter.new(player,World,Replicated,app.input)
 local env=type(getgenv)=="function"and getgenv()or nil
@@ -45,6 +45,11 @@ function app.toggleAuto()
     if app.cfg.auto then app.enabled=true;app.status="Autodrive armed; waiting for driver seat"
     else app.status="Manual driving with assistance"end
 end
+function app.toggleRoadAssist()
+    if not app.enabled and app.cfg.roadAssist then app.start();return end
+    app.cfg.roadAssist=not app.cfg.roadAssist
+    if app.cfg.roadAssist and not app.enabled then app.start()end
+end
 local ghostLease,ghostBase
 local function learnGhost(on)
     app.cfg.learn=on
@@ -68,14 +73,16 @@ local panel=make("Frame",{Name="Window",Size=UDim2.fromOffset(444,676),Position=
     BackgroundColor3=palette.bg,BorderSizePixel=0,Active=true},gui)
 corner(panel,12);make("UIStroke",{Color=palette.edge,Thickness=1},panel)
 local scale=make("UIScale",{Scale=1},panel)
-local header=make("TextButton",{Name="Titlebar",Size=UDim2.new(1,-88,0,46),BackgroundTransparency=1,Text="  BACKSEAT / RALLY ASSIST",
+local header=make("TextButton",{Name="Titlebar",Size=UDim2.new(1,-88,0,46),BackgroundTransparency=1,Text="  BACKSEAT / RALLY 1.1",
     TextColor3=palette.text,TextXAlignment=Enum.TextXAlignment.Left,TextSize=15,Font=Enum.Font.GothamBold,AutoButtonColor=false},panel)
 local function button(name,text,x,y,w,h,parent,callback)
     local b=make("TextButton",{Name=name,Text=text,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),
         BackgroundColor3=palette.card,BorderSizePixel=0,TextColor3=palette.text,TextSize=13,Font=Enum.Font.GothamBold,AutoButtonColor=true},parent)
     corner(b,7);connect(b.Activated,callback);return b
 end
-local body=make("Frame",{Name="Body",BackgroundTransparency=1,Position=UDim2.fromOffset(14,48),Size=UDim2.new(1,-28,1,-58)},panel)
+local body=make("ScrollingFrame",{Name="Body",BackgroundTransparency=1,BorderSizePixel=0,
+    CanvasSize=UDim2.fromOffset(0,840),ScrollBarThickness=4,
+    Position=UDim2.fromOffset(14,48),Size=UDim2.new(1,-28,1,-58)},panel)
 local minimized=false
 local minimize=button("Minimize","–",354,9,32,28,panel,function()
     minimized=not minimized;body.Visible=not minimized
@@ -87,6 +94,7 @@ local status=make("TextLabel",{Name="Status",Size=UDim2.new(1,0,0,54),Background
 corner(status,7)
 local master=button("Master","Enable assists [F6]",0,64,204,34,body,function()if app.enabled then app.stop()else app.start()end end)
 local auto=button("AutoDrive","Autodrive OFF [F7]",212,64,204,34,body,app.toggleAuto)
+local roadButton=button("RoadAssist","Road assist: ON [F9]",0,106,416,32,body,app.toggleRoadAssist)
 local sliders={};local draggingSlider,draggingPanel
 local function slider(key,label,lo,hi,step,suffix,y)
     local row=make("Frame",{Name=key,BackgroundTransparency=1,Position=UDim2.fromOffset(0,y),Size=UDim2.new(1,0,0,53)},body)
@@ -116,16 +124,18 @@ local function slider(key,label,lo,hi,step,suffix,y)
     connect(value.FocusLost,function()local v=tonumber((value.Text:gsub("[^%d%.%-]","")));set(v or app.cfg[key])end)
     sliders[key]=set;set(app.cfg[key])
 end
-slider("speed","Speed / power boost",1,3,.05,"×",110)
-slider("turn","Turn response boost",1,2.5,.05,"×",166)
-slider("grip","Grip boost",1,3,.05,"×",222)
-slider("maxKmh","Autodrive speed cap",50,260,5," km/h",278)
-slider("pace","Reference pace",.6,1.25,.05,"×",334)
+slider("speed","Speed / power boost",1,3,.05,"×",150)
+slider("turn","Turn response boost",1,2.5,.05,"×",206)
+slider("grip","Grip boost",1,3,.05,"×",262)
+slider("brake","Brake force multiplier",1,4,.1,"×",318)
+slider("maxKmh","Autodrive speed cap",50,260,5," km/h",374)
+slider("margin","Extra road-edge clearance",.5,3.5,.1," studs",430)
+slider("pace","Reference preference",.6,1.25,.05,"×",486)
 local sources={"Showcase","Road","Personal ghost"}
-local lineButton=button("Line","Line: Showcase",0,395,416,32,body,function()
+local lineButton=button("Line","Line: Road",0,547,416,32,body,function()
     local index=table.find(sources,app.cfg.line)or 1;app.cfg.line=sources[index%#sources+1];app.driver=Driver.new()
 end)
-local learnButton=button("LearnGhost","Learn loaded ghost: OFF",0,435,416,32,body,function()learnGhost(not app.cfg.learn)end)
+local learnButton=button("LearnGhost","Learn loaded ghost: OFF",0,587,416,32,body,function()learnGhost(not app.cfg.learn)end)
 local function saveGhosts()
     assert(type(writefile)=="function","writefile is unavailable")
     writefile("BackseatRally_Ghosts.json",Http:JSONEncode({version=1,tracks=app.ghost.tracks}))
@@ -155,17 +165,17 @@ end
 local function guarded(fn)
     return function()local ok,err=pcall(fn);if not ok then app.status=tostring(err)end end
 end
-button("SaveGhost","Save ghost lines",0,475,204,31,body,guarded(saveGhosts))
-button("LoadGhost","Load ghost lines",212,475,204,31,body,guarded(loadGhosts))
-button("Report","Save diagnostics",0,514,416,31,body,guarded(function()
+button("SaveGhost","Save ghost lines",0,627,204,31,body,guarded(saveGhosts))
+button("LoadGhost","Load ghost lines",212,627,204,31,body,guarded(loadGhosts))
+button("Report","Save diagnostics",0,666,416,31,body,guarded(function()
     assert(type(writefile)=="function","writefile is unavailable")
     writefile("BackseatRally_Report.json",Http:JSONEncode({version=app.version,settings=app.cfg,status=app.status,
         last_error=app.lastError,stage=app.stage,input=app.input.name,native_tune=app.adapter.applied~=nil,
         ghost_status=app.ghost.reason,trace=app.trace}))
     app.status="Saved BackseatRally_Report.json"
 end))
-make("TextLabel",{Position=UDim2.fromOffset(0,554),Size=UDim2.new(1,0,0,44),BackgroundTransparency=1,
-    Text="Showcase = recorded game driving line.\nPersonal ghost = best run loaded by the game. F8 stops.",TextWrapped=true,
+make("TextLabel",{Position=UDim2.fromOffset(0,706),Size=UDim2.new(1,0,0,64),BackgroundTransparency=1,
+    Text="Road assist: lane guard + roll stability.\nAutodrive searches predicted paths inside the road.\nF8 stops; F9 toggles road assist.",TextWrapped=true,
     TextColor3=palette.dim,TextSize=11,Font=Enum.Font.Gotham},body)
 local function resize()
     local camera=World.CurrentCamera
@@ -196,6 +206,7 @@ connect(UIS.InputBegan,function(input,processed)
     elseif not processed and not UIS:GetFocusedTextBox()then
         if input.KeyCode==Enum.KeyCode.F6 then if app.enabled then app.stop()else app.start()end
         elseif input.KeyCode==Enum.KeyCode.F7 then app.toggleAuto()end
+        if input.KeyCode==Enum.KeyCode.F9 then app.toggleRoadAssist()end
     end
 end)
 connect(UIS.WindowFocusReleased,function()focused=false;app.stop("Paused: Roblox lost focus")end)
@@ -250,7 +261,7 @@ if ghostNet and ghostNet:IsA("RemoteEvent")then
     end)
 end
 local lastUi,lastTrace,lastObstacle=-math.huge,-math.huge,-math.huge
-local obstacle,previousCar,previousStage,previousLine
+local obstacle,obstacles,previousCar,previousStage,previousLine
 local probing=false
 connect(Run.Heartbeat,function(dt)
     if not app.alive then return end
@@ -268,6 +279,12 @@ connect(Run.Heartbeat,function(dt)
             if car~=previousCar then release();previousCar=car;app.ghost.capture=nil end
             app.adapter:tune(app.cfg,app.enabled)
             local state=app.adapter:measure();app.stage=state.stage
+            state.inputAnalog=app.input.name=='analog'
+            if not state.inputAnalog then
+                app.input.steerRate=state.steerRate;app.input.returnRate=state.returnRate
+                local estimate=app.input:estimateSteer()
+                if state.steerInput~=nil then app.input.keySteer=state.steerInput else state.steerInput=estimate end
+            end
             if not PROFILES[state.stage]then release();app.status="No route profile for this stage";return end
             if state.stage~=previousStage then app.driver=Driver.new();previousStage=state.stage end
             if app.cfg.learn then
@@ -305,14 +322,19 @@ connect(Run.Heartbeat,function(dt)
                     if app.autoReady then
                         local line,base=lineFor(state.stage,state.carId,state.halfWidth)
                         if line~=previousLine then app.driver=Driver.new();previousLine=line end
-                        if now-lastObstacle>.1 then obstacle=app.adapter:obstacle(state);lastObstacle=now end
-                        state.obstacle=obstacle
-                        if not app.adapter.applied then state.grip=state.grip*app.cfg.grip end
+                        if now-lastObstacle>.12 then obstacles,obstacle=app.adapter:scan(state);lastObstacle=now end
+                        state.obstacle=obstacle;state.obstacles=obstacles
                         local command=Driver.step(app.driver,line,base,PROFILES[state.stage],state,app.cfg,dt,now)
+                        if command.Brake>.25 and command.Throttle==0 and state.vx^2+state.vz^2<2.25 then
+                            command.Brake=0;command.Handbrake=true -- held S otherwise selects reverse
+                        end
                         local written,why=app.input:write(command)
                         if not app.alive or not app.enabled or not app.cfg.auto then app.input:release();return end
                         assert(written,why)
                         app.adapter:boost(state,app.cfg,command,dt)
+                        local guard=Driver.assist(base,PROFILES[state.stage],state,app.cfg)
+                        app.adapter:stabilize(state,app.cfg,guard,command,dt)
+                        command.guard=guard
                         app.command=command;app.status=command.mode
                         if app.cfg.line=="Personal ghost"and line.meta.source~="personal ghost"then
                             app.status=app.status.." (personal ghost not loaded)"
@@ -320,8 +342,15 @@ connect(Run.Heartbeat,function(dt)
                     end
                 else
                     app.input:release();app.adapter:automatic(false)
-                    app.adapter:boost(state,app.cfg,app.input:manualState(),dt)
-                    app.status="Manual assist"
+                    local manual=app.input:manualState()
+                    app.adapter:boost(state,app.cfg,manual,dt)
+                    if app.cfg.roadAssist then
+                        local _,base=lineFor(state.stage,state.carId,state.halfWidth)
+                        local guard=Driver.assist(base,PROFILES[state.stage],state,app.cfg)
+                        app.adapter:stabilize(state,app.cfg,guard,manual,dt)
+                        app.command={mode='Manual road assist',guard=guard}
+                    end
+                    app.status=app.cfg.roadAssist and "Manual road assist"or "Manual boosts"
                 end
             end
             app.state=state
@@ -338,6 +367,7 @@ connect(Run.Heartbeat,function(dt)
             master.TextColor3=app.enabled and palette.bg or palette.text
             auto.Text=app.cfg.auto and(app.enabled and "Autodrive ON [F7]"or "Resume autodrive [F7]")or "Autodrive OFF [F7]"
             lineButton.Text="Line: "..app.cfg.line
+            roadButton.Text="Road assist: "..(app.cfg.roadAssist and "ON [F9]"or "OFF [F9]")
             local capture=app.ghost.capture
             local learning=not app.cfg.learn and "OFF"or(capture and(capture.invalid and "start a fresh run"or(#capture.rows.." points"))or "waiting for ghost")
             learnButton.Text="Learn loaded ghost: "..learning
