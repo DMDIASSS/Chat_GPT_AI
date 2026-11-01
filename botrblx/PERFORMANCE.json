@@ -1,0 +1,100 @@
+{
+  "version": "local-6.3",
+  "date": "2026-11-01",
+  "original_nexto": {
+    "name": "Nexto",
+    "source": "https://raw.githubusercontent.com/Rolv-Arild/Necto/master/rlbot-support/Nexto/nexto-model.pt",
+    "upstream_file_verified": true,
+    "source_bytes": 1852625,
+    "source_sha256": "bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa",
+    "license": "CC BY-NC-SA 4.0",
+    "trained_or_changed_weights": false,
+    "bundles_private_checkpoint": false,
+    "default_ground_assist": false,
+    "default_scripted_teammate_yield": false,
+    "pad_entity_limit": 6,
+    "other_car_entity_limit": 5
+  },
+  "supplied_report": {
+    "trace_samples": 150,
+    "active_trace_samples": 0,
+    "recorded_model_was_original_nexto": false,
+    "last_decision_ms": 32.66259999873,
+    "conclusion": "Paused samples and a stale decision do not establish the active-play bottleneck."
+  },
+  "kernel_benchmark": {
+    "runtime": "Cloud Luau CLI; not Windows or JJSploit",
+    "calls_per_case": 12,
+    "results": [
+      {
+        "entities": 2,
+        "previous_ms": 7.8139609152761595,
+        "current_ms": 5.58755433303304
+      },
+      {
+        "entities": 7,
+        "previous_ms": 14.161143165741427,
+        "current_ms": 9.975946581107564
+      },
+      {
+        "entities": 13,
+        "previous_ms": 22.973320834959548,
+        "current_ms": 15.777209831867367
+      }
+    ],
+    "reference_cases_compared": 12,
+    "max_logit_difference_between_kernels": 0
+  },
+  "ground_planner_benchmark": {
+    "runtime": "Cloud Luau CLI",
+    "calls_per_version": 60,
+    "previous_ms": 0.9896473668050021,
+    "current_ms": 0.5491525002677614,
+    "same_ground_action": true,
+    "model_inference_included": false
+  },
+  "validation": {
+    "tests_passed": 148,
+    "tests_failed": 0,
+    "tests_skipped": 0,
+    "prebuilt_luau_compile": true,
+    "cadence_frame_rates_hz": [
+      50,
+      60,
+      75,
+      120,
+      144
+    ],
+    "target_policy_hz": 15,
+    "live_roblox_tested": false,
+    "live_windows_performance_tested": false
+  },
+  "changes": [
+    "Deadline scheduling instead of resetting timers at each frame; missed slots are not replayed",
+    "Exact four-row dense kernel; no quantization or weight changes",
+    "Skip discarded inference during far ground overrides and recovery; retain near-ball actor jump decisions",
+    "Reuse travel integration across ground interception candidates",
+    "Scripted teammate yielding defaults off and optional yielding requires active, aligned approach",
+    "Retain active-run trace while paused and capture separate phase timings and latest pose"
+  ],
+  "limits": [
+    "Measured cloud speedups do not guarantee a particular FPS, decision rate or win rate on the user PC.",
+    "The actor receives approximate rendered state, estimated opponent boost/flip availability and a bounded pad subset.",
+    "Disabling our teammate-yield override does not retrain the learned actor or remove teammates from observations."
+  ],
+  "runtime_source_sha256": {
+    "file_transport.lua": "6cea0e28784191461f21b2b425be96134e32b5a99cf4820d9ffc07e3b7e5d3d2",
+    "local_arena.lua": "f89bfe48ccd8b49cae0f021c69aaaaaf79c56ddbf1e6ee1405aad3288dcf946f",
+    "local_kickoff.lua": "15488463581aaa45e51df05e1fcc7aaeb210e3c4b8f1ef9f411c6b550a855014",
+    "local_keyboard.lua": "96f7f89de55b8023753efd7443289c19276861acdf7d02306b1f4db402053c91",
+    "local_pads.lua": "8df26791b386d58d114b195b865c6bf2e744a011d1f3de40f3e04003a2083b97",
+    "http_compat.lua": "e2f86fdcf2d675f707467e6e101dd92b6d5c06c662ec1f65c5c1428c21a33dc5",
+    "local_physics.lua": "55edcd8cf94c7155be3e4865a68a2daae626927a76fa603db3ebdf382113c351",
+    "local_policy.lua": "1f9ef4447421e3accf85a1b18415fd38e5e621c02b8256ccebb9a65210a4b069",
+    "local_timing.lua": "c27a15c95ac432d07fed31aef79a2def3ebdc36d9541563c8eb46227e3be4775",
+    "local_cars.lua": "5e72ca42274b11895e8164cdd6716fc8e656f21cea212e1ba84693efa5c1d983",
+    "local_intercept.lua": "278e83a72d813829a2a5933dc18f06130794fa724d7c605b1493fd4ccf0bb715",
+    "standalone.lua": "996e9fd3697ee4e9210f0cf805761d1a5157ab349235dd28f02f023dd4e0031c",
+    "local_teams.lua": "68ca4ee0794ad9297cf1fe6f1f9140ea02dcc74f2538e0a95ddd4cb28f427b4a"
+  }
+}

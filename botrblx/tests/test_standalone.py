@@ -106,7 +106,7 @@ print('OBS_AND_INPUT_OK')
 '''
         self.assertIn("OBS_AND_INPUT_OK",self.run_lua(source))
 
-    def client_case(self,behaviour,checks,extra=""):
+    def client_case(self,behaviour,checks,extra="",source=None):
         prefix=(HERE/"fixtures/roblox_mock.luau").read_text(encoding="utf-8")
         extra='''
 services.UserInputService.WindowFocusReleased=event()
@@ -134,12 +134,12 @@ local readfile=function()error('Standalone must not read files during operation'
 local writefile=readfile
 task.wait=function(dt)move(dt)end
 '''+extra
-        wrapped="\nlocal function boot()\n"+self.source+"\nend\nlocal result=boot()\n"
+        wrapped="\nlocal function boot()\n"+(source or self.source)+"\nend\nlocal result=boot()\n"
         return self.run_lua(prefix+extra+wrapped+behaviour+checks)
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-6.2')
+assert(result.version=='local-6.3')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -318,7 +318,7 @@ inputKey('F6');for i=1,30 do move(1/30)end
 inputKey('F8');click('Save physics report')
 assert(savedName=='TurboBall_Physics_Report.json' and savedReport,'Report was not written')
 local report=encoded[savedReport]
-assert(report.version=='local-6.2' and report.physics_assist_enabled==false)
+assert(report.version=='local-6.3' and report.physics_assist_enabled==false)
 assert(report.place==101880234193261 and #report.model_sha256==64)
 assert(report.saved_from.enabled==false and report.saved_from.last_stop_reason=='STOPPED by F8. F6 starts again.')
 assert(#report.trace>0 and #report.trace<=150 and report.profile=='turbo_soccer_standard')
@@ -368,10 +368,11 @@ end
         self.client_case('''
 for i=1,12 do move(1/30)end
 click('Save physics report')
-local t=savedReport.trace[#savedReport.trace]
+local t=savedReport.latest_pose
 assert(t.pads_total==1 and t.pads_known==1 and t.pad_folder_found,'Local nested pads were omitted')
 assert(t.boost_pads[1].active and t.boost_pads[1].position[1]==400)
 assert(t.hitbox_probe.selection_boxes==0,'Hitbox probe omitted missing renderer markers')
+assert(#savedReport.trace==0,'Paused poses replaced active-run history')
 ''',"click('Close')",extra='''
 local savedReport
 writefile=function(_,body)savedReport=encoded[body]end
@@ -416,6 +417,72 @@ assert(p.position[1]==120 and p.velocity[1]==200,'Legacy bridge scale changed')
             self.assertIn(hashlib.sha256(model.read_bytes()).hexdigest(),output.read_text(encoding="utf-8"))
             self.assertNotIn("-- MODEL_",output.read_text(encoding="utf-8"))
             self.assertIn("Generated LOCAL model",output.read_text(encoding="utf-8"))
+
+    def test_nexto_preset_selects_original_asset_and_rejects_custom_checkpoint(self):
+        with tempfile.TemporaryDirectory()as directory:
+            output=Path(directory)/'nexto.lua'
+            args=[sys.executable,str(APP/'export_standalone.py'),'--project-root',str(APP.parent),
+                  '--preset','nexto','--no-install','--output',str(output)]
+            result=subprocess.run(args,capture_output=True,text=True,timeout=30)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            source=output.read_text()
+            self.assertIn('local MODEL_NAME="Nexto"',source)
+            self.assertIn('local physicsEnabled=false',source)
+            self.assertIn(export.NEXTO_SHA256,source)
+            result=subprocess.run(args+['--model',str(BASE)],capture_output=True,text=True,timeout=30)
+            self.assertNotEqual(result.returncode,0,'Nexto preset accepted an arbitrary model override')
+            private=Path(directory)/'private.pt';private.write_bytes(b'private-checkpoint')
+            rejected=Path(directory)/'must-not-publish.lua'
+            result=subprocess.run([sys.executable,str(APP/'build_nexto.py'),'--asset',str(private),
+                '--output',str(rejected)],capture_output=True,text=True,timeout=30)
+            self.assertNotEqual(result.returncode,0)
+            self.assertFalse(rejected.exists(),'Public build accepted an unverified checkpoint')
+
+    def test_ready_nexto_runtime_keeps_cadence_and_active_trace_after_pause(self):
+        from build_nexto import NOTICE
+        expected=NOTICE+export.standalone_source(self.model,export.NEXTO_SHA256,model_name='Nexto',physics_assist=False)
+        artifact=APP/'TurboBall_Nexto.lua'
+        if not artifact.is_file():artifact=APP.parent/'downloads/TurboBall_Nexto.lua'
+        source=artifact.read_text()
+        self.assertEqual(source,expected,'Rebuild the public Nexto artifact after runtime changes')
+        self.client_case('''
+move(.05);inputKey('F6')
+for i=1,220 do move(.02)end
+inputKey('F8');click('Save physics report')
+local before=saved
+assert(before.model_name=='Nexto'and before.model_sha256=='bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa')
+assert(not before.physics_assist_enabled and not before.teammate_yield_enabled,'Nexto default contains scripted yielding')
+assert(before.performance.decision_hz>14 and before.performance.decision_hz<16,'Runtime scheduling fell below cadence')
+assert(before.performance.model_calls>0 and #before.trace>0)
+local lastAt=before.trace[#before.trace].time
+for i=1,260 do move(.02)end
+click('Save physics report')
+assert(saved.trace[#saved.trace].time==lastAt and saved.performance.samples==before.performance.samples,'Pause overwrote active diagnostics')
+assert(saved.performance.last_active_age>5)
+click('Yield to teammate: OFF');click('Save physics report')
+assert(saved.teammate_yield_enabled,'Optional teammate switch did not update')
+''',"click('Close')",extra='''
+local saved
+writefile=function(_,body)saved=encoded[body]end
+''',source=source)
+
+    def test_far_ground_override_skips_inference_in_actual_worker(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,20 do move(1/30)end
+inputKey('F8');click('Save physics report')
+assert(saved.performance.samples>0,'No ground decisions produced')
+assert(saved.performance.model_calls==0,'Computed a model result discarded by far ground assist')
+assert(saved.trace[#saved.trace].decision.mode~='model','Did not test a ground override')
+''',"click('Close')",extra='''
+local saved
+writefile=function(_,body)saved=encoded[body]end
+local originalFrame=frame
+frame=function(x)
+ local out=originalFrame(x)
+ if x>4 then out.Position=Vector3.new(out.Position.X+200,out.Position.Y,out.Position.Z)end
+ return out
+end
+''')
 
 
 if __name__=="__main__": unittest.main()

@@ -183,7 +183,7 @@ function Physics:observe(packet,now)
             body.ground_estimate=car.ground_estimate;body.flip_estimate=car.flip_estimate
             others[#others+1]=body
         end
-        self.trace[#self.trace+1]={time=now,car=copy(packet.car),ball=copy(packet.ball),
+        local sample={time=now,car=copy(packet.car),ball=copy(packet.ball),
             other_cars=others,boost_pads=packet.boost_pads,
             team=packet.team,ground=packet.ground_estimate,radius=radius,boost=packet.boost,
             radius_verified=packet.ball_size_verified==true,car_preset=packet.car_preset,
@@ -193,18 +193,23 @@ function Physics:observe(packet,now)
             decision=self.decision,decision_age=self.decision and self.decision.time and now-self.decision.time or nil,
             runtime=self.runtime,physics_status=self.status,gravity=self.gravity,
             flight_error=self.error,plan=self.plan}
-        if #self.trace>150 then table.remove(self.trace,1)end
+        self.latestPose=sample
+        if not self.runtime or self.runtime.enabled then
+            self.trace[#self.trace+1]=sample
+            if #self.trace>150 then table.remove(self.trace,1)end
+        end
     end
 end
 
 function Physics:report()
-    return {version="local-6.2",profile=self.profile.name,units="simulation units; seconds",
+    return {version="local-6.3",profile=self.profile.name,units="simulation units; seconds",
         studs_per_unit=self.profile.roblox_studs_per_sim_unit,arena=self.profile.arena,
         saved_physics=self.profile.physics,gravity_used=self.gravity,observed_gravity=self.observedGravity,
         gravity_samples=#self.gravitySamples,flight_position_error_median=self.error,
         flight_error_samples=#self.errors,status=self.status,profile_mismatch=self.mismatch==true,
         last_valid_flight_error=self.lastFlightError,last_valid_flight_time=self.lastFlightAt,
-        total_flight_error_samples=self.totalFlightErrors,resets=self.resets,trace=self.trace,
+        total_flight_error_samples=self.totalFlightErrors,resets=self.resets,trace=self.trace,latest_pose=self.latestPose,
+        trace_collection="Active-run poses; paused sampling does not replace the driving trace",
         runtime=self.runtime,events=self.events,last_error=self.lastError,
         limitations="Ball/world forecast only; future car touches and exact curved goal-frame contact are uncertain. Ground reach is an estimate."}
 end

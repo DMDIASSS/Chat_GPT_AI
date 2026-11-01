@@ -12,6 +12,7 @@ import torch
 from bridge271 import APP_DIR, load_model, lookup_table, observations, resolve_paths
 from file_transport import select_workspace
 
+NEXTO_SHA256="bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa"
 
 def literal(value):
     """JSON-like, finite data only; never interpolate executable model metadata."""
@@ -157,7 +158,7 @@ def load_arena_profile(path):
     return profile
 
 
-def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None):
+def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None,model_name="Update271",physics_assist=True):
     tensors,cases=prepare_model(model)
     policy=(app_dir/"templates/local_policy.lua").read_text(encoding="utf-8")
     keyboard=(app_dir/"templates/local_keyboard.lua").read_text(encoding="utf-8")
@@ -168,6 +169,7 @@ def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None):
     kickoff=(app_dir/"templates/local_kickoff.lua").read_text(encoding="utf-8")
     physics=(app_dir/"templates/local_physics.lua").read_text(encoding="utf-8")
     intercept=(app_dir/"templates/local_intercept.lua").read_text(encoding="utf-8")
+    timing=(app_dir/"templates/local_timing.lua").read_text(encoding="utf-8")
     if profile is None:profile=load_arena_profile(app_dir/"arena_profile.json")
     client=(app_dir/"client271.lua").read_text(encoding="utf-8")
     pose=client.split("-- POSE_READER_BEGIN",1)[1].partition("\n")[2].split("-- POSE_READER_END",1)[0]
@@ -181,6 +183,8 @@ def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None):
             .replace("-- LOCAL_KICKOFF_HERE", "local Kickoff=(function()\n"+kickoff+"\nend)()")
             .replace("-- LOCAL_PHYSICS_HERE", "local Physics=(function()\n"+physics+"\nend)()")
             .replace("-- LOCAL_INTERCEPT_HERE", "local Intercept=(function()\n"+intercept+"\nend)()")
+            .replace("-- LOCAL_TIMING_HERE", "local Timing=(function()\n"+timing+"\nend)()")
+            .replace("-- MODEL_SETTINGS_HERE","local MODEL_NAME="+literal(model_name)+"\nlocal physicsEnabled="+literal(physics_assist))
             .replace("-- ARENA_PROFILE_HERE",literal(profile))
             .replace("-- MODEL_TENSORS_HERE",tensor_source(tensors))
             .replace("-- MODEL_CASES_HERE",literal(cases))
@@ -192,19 +196,25 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root",type=Path,default=APP_DIR.parent)
     parser.add_argument("--model",type=Path);parser.add_argument("--base",type=Path)
+    parser.add_argument("--preset",choices=("update271","nexto"),default="update271")
     parser.add_argument("--workspace",type=Path)
     parser.add_argument("--reset-workspace",action="store_true")
     parser.add_argument("--no-install",action="store_true",help="Only write --output; do not install in an executor workspace")
     parser.add_argument("--output",type=Path,default=APP_DIR/"botrblx_standalone.lua")
     parser.add_argument("--arena-profile",type=Path,default=APP_DIR/"arena_profile.json")
     args=parser.parse_args();args.choose_workspace=True
+    if args.preset=="nexto":
+        if args.model:raise ValueError("--preset nexto uses the original vendor/nexto model; use --preset update271 --model for a custom checkpoint")
+        args.model=args.base or args.project_root.expanduser().resolve()/"vendor/nexto/nexto-model.pt"
     root,model_path,base_path=resolve_paths(args)
     torch.set_num_threads(1)
     print("Exporting private model locally:",model_path,flush=True)
     model=load_model(model_path,base_path)
     sha=hashlib.sha256(model_path.read_bytes()).hexdigest()
+    if args.preset=="nexto" and sha!=NEXTO_SHA256:raise ValueError("Nexto asset checksum differs from the verified upstream model")
     profile=load_arena_profile(args.arena_profile)
-    source=standalone_source(model,sha,profile=profile)
+    source=standalone_source(model,sha,profile=profile,model_name="Nexto"if args.preset=="nexto"else "Update271",
+        physics_assist=args.preset!="nexto")
     args.output.write_text(source,encoding="utf-8")
     print("Saved:",args.output.resolve(),flush=True)
     print("Arena:",profile["name"],"| live boost context limit:",profile["policy_boost_limit"],flush=True)

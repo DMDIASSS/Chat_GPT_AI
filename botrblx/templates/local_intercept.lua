@@ -20,7 +20,7 @@ local function curve(points,value)
     return points[#points][2]
 end
 function Intercept.new(profile,arena,physics)
-    return setmetatable({profile=profile,arena=arena,physics=physics},Intercept)
+    return setmetatable({profile=profile,arena=arena,physics=physics,supportEnabled=false},Intercept)
 end
 function Intercept:reset()self.side=nil;self.last=nil;self.padTarget=nil;self.goalX=nil end
 
@@ -61,7 +61,7 @@ end
 
 function Intercept:support(packet,future,danger)
     local attack=packet.team==0 and 1 or -1
-    if danger or(future[2]*attack< -1800 and packet.ball.velocity[2]*attack< -250)then return nil end
+    if not self.supportEnabled or danger or(future[2]*attack< -1800 and packet.ball.velocity[2]*attack< -250)then return nil end
     local function eta(body)
         local dx,dy=unit(future[1]-body.position[1],future[2]-body.position[2])
         local v=body.velocity or {0,0,0}
@@ -74,9 +74,14 @@ function Intercept:support(packet,future,danger)
     for _,other in ipairs(packet.other_cars or {})do
         if other.team==packet.team and other.position and other.position[3]<150
             and other.ground_estimate==true and(other.position[2]-future[2])*attack< -120
-            and distance(other.position,future)<2000 then
-            local arrival=eta(other)
-            if arrival<best then chosen,best=other,arrival end
+            and distance(other.position,future)<1300 and other.forward and other.up and other.velocity then
+            local dx,dy=unit(future[1]-other.position[1],future[2]-other.position[2])
+            local closing=other.velocity[1]*dx+other.velocity[2]*dy
+            local facing=other.forward[1]*dx+other.forward[2]*dy
+            if closing>500 and facing>.85 then
+                local arrival=eta(other)
+                if arrival<best then chosen,best=other,arrival end
+            end
         end
     end
     if not chosen then return nil end
@@ -97,12 +102,11 @@ end
 
 -- A small 60 Hz longitudinal integration uses throttle taper, measured cap and
 -- finite boost. Turning consumes time; reachable balls must also be low enough.
-function Intercept:reach(car,boost,seconds,angle)
+function Intercept:travel(car,boost,seconds)
     local speed=max(0,dot(car.velocity,car.forward))
-    local delay=min(abs(angle)/2.5,.9)
-    local travel=0
+    local travel={0}
     local cfg=self.profile.physics
-    for _=1,math.floor(max(0,seconds-delay)*60)do
+    for i=1,math.floor(seconds*60)do
         local throttle=4*cfg.THROTTLE_TORQUE_AMOUNT/cfg.CAR_MASS*curve(cfg.DRIVE_SPEED_TORQUE_FACTOR,speed)
         local acceleration=throttle
         if boost>0 then
@@ -110,9 +114,14 @@ function Intercept:reach(car,boost,seconds,angle)
             boost=boost-cfg.BOOST_USED_PER_SECOND/60
         end
         speed=min(cfg.CAR_MAX_SPEED,speed+acceleration/60)
-        travel=travel+speed/60
+        travel[i+1]=travel[i]+speed/60
     end
     return travel
+end
+function Intercept:reach(car,boost,seconds,angle,travel)
+    local ticks=math.floor(max(0,seconds-min(abs(angle)/2.5,.9))*60)
+    travel=travel or self:travel(car,boost,seconds)
+    return travel[min(ticks+1,#travel)]
 end
 
 -- Use verified active pads on an existing approach, with a small detour budget.
@@ -154,7 +163,13 @@ function Intercept:step(packet,modelAction,now)
         or abs(car.position[1])>arena.EXTENT_X-300 then return nil end
     -- Ground assistance only: never invent aerial/flip timing or interrupt the
     -- actor at contact. Goals and side switches reset the approach hysteresis.
-    if ballDistance<radius+300 or(modelAction[6]>0 and ballDistance<1000)then return nil end
+    if ballDistance<radius+300 then return nil end
+    -- Near the ball we need the actor's jump decision; far ground approaches
+    -- can be planned without paying for a model result that would be replaced.
+    if ballDistance<1000 then
+        if not modelAction then return nil,nil,true end
+        if modelAction[6]>0 then return nil end
+    end
     local trajectory=self.physics:predict(ball,radius,2.5)
     local attack=packet.team==0 and 1 or -1
     local danger=false
@@ -164,10 +179,11 @@ function Intercept:step(packet,modelAction,now)
             and p[3]<arena.MOUTH_HEIGHT+radius then danger=true;break end
     end
     local chosen,bestGap=nil,math.huge
+    local travel=self:travel(car,packet.boost,2.5)
     for _,sample in ipairs(trajectory)do
         local p=sample.position
         if sample.time>=.15 and p[3]<radius+150 and abs(p[2])<arena.EXTENT_Y+200 then
-            local gap=distance(car.position,p)-self:reach(car,packet.boost,sample.time,self:heading(car,p))-(radius+100)
+            local gap=distance(car.position,p)-self:reach(car,packet.boost,sample.time,self:heading(car,p),travel)-(radius+100)
             if gap<bestGap then bestGap=gap;chosen=sample end
             if gap<=0 then chosen=sample;break end
         end

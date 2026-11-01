@@ -29,15 +29,22 @@ local function dense(layer,x,relu,first,rows)
     local width=layer.width
     local out=table.create(rows or layer.rows)
     local base=((first or 1)-1)*width
-    for r=1,rows or layer.rows do
-        local value=b[(first or 1)+r-1]
-        -- The exported widths are all multiples of four.
+    -- Four output rows share each input load. The accumulation order of each
+    -- row is unchanged; this does not quantize weights or approximate logits.
+    for r=1,rows or layer.rows,4 do
+        local row=(first or 1)+r-1
+        local a0,a1,a2,a3=b[row],b[row+1],b[row+2],b[row+3]
+        local b1,b2,b3=base+width,base+width*2,base+width*3
         for c=1,width,4 do
-            value=value+w[base+c]*x[c]+w[base+c+1]*x[c+1]
-                +w[base+c+2]*x[c+2]+w[base+c+3]*x[c+3]
+            local x0,x1,x2,x3=x[c],x[c+1],x[c+2],x[c+3]
+            a0=a0+w[base+c]*x0+w[base+c+1]*x1+w[base+c+2]*x2+w[base+c+3]*x3
+            a1=a1+w[b1+c]*x0+w[b1+c+1]*x1+w[b1+c+2]*x2+w[b1+c+3]*x3
+            a2=a2+w[b2+c]*x0+w[b2+c+1]*x1+w[b2+c+2]*x2+w[b2+c+3]*x3
+            a3=a3+w[b3+c]*x0+w[b3+c+1]*x1+w[b3+c+2]*x2+w[b3+c+3]*x3
         end
-        out[r]=relu and max(0,value)or value
-        base=base+width
+        out[r]=relu and max(0,a0)or a0;out[r+1]=relu and max(0,a1)or a1
+        out[r+2]=relu and max(0,a2)or a2;out[r+3]=relu and max(0,a3)or a3
+        base=base+width*4
     end
     return out
 end

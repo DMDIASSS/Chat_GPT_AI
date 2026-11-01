@@ -1,6 +1,76 @@
-# TurboBall Roblox bot — Local v6.2
+# TurboBall Roblox bot — Local v6.3
 
-## Local Lua mode: remove the file round trip
+## Ready-to-run original Nexto
+
+The ZIP now includes **TurboBall_Nexto.lua**, built from the original public
+Nexto actor. No Python, checkpoint export or running bridge is needed for this
+preset. Its source SHA256 was checked against the upstream public file; it is
+not a renamed Update271 checkpoint. Attribution and the CC BY-NC-SA 4.0 license
+are in `NEXTO_NOTICE.md` and `NEXTO_LICENSE.txt`.
+
+1. Close the old standalone bot panel.
+2. Copy `TurboBall_Nexto.lua` from this folder into the JJSploit workspace.
+3. Execute:
+
+   ```lua
+   loadstring(readfile("TurboBall_Nexto.lua"))()
+   ```
+
+4. Wait for **Nexto LOCAL v6.3 ready**, then press **F6**. **F8** stops.
+
+Nexto starts with **Physics assist: OFF** and **Yield to teammate: OFF**. The actor
+chooses its actions, with the existing kickoff and bounded stuck-recovery
+controllers. These switches control our overrides; they do not retrain Nexto or
+remove teammates from its observation. Pause with F8 to change either switch.
+If enabled, teammate yielding now requires a nearby, grounded teammate moving
+toward the ball and facing it; a stationary or misaligned teammate is insufficient.
+
+To rebuild from the original asset already in your project, run
+**EXPORT_NEXTO_BOT.bat**. It installs `botrblx_standalone.lua` in the executor
+workspace, using the existing project Python. `EXPORT_LOCAL_BOT.bat` continues to
+export your private Update271 checkpoint separately. Both builds identify the
+model by name and SHA256 in diagnostics.
+
+## Cadence and performance (local v6.3)
+
+The previous loop rounded pose sampling and model decisions to whole frames. A
+50 FPS game could consequently run decisions at 12.5 Hz despite a 15 Hz target.
+Deadline scheduling now retains the target cadence and skips missed slots rather
+than replaying old decisions in a burst. A slow startup reference case no longer
+permanently lowers the target. Actual throughput still depends on your PC and
+executor; the panel reports completed decisions rather than a promised rate.
+
+The exact dense kernel shares input loads across four output rows. On cloud
+Luau, twelve calls per case averaged:
+
+| Entities | Previous kernel | New kernel |
+| --- | --- | --- |
+| 2 | 7.81 ms | 5.59 ms |
+| 7 | 14.16 ms | 9.98 ms |
+| 13 | 22.97 ms | 15.78 ms |
+
+All twelve reference cases produced identical logits between the two kernels.
+These are cloud interpreter timings, not measurements on Windows/JJSploit.
+When ground assist is enabled, far ground approaches and recovery no longer run
+an actor inference whose result would be discarded. The ground reach calculation
+also reuses one travel curve across candidate ball positions. Close approaches
+still consult the actor's jump choice.
+
+The uploaded v6.2 report contained paused samples with a stale last decision, so
+it could not establish the active-run bottleneck. Reports now retain the driving
+trace while paused and store a separate `latest_pose`. A bounded `performance`
+summary records model, planning, pose, physics-observation, input and scheduling
+timings. It includes the age of the last active measurement; paused time is
+excluded from the live decision-rate calculation. The earlier stop/error logs
+and key-release protections remain in place.
+
+The runtime passes offline policy-parity, cadence, teammate and input-lifecycle
+checks. Live play quality and Windows performance still require an actual run.
+Maintainers can regenerate the public preset with `python build_nexto.py`, run
+`python -m unittest discover -s tests -v` with `LUAU_BIN` set, and package from a
+full Git checkout with `python package.py`.
+
+## Optional private Update271 export
 
 **Use this mode for JJSploit/WRD.** The supplied diagnostic measured 1.2–1.3
 seconds per file exchange. Local mode runs the actual two-block attention policy
@@ -20,7 +90,7 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v6.2 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v6.3 ready | model self-test passed`**, then press **F6**.
    **Team: AUTO** identifies `Deadline_coolgun` from the match scoreboard and
    cross-checks the rendered nameplate relationship. It follows team changes.
    If the team cannot be identified, open the in-game scoreboard once. The
@@ -31,10 +101,10 @@ is no file exchange, HTTP request, or Python process during driving.
    WASD, Q/E air roll, LMB boost, RMB jump, Shift powerslide. Disable mouse
    steering, pitch inversion, and aerial safety.
 
-The generated file is the complete standalone bot, including your model. It is
+The private exported file is the complete standalone bot, including your model. It is
 also saved as `botrblx\botrblx_standalone.lua`. **Keep it private:** it contains
 your model weights. It is ignored by Git and excluded from the public download.
-The download contains the exporter and runtime source, not anyone's weights.
+The download also includes the verified public Nexto preset; it excludes your private checkpoint.
 Re-export only when changing the model or updating this runtime.
 
 The panel reports inference time, executor input-call time, actual decisions per
@@ -84,7 +154,7 @@ EXPORT_LOCAL_BOT.bat --workspace "C:\Users\almas\AppData\Roaming\jjsploit\worksp
 EXPORT_LOCAL_BOT.bat --model "D:\Models\update.pt"
 ```
 
-## Updated-place review and team tactics (local v6.2)
+## Updated-place review and team tactics (local v6.2 history)
 
 The new Beta 10 export confirms all 54 numeric constants and curve entries used
 by this adapter's arena/physics profile. The existing calibration remains in use.
@@ -113,13 +183,13 @@ runtime coverage, but have not been live-tested in Roblox/JJSploit and are not a
 measured win-rate improvement.
 
 After replacing this folder, rerun **EXPORT_LOCAL_BOT.bat** and execute the newly
-generated private Lua file. The ready badge must show **LOCAL v6.2**. Exporting the
+generated private Lua file. The ready badge must show **LOCAL v6.3** for a private export. Exporting the
 place itself does not update a standalone script you already generated.
 
 ## Match pad detection and stop diagnostics (local v6.1)
 
 Rerun **EXPORT_LOCAL_BOT.bat** after updating this folder. Existing generated Lua
-scripts contain the previous runtime; the current ready badge is **v6.2**.
+scripts contain the previous runtime; the current ready badge is **v6.3**.
 
 The first live v6 report showed a measured standard ball radius and gravity close
 to the saved profile, but zero discovered boost pads throughout the run. The
@@ -259,7 +329,7 @@ change model weights or create a policy mesh input.
 
 Rerun **EXPORT_LOCAL_BOT.bat after installing this update**: the previous generated
 standalone script contains the previous adapter. No model weights are downloaded
-or retrained. The current package shows a **v6.2** badge after re-export.
+or retrained. The current package shows a **v6.3** badge after re-export.
 
 The game uses its own match teams. The new reader matches your name to the
 scoreboard row's team edge; it does not assume Roblox's `Player.Team` is the match

@@ -148,10 +148,18 @@ assert(planner:heading(car,{0,100,17})>0 and planner:heading(car,{0,-100,17})<0,
         self.run_lua('''
 local p=packet({700,-3000,17},{0,500,93.15})
 p.other_cars={{team=0,position={0,-200,17},velocity={0,900,0},forward={0,1,0},up={0,0,1},ground_estimate=true}}
+planner:step(p,model,0)
+assert(not planner.last.support,'Scripted teammate yielding was enabled by default')
+planner.supportEnabled=true
 local a,mode=planner:step(p,model,0)
 assert(a and mode=='support teammate' and planner.last.support,'Double-committed behind a better placed teammate')
 assert(planner.last.target[2]<planner.last.ball[2]-1000,'Support drove ahead of the ball')
 assert(planner.last.desired_speed<=1100 and not planner.last.boost_pad)
+p.other_cars[1].velocity={0,0,0};planner:step(p,model,.05)
+assert(not planner.last.support,'Yielded to a stationary teammate')
+p.other_cars[1].velocity={0,900,0};p.other_cars[1].forward={0,-1,0};planner:step(p,model,.075)
+assert(not planner.last.support,'Yielded to a teammate facing away from the ball')
+p.other_cars[1].forward={0,1,0}
 p.other_cars[1].team=1;planner:step(p,model,.1)
 assert(not planner.last.support,'Yielded possession to an opponent')
 p.other_cars[1].team=0;p.other_cars[1].ground_estimate=false;planner:step(p,model,.2)
@@ -176,6 +184,34 @@ p.other_cars[1].team=0;p.other_cars[1].position[2]=-4900
 assert(planner:shotLane(p,{0,0,93.15},.8)==-x,'Orange shot selection failed to mirror')
 planner:reset();p.other_cars[1].team=nil
 assert(planner:shotLane(p,{0,0,93.15},.8)==0,'Invented a defender from an unknown team')
+''')
+
+    def test_ground_plan_can_skip_model_and_keeps_close_jump_decisions(self):
+        self.run_lua('''
+local p=packet({0,-2200,17},{0,0,93.15})
+local a=planner:step(p,nil,0)
+assert(a,'Far ground approach unnecessarily required the policy')
+p.car.position={0,-700,17}
+local action,mode,needs=planner:step(p,nil,.1)
+assert(not action and needs,'Close approach skipped the actor jump decision')
+local jump={1,0,0,0,0,1,0,0}
+assert(not planner:step(p,jump,.1),'Overrode the actor close jump')
+''')
+
+    def test_shared_reach_curve_matches_individual_travel_and_pauses_keep_trace(self):
+        self.run_lua('''
+local p=packet({0,-2200,17},{0,0,93.15})
+p.car.velocity={0,700,0}
+local travel=planner:travel(p.car,19,2.5)
+for _,t in ipairs({.15,.8,1.1,2.5})do for _,a in ipairs({0,.3,1.5,3})do
+ assert(planner:reach(p.car,19,t,a)==planner:reach(p.car,19,t,a,travel),'Shared reach changed the travel estimate')
+end end
+physics.runtime={enabled=true};physics:observe(p,1);physics:observe(p,1.25)
+local count=#physics.trace;local last=physics.trace[count].time
+physics.runtime={enabled=false}
+for i=1,200 do physics:observe(p,1.25+i*.1)end
+assert(#physics.trace==count and physics.trace[count].time==last,'Paused recording erased driving evidence')
+assert(physics:report().latest_pose.time>last+19)
 ''')
 
     def test_defensive_intercept_and_field_safe_corner_target(self):
@@ -243,10 +279,11 @@ physics:observe(p,1)
 physics.runtime={enabled=false,phase='paused',last_stop_reason='F8'}
 physics:mark('stop',1.1,'F8')
 physics:observe(p,1.3)
-local t=physics.trace[#physics.trace]
+local t=physics:report().latest_pose
 assert(t.car.forward[2]==1 and t.car.up[3]==1,'Lost orientation required to replay policy')
 assert(t.runtime.enabled==false and t.runtime.last_stop_reason=='F8')
 assert(math.abs(t.decision_age-.3)<1e-6,'Stale decisions appear current after pause')
+assert(physics.trace[#physics.trace].runtime.enabled==true,'Paused pose replaced driving trace')
 assert(physics:report().events[1].reason=='F8')
 p.car.forward[2]=0
 assert(physics.trace[1].car.forward[2]==1,'Trace retained mutable pose references')
@@ -260,6 +297,6 @@ assert(#physics.trace<=150)
 p.ball.position={9000,0,93.15};physics:observe(p,2001/30)
 assert(physics.mismatch,'Outside geometry did not flag profile mismatch')
 local report=physics:report()
-assert(report.version=='local-6.2' and report.profile_mismatch and report.arena.EXTENT_X==4096)
+assert(report.version=='local-6.3' and report.profile_mismatch and report.arena.EXTENT_X==4096)
 assert(report.saved_physics.BALLWORLD_RESTITUTION==.6)
 ''')
