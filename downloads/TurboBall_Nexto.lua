@@ -537,6 +537,7 @@ end
 function Arena:measureCar(model,root)
     self.lastMeasure=os.clock()
     local probe={selection_boxes=0,best_error=nil,candidates={}}
+    local sizeMatch,ambiguous=nil,false
     for _,part in ipairs(model:GetDescendants())do
         if part:IsA("BasePart")and part~=root then
             local box=part:FindFirstChildOfClass("SelectionBox")
@@ -548,17 +549,26 @@ function Arena:measureCar(model,root)
                 local offset={-localOffset.Z*k,localOffset.X*k,localOffset.Y*k}
                 if #probe.candidates<6 then probe.candidates[#probe.candidates+1]={size=measured,offset=offset}end
                 for name,config in pairs(self.profile.car_presets)do
+                    local sizeError=0
+                    for i=1,3 do sizeError=sizeError+abs(measured[i]-config.size[i])end
+                    if sizeError<.1 then
+                        if sizeMatch and sizeMatch~=name then ambiguous=true end
+                        sizeMatch=name
+                    end
                     local error=0
                     for i=1,3 do error=error+abs(measured[i]-config.size[i])+abs(offset[i]-config.offset[i])end
                     if not probe.best_error or error<probe.best_error then
                         probe.best_error=error;probe.closest_preset=name
                     end
-                    if error<1 then self.preset=name;self.hitboxVerified=true;self.hitboxProbe=probe;return end
+                    if error<1 then self.preset=name;self.sizeVerified=true;self.hitboxVerified=true;self.hitboxProbe=probe;return end
                 end
             end
         end
     end
-    self.preset="standard";self.hitboxVerified=false
+    self.sizeVerified=sizeMatch~=nil and not ambiguous
+    self.preset=self.sizeVerified and sizeMatch or "standard";self.hitboxVerified=false
+    probe.dimension_preset=self.sizeVerified and sizeMatch or nil
+    probe.offset_verified=false
     self.hitboxProbe=probe
 end
 
@@ -1073,12 +1083,13 @@ function Physics:step(ball,radius,dt)
     v[3]=v[3]+self.gravity*dt
     local worldRadius=radius*cfg.BALL_WORLD_RADIUS/cfg.BALL_RADIUS
     local d=self.arena:distance(p)
-    local touched=false
+    local touched,obstructed=false,false
     if d-worldRadius<cfg.CONTACT_BREAKING_THRESHOLD then
         local _,n=self.arena:query(p)
         local flat=abs(n[3])>.9999 or(abs(n[3])<.0001 and(abs(n[1])>.9999 or abs(n[2])>.9999))
         if d-worldRadius<(flat and cfg.BALL_WORLD_CONTACT_FLAT or cfg.CONTACT_BREAKING_THRESHOLD)then
             touched=true
+            obstructed=n[3]<.9
             local incoming=dot(old,n)
             local bounce=abs(incoming)>=cfg.RESTITUTION_VEL_THRESHOLD and max(-incoming*cfg.BALLWORLD_RESTITUTION,0)or 0
             local impulse=max(0,bounce-dot(v,n))
@@ -1110,21 +1121,23 @@ function Physics:step(ball,radius,dt)
             ball.velocity={0,0,0};ball.angular_velocity={0,0,0}
         end
     else ball.slow=0 end
-    return touched
+    return touched,obstructed
 end
 
 function Physics:predict(ball,radius,seconds,stride)
     radius=radius or self.profile.physics.BALL_RADIUS
     local state=copy(ball)
-    local result={{time=0,position=table.clone(state.position),velocity=table.clone(state.velocity),bounces=0}}
+    local result={{time=0,position=table.clone(state.position),velocity=table.clone(state.velocity),bounces=0,obstructions=0}}
     local dt=1/self.profile.physics.TICK_RATE
     local steps=math.floor(math.clamp(seconds or 2.5,0,3)*self.profile.physics.TICK_RATE+.5)
-    local bounces=0
+    local bounces,obstructions=0,0
     for tick=1,steps do
-        if self:step(state,radius,dt)then bounces=bounces+1 end
+        local touched,blocked=self:step(state,radius,dt)
+        if touched then bounces=bounces+1 end
+        if blocked then obstructions=obstructions+1 end
         if tick%(stride or 4)==0 or tick==steps then
             result[#result+1]={time=tick*dt,position=table.clone(state.position),
-                velocity=table.clone(state.velocity),bounces=bounces}
+                velocity=table.clone(state.velocity),bounces=bounces,obstructions=obstructions}
         end
     end
     return result
@@ -1228,7 +1241,7 @@ function Physics:observe(packet,now)
 end
 
 function Physics:report()
-    return {version="local-6.4",profile=self.profile.name,units="simulation units; seconds",
+    return {version="local-6.5",profile=self.profile.name,units="simulation units; seconds",
         studs_per_unit=self.profile.roblox_studs_per_sim_unit,arena=self.profile.arena,
         saved_physics=self.profile.physics,gravity_used=self.gravity,observed_gravity=self.observedGravity,
         gravity_samples=#self.gravitySamples,flight_position_error_median=self.error,
@@ -1269,18 +1282,24 @@ function Intercept.new(profile,arena,physics)
     return setmetatable({profile=profile,arena=arena,physics=physics,supportEnabled=false},Intercept)
 end
 function Intercept:reset()self.side=nil;self.last=nil;self.padTarget=nil;self.goalX=nil end
+function Intercept:goal(team)
+    if self.calibration then return self.calibration:goal(team)end
+    local a=self.profile.arena;local sign=team==0 and -1 or 1
+    return {origin={0,sign*a.EXTENT_Y,0},side={1,0,0},normal={0,sign,0},half_width=a.MOUTH_HALF_WIDTH,height=a.MOUTH_HEIGHT}
+end
 
 -- Rank ground-shot lanes against the observed defenders. Constant-velocity
 -- projections are a short tactical estimate, not a prediction of their actions.
 function Intercept:shotLane(packet,future,seconds)
-    local extent=self.profile.arena
-    local attack=packet.team==0 and 1 or -1
-    local preferred=math.clamp(future[1]*.25,-extent.MOUTH_HALF_WIDTH*.55,extent.MOUTH_HALF_WIDTH*.55)
-    local half=extent.MOUTH_HALF_WIDTH-(packet.ball_radius or self.profile.physics.BALL_RADIUS)-120
+    local goal=self:goal(1-packet.team)
+    local lateral=(future[1]-goal.origin[1])*goal.side[1]+(future[2]-goal.origin[2])*goal.side[2]
+    local carLateral=(packet.car.position[1]-goal.origin[1])*goal.side[1]+(packet.car.position[2]-goal.origin[2])*goal.side[2]
+    local preferred=math.clamp(lateral*.25,-goal.half_width*.55,goal.half_width*.55)
+    local half=goal.half_width-(packet.ball_radius or self.profile.physics.BALL_RADIUS)-120
     local function cost(x)
-        local dx,dy=x-future[1],attack*extent.EXTENT_Y-future[2]
+        local dx,dy=goal.origin[1]+goal.side[1]*x-future[1],goal.origin[2]+goal.side[2]*x-future[2]
         local length=max(1,sqrt(dx*dx+dy*dy))
-        local score=abs(x-preferred)*.015+(x-packet.car.position[1])^2*.000001
+        local score=abs(x-preferred)*.015+(x-carLateral)^2*.000001
         for _,other in ipairs(packet.other_cars or {})do
             if(other.team==0 or other.team==1)and other.team~=packet.team and other.position and other.position[3]<250 then
                 local velocity=other.velocity or {0,0,0}
@@ -1418,11 +1437,14 @@ function Intercept:step(packet,modelAction,now)
     end
     local trajectory=self.physics:predict(ball,radius,2.5)
     local attack=packet.team==0 and 1 or -1
+    local ownGoal=self:goal(packet.team)
     local danger=false
     for _,sample in ipairs(trajectory)do
         local p=sample.position
-        if p[2]*attack< -arena.EXTENT_Y+radius and abs(p[1])<arena.MOUTH_HALF_WIDTH-radius*.5
-            and p[3]<arena.MOUTH_HEIGHT+radius then danger=true;break end
+        local dx,dy=p[1]-ownGoal.origin[1],p[2]-ownGoal.origin[2]
+        if dx*ownGoal.normal[1]+dy*ownGoal.normal[2]>-radius
+            and abs(dx*ownGoal.side[1]+dy*ownGoal.side[2])<ownGoal.half_width-radius*.5
+            and p[3]-ownGoal.origin[3]<ownGoal.height+radius then danger=true;break end
     end
     local chosen,bestGap=nil,math.huge
     local travel=self:travel(car,packet.boost,2.5)
@@ -1437,7 +1459,9 @@ function Intercept:step(packet,modelAction,now)
     if not chosen then return nil end -- keep learned high-ball/wall decisions
     local future=chosen.position
     local goalX=self:shotLane(packet,future,chosen.time)
-    local dx,dy=unit(goalX-future[1],attack*arena.EXTENT_Y-future[2])
+    local goal=self:goal(1-packet.team)
+    local goalPoint={goal.origin[1]+goal.side[1]*goalX,goal.origin[2]+goal.side[2]*goalX,17}
+    local dx,dy=unit(goalPoint[1]-future[1],goalPoint[2]-future[2])
     local speed=sqrt(car.velocity[1]^2+car.velocity[2]^2)
     local preset=self.profile.car_presets[packet.car_preset or "standard"]or self.profile.car_presets.standard
     local front=preset.size[1]/2+preset.offset[1]
@@ -1500,7 +1524,7 @@ function Intercept:step(packet,modelAction,now)
     self.last={mode=mode,target=target,ball=table.clone(future),time=chosen.time,
         reachable=bestGap<=0,danger=danger,heading=angle,desired_speed=desired,action=action,
         boost_pad=pad and {position=table.clone(pad.position),is_big=pad.is_big}or nil,
-        goal_x=goalX,support=supportTarget~=nil,teammate_eta=teammateETA}
+        goal_x=goalX,goal_target=goalPoint,support=supportTarget~=nil,teammate_eta=teammateETA}
     self.physics.plan=self.last
     return action,mode
 end
@@ -1534,7 +1558,7 @@ end
 function Timing:report()
     local out={target_hz=self.target,decision_hz=self.rate,samples=#self.samples,last=self.last,
         model_calls=0,fields={}}
-    for _,key in ipairs({'pose_ms','observe_ms','model_ms','planning_ms','decision_ms','input_ms','schedule_late_ms','entities'})do
+    for _,key in ipairs({'pose_ms','observe_ms','model_ms','planning_ms','safety_ms','decision_ms','input_ms','schedule_late_ms','entities'})do
         local sum,peak=0,0
         for _,sample in ipairs(self.samples)do local n=sample[key]or 0;sum=sum+n;peak=math.max(peak,n)end
         out.fields[key]={mean=sum/math.max(1,#self.samples),max=peak}
@@ -1545,6 +1569,401 @@ end
 return Timing
 
 end)()
+local Calibration=(function()
+-- User-marked goal geometry and passive motion recording. No game APIs.
+local Calibration={}
+Calibration.__index=Calibration
+local abs,sqrt,min,max=math.abs,math.sqrt,math.min,math.max
+local function copy(t)
+    if type(t)~='table'then return t end
+    local out={};for k,v in pairs(t)do out[k]=copy(v)end;return out
+end
+local function distance(a,b)return sqrt((a[1]-b[1])^2+(a[2]-b[2])^2+(a[3]-b[3])^2)end
+local function dot(a,b)return a[1]*b[1]+a[2]*b[2]+a[3]*b[3]end
+local function sub(a,b)return {a[1]-b[1],a[2]-b[2],a[3]-b[3]}end
+local function median(t)
+    if #t==0 then return nil end
+    local a=table.clone(t);table.sort(a);return a[math.floor((#a+1)/2)]
+end
+local function vector(v)
+    if type(v)~='table'or #v~=3 then return false end
+    for _,x in ipairs(v)do if type(x)~='number'or x~=x or abs(x)>100000 then return false end end
+    return true
+end
+Calibration.steps={
+    {'center','Field centre','Place the centre of your car over the centre spot, upright on the floor.'},
+    {'orange_a','Orange: first inner post','At the goal line, point your nose sideways into either INNER post face. Touch it and stop.'},
+    {'orange_b','Orange: other inner post','Touch the OTHER inner post face with your nose at the goal line. Stop moving.'},
+    {'orange_top','Orange: underside of crossbar','At the middle of the goal mouth, point the nose straight UP and touch the underside of the crossbar.'},
+    {'orange_back','Orange: back of net','Inside the net, face away from midfield. Touch the REAR wall with your nose.'},
+    {'blue_a','Blue: first inner post','Touch either INNER post face with your nose, sideways at the goal line.'},
+    {'blue_b','Blue: other inner post','Touch the OTHER inner post face with your nose at the goal line.'},
+    {'blue_top','Blue: underside of crossbar','At the middle of the goal mouth, point the nose UP and touch the underside of the crossbar.'},
+    {'blue_back','Blue: back of net','Inside the blue net, face away from midfield and touch the REAR wall with your nose.'}}
+function Calibration.new(profile)
+    return setmetatable({profile=profile,points={},index=1,history={},reference='bumper',tab='geometry'},Calibration)
+end
+function Calibration:begin()self.history={};self.index=1;self.points={};self.candidate=nil end
+function Calibration:observe(packet,now,keys,physics)
+    if not packet then self.history={};return end
+    self.latest=packet
+    self.history[#self.history+1]={time=now,car=copy(packet.car),ground=packet.ground_estimate,on_ball=packet.ball_wheel_contacts or 0,preset=packet.car_preset or 'standard',verified=packet.car_size_verified,dimensions_verified=packet.car_dimensions_verified}
+    while #self.history>1 and now-self.history[1].time>.6 do table.remove(self.history,1)end
+    if self.recordingUntil and now<=self.recordingUntil and now-(self.motionAt or -math.huge)>=.09 then
+        self.motionAt=now
+        local row={time=now,car=copy(packet.car),ball=copy(packet.ball),ground=packet.ground_estimate,
+            boost=packet.boost,keys=copy(keys or {}),radius=packet.ball_radius or self.profile.physics.BALL_RADIUS,
+            radius_verified=packet.ball_size_verified,clear_flight=physics:clearFlight(packet,packet.ball_radius or self.profile.physics.BALL_RADIUS)}
+        self.motion.samples[#self.motion.samples+1]=row
+        if #self.motion.samples>=250 then self.recordingUntil=nil end
+    end
+    if self.recordingUntil and now>self.recordingUntil then self.recordingUntil=nil;self:summarizeMotion()end
+end
+function Calibration:probe(row,key)
+    local car=row.car;local p=table.clone(car.position)
+    if key~='center'and self.reference=='bumper'then
+        local c=self.profile.car_presets[row.preset]or self.profile.car_presets.standard
+        local f,u=car.forward,car.up
+        local right={u[2]*f[3]-u[3]*f[2],u[3]*f[1]-u[1]*f[3],u[1]*f[2]-u[2]*f[1]}
+        for i=1,3 do p[i]=p[i]+f[i]*(c.size[1]/2+c.offset[1])+right[i]*c.offset[2]+u[i]*c.offset[3]end
+    end
+    return {point=p,root=table.clone(car.position),forward=table.clone(car.forward),up=table.clone(car.up),
+        preset=row.preset,reference=self.reference,hitbox_verified=row.verified==true,time=row.time}
+end
+function Calibration:corners(p)
+    local cfg=self.profile.car_presets[p.preset]or self.profile.car_presets.standard
+    local f,u=p.forward,p.up
+    local right={u[2]*f[3]-u[3]*f[2],u[3]*f[1]-u[1]*f[3],u[1]*f[2]-u[2]*f[1]}
+    local face={}
+    for j=1,3 do face[j]=p.root[j]+f[j]*(cfg.offset[1]+cfg.size[1]/2)+right[j]*cfg.offset[2]+u[j]*cfg.offset[3]end
+    local out={}
+    for _,a in ipairs({-1,1})do for _,b in ipairs({-1,1})do for _,c in ipairs({-1,1})do
+        local v={}
+        for j=1,3 do v[j]=p.root[j]+f[j]*(cfg.offset[1]+a*cfg.size[1]/2)
+            +right[j]*(cfg.offset[2]+b*cfg.size[2]/2)+u[j]*(cfg.offset[3]+c*cfg.size[3]/2)+p.point[j]-face[j]end
+        out[#out+1]=v
+    end end end
+    return out
+end
+function Calibration:capture()
+    assert(self.index<=#Calibration.steps,'All points captured; review and apply the result')
+    assert(#self.history>=3,'Hold the car still for half a second first')
+    local latest=self.history[#self.history]
+    assert(latest.time-self.history[1].time>=.25,'Hold still a little longer')
+    for _,r in ipairs(self.history)do
+        assert(r.preset==latest.preset,'Car body changed; hold still and capture again')
+        assert(distance(r.car.position,latest.car.position)<12,'Car moved during capture; stop and retry')
+        assert(dot(r.car.velocity,r.car.velocity)<2500,'Car is still moving; stop and retry')
+        assert(dot(r.car.angular_velocity or {0,0,0},r.car.angular_velocity or {0,0,0})<.08^2,'Car is rotating; hold still and retry')
+    end
+    local key=Calibration.steps[self.index][1]
+    if key~='center'and self.reference=='bumper'then assert(latest.verified or latest.dimensions_verified,'Collision body dimensions are unknown; use a supported car or explicit centre-marker mode')end
+    if key=='center'then assert(latest.ground and latest.car.up[3]>.9 and latest.on_ball==0 and abs(latest.car.position[3]-self.profile.physics.CAR_SPAWN_REST_Z)<30,'Centre point must be upright on the field floor, not on the ball')end
+    local point=self:probe(latest,key);local probes={}
+    for _,r in ipairs(self.history)do probes[#probes+1]=self:probe(r,key).point end
+    for j=1,3 do local values={};for _,p in ipairs(probes)do values[#values+1]=p[j]end;point.point[j]=median(values)end
+    point.samples=#probes;point.spread=0
+    for _,p in ipairs(probes)do point.spread=max(point.spread,distance(p,point.point))end
+    self.points[key]=point;self.index=self.index+1;self.candidate=nil
+    if self.index>#Calibration.steps then self.candidate=self:fit()end
+    return self.index
+end
+function Calibration:back()
+    self.index=max(1,self.index-1);self.points[Calibration.steps[self.index][1]]=nil;self.candidate=nil
+end
+function Calibration:fit()
+    for _,s in ipairs(Calibration.steps)do
+        local p=self.points[s[1]]
+        assert(type(p)=='table'and vector(p.point)and vector(p.root)and vector(p.forward)and vector(p.up),'Missing or invalid point: '..s[2])
+        assert(abs(dot(p.forward,p.forward)-1)<.02 and abs(dot(p.up,p.up)-1)<.02 and abs(dot(p.forward,p.up))<.02,'Invalid car orientation at '..s[2])
+        assert(p.reference=='bumper'or p.reference=='center','Unknown point reference')
+    end
+    local centre=self.points.center.point
+    local floor=0 -- fixed vertical origin of the saved standard soccer arena
+    local out={version=1,centre=table.clone(centre),floor=floor,goals={},
+        note='Centre measures XY; floor zero comes from the saved standard arena. Front-face contacts use source hitbox offsets; rounded-corner correction uses the saved fillet. Marker mode uses the car root directly.'}
+    for team,name in ipairs({'blue','orange'})do
+        local a,b,top,back=self.points[name..'_a'],self.points[name..'_b'],self.points[name..'_top'],self.points[name..'_back']
+        local dx,dy=b.point[1]-a.point[1],b.point[2]-a.point[2]
+        local width=sqrt(dx*dx+dy*dy)
+        assert(width>1000 and width<2400,name..': post spacing is implausible; capture the inner faces')
+        local side={dx/width,dy/width,0}
+        local normal={-side[2],side[1],0}
+        local origin={(a.point[1]+b.point[1])/2,(a.point[2]+b.point[2])/2,floor}
+        if dot(sub(origin,centre),normal)<0 then normal[1]=-normal[1];normal[2]=-normal[2]end
+        local depth=dot(sub(origin,centre),normal)
+        assert(depth>4000 and depth<7000,name..': goal is not at a plausible field end')
+        assert(abs(depth-self.profile.arena.EXTENT_Y)<250,name..': capture the front goal line; large arena changes need a separate profile')
+        assert(abs(dot(sub(origin,centre),side))<200,name..': goal centre is too far sideways from the centre spot')
+        assert(abs(dot(sub(top.point,origin),normal))<180,name..': crossbar point must be at the goal mouth, not the ceiling/back wall')
+        local height=top.point[3]-floor
+        if top.reference=='bumper'then for _,v in ipairs(self:corners(top))do height=max(height,v[3]-floor)end end
+        assert(height>350 and height<900,name..': crossbar height is implausible')
+        local backDepth=dot(sub(back.point,origin),normal)
+        assert(backDepth>300 and backDepth<1400,name..': touch the back of the net, not the field backwall')
+        assert(abs(dot(sub(back.point,origin),side))<width*.4,name..': use the middle of the rear net wall')
+        for _,p in ipairs({a,b})do
+            assert(p.point[3]-floor>0 and p.point[3]-floor<height,name..': post contact must be below the crossbar')
+            if p.reference=='bumper'then
+                local sign=dot(sub(p.point,origin),side)>0 and 1 or -1
+                assert(dot(p.forward,side)*sign>.9,name..': point the nose sideways into the inner post face')
+            end
+        end
+        if top.reference=='bumper'then assert(top.forward[3]>.9,name..': point the nose up into the crossbar underside')end
+        if back.reference=='bumper'then assert(dot(back.forward,normal)>.9,name..': point the nose into the rear net wall')end
+        local r=self.profile.arena.MOUTH_FILLET
+        local function rounded(z)
+            local dz=max(0,r-min(z,height-z))
+            return r-sqrt(max(0,r*r-dz*dz))
+        end
+        local function correction(p,sign)
+            if p.reference=='center'then return rounded(p.point[3]-floor)end
+            local face=dot(sub(p.point,origin),side)*sign
+            local required=face
+            for _,v in ipairs(self:corners(p))do
+                local z=v[3]-floor
+                if z>=0 and z<=height then required=max(required,dot(sub(v,origin),side)*sign+rounded(z))end
+            end
+            return required-face
+        end
+        local ca,cb=correction(a,-1),correction(b,1)
+        width=width+ca+cb
+        for i=1,2 do origin[i]=origin[i]+side[i]*(cb-ca)/2 end
+        out.goals[team]={origin=origin,side=side,normal=normal,half_width=width/2,height=height,back_depth=backDepth,fillet=r}
+    end
+    local blue,orange=out.goals[1],out.goals[2]
+    assert(dot(blue.normal,orange.normal)<-.97,'The two goals must face opposite field ends')
+    assert(blue.normal[2]<-.95 and orange.normal[2]>.95,'Blue/orange ends appear swapped; this calibration targets the saved standard soccer orientation')
+    assert(abs(blue.half_width-orange.half_width)<min(blue.half_width,orange.half_width)*.12,'Goal widths disagree; recapture the inner faces')
+    assert(abs(blue.height-orange.height)<min(blue.height,orange.height)*.12,'Crossbar heights disagree')
+    out.summary=string.format('Blue %.1f x %.1f studs | Orange %.1f x %.1f studs',blue.half_width*.2,blue.height*.1,orange.half_width*.2,orange.height*.1)
+    return out
+end
+function Calibration:apply()self.candidate=self:fit();self.active=copy(self.candidate);return self.active end
+function Calibration:goal(team)
+    if self.active then return self.active.goals[team+1]end
+    local a=self.profile.arena;local sign=team==0 and -1 or 1
+    return {origin={0,sign*a.EXTENT_Y,0},side={1,0,0},normal={0,sign,0},half_width=a.MOUTH_HALF_WIDTH,
+        height=a.MOUTH_HEIGHT,back_depth=a.GOAL_BACK_Y-a.EXTENT_Y,fillet=a.MOUTH_FILLET}
+end
+function Calibration:startMotion(now)self.motion={samples={},started_at=now};self.recordingUntil=now+20;self.motionAt=nil end
+function Calibration:summarizeMotion()
+    if not self.motion then return nil end
+    local samples=self.motion.samples;local gravity,accel,brakes,radii={},{},{},{}
+    for i,r in ipairs(samples)do
+        if r.radius_verified then radii[#radii+1]=r.radius end
+        local old=samples[i-1]
+        if old then
+            local dt=r.time-old.time
+            if dt>.02 and dt<.3 and r.ground and old.ground and dot(r.car.forward,old.car.forward)>.995 and r.car.up[3]>.95 then
+                local speed=dot(old.car.velocity,old.car.forward)
+                local dv=(dot(r.car.velocity,r.car.forward)-speed)/dt
+                if old.keys.W and not old.keys.S and not old.keys.LMB and speed>200 and speed<1000 and dv>0 and dv<3000 then accel[#accel+1]=dv end
+                if old.keys.S and not old.keys.W and speed>400 and dv< -100 and dv> -6000 then brakes[#brakes+1]=-dv end
+            end
+        end
+        local a,b=samples[i-4],samples[i-2]
+        if a and b and a.clear_flight and b.clear_flight and r.clear_flight then
+            local dt1,dt2=b.time-a.time,r.time-b.time
+            if min(dt1,dt2)>.09 and max(dt1,dt2)<.4 then
+                local g=2*((r.ball.position[3]-b.ball.position[3])/dt2-(b.ball.position[3]-a.ball.position[3])/dt1)/(dt1+dt2)
+                local horizontal=0
+                for j=1,2 do local n=2*((r.ball.position[j]-b.ball.position[j])/dt2-(b.ball.position[j]-a.ball.position[j])/dt1)/(dt1+dt2);horizontal=horizontal+n*n end
+                g=g-math.log(1-self.profile.physics.BALL_DRAG)*r.ball.velocity[3]
+                if g< -150 and g> -2000 and horizontal<250^2 then gravity[#gravity+1]=g end
+            end
+        end
+    end
+    local g=median(gravity);local deviations={}
+    if g then for _,n in ipairs(gravity)do deviations[#deviations+1]=abs(n-g)end end
+    self.motion.summary={samples=#samples,gravity_samples=#gravity,gravity=g,
+        gravity_consistent=#gravity>=6 and median(deviations)<max(35,abs(g)*.08)or false,
+        verified_ball_radius=median(radii),ground_acceleration_median=median(accel),braking_median=median(brakes),
+        note='Acceleration/braking describe the sampled speeds and surface. Static landmarks and this recording do not identify masses or train the actor.'}
+    return self.motion.summary
+end
+function Calibration:export()return {version=1,place=101880234193261,reference=self.reference,points=copy(self.points),motion=copy(self.motion)}end
+function Calibration:load(data)
+    assert(type(data)=='table'and data.version==1 and data.place==101880234193261,'Unsupported calibration file')
+    assert(type(data.points)=='table','Calibration file has no points')
+    local points={};local nextIndex=10
+    for i,s in ipairs(Calibration.steps)do
+        local p=data.points[s[1]]
+        if p then
+            assert(vector(p.point)and vector(p.root)and vector(p.forward)and vector(p.up),'Invalid saved landmark')
+            assert(p.reference=='bumper'or p.reference=='center','Invalid saved reference')
+            points[s[1]]=copy(p)
+        else nextIndex=min(nextIndex,i)end
+    end
+    local old=self.points;self.points=points
+    local ok,candidate=true,nil
+    if nextIndex==10 then ok,candidate=pcall(function()return self:fit()end)end
+    self.points=old
+    if not ok then error(candidate)end
+    local loadedMotion
+    if data.motion then
+        assert(type(data.motion.samples)=='table'and #data.motion.samples<=250,'Invalid motion recording')
+        for _,r in ipairs(data.motion.samples)do
+            assert(type(r.time)=='number'and r.time==r.time and abs(r.time)<1e9 and type(r.radius)=='number'and r.radius>0 and r.radius<1000,'Invalid motion sample')
+            for _,body in ipairs({r.car,r.ball})do
+                assert(type(body)=='table'and vector(body.position)and vector(body.velocity),'Invalid recorded pose')
+            end
+            assert(vector(r.car.forward)and vector(r.car.up)and type(r.keys)=='table','Invalid recorded controls')
+        end
+        local temporary=setmetatable({profile=self.profile,motion=copy(data.motion)},Calibration)
+        temporary:summarizeMotion();loadedMotion=temporary.motion
+    end
+    self.points=points;self.candidate=candidate;self.index=nextIndex
+    self.history={};self.recordingUntil=nil;self.motionAt=nil
+    if loadedMotion then self.motion=loadedMotion end
+    if data.reference=='bumper'or data.reference=='center'then self.reference=data.reference end
+end
+function Calibration:report()return {points=copy(self.points),candidate=copy(self.candidate),active=copy(self.active),motion=self.motion and copy(self.motion.summary)or nil}end
+return Calibration
+
+end)()
+local GoalSafety=(function()
+-- Conservative ground-touch guards. Does not simulate future car-ball impacts.
+local Safety={}
+Safety.__index=Safety
+local sqrt,abs,min,max=math.sqrt,math.abs,math.min,math.max
+local function dot(a,b)return a[1]*b[1]+a[2]*b[2]+a[3]*b[3]end
+local function sub(a,b)return {a[1]-b[1],a[2]-b[2],a[3]-b[3]}end
+local function distance(a,b)local d=sub(a,b);return sqrt(dot(d,d))end
+function Safety.new(profile,arena,physics,calibration)
+    return setmetatable({profile=profile,arena=arena,physics=physics,calibration=calibration},Safety)
+end
+function Safety:fits(goal,p,radius,margin)
+    local x=abs(dot(sub(p,goal.origin),goal.side))+margin
+    local z=p[3]-goal.origin[3]
+    if x+radius>goal.half_width or z+radius+margin>goal.height or z<radius-2 then return false end
+    local r=goal.fillet
+    local dx=x-(goal.half_width-r)
+    local dz=abs(z-goal.height/2)-(goal.height/2-r)
+    local inside=r-sqrt(max(dx,0)^2+max(dz,0)^2)-min(max(dx,dz),0)
+    return inside>=radius-2
+end
+function Safety:crossing(goal,trajectory,radius)
+    for i=2,#trajectory do
+        local a,b=trajectory[i-1],trajectory[i]
+        local da=dot(sub(a.position,goal.origin),goal.normal)
+        local db=dot(sub(b.position,goal.origin),goal.normal)
+        local plane=radius+10
+        if da<plane and db>=plane then
+            local f=(plane-da)/max(db-da,.00001);local p={}
+            for j=1,3 do p[j]=a.position[j]+(b.position[j]-a.position[j])*f end
+            if (b.obstructions or 0)==0 and self:fits(goal,p,radius,35)then return {position=p,time=a.time+(b.time-a.time)*f}end
+        end
+    end
+end
+function Safety:step(packet,action,now)
+    self.last=nil
+    local car,ball=packet.car,packet.ball
+    if self.physics.mismatch or not packet.ground_estimate or car.up[3]<.9 or action[6]~=0 then return nil end
+    local radius=packet.ball_radius or self.profile.physics.BALL_RADIUS
+    local worldRadius=radius*self.profile.physics.BALL_WORLD_RADIUS/self.profile.physics.BALL_RADIUS
+    if ball.position[3]>worldRadius+120 or abs(ball.velocity[3])>250 then return nil end
+    local cfg=self.profile.car_presets[packet.car_preset or 'standard']or self.profile.car_presets.standard
+    local own=self.calibration:goal(packet.team)
+    local target=self.calibration:goal(1-packet.team)
+    local forwardSpeed=dot(car.velocity,car.forward)
+    local centre={}
+    local f,u=car.forward,car.up
+    local right={u[2]*f[3]-u[3]*f[2],u[3]*f[1]-u[1]*f[3],u[1]*f[2]-u[2]*f[1]}
+    for i=1,3 do centre[i]=car.position[i]+f[i]*cfg.offset[1]+right[i]*cfg.offset[2]+u[i]*cfg.offset[3]end
+    local delta=sub(ball.position,centre);local gap=sqrt(dot(delta,delta))
+    -- A straight, close ground push through our own mouth is avoidable. Turns,
+    -- jumps and aerial saves retain the actor's command.
+    if gap<radius+cfg.size[1]/2+75 and gap>1 and abs(action[2])<.5
+        and(action[1]>.5 or action[7]~=0)and forwardSpeed>-100
+        and dot(sub(ball.position,own.origin),own.normal)>-1600 then
+        local direction={delta[1]/gap,delta[2]/gap,delta[3]/gap}
+        local towards=dot(direction,own.normal)
+        if towards>.7 and dot(direction,car.forward)>.75 then
+            local t=-dot(sub(ball.position,own.origin),own.normal)/towards
+            local cross={ball.position[1]+direction[1]*t,ball.position[2]+direction[2]*t,ball.position[3]+direction[3]*t}
+            if t>0 and self:fits(own,cross,worldRadius,0)then
+                local a=table.clone(action);a[1]=forwardSpeed>150 and -1 or 0;a[7]=0;a[8]=0
+                self.last={mode='Own-goal push guard',time=now,crossing=cross}
+                return a,self.last.mode
+            end
+        end
+    end
+    if gap>850 or (packet.unknown_cars or 0)>0 or dot(ball.velocity,target.normal)<450
+        or dot(sub(ball.position,target.origin),target.normal)<-1800
+        or dot(sub(car.position,ball.position),target.normal)>-40 then return nil end
+    local relative=sub(car.velocity,ball.velocity)
+    local speed2=dot(relative,relative)
+    if speed2<120^2 then return nil end
+    local d=sub(ball.position,car.position)
+    local nearTime=math.clamp(dot(d,relative)/speed2,0,.5)
+    local separation={d[1]-relative[1]*nearTime,d[2]-relative[2]*nearTime,d[3]-relative[3]*nearTime}
+    if sqrt(dot(separation,separation))>radius+cfg.size[1]/2+50 or dot(d,relative)<=0 then return nil end
+    local trajectory=self.physics:predict(ball,radius,1.5)
+    local cross=self:crossing(target,trajectory,worldRadius)
+    if not cross then return nil end
+    for _,other in ipairs(packet.other_cars or {})do
+        for _,sample in ipairs(trajectory)do
+                if sample.time>cross.time then break end
+                local t=min(sample.time,.8);local v=other.velocity or {0,0,0}
+                local p={other.position[1]+v[1]*t,other.position[2]+v[2]*t,other.position[3]+v[3]*t}
+                if distance(p,sample.position)<450+radius+800*min(sample.time,.8)^2 then return nil end
+        end
+    end
+    local a={forwardSpeed>200 and -1 or 0,0,0,0,0,0,0,0}
+    self.last={mode='Leave clear shot',time=now,crossing=cross.position,crossing_seconds=cross.time,
+        calibrated_geometry=self.calibration.active~=nil}
+    return a,self.last.mode
+end
+return Safety
+
+end)()
+local Window=(function()
+-- Draggable while paused; F4 can minimize while mouse boost is active.
+local Window={}
+Window.__index=Window
+function Window.new(gui,input,connect,canDrag,title)
+    local panel=Instance.new('Frame',gui);panel.Name='Window'
+    panel.Size=UDim2.fromOffset(480,372);panel.Position=UDim2.fromOffset(20,20)
+    panel.BackgroundColor3=Color3.fromRGB(18,22,30)
+    local header=Instance.new('TextButton',panel);header.Name='Titlebar'
+    header.Position=UDim2.fromOffset(8,2);header.Size=UDim2.fromOffset(420,30)
+    header.BackgroundTransparency=1;header.Text=title;header.TextColor3=Color3.new(1,1,1)
+    header.Font=Enum.Font.Code;header.TextSize=13
+    local mini=Instance.new('TextButton',panel);mini.Name='Minimize'
+    mini.Position=UDim2.fromOffset(442,4);mini.Size=UDim2.fromOffset(28,26);mini.Text='–'
+    local body=Instance.new('Frame',panel);body.Name='Body';body.BackgroundTransparency=1
+    body.Position=UDim2.fromOffset(0,34);body.Size=UDim2.fromOffset(480,334)
+    local self=setmetatable({panel=panel,body=body,header=header,mini=mini,minimized=false},Window)
+    connect(mini.Activated,function()self:toggle()end)
+    local drag
+    connect(header.InputBegan,function(event)
+        if canDrag()and(event.UserInputType==Enum.UserInputType.MouseButton1 or event.UserInputType==Enum.UserInputType.Touch)then
+            drag={at=event.Position,position=panel.Position,event=event}
+        end
+    end)
+    connect(input.InputChanged,function(event)
+        if drag and(event==drag.event or event.UserInputType==Enum.UserInputType.MouseMovement)then
+            local delta=event.Position-drag.at
+            local camera=game:GetService('Workspace').CurrentCamera
+            local size=camera and camera.ViewportSize or Vector3.new(1920,1080,0)
+            panel.Position=UDim2.fromOffset(math.clamp(drag.position.X.Offset+delta.X,0,math.max(0,size.X-480)),
+                math.clamp(drag.position.Y.Offset+delta.Y,0,math.max(0,size.Y-34)))
+        end
+    end)
+    connect(input.InputEnded,function(event)
+        if drag and(event==drag.event or event.UserInputType==Enum.UserInputType.MouseButton1)then drag=nil end
+    end)
+    return self
+end
+function Window:toggle()
+    self.minimized=not self.minimized;self.body.Visible=not self.minimized
+    self.panel.Size=UDim2.fromOffset(480,self.minimized and 34 or 372)
+    self.mini.Text=self.minimized and '+'or '–'
+end
+return Window
+
+end)()
 local PROFILE=
 {["version"]=1,["name"]="turbo_soccer_standard",["provenance"]={["kind"]="numeric collision/physics specification from user-provided saved place",["place_sha256"]="00ea1fbc258e3d5e317daf5bef484368490726d006d53176e94a42375b1ee733",["geometry_source_sha256"]="d8f35aa62627d23a68ee3a51ef315c1b8b9e53ec4ba0a14cfa3f6a76dab467c0",["constants_source_sha256"]="3274f6c9d71e5e86d9708694e59599f1de71a8dfc41db0028567c0bffe8d541c"},["roblox_studs_per_sim_unit"]=0.1,["arena"]={["EXTENT_X"]=4096.0,["EXTENT_Y"]=5120.0,["HEIGHT"]=2048.0,["CORNER"]=8064.0,["EDGE_RADIUS"]=256.0,["BACK_RAMP_RADIUS"]=160.0,["CEILING_RADIUS"]=512.0,["SIDE_CORNER_RADIUS"]=852.0,["BACK_CORNER_RADIUS"]=874.0,["GOAL_HALF_WIDTH"]=893.0,["GOAL_HEIGHT"]=642.775,["GOAL_BACK_Y"]=6000.0,["GOAL_TOP_RADIUS"]=130.0,["GOAL_BOTTOM_RADIUS"]=70.0,["GOAL_LIP_RADIUS"]=80.0,["GOAL_BACK_RADIUS"]=300.0,["MOUTH_HALF_WIDTH"]=896.0,["MOUTH_HEIGHT"]=640.0,["MOUTH_FILLET"]=96.0,["MOUTH_LIP"]=8.0},["ramp_facets_degrees"]={0,11.617,22.892,33.984,45,56.016,67.108,78.383,90},["physics"]={["GRAVITY_Z"]=-650.0,["BALL_RADIUS"]=91.25,["BALL_WORLD_RADIUS"]=93.15,["BALL_REST_Z"]=93.15,["CAR_MAX_SPEED"]=2300.0,["CAR_MAX_ANG_SPEED"]=5.5,["BALL_MAX_SPEED"]=6000.0,["BALL_MAX_ANG_SPEED"]=6.0,["BALL_DRAG"]=0.03,["BOOST_USED_PER_SECOND"]=33.333333333333336,["BOOST_ACCEL_GROUND"]=991.6666666666666,["BOOST_ACCEL_AIR"]=1058.3333333333333,["DOUBLEJUMP_MAX_DELAY"]=1.25,["MAX_SUSPENSION_TRAVEL"]=12.0,["WHEEL_RAY_MIN_HIT_DIST"]=17.079519899575633,["CAR_SPAWN_REST_Z"]=17.0,["TICK_RATE"]=120,["BALLWORLD_FRICTION"]=0.35,["BALLWORLD_RESTITUTION"]=0.6,["SOLVER_ERP2"]=0.8,["RESTITUTION_VEL_THRESHOLD"]=10,["CONTACT_BREAKING_THRESHOLD"]=1,["BALL_WORLD_CONTACT_FLAT"]=0.0050000000000001155,["BALL_SLEEP_LIN_SPEED"]=40,["BALL_SLEEP_ANG_SPEED"]=1,["BALL_SLEEP_TIME"]=2,["CAR_MASS"]=180,["THROTTLE_TORQUE_AMOUNT"]=72000,["DRIVE_SPEED_TORQUE_FACTOR"]={{0,1},{1400,0.1},{1410,0}}},["car_presets"]={["standard"]={["size"]={120.50700378417969,86.69940185546875,38.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-33.75,29.5,20.7549991607666}}},["low"]={["size"]={130.427001953125,85.77989959716797,33.79999923706055},["offset"]={9.0,0.0,15.75},["front"]={["radius"]=12.0,["rest_length"]=33.95,["offset"]={50.29999923706055,31.100000381469727,15.75}},["back"]={["radius"]=13.5,["rest_length"]=33.85,["offset"]={-34.75,33.0,15.75}}},["flat"]={["size"]={131.32000732421875,87.17040252685547,31.894399642944336},["offset"]={9.008569717407227,0.0,12.094200134277344},["front"]={["radius"]=12.5,["rest_length"]=31.9242,["offset"]={49.970001220703125,27.799999237060547,12.094200134277344}},["back"]={["radius"]=17.0,["rest_length"]=27.9242,["offset"]={-35.43000030517578,20.280000686645508,12.094200134277344}}},["wedge"]={["size"]={133.99200439453125,83.02100372314453,32.79999923706055},["offset"]={12.5,0.0,11.75},["front"]={["radius"]=13.5,["rest_length"]=29.7,["offset"]={51.5,26.670000076293945,11.75}},["back"]={["radius"]=15.0,["rest_length"]=29.666,["offset"]={-35.75,35.0,11.75}}},["long"]={["size"]={129.5189971923828,84.68789672851562,36.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-34.0,29.5,20.7549991607666}}},["tall"]={["size"]={123.22000122070312,79.21029663085938,44.15909957885742},["offset"]={11.375699996948242,0.0,21.5049991607666},["front"]={["radius"]=15.0,["rest_length"]=39.505,["offset"]={51.25,25.899999618530273,21.5049991607666}},["back"]={["radius"]=15.0,["rest_length"]=39.105,["offset"]={-33.75,29.5,21.5049991607666}}}},["boost_positions"]={["big"]={{-3584.0,0.0,73.0},{3584.0,0.0,73.0},{-3072.0,4096.0,73.0},{3072.0,4096.0,73.0},{-3072.0,-4096.0,73.0},{3072.0,-4096.0,73.0}},["small"]={{0.0,-4240.0,70.0},{-1792.0,-4184.0,70.0},{1792.0,-4184.0,70.0},{-940.0,-3308.0,70.0},{940.0,-3308.0,70.0},{0.0,-2816.0,70.0},{-3584.0,-2484.0,70.0},{3584.0,-2484.0,70.0},{-1788.0,-2300.0,70.0},{1788.0,-2300.0,70.0},{-2048.0,-1036.0,70.0},{0.0,-1024.0,70.0},{2048.0,-1036.0,70.0},{-1024.0,0.0,70.0},{1024.0,0.0,70.0},{-2048.0,1036.0,70.0},{0.0,1024.0,70.0},{2048.0,1036.0,70.0},{-1788.0,2300.0,70.0},{1788.0,2300.0,70.0},{-3584.0,2484.0,70.0},{3584.0,2484.0,70.0},{0.0,2816.0,70.0},{-940.0,3308.0,70.0},{940.0,3308.0,70.0},{-1792.0,4184.0,70.0},{1792.0,4184.0,70.0},{0.0,4240.0,70.0}}},["policy_boost_limit"]=6,["recovery"]={["enabled"]=true,["stuck_seconds"]=2.2,["minimum_travel"]=45,["escape_seconds"]=0.65,["cooldown_seconds"]=3}}
 local arenaAdapter=Arena.new(PROFILE)
@@ -1553,6 +1972,10 @@ local carReader=Cars.new(PROFILE,Arena)
 local kickoff=Kickoff.new(PROFILE)
 local physics=Physics.new(PROFILE,arenaAdapter)
 local intercept=Intercept.new(PROFILE,arenaAdapter,physics)
+local calibration=Calibration.new(PROFILE)
+intercept.calibration=calibration
+local safety=GoalSafety.new(PROFILE,arenaAdapter,physics,calibration)
+local safetyEnabled=true
 local MODEL_NAME="Nexto"
 local physicsEnabled=false
 local timing=Timing.new(15)
@@ -1565,40 +1988,55 @@ carReader.teams=teamReader
 assert(not pg:FindFirstChild("Update271Standalone"),"Close the old standalone panel first")
 local gui=Instance.new("ScreenGui")
 gui.Name="Update271Standalone";gui.ResetOnSpawn=false;gui.DisplayOrder=1000072
-local panel=Instance.new("Frame",gui)
-panel.Size=UDim2.fromOffset(480,296);panel.Position=UDim2.fromOffset(20,20)
-panel.BackgroundColor3=Color3.fromRGB(18,22,30)
-local label=Instance.new("TextLabel",panel)
+local enabled=false
+local connections={}
+local function connect(signal,callback)
+    local connection=signal:Connect(callback);connections[#connections+1]=connection
+end
+local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.5 | F4 minimize')
+local panel=window.panel
+local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
+local label=Instance.new("TextLabel",main)
 label.Position=UDim2.fromOffset(10,8);label.Size=UDim2.new(1,-20,0,172)
 label.BackgroundTransparency=1;label.TextColor3=Color3.new(1,1,1)
 label.TextSize=14;label.Font=Enum.Font.Code;label.TextWrapped=true
 label.Text=MODEL_NAME.." LOCAL: loading model..."
-local start=Instance.new("TextButton",panel)
+local start=Instance.new("TextButton",main)
 start.Position=UDim2.fromOffset(10,185);start.Size=UDim2.fromOffset(150,30)
 start.Text="Start bot / F6";start.Active=false
-local teamButton=Instance.new("TextButton",panel)
+local teamButton=Instance.new("TextButton",main)
 teamButton.Position=UDim2.fromOffset(170,185);teamButton.Size=UDim2.fromOffset(140,30)
 teamButton.Text="Team: AUTO"
-local close=Instance.new("TextButton",panel)
+local close=Instance.new("TextButton",main)
 close.Position=UDim2.fromOffset(320,185);close.Size=UDim2.fromOffset(150,30);close.Text="Close"
-local physicsButton=Instance.new("TextButton",panel)
+local physicsButton=Instance.new("TextButton",main)
 physicsButton.Position=UDim2.fromOffset(10,222);physicsButton.Size=UDim2.fromOffset(220,28)
 physicsButton.Text=physicsEnabled and "Physics assist: ON"or "Physics assist: OFF"
-local reportButton=Instance.new("TextButton",panel)
+local reportButton=Instance.new("TextButton",main)
 reportButton.Position=UDim2.fromOffset(240,222);reportButton.Size=UDim2.fromOffset(230,28)
 reportButton.Text="Save physics report"
-local supportButton=Instance.new("TextButton",panel)
-supportButton.Position=UDim2.fromOffset(10,259);supportButton.Size=UDim2.fromOffset(460,28)
+local supportButton=Instance.new("TextButton",main)
+supportButton.Position=UDim2.fromOffset(10,259);supportButton.Size=UDim2.fromOffset(220,28)
 supportButton.Text="Yield to teammate: OFF"
+local calibrationButton=Instance.new('TextButton',main)
+calibrationButton.Position=UDim2.fromOffset(240,259);calibrationButton.Size=UDim2.fromOffset(230,28)
+calibrationButton.Text='Calibration / physics test'
+local safetyButton=Instance.new('TextButton',main)
+safetyButton.Position=UDim2.fromOffset(10,296);safetyButton.Size=UDim2.fromOffset(220,28);safetyButton.Text='Goal safety: ON'
+local markerLabel=Instance.new('TextLabel',main)
+markerLabel.Position=UDim2.fromOffset(240,296);markerLabel.Size=UDim2.fromOffset(230,28)
+markerLabel.BackgroundTransparency=1;markerLabel.TextColor3=Color3.new(1,1,1);markerLabel.Text='F9 marks a bad decision'
 gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
-local alive,enabled,ready,armAt=true,false,false,0
+local alive,ready,armAt=true,false,0
+local calibrating=false
+local calView,refreshCalibration,captureCalibration
 local lastStopReason,lastStopAt,lastReadReason
 local testingKeyboard=false
 local epoch=0
 local sampleAt,decisionAt,previousPeriod=nil,nil,nil
-local held,connections={},{}
+local held={}
 local pressLeft,releaseLeft,pressRight,releaseRight
 local activeWindow=isrbxactive or isgameactive
 local keyboard=Keyboard.new(input)
@@ -1652,6 +2090,11 @@ local function controls()
     physicsButton.Visible=not enabled and not testingKeyboard
     reportButton.Visible=not enabled and not testingKeyboard
     supportButton.Visible=not enabled and not testingKeyboard
+    calibrationButton.Visible=not enabled and not testingKeyboard
+    safetyButton.Visible=not enabled and not testingKeyboard
+    window.mini.Visible=not enabled
+    main.Visible=not calibrating
+    if calView then calView.Visible=calibrating end
 end
 local function runtimeSnapshot(now)
     local keys={};for _,key in ipairs(order)do if held[key]then keys[#keys+1]=key end end
@@ -1678,12 +2121,15 @@ local function saveReport(filename,savedFrom)
     report.performance=timing:report()
     report.performance.last_active_age=timing.last and os.clock()-timing.last.time or nil
     report.jump_events=physics.jumpEvents or {}
+    report.goal_safety_enabled=safetyEnabled;report.goal_safety=safety.last
+    report.calibration=calibration:report();report.incidents=physics.incidents or {}
     report.control_requirements={default_keyboard_bindings=true,invertPitch=false,aerialSafety=false}
     report.model_sha256="bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa";report.place=game.PlaceId
     local body=game:GetService("HttpService"):JSONEncode(report)
     writefile(filename,body)
 end
 local function toggle()
+    if calibrating then calibration.message='Close calibration before starting the bot';return end
     if not ready then return end
     if enabled or testingKeyboard then stop("LOCAL paused. F6 starts; F8 stops.");return end
     epoch=epoch+1
@@ -1713,9 +2159,6 @@ local function toggle()
         physics:mark("start",os.clock(),"keyboard verified")
     end)
 end
-local function connect(signal,callback)
-    local connection=signal:Connect(callback);connections[#connections+1]=connection
-end
 start.Activated:Connect(toggle)
 teamButton.Activated:Connect(function()
     stop();manualTeam=manualTeam==nil and 0 or(manualTeam==0 and 1 or nil)
@@ -1734,6 +2177,107 @@ supportButton.Activated:Connect(function()
     label.Text=intercept.supportEnabled and "Ground assist may yield to a nearby, aligned teammate actively approaching the ball."
         or "Scripted teammate yielding disabled. F6 starts."
 end)
+safetyButton.Activated:Connect(function()
+    stop();safetyEnabled=not safetyEnabled
+    safetyButton.Text=safetyEnabled and 'Goal safety: ON'or 'Goal safety: OFF'
+    label.Text=safetyEnabled and 'Conservative ground goal guards enabled.'or 'Goal guards disabled. F6 starts.'
+end)
+do
+    calView=Instance.new('Frame',window.body);calView.Name='Calibration';calView.Visible=false
+    calView.Size=UDim2.fromScale(1,1);calView.BackgroundTransparency=1
+    local function button(text,x,y,w,callback)
+        local b=Instance.new('TextButton',calView);b.Text=text;b.Position=UDim2.fromOffset(x,y);b.Size=UDim2.fromOffset(w,28)
+        connect(b.Activated,function()
+            local ok,err=pcall(callback)
+            if not ok then calibration.message=tostring(err)end
+            refreshCalibration(os.clock())
+        end)
+        return b
+    end
+    local function text(y,h,size)
+        local t=Instance.new('TextLabel',calView);t.Position=UDim2.fromOffset(10,y);t.Size=UDim2.fromOffset(460,h)
+        t.BackgroundTransparency=1;t.TextColor3=Color3.new(1,1,1);t.TextWrapped=true;t.Font=Enum.Font.Code;t.TextSize=size
+        return t
+    end
+    local title=text(39,28,14);local instruction=text(70,92,12)
+    button('Goal landmarks',10,4,220,function()calibration.tab='geometry';calibration.message=nil end)
+    button('Motion / physics test',240,4,230,function()calibration.tab='motion';calibration.message=nil end)
+    local reference=button('Reference: front bumper',10,166,460,function()
+        calibration.reference=calibration.reference=='bumper'and 'center'or 'bumper'
+    end)
+    captureCalibration=function()
+        if calibration.tab=='motion'then
+            if calibration.recordingUntil then calibration.recordingUntil=nil;calibration:summarizeMotion()
+            else calibration:startMotion(os.clock())end
+        else calibration:capture()end
+        calibration.message=nil
+    end
+    local capture=button('Capture point',10,203,220,captureCalibration)
+    local back=button('Back',240,203,110,function()calibration:back();calibration.message=nil end)
+    button('Reset',360,203,110,function()
+        if calibration.tab=='motion'then
+            calibration.motion=nil;calibration.recordingUntil=nil
+            physics.gravity=PROFILE.physics.GRAVITY_Z;physics.observedGravity=nil;physics.gravitySamples={};physics:reset()
+        else calibration:begin();calibration.active=nil end
+        calibration.message='Calibration reset to the saved defaults'
+    end)
+    local apply=button('Apply goal measurements',10,240,460,function()
+        if calibration.tab=='motion'then
+            assert(not calibration.recordingUntil,'Finish recording first')
+            local result=calibration:summarizeMotion()
+            assert(result and result.gravity_consistent,'Need at least six consistent isolated airborne samples; launch the ball and record again')
+            physics.gravity=result.gravity;physics.observedGravity=result.gravity;physics:reset()
+            calibration.message=string.format('Applied gravity %.1f; masses and actor unchanged',result.gravity)
+        else
+            local data=calibration:apply();safety.last=nil
+            intercept:reset();calibration.message='Applied to goal guards and optional ground aiming: '..data.summary
+        end
+    end)
+    button('Save test file',10,277,150,function()
+        assert(type(writefile)=='function','Executor writefile is unavailable')
+        writefile('TurboBall_Calibration.json',game:GetService('HttpService'):JSONEncode(calibration:export()))
+        calibration.message='Saved TurboBall_Calibration.json in the executor workspace'
+    end)
+    button('Load test file',170,277,150,function()
+        assert(type(readfile)=='function','Executor readfile is unavailable')
+        local data=readfile('TurboBall_Calibration.json');assert(#data<5000000,'Calibration file is too large')
+        calibration:load(game:GetService('HttpService'):JSONDecode(data))
+        calibration.message='Loaded measurements; review and Apply to use them'
+    end)
+    button('Close test',330,277,140,function()
+        calibration.recordingUntil=nil;if calibration.motion then calibration:summarizeMotion()end
+        calibrating=false;controls()
+    end)
+    refreshCalibration=function(now)
+        local geometry=calibration.tab=='geometry'
+        reference.Visible=geometry;back.Visible=geometry
+        reference.Text=calibration.reference=='bumper'and 'Reference: front bumper contact'or 'Reference: car centre on marker'
+        if geometry then
+            local step=Calibration.steps[calibration.index]
+            title.Text=step and string.format('%d/9  %s',calibration.index,step[2])or '9/9  Review goal measurements'
+            local message=step and step[3]or(calibration.candidate and calibration.candidate.summary or 'Capture every landmark before applying')
+            if calibration.reference=='center'and step and step[1]~='center'then message='Place the CAR CENTRE directly on the geometric marker; no bumper offset will be added.'end
+            local last=calibration.history[#calibration.history]
+            local body=last and ('\nBody: '..last.preset..(last.verified and ' verified'or ' / source offsets'))or ''
+            instruction.Text=message..body..'\n'..(calibration.message or 'Hold still. F10 captures; F4 minimizes this window.')
+            capture.Text='Capture point';apply.Text='Apply goal measurements'
+        else
+            title.Text='20-second manual physics recording'
+            local result=calibration.motion and calibration.motion.summary
+            local status=calibration.recordingUntil and string.format('Recording: %.0f s left',math.max(0,calibration.recordingUntil-now))
+                or(result and string.format('%d samples | gravity %s | acceleration %s',result.samples,
+                    result.gravity_consistent and string.format('%.1f',result.gravity)or 'needs clear flight',
+                    result.ground_acceleration_median and string.format('%.0f',result.ground_acceleration_median)or 'not measured')or 'Ready')
+            instruction.Text='In freeplay: drive straight, brake, then launch the ball into clear flight. You drive; the bot stays paused.\n'..status..'\n'..(calibration.message or 'Landmarks measure geometry. Motion samples do not identify masses.')
+            capture.Text=calibration.recordingUntil and 'Finish recording'or 'Record 20 seconds';apply.Text='Apply consistent gravity estimate'
+        end
+    end
+    calibrationButton.Activated:Connect(function()
+        stop('Calibration: bot paused for manual placement')
+        if not calibration.started then calibration:begin();calibration.started=true end
+        calibrating=true;controls();refreshCalibration(os.clock())
+    end)
+end
 reportButton.Activated:Connect(function()
     local savedFrom=runtimeSnapshot(os.clock())
     stop("Paused to save physics report.")
@@ -1745,7 +2289,22 @@ reportButton.Activated:Connect(function()
 end)
 connect(input.InputBegan,function(key,processed)
     if key.KeyCode==Enum.KeyCode.F8 then stop("STOPPED by F8. F6 starts again.")
-    elseif not processed and key.KeyCode==Enum.KeyCode.F6 then toggle()end
+    elseif not processed then
+        if key.KeyCode==Enum.KeyCode.F6 then toggle()
+        elseif key.KeyCode==Enum.KeyCode.F4 then window:toggle()
+        elseif key.KeyCode==Enum.KeyCode.F10 and calibrating then
+            local ok,err=pcall(captureCalibration)
+            if not ok then calibration.message=tostring(err)end
+            refreshCalibration(os.clock())
+        elseif key.KeyCode==Enum.KeyCode.F9 then
+            local rows={};local now=os.clock()
+            for _,row in ipairs(physics.trace)do if now-row.time<=8 then rows[#rows+1]=row end end
+            physics.incidents=physics.incidents or {}
+            physics.incidents[#physics.incidents+1]={time=now,trace=rows,decision=physics.decision,goal_safety=safety.last}
+            if #physics.incidents>2 then table.remove(physics.incidents,1)end
+            physics:mark('Incident marker',now,#rows..' recent poses retained')
+        end
+    end
 end)
 connect(input.WindowFocusReleased,function()focus=false;stop("Paused: Roblox lost focus. F6 restarts.")end)
 connect(input.WindowFocused,function()focus=true end)
@@ -1851,6 +2410,7 @@ local function read()
     if arenaAdapter then
         packet.ball_radius,packet.ball_size_verified=ballRadius,ballSizeVerified
         packet.car_preset=arenaAdapter.preset;packet.car_size_verified=arenaAdapter.hitboxVerified
+        packet.car_dimensions_verified=arenaAdapter.sizeVerified==true
         packet.wheel_contacts=contacts
         packet.ball_wheel_contacts=ballContacts
     end
@@ -2058,7 +2618,7 @@ task.spawn(function()
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=(MODEL_NAME.." LOCAL v6.4 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
+        label.Text=(MODEL_NAME.." LOCAL v6.5 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
             :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")
         local lastTick,lastUi=os.clock(),-math.huge
         local busy=false
@@ -2089,6 +2649,13 @@ task.spawn(function()
                 local observeAt=os.clock()
                 physics:observe(packet,now)
                 local observeMs=(os.clock()-observeAt)*1000
+                if calibrating then
+                    local keys={}
+                    for _,name in ipairs({'W','S'})do keys[name]=input:IsKeyDown(Enum.KeyCode[name])end
+                    keys.LMB=input:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                    calibration:observe(packet,now,keys,physics)
+                    refreshCalibration(now)
+                end
                 if not enabled or now<armAt then return end
                 stage="verifying keyboard"
                 local keyboardOk,keyboardReason=keyboard:verify()
@@ -2125,7 +2692,7 @@ task.spawn(function()
                 lastGround=ground
                 local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<PROFILE.physics.DOUBLEJUMP_MAX_DELAY))
                 local action=override
-                local modelMs,planningMs,entityCount=0,0,0
+                local modelMs,planningMs,entityCount,safetyMs=0,0,0,0
                 local modelRan=false
                 physics.plan=nil
                 if not action then
@@ -2155,6 +2722,15 @@ task.spawn(function()
                             if assisted then action,recovery=assisted,mode end
                         end
                     end
+                end
+                local proposed=table.clone(action)
+                safety.last=nil
+                if modelRan and safetyEnabled then
+                    stage='ground goal safety'
+                    local safetyAt=os.clock()
+                    local guarded,mode=safety:step(packet,action,now)
+                    safetyMs=(os.clock()-safetyAt)*1000
+                    if guarded then action,recovery=guarded,mode end
                 end
                 stage="mapping inputs"
                 local wanted,actual=Policy.keys(action,ground)
@@ -2193,15 +2769,16 @@ task.spawn(function()
                 assert(inputMs<200,"Executor input calls exceeded 200ms")
                 physics.decision={time=now,mode=recovery or "model",milliseconds=inferenceMs,
                     input_milliseconds=inputMs,action=table.clone(actual),model_milliseconds=modelMs,
-                    planning_milliseconds=planningMs,model_ran=modelRan,entity_count=entityCount}
+                    planning_milliseconds=planningMs,model_ran=modelRan,entity_count=entityCount,
+                    proposed_action=proposed,goal_safety=safety.last,goal_safety_milliseconds=safetyMs}
                 timing:record({time=now,model_ran=modelRan,entities=entityCount,pose_ms=poseMs,observe_ms=observeMs,
-                    model_ms=modelMs,planning_ms=planningMs,decision_ms=inferenceMs,input_ms=inputMs,schedule_late_ms=late*1000})
+                    model_ms=modelMs,planning_ms=planningMs,safety_ms=safetyMs,decision_ms=inferenceMs,input_ms=inputMs,schedule_late_ms=late*1000})
                 previous=actual;rate=timing.rate
                 if now-lastUi>=.2 then
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=(MODEL_NAME.." v6.4 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=(MODEL_NAME.." v6.5 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -2228,4 +2805,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.4"}
+return {started=true,version="local-6.5"}

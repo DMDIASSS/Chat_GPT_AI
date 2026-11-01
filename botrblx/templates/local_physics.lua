@@ -47,12 +47,13 @@ function Physics:step(ball,radius,dt)
     v[3]=v[3]+self.gravity*dt
     local worldRadius=radius*cfg.BALL_WORLD_RADIUS/cfg.BALL_RADIUS
     local d=self.arena:distance(p)
-    local touched=false
+    local touched,obstructed=false,false
     if d-worldRadius<cfg.CONTACT_BREAKING_THRESHOLD then
         local _,n=self.arena:query(p)
         local flat=abs(n[3])>.9999 or(abs(n[3])<.0001 and(abs(n[1])>.9999 or abs(n[2])>.9999))
         if d-worldRadius<(flat and cfg.BALL_WORLD_CONTACT_FLAT or cfg.CONTACT_BREAKING_THRESHOLD)then
             touched=true
+            obstructed=n[3]<.9
             local incoming=dot(old,n)
             local bounce=abs(incoming)>=cfg.RESTITUTION_VEL_THRESHOLD and max(-incoming*cfg.BALLWORLD_RESTITUTION,0)or 0
             local impulse=max(0,bounce-dot(v,n))
@@ -84,21 +85,23 @@ function Physics:step(ball,radius,dt)
             ball.velocity={0,0,0};ball.angular_velocity={0,0,0}
         end
     else ball.slow=0 end
-    return touched
+    return touched,obstructed
 end
 
 function Physics:predict(ball,radius,seconds,stride)
     radius=radius or self.profile.physics.BALL_RADIUS
     local state=copy(ball)
-    local result={{time=0,position=table.clone(state.position),velocity=table.clone(state.velocity),bounces=0}}
+    local result={{time=0,position=table.clone(state.position),velocity=table.clone(state.velocity),bounces=0,obstructions=0}}
     local dt=1/self.profile.physics.TICK_RATE
     local steps=math.floor(math.clamp(seconds or 2.5,0,3)*self.profile.physics.TICK_RATE+.5)
-    local bounces=0
+    local bounces,obstructions=0,0
     for tick=1,steps do
-        if self:step(state,radius,dt)then bounces=bounces+1 end
+        local touched,blocked=self:step(state,radius,dt)
+        if touched then bounces=bounces+1 end
+        if blocked then obstructions=obstructions+1 end
         if tick%(stride or 4)==0 or tick==steps then
             result[#result+1]={time=tick*dt,position=table.clone(state.position),
-                velocity=table.clone(state.velocity),bounces=bounces}
+                velocity=table.clone(state.velocity),bounces=bounces,obstructions=obstructions}
         end
     end
     return result
@@ -202,7 +205,7 @@ function Physics:observe(packet,now)
 end
 
 function Physics:report()
-    return {version="local-6.4",profile=self.profile.name,units="simulation units; seconds",
+    return {version="local-6.5",profile=self.profile.name,units="simulation units; seconds",
         studs_per_unit=self.profile.roblox_studs_per_sim_unit,arena=self.profile.arena,
         saved_physics=self.profile.physics,gravity_used=self.gravity,observed_gravity=self.observedGravity,
         gravity_samples=#self.gravitySamples,flight_position_error_median=self.error,

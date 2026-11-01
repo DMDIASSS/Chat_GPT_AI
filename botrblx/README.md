@@ -1,4 +1,4 @@
-# TurboBall Roblox bot — Local v6.4
+# TurboBall Roblox bot — Local v6.5
 
 ## Ready-to-run original Nexto
 
@@ -16,11 +16,11 @@ are in `NEXTO_NOTICE.md` and `NEXTO_LICENSE.txt`.
    loadstring(readfile("TurboBall_Nexto.lua"))()
    ```
 
-4. Wait for **Nexto LOCAL v6.4 ready**, then press **F6**. **F8** stops.
+4. Wait for **Nexto LOCAL v6.5 ready**, then press **F6**. **F8** stops.
 
 Nexto starts with **Physics assist: OFF** and **Yield to teammate: OFF**. The actor
-chooses its actions, with the existing kickoff and bounded stuck-recovery
-controllers. These switches control our overrides; they do not retrain Nexto or
+chooses its actions, with the existing kickoff, bounded stuck recovery, and the
+separate **Goal safety: ON** guard. These switches control our overrides; they do not retrain Nexto or
 remove teammates from its observation. Pause with F8 to change either switch.
 If enabled, teammate yielding now requires a nearby, grounded teammate moving
 toward the ball and facing it; a stationary or misaligned teammate is insufficient.
@@ -30,6 +30,51 @@ To rebuild from the original asset already in your project, run
 workspace, using the existing project Python. `EXPORT_LOCAL_BOT.bat` continues to
 export your private Update271 checkpoint separately. Both builds identify the
 model by name and SHA256 in diagnostics.
+
+## Movable window, goal calibration and physics recording (local v6.5)
+
+**F4** minimizes/restores the window during play. Pause with **F8** to drag its
+title bar. Open **Calibration / physics test** while paused; the bot stays paused
+while you position or drive the car.
+
+The **Goal landmarks** wizard records nine points: field centre, then both inner
+posts, the crossbar underside and the rear net wall at orange and blue. Touch the
+specified face with the front collision body, hold still, and press **F10** to
+capture, including while minimized. The tool accounts for the car's source box
+and offset, checks stillness, and validates the fitted dimensions. **Apply goal
+measurements** activates the fit; **Save test file** writes
+`TurboBall_Calibration.json`. Loading also requires review and Apply. Partial
+files can be saved and resumed. See the [placement guide](CALIBRATION_GUIDE.md)
+for contact directions and the alternative centre-marker reference.
+
+The applied goal positions, widths and heights inform Goal safety and, when
+enabled, Physics assist's ground aiming. The rear-wall samples validate and
+export the layout; they do not replace the analytic curved collision profile.
+The frozen actor's observations and weights remain unchanged.
+
+**Motion / physics test** records up to twenty seconds while you drive straight,
+brake, and launch the ball into clear flight. It reports a verified radius when
+available, consistent airborne gravity, and sampled acceleration/braking. Only
+consistent gravity can be applied here. Static landmarks and this short recording
+cannot identify masses or all handling/contact parameters. The saved masses stay
+unchanged. Save and upload the calibration file for further analysis.
+
+**Goal safety** brakes a close, straight ground push toward the own-goal opening
+and suppresses a likely retouch of an uncontested low ball forecast to score
+cleanly. A forecast post/wall bounce or another car within reach prevents the
+clear-shot override. It preserves jumps and aerials, and can be disabled while
+paused. These bounded guards do not guarantee goals or prevent every own goal.
+
+Press **F9 immediately after a bad decision**, then pause and **Save physics
+report**. The report retains up to two marked windows containing the preceding
+eight seconds even after the normal trace advances. It also reports goal-guard
+actions, calibration and the guard's timing separately from model inference.
+
+The latest supplied v6.4 report records 15.07 decisions/s and a 20.04 ms mean model
+phase across 120 decisions (114 model calls). The retained trace does not identify
+the reported own goal or last-second redirect precisely enough to establish a
+cause. This update has offline scenario/runtime coverage; it has not been
+live-tested in Roblox and has no measured win-rate improvement.
 
 ## Jump direction and input sequencing (local v6.4)
 
@@ -121,7 +166,7 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v6.4 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v6.5 ready | model self-test passed`**, then press **F6**.
    **Team: AUTO** identifies `Deadline_coolgun` from the match scoreboard and
    cross-checks the rendered nameplate relationship. It follows team changes.
    If the team cannot be identified, open the in-game scoreboard once. The
@@ -214,13 +259,13 @@ runtime coverage, but have not been live-tested in Roblox/JJSploit and are not a
 measured win-rate improvement.
 
 After replacing this folder, rerun **EXPORT_LOCAL_BOT.bat** and execute the newly
-generated private Lua file. The ready badge must show **LOCAL v6.4** for a private export. Exporting the
+generated private Lua file. The ready badge must show **LOCAL v6.5** for a private export. Exporting the
 place itself does not update a standalone script you already generated.
 
 ## Match pad detection and stop diagnostics (local v6.1)
 
 Rerun **EXPORT_LOCAL_BOT.bat** after updating this folder. Existing generated Lua
-scripts contain the previous runtime; the current ready badge is **v6.4**.
+scripts contain the previous runtime; the current ready badge is **v6.5**.
 
 The first live v6 report showed a measured standard ball radius and gravity close
 to the saved profile, but zero discovered boost pads throughout the run. The
@@ -360,7 +405,7 @@ change model weights or create a policy mesh input.
 
 Rerun **EXPORT_LOCAL_BOT.bat after installing this update**: the previous generated
 standalone script contains the previous adapter. No model weights are downloaded
-or retrained. The current package shows a **v6.4** badge after re-export.
+or retrained. The current package shows a **v6.5** badge after re-export.
 
 The game uses its own match teams. The new reader matches your name to the
 scoreboard row's team edge; it does not assume Roblox's `Player.Team` is the match

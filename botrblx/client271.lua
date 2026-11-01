@@ -354,6 +354,7 @@ local function read()
     if arenaAdapter then
         packet.ball_radius,packet.ball_size_verified=ballRadius,ballSizeVerified
         packet.car_preset=arenaAdapter.preset;packet.car_size_verified=arenaAdapter.hitboxVerified
+        packet.car_dimensions_verified=arenaAdapter.sizeVerified==true
         packet.wheel_contacts=contacts
         packet.ball_wheel_contacts=ballContacts
     end

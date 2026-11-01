@@ -1,5 +1,5 @@
 {
-  "version": "local-6.4",
+  "version": "local-6.5",
   "date": "2026-11-01",
   "original_nexto": {
     "name": "Nexto",
@@ -13,14 +13,55 @@
     "default_ground_assist": false,
     "default_scripted_teammate_yield": false,
     "pad_entity_limit": 6,
-    "other_car_entity_limit": 5
+    "other_car_entity_limit": 5,
+    "default_goal_safety": true
   },
   "supplied_report": {
+    "version": "local-6.4",
     "trace_samples": 150,
-    "active_trace_samples": 0,
-    "recorded_model_was_original_nexto": false,
-    "last_decision_ms": 32.66259999873,
-    "conclusion": "Paused samples and a stale decision do not establish the active-play bottleneck."
+    "recorded_model_was_original_nexto": true,
+    "physics_assist_enabled": false,
+    "scripted_teammate_yield_enabled": false,
+    "decision_hz": 15.07097250629207,
+    "performance_samples": 120,
+    "model_calls": 114,
+    "phase_timings_ms": {
+      "entities": {
+        "mean": 10.041666666666666,
+        "max": 11
+      },
+      "model_ms": {
+        "mean": 20.044518333149124,
+        "max": 34.921800001029624
+      },
+      "schedule_late_ms": {
+        "mean": 12.939571392530524,
+        "max": 97.2650000021531
+      },
+      "decision_ms": {
+        "mean": 20.081210000019684,
+        "max": 34.95459999976447
+      },
+      "observe_ms": {
+        "mean": 0.020675833366112784,
+        "max": 0.2967000000353437
+      },
+      "input_ms": {
+        "mean": 1.2699833335318544,
+        "max": 25.16730000206735
+      },
+      "planning_ms": {
+        "mean": 0,
+        "max": 0
+      },
+      "pose_ms": {
+        "mean": 2.5809558336125824,
+        "max": 31.754399999044836
+      }
+    },
+    "model_phase_mean_includes_non_model_decisions": true,
+    "observed_gravity": -616.7715230074821,
+    "conclusion": "Active decisions reached the 15 Hz target. The retained trace does not identify the reported own goal or last-second shot redirect precisely enough to establish a cause."
   },
   "kernel_benchmark": {
     "runtime": "Cloud Luau CLI; not Windows or JJSploit",
@@ -56,7 +97,7 @@
     "measured_version": "local-6.3"
   },
   "validation": {
-    "tests_passed": 154,
+    "tests_passed": 167,
     "tests_failed": 0,
     "tests_skipped": 0,
     "prebuilt_luau_compile": true,
@@ -80,27 +121,40 @@
     "Retain active-run trace while paused and capture separate phase timings and latest pose",
     "Prioritize requested pitch/yaw on jumps despite lingering wheel-contact estimates; omit Shift during jumps",
     "Require observed direction-key state before a new jump edge; cancel or time out deferred jumps safely",
-    "Report intended and mapped jump actions, observed keys and direction-delivery wait time"
+    "Report intended and mapped jump actions, observed keys and direction-delivery wait time",
+    "Draggable paused window and F4 minimize/restore during active play",
+    "Nine-point manual goal calibration with collision-box support/offset correction, consistency checks, explicit Apply and local Save/Load",
+    "Separate passive twenty-second manual motion test; only consistent isolated-flight gravity can be applied",
+    "Conservative straight ground own-goal push veto and uncontested clean low roll-in protection; forecast post/wall bounces and reachable cars prevent clear-shot override",
+    "Use fitted goal planes and opening dimensions for goal guards and optional ground planner; preserve actor observations, masses and analytic world collision profile",
+    "F9 incident marker retains up to two recent eight-second trace windows",
+    "Identify unique source car dimensions even when hidden hitbox transform is stale; keep source-offset fallback explicit"
   ],
   "limits": [
     "Measured cloud speedups do not guarantee a particular FPS, decision rate or win rate on the user PC.",
     "The actor receives approximate rendered state, estimated opponent boost/flip availability and a bounded pad subset.",
-    "Disabling our teammate-yield override does not retrain the learned actor or remove teammates from observations."
+    "Disabling our teammate-yield override does not retrain the learned actor or remove teammates from observations.",
+    "Static landmarks cannot identify car/ball masses, contact restitution or all handling parameters. Manual contact scatter and the assumed rounded profile limit accuracy.",
+    "The goal guards cover selected low ground situations; they cannot guarantee goals or prevent every own goal. Future touches and server corrections remain uncertain.",
+    "The frozen actor does not consume custom goal geometry; measured goal overrides apply to the guards and optional ground planner only."
   ],
   "runtime_source_sha256": {
     "file_transport.lua": "6cea0e28784191461f21b2b425be96134e32b5a99cf4820d9ffc07e3b7e5d3d2",
-    "local_arena.lua": "f89bfe48ccd8b49cae0f021c69aaaaaf79c56ddbf1e6ee1405aad3288dcf946f",
-    "local_kickoff.lua": "15488463581aaa45e51df05e1fcc7aaeb210e3c4b8f1ef9f411c6b550a855014",
-    "local_keyboard.lua": "76f0f8eed707da8befdafd3248c0f60da7e8fa760248763b8a34ba9c9657ff4a",
-    "local_pads.lua": "8df26791b386d58d114b195b865c6bf2e744a011d1f3de40f3e04003a2083b97",
     "http_compat.lua": "e2f86fdcf2d675f707467e6e101dd92b6d5c06c662ec1f65c5c1428c21a33dc5",
-    "local_physics.lua": "394cc786c28d2925b234cbde7e34e9ffd795fa283c4e05a981759ed332975792",
-    "local_policy.lua": "cfddae893ef58bb5688938411bb5c6c417544a710aa543f64bb4aab69f6804be",
-    "local_timing.lua": "c27a15c95ac432d07fed31aef79a2def3ebdc36d9541563c8eb46227e3be4775",
+    "local_arena.lua": "b0cc75983cc9c5d0ee5fcb28655d786cad24823115495f4f6fdc1b8df1b70788",
+    "local_calibration.lua": "205b4bb920b912491d21b50ba2af5972f33302d418bd9665b8f96409d16c97dd",
     "local_cars.lua": "5e72ca42274b11895e8164cdd6716fc8e656f21cea212e1ba84693efa5c1d983",
-    "local_intercept.lua": "278e83a72d813829a2a5933dc18f06130794fa724d7c605b1493fd4ccf0bb715",
-    "standalone.lua": "74e0edf09f5bbbaa10cfbef3fde5272a3461fc1cdd572452e38f13d4a2d68afd",
-    "local_teams.lua": "68ca4ee0794ad9297cf1fe6f1f9140ea02dcc74f2538e0a95ddd4cb28f427b4a"
+    "local_goal_safety.lua": "40a62eef476a69cb71488ba895dec0aed2b294ccac8aa490270cffeb5887abab",
+    "local_intercept.lua": "c89e529a7be5db1e7ecec8410967da3100f5b92ce9b5211cb7f59d6de4122151",
+    "local_keyboard.lua": "76f0f8eed707da8befdafd3248c0f60da7e8fa760248763b8a34ba9c9657ff4a",
+    "local_kickoff.lua": "15488463581aaa45e51df05e1fcc7aaeb210e3c4b8f1ef9f411c6b550a855014",
+    "local_pads.lua": "8df26791b386d58d114b195b865c6bf2e744a011d1f3de40f3e04003a2083b97",
+    "local_physics.lua": "8f8a40e0b599323783d6f3ee959ad8172358378de7bd855ebc079ed03d733318",
+    "local_policy.lua": "cfddae893ef58bb5688938411bb5c6c417544a710aa543f64bb4aab69f6804be",
+    "local_teams.lua": "68ca4ee0794ad9297cf1fe6f1f9140ea02dcc74f2538e0a95ddd4cb28f427b4a",
+    "local_timing.lua": "ff6b98140431f3046ebdb4a80f0e2255d79600b550609275681a63197f14d3e0",
+    "local_window.lua": "76dcad27ff4901dc15b6af81c8de566a9e1b0575ac177bc0868bb7699d5d1487",
+    "standalone.lua": "f038baf53d021e149484ec57fff935f24a19c03945dd66047ff2a9804f130d5a"
   },
   "jump_mapping": {
     "ground_estimate_previously_changed_pitch_in_actions": 12,
@@ -111,5 +165,33 @@
     "latency_offset_from_reported_network_ping_ms": 0,
     "live_backflip_issue_confirmed": false,
     "limits": "Default keyboard bindings, pitch inversion off and aerial safety off. Reproduced mapping defect; no live validation that it caused the reported flip or goal misses."
+  },
+  "goal_safety_benchmark": {
+    "measured_version": "local-6.5",
+    "runtime": "Cloud Luau CLI; not Windows or JJSploit",
+    "calls_per_scenario": 300,
+    "warmup_calls": 20,
+    "mean_ms": {
+      "clear_roll_in_forecast": 0.933790656660373,
+      "far_approach_no_override": 0.0011235933440426986,
+      "own_goal_straight_push": 0.0020276167197152972
+    },
+    "model_inference_included": false,
+    "limits": "Synthetic fixed states; active reports record safety_ms separately to measure actual runtime cost."
+  },
+  "calibration": {
+    "landmarks": 9,
+    "motion_recording_seconds": 20,
+    "requires_explicit_apply": true,
+    "changes_actor_observations_or_weights": false,
+    "changes_saved_masses": false,
+    "goal_override_consumers": [
+      "conservative ground goal guards",
+      "optional ground planner aiming and threat checks"
+    ],
+    "world_collision_profile_replaced": false,
+    "rear_wall_samples": "Validate and export net layout; not a fit of the full curved collision surface.",
+    "gravity_apply_requires_consistent_isolated_flight": true,
+    "guide": "CALIBRATION_GUIDE.md"
   }
 }

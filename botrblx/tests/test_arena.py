@@ -80,6 +80,19 @@ local ground,contacts,onBall=arena:ground(car,ball,182.5)
 assert(ground and contacts>=3 and onBall==contacts,'Scaled ball was ignored by wheel rays')
 ''')
 
+    def test_hidden_hitbox_dimensions_identify_preset_without_claiming_offset(self):
+        self.run_lua('''
+local cfg=profile.car_presets.low
+local part=object('Part','HiddenBox');part.Parent=car
+part.Size=Vector3.new(cfg.size[2]/10,cfg.size[3]/10,cfg.size[1]/10)
+part.CFrame=frame(0)
+local box=object('SelectionBox');box.Adornee=part;box.Parent=part
+carRoot.CFrame.ToObjectSpace=function()return {Position=Vector3.new(500,700,900)}end
+arena:measureCar(car,carRoot)
+assert(arena.preset=='low'and arena.sizeVerified and not arena.hitboxVerified,'Hidden stale transform discarded a unique size match')
+assert(arena.hitboxProbe.dimension_preset=='low'and not arena.hitboxProbe.offset_verified)
+''',mock=True)
+
     def test_ball_collision_radius_tracks_verified_scale_marker(self):
         self.run_lua('''
 ballRoot.Size=Vector3.new(1000,1000,1000)

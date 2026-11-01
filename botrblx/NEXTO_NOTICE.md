@@ -19,4 +19,7 @@ user's private checkpoint. Other projects in this repository are not relicensed.
 The adapter supplies six verified nearby boost pads and up to five other cars.
 This bounds local inference cost and differs from supplying every Rocket League
 pad. It starts with ground assist and scripted teammate yielding OFF, so the
-actor chooses its driving actions except for kickoff and bounded stuck recovery.
+actor chooses its driving actions with kickoff, bounded stuck recovery and the
+separate conservative ground goal-safety guard. Goal safety can be toggled while
+paused. Applying manual calibration updates goal bounds for the guards and optional
+ground planner; it does not retrain the actor.

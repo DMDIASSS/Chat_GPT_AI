@@ -155,7 +155,7 @@ task.wait=function(dt)move(dt)end
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-6.4')
+assert(result.version=='local-6.5')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -180,6 +180,48 @@ end
 assert(next(held)==nil,'Inputs left down after close')
 for _,listener in ipairs(beat.listeners)do assert(not listener.connection.enabled)end
 print('LIFECYCLE_OK')
+''')
+
+    def test_window_drag_minimize_and_calibration_pause(self):
+        self.client_case('''
+local function find(name)
+ for _,o in ipairs(created)do if o.Name==name then return o end end
+end
+local panel,header,body=find('Window'),find('Titlebar'),find('Body')
+local press={UserInputType=Enum.UserInputType.MouseButton1,Position=Vector3.new(20,20,0)}
+header.InputBegan:Fire(press)
+services.UserInputService.InputChanged:Fire({UserInputType=Enum.UserInputType.MouseMovement,Position=Vector3.new(100,70,0)})
+assert(panel.Position.X.Offset==100 and panel.Position.Y.Offset==70,'Window did not move')
+services.UserInputService.InputEnded:Fire(press)
+inputKey('F4');assert(not body.Visible and panel.Size.Y.Offset==34)
+inputKey('F4');assert(body.Visible and panel.Size.Y.Offset==372)
+click('Calibration / physics test');inputKey('F6')
+for i=1,15 do move(.02)end
+assert(#emissions==0,'F6 started bot during calibration')
+local view=find('Calibration');assert(view.Visible)
+click('Motion / physics test');click('Record 20 seconds')
+for i=1,20 do move(.02)end
+inputKey('F10') -- finish the current recording
+click('Save test file')
+assert(savedName=='TurboBall_Calibration.json'and encoded[savedBody].motion.samples[1],'Motion test did not save poses')
+click('Close test');click('Goal safety: ON')
+assert(not view.Visible)
+''',"click('Close')",extra='''
+local savedName,savedBody
+writefile=function(name,body)savedName,savedBody=name,body end
+''')
+
+    def test_incident_hotkey_retains_recent_driving_window(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,100 do move(.02)end
+inputKey('F9');inputKey('F8')
+for i=1,120 do move(.02)end
+click('Save physics report')
+assert(saved.incidents and #saved.incidents==1 and #saved.incidents[1].trace>0,'Lost marked incident')
+assert(saved.goal_safety_enabled and saved.calibration.active==nil)
+''',"click('Close')",extra='''
+local saved
+writefile=function(_,body)saved=encoded[body]end
 ''')
 
     def test_missing_input_function_reports_in_panel_without_pressing(self):
@@ -334,7 +376,7 @@ inputKey('F6');for i=1,30 do move(1/30)end
 inputKey('F8');click('Save physics report')
 assert(savedName=='TurboBall_Physics_Report.json' and savedReport,'Report was not written')
 local report=encoded[savedReport]
-assert(report.version=='local-6.4' and report.physics_assist_enabled==false)
+assert(report.version=='local-6.5' and report.physics_assist_enabled==false)
 assert(report.place==101880234193261 and #report.model_sha256==64)
 assert(report.saved_from.enabled==false and report.saved_from.last_stop_reason=='STOPPED by F8. F6 starts again.')
 assert(#report.trace>0 and #report.trace<=150 and report.profile=='turbo_soccer_standard')
@@ -464,6 +506,7 @@ assert(p.position[1]==120 and p.velocity[1]==200,'Legacy bridge scale changed')
         self.client_case('''
 move(.05);inputKey('F6')
 for i=1,220 do move(.02)end
+inputKey('F4');for i=1,20 do move(.02)end;inputKey('F4')
 inputKey('F8');click('Save physics report')
 local before=saved
 assert(before.model_name=='Nexto'and before.model_sha256=='bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa')

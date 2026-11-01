@@ -23,18 +23,24 @@ function Intercept.new(profile,arena,physics)
     return setmetatable({profile=profile,arena=arena,physics=physics,supportEnabled=false},Intercept)
 end
 function Intercept:reset()self.side=nil;self.last=nil;self.padTarget=nil;self.goalX=nil end
+function Intercept:goal(team)
+    if self.calibration then return self.calibration:goal(team)end
+    local a=self.profile.arena;local sign=team==0 and -1 or 1
+    return {origin={0,sign*a.EXTENT_Y,0},side={1,0,0},normal={0,sign,0},half_width=a.MOUTH_HALF_WIDTH,height=a.MOUTH_HEIGHT}
+end
 
 -- Rank ground-shot lanes against the observed defenders. Constant-velocity
 -- projections are a short tactical estimate, not a prediction of their actions.
 function Intercept:shotLane(packet,future,seconds)
-    local extent=self.profile.arena
-    local attack=packet.team==0 and 1 or -1
-    local preferred=math.clamp(future[1]*.25,-extent.MOUTH_HALF_WIDTH*.55,extent.MOUTH_HALF_WIDTH*.55)
-    local half=extent.MOUTH_HALF_WIDTH-(packet.ball_radius or self.profile.physics.BALL_RADIUS)-120
+    local goal=self:goal(1-packet.team)
+    local lateral=(future[1]-goal.origin[1])*goal.side[1]+(future[2]-goal.origin[2])*goal.side[2]
+    local carLateral=(packet.car.position[1]-goal.origin[1])*goal.side[1]+(packet.car.position[2]-goal.origin[2])*goal.side[2]
+    local preferred=math.clamp(lateral*.25,-goal.half_width*.55,goal.half_width*.55)
+    local half=goal.half_width-(packet.ball_radius or self.profile.physics.BALL_RADIUS)-120
     local function cost(x)
-        local dx,dy=x-future[1],attack*extent.EXTENT_Y-future[2]
+        local dx,dy=goal.origin[1]+goal.side[1]*x-future[1],goal.origin[2]+goal.side[2]*x-future[2]
         local length=max(1,sqrt(dx*dx+dy*dy))
-        local score=abs(x-preferred)*.015+(x-packet.car.position[1])^2*.000001
+        local score=abs(x-preferred)*.015+(x-carLateral)^2*.000001
         for _,other in ipairs(packet.other_cars or {})do
             if(other.team==0 or other.team==1)and other.team~=packet.team and other.position and other.position[3]<250 then
                 local velocity=other.velocity or {0,0,0}
@@ -172,11 +178,14 @@ function Intercept:step(packet,modelAction,now)
     end
     local trajectory=self.physics:predict(ball,radius,2.5)
     local attack=packet.team==0 and 1 or -1
+    local ownGoal=self:goal(packet.team)
     local danger=false
     for _,sample in ipairs(trajectory)do
         local p=sample.position
-        if p[2]*attack< -arena.EXTENT_Y+radius and abs(p[1])<arena.MOUTH_HALF_WIDTH-radius*.5
-            and p[3]<arena.MOUTH_HEIGHT+radius then danger=true;break end
+        local dx,dy=p[1]-ownGoal.origin[1],p[2]-ownGoal.origin[2]
+        if dx*ownGoal.normal[1]+dy*ownGoal.normal[2]>-radius
+            and abs(dx*ownGoal.side[1]+dy*ownGoal.side[2])<ownGoal.half_width-radius*.5
+            and p[3]-ownGoal.origin[3]<ownGoal.height+radius then danger=true;break end
     end
     local chosen,bestGap=nil,math.huge
     local travel=self:travel(car,packet.boost,2.5)
@@ -191,7 +200,9 @@ function Intercept:step(packet,modelAction,now)
     if not chosen then return nil end -- keep learned high-ball/wall decisions
     local future=chosen.position
     local goalX=self:shotLane(packet,future,chosen.time)
-    local dx,dy=unit(goalX-future[1],attack*arena.EXTENT_Y-future[2])
+    local goal=self:goal(1-packet.team)
+    local goalPoint={goal.origin[1]+goal.side[1]*goalX,goal.origin[2]+goal.side[2]*goalX,17}
+    local dx,dy=unit(goalPoint[1]-future[1],goalPoint[2]-future[2])
     local speed=sqrt(car.velocity[1]^2+car.velocity[2]^2)
     local preset=self.profile.car_presets[packet.car_preset or "standard"]or self.profile.car_presets.standard
     local front=preset.size[1]/2+preset.offset[1]
@@ -254,7 +265,7 @@ function Intercept:step(packet,modelAction,now)
     self.last={mode=mode,target=target,ball=table.clone(future),time=chosen.time,
         reachable=bestGap<=0,danger=danger,heading=angle,desired_speed=desired,action=action,
         boost_pad=pad and {position=table.clone(pad.position),is_big=pad.is_big}or nil,
-        goal_x=goalX,support=supportTarget~=nil,teammate_eta=teammateETA}
+        goal_x=goalX,goal_target=goalPoint,support=supportTarget~=nil,teammate_eta=teammateETA}
     self.physics.plan=self.last
     return action,mode
 end

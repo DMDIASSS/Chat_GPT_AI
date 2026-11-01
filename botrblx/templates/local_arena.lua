@@ -168,6 +168,7 @@ end
 function Arena:measureCar(model,root)
     self.lastMeasure=os.clock()
     local probe={selection_boxes=0,best_error=nil,candidates={}}
+    local sizeMatch,ambiguous=nil,false
     for _,part in ipairs(model:GetDescendants())do
         if part:IsA("BasePart")and part~=root then
             local box=part:FindFirstChildOfClass("SelectionBox")
@@ -179,17 +180,26 @@ function Arena:measureCar(model,root)
                 local offset={-localOffset.Z*k,localOffset.X*k,localOffset.Y*k}
                 if #probe.candidates<6 then probe.candidates[#probe.candidates+1]={size=measured,offset=offset}end
                 for name,config in pairs(self.profile.car_presets)do
+                    local sizeError=0
+                    for i=1,3 do sizeError=sizeError+abs(measured[i]-config.size[i])end
+                    if sizeError<.1 then
+                        if sizeMatch and sizeMatch~=name then ambiguous=true end
+                        sizeMatch=name
+                    end
                     local error=0
                     for i=1,3 do error=error+abs(measured[i]-config.size[i])+abs(offset[i]-config.offset[i])end
                     if not probe.best_error or error<probe.best_error then
                         probe.best_error=error;probe.closest_preset=name
                     end
-                    if error<1 then self.preset=name;self.hitboxVerified=true;self.hitboxProbe=probe;return end
+                    if error<1 then self.preset=name;self.sizeVerified=true;self.hitboxVerified=true;self.hitboxProbe=probe;return end
                 end
             end
         end
     end
-    self.preset="standard";self.hitboxVerified=false
+    self.sizeVerified=sizeMatch~=nil and not ambiguous
+    self.preset=self.sizeVerified and sizeMatch or "standard";self.hitboxVerified=false
+    probe.dimension_preset=self.sizeVerified and sizeMatch or nil
+    probe.offset_verified=false
     self.hitboxProbe=probe
 end
 

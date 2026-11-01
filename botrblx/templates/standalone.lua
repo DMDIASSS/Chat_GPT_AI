@@ -9,6 +9,9 @@
 -- LOCAL_PHYSICS_HERE
 -- LOCAL_INTERCEPT_HERE
 -- LOCAL_TIMING_HERE
+-- LOCAL_CALIBRATION_HERE
+-- LOCAL_GOAL_SAFETY_HERE
+-- LOCAL_WINDOW_HERE
 local PROFILE=
 -- ARENA_PROFILE_HERE
 local arenaAdapter=Arena.new(PROFILE)
@@ -17,6 +20,10 @@ local carReader=Cars.new(PROFILE,Arena)
 local kickoff=Kickoff.new(PROFILE)
 local physics=Physics.new(PROFILE,arenaAdapter)
 local intercept=Intercept.new(PROFILE,arenaAdapter,physics)
+local calibration=Calibration.new(PROFILE)
+intercept.calibration=calibration
+local safety=GoalSafety.new(PROFILE,arenaAdapter,physics,calibration)
+local safetyEnabled=true
 -- MODEL_SETTINGS_HERE
 local timing=Timing.new(15)
 local TEAM,manualTeam=nil,nil
@@ -28,40 +35,55 @@ carReader.teams=teamReader
 assert(not pg:FindFirstChild("Update271Standalone"),"Close the old standalone panel first")
 local gui=Instance.new("ScreenGui")
 gui.Name="Update271Standalone";gui.ResetOnSpawn=false;gui.DisplayOrder=1000072
-local panel=Instance.new("Frame",gui)
-panel.Size=UDim2.fromOffset(480,296);panel.Position=UDim2.fromOffset(20,20)
-panel.BackgroundColor3=Color3.fromRGB(18,22,30)
-local label=Instance.new("TextLabel",panel)
+local enabled=false
+local connections={}
+local function connect(signal,callback)
+    local connection=signal:Connect(callback);connections[#connections+1]=connection
+end
+local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.5 | F4 minimize')
+local panel=window.panel
+local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
+local label=Instance.new("TextLabel",main)
 label.Position=UDim2.fromOffset(10,8);label.Size=UDim2.new(1,-20,0,172)
 label.BackgroundTransparency=1;label.TextColor3=Color3.new(1,1,1)
 label.TextSize=14;label.Font=Enum.Font.Code;label.TextWrapped=true
 label.Text=MODEL_NAME.." LOCAL: loading model..."
-local start=Instance.new("TextButton",panel)
+local start=Instance.new("TextButton",main)
 start.Position=UDim2.fromOffset(10,185);start.Size=UDim2.fromOffset(150,30)
 start.Text="Start bot / F6";start.Active=false
-local teamButton=Instance.new("TextButton",panel)
+local teamButton=Instance.new("TextButton",main)
 teamButton.Position=UDim2.fromOffset(170,185);teamButton.Size=UDim2.fromOffset(140,30)
 teamButton.Text="Team: AUTO"
-local close=Instance.new("TextButton",panel)
+local close=Instance.new("TextButton",main)
 close.Position=UDim2.fromOffset(320,185);close.Size=UDim2.fromOffset(150,30);close.Text="Close"
-local physicsButton=Instance.new("TextButton",panel)
+local physicsButton=Instance.new("TextButton",main)
 physicsButton.Position=UDim2.fromOffset(10,222);physicsButton.Size=UDim2.fromOffset(220,28)
 physicsButton.Text=physicsEnabled and "Physics assist: ON"or "Physics assist: OFF"
-local reportButton=Instance.new("TextButton",panel)
+local reportButton=Instance.new("TextButton",main)
 reportButton.Position=UDim2.fromOffset(240,222);reportButton.Size=UDim2.fromOffset(230,28)
 reportButton.Text="Save physics report"
-local supportButton=Instance.new("TextButton",panel)
-supportButton.Position=UDim2.fromOffset(10,259);supportButton.Size=UDim2.fromOffset(460,28)
+local supportButton=Instance.new("TextButton",main)
+supportButton.Position=UDim2.fromOffset(10,259);supportButton.Size=UDim2.fromOffset(220,28)
 supportButton.Text="Yield to teammate: OFF"
+local calibrationButton=Instance.new('TextButton',main)
+calibrationButton.Position=UDim2.fromOffset(240,259);calibrationButton.Size=UDim2.fromOffset(230,28)
+calibrationButton.Text='Calibration / physics test'
+local safetyButton=Instance.new('TextButton',main)
+safetyButton.Position=UDim2.fromOffset(10,296);safetyButton.Size=UDim2.fromOffset(220,28);safetyButton.Text='Goal safety: ON'
+local markerLabel=Instance.new('TextLabel',main)
+markerLabel.Position=UDim2.fromOffset(240,296);markerLabel.Size=UDim2.fromOffset(230,28)
+markerLabel.BackgroundTransparency=1;markerLabel.TextColor3=Color3.new(1,1,1);markerLabel.Text='F9 marks a bad decision'
 gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
-local alive,enabled,ready,armAt=true,false,false,0
+local alive,ready,armAt=true,false,0
+local calibrating=false
+local calView,refreshCalibration,captureCalibration
 local lastStopReason,lastStopAt,lastReadReason
 local testingKeyboard=false
 local epoch=0
 local sampleAt,decisionAt,previousPeriod=nil,nil,nil
-local held,connections={},{}
+local held={}
 local pressLeft,releaseLeft,pressRight,releaseRight
 local activeWindow=isrbxactive or isgameactive
 local keyboard=Keyboard.new(input)
@@ -115,6 +137,11 @@ local function controls()
     physicsButton.Visible=not enabled and not testingKeyboard
     reportButton.Visible=not enabled and not testingKeyboard
     supportButton.Visible=not enabled and not testingKeyboard
+    calibrationButton.Visible=not enabled and not testingKeyboard
+    safetyButton.Visible=not enabled and not testingKeyboard
+    window.mini.Visible=not enabled
+    main.Visible=not calibrating
+    if calView then calView.Visible=calibrating end
 end
 local function runtimeSnapshot(now)
     local keys={};for _,key in ipairs(order)do if held[key]then keys[#keys+1]=key end end
@@ -141,12 +168,15 @@ local function saveReport(filename,savedFrom)
     report.performance=timing:report()
     report.performance.last_active_age=timing.last and os.clock()-timing.last.time or nil
     report.jump_events=physics.jumpEvents or {}
+    report.goal_safety_enabled=safetyEnabled;report.goal_safety=safety.last
+    report.calibration=calibration:report();report.incidents=physics.incidents or {}
     report.control_requirements={default_keyboard_bindings=true,invertPitch=false,aerialSafety=false}
     report.model_sha256="__MODEL_SHA__";report.place=game.PlaceId
     local body=game:GetService("HttpService"):JSONEncode(report)
     writefile(filename,body)
 end
 local function toggle()
+    if calibrating then calibration.message='Close calibration before starting the bot';return end
     if not ready then return end
     if enabled or testingKeyboard then stop("LOCAL paused. F6 starts; F8 stops.");return end
     epoch=epoch+1
@@ -176,9 +206,6 @@ local function toggle()
         physics:mark("start",os.clock(),"keyboard verified")
     end)
 end
-local function connect(signal,callback)
-    local connection=signal:Connect(callback);connections[#connections+1]=connection
-end
 start.Activated:Connect(toggle)
 teamButton.Activated:Connect(function()
     stop();manualTeam=manualTeam==nil and 0 or(manualTeam==0 and 1 or nil)
@@ -197,6 +224,107 @@ supportButton.Activated:Connect(function()
     label.Text=intercept.supportEnabled and "Ground assist may yield to a nearby, aligned teammate actively approaching the ball."
         or "Scripted teammate yielding disabled. F6 starts."
 end)
+safetyButton.Activated:Connect(function()
+    stop();safetyEnabled=not safetyEnabled
+    safetyButton.Text=safetyEnabled and 'Goal safety: ON'or 'Goal safety: OFF'
+    label.Text=safetyEnabled and 'Conservative ground goal guards enabled.'or 'Goal guards disabled. F6 starts.'
+end)
+do
+    calView=Instance.new('Frame',window.body);calView.Name='Calibration';calView.Visible=false
+    calView.Size=UDim2.fromScale(1,1);calView.BackgroundTransparency=1
+    local function button(text,x,y,w,callback)
+        local b=Instance.new('TextButton',calView);b.Text=text;b.Position=UDim2.fromOffset(x,y);b.Size=UDim2.fromOffset(w,28)
+        connect(b.Activated,function()
+            local ok,err=pcall(callback)
+            if not ok then calibration.message=tostring(err)end
+            refreshCalibration(os.clock())
+        end)
+        return b
+    end
+    local function text(y,h,size)
+        local t=Instance.new('TextLabel',calView);t.Position=UDim2.fromOffset(10,y);t.Size=UDim2.fromOffset(460,h)
+        t.BackgroundTransparency=1;t.TextColor3=Color3.new(1,1,1);t.TextWrapped=true;t.Font=Enum.Font.Code;t.TextSize=size
+        return t
+    end
+    local title=text(39,28,14);local instruction=text(70,92,12)
+    button('Goal landmarks',10,4,220,function()calibration.tab='geometry';calibration.message=nil end)
+    button('Motion / physics test',240,4,230,function()calibration.tab='motion';calibration.message=nil end)
+    local reference=button('Reference: front bumper',10,166,460,function()
+        calibration.reference=calibration.reference=='bumper'and 'center'or 'bumper'
+    end)
+    captureCalibration=function()
+        if calibration.tab=='motion'then
+            if calibration.recordingUntil then calibration.recordingUntil=nil;calibration:summarizeMotion()
+            else calibration:startMotion(os.clock())end
+        else calibration:capture()end
+        calibration.message=nil
+    end
+    local capture=button('Capture point',10,203,220,captureCalibration)
+    local back=button('Back',240,203,110,function()calibration:back();calibration.message=nil end)
+    button('Reset',360,203,110,function()
+        if calibration.tab=='motion'then
+            calibration.motion=nil;calibration.recordingUntil=nil
+            physics.gravity=PROFILE.physics.GRAVITY_Z;physics.observedGravity=nil;physics.gravitySamples={};physics:reset()
+        else calibration:begin();calibration.active=nil end
+        calibration.message='Calibration reset to the saved defaults'
+    end)
+    local apply=button('Apply goal measurements',10,240,460,function()
+        if calibration.tab=='motion'then
+            assert(not calibration.recordingUntil,'Finish recording first')
+            local result=calibration:summarizeMotion()
+            assert(result and result.gravity_consistent,'Need at least six consistent isolated airborne samples; launch the ball and record again')
+            physics.gravity=result.gravity;physics.observedGravity=result.gravity;physics:reset()
+            calibration.message=string.format('Applied gravity %.1f; masses and actor unchanged',result.gravity)
+        else
+            local data=calibration:apply();safety.last=nil
+            intercept:reset();calibration.message='Applied to goal guards and optional ground aiming: '..data.summary
+        end
+    end)
+    button('Save test file',10,277,150,function()
+        assert(type(writefile)=='function','Executor writefile is unavailable')
+        writefile('TurboBall_Calibration.json',game:GetService('HttpService'):JSONEncode(calibration:export()))
+        calibration.message='Saved TurboBall_Calibration.json in the executor workspace'
+    end)
+    button('Load test file',170,277,150,function()
+        assert(type(readfile)=='function','Executor readfile is unavailable')
+        local data=readfile('TurboBall_Calibration.json');assert(#data<5000000,'Calibration file is too large')
+        calibration:load(game:GetService('HttpService'):JSONDecode(data))
+        calibration.message='Loaded measurements; review and Apply to use them'
+    end)
+    button('Close test',330,277,140,function()
+        calibration.recordingUntil=nil;if calibration.motion then calibration:summarizeMotion()end
+        calibrating=false;controls()
+    end)
+    refreshCalibration=function(now)
+        local geometry=calibration.tab=='geometry'
+        reference.Visible=geometry;back.Visible=geometry
+        reference.Text=calibration.reference=='bumper'and 'Reference: front bumper contact'or 'Reference: car centre on marker'
+        if geometry then
+            local step=Calibration.steps[calibration.index]
+            title.Text=step and string.format('%d/9  %s',calibration.index,step[2])or '9/9  Review goal measurements'
+            local message=step and step[3]or(calibration.candidate and calibration.candidate.summary or 'Capture every landmark before applying')
+            if calibration.reference=='center'and step and step[1]~='center'then message='Place the CAR CENTRE directly on the geometric marker; no bumper offset will be added.'end
+            local last=calibration.history[#calibration.history]
+            local body=last and ('\nBody: '..last.preset..(last.verified and ' verified'or ' / source offsets'))or ''
+            instruction.Text=message..body..'\n'..(calibration.message or 'Hold still. F10 captures; F4 minimizes this window.')
+            capture.Text='Capture point';apply.Text='Apply goal measurements'
+        else
+            title.Text='20-second manual physics recording'
+            local result=calibration.motion and calibration.motion.summary
+            local status=calibration.recordingUntil and string.format('Recording: %.0f s left',math.max(0,calibration.recordingUntil-now))
+                or(result and string.format('%d samples | gravity %s | acceleration %s',result.samples,
+                    result.gravity_consistent and string.format('%.1f',result.gravity)or 'needs clear flight',
+                    result.ground_acceleration_median and string.format('%.0f',result.ground_acceleration_median)or 'not measured')or 'Ready')
+            instruction.Text='In freeplay: drive straight, brake, then launch the ball into clear flight. You drive; the bot stays paused.\n'..status..'\n'..(calibration.message or 'Landmarks measure geometry. Motion samples do not identify masses.')
+            capture.Text=calibration.recordingUntil and 'Finish recording'or 'Record 20 seconds';apply.Text='Apply consistent gravity estimate'
+        end
+    end
+    calibrationButton.Activated:Connect(function()
+        stop('Calibration: bot paused for manual placement')
+        if not calibration.started then calibration:begin();calibration.started=true end
+        calibrating=true;controls();refreshCalibration(os.clock())
+    end)
+end
 reportButton.Activated:Connect(function()
     local savedFrom=runtimeSnapshot(os.clock())
     stop("Paused to save physics report.")
@@ -208,7 +336,22 @@ reportButton.Activated:Connect(function()
 end)
 connect(input.InputBegan,function(key,processed)
     if key.KeyCode==Enum.KeyCode.F8 then stop("STOPPED by F8. F6 starts again.")
-    elseif not processed and key.KeyCode==Enum.KeyCode.F6 then toggle()end
+    elseif not processed then
+        if key.KeyCode==Enum.KeyCode.F6 then toggle()
+        elseif key.KeyCode==Enum.KeyCode.F4 then window:toggle()
+        elseif key.KeyCode==Enum.KeyCode.F10 and calibrating then
+            local ok,err=pcall(captureCalibration)
+            if not ok then calibration.message=tostring(err)end
+            refreshCalibration(os.clock())
+        elseif key.KeyCode==Enum.KeyCode.F9 then
+            local rows={};local now=os.clock()
+            for _,row in ipairs(physics.trace)do if now-row.time<=8 then rows[#rows+1]=row end end
+            physics.incidents=physics.incidents or {}
+            physics.incidents[#physics.incidents+1]={time=now,trace=rows,decision=physics.decision,goal_safety=safety.last}
+            if #physics.incidents>2 then table.remove(physics.incidents,1)end
+            physics:mark('Incident marker',now,#rows..' recent poses retained')
+        end
+    end
 end)
 connect(input.WindowFocusReleased,function()focus=false;stop("Paused: Roblox lost focus. F6 restarts.")end)
 connect(input.WindowFocused,function()focus=true end)
@@ -259,7 +402,7 @@ task.spawn(function()
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=(MODEL_NAME.." LOCAL v6.4 ready | model self-test passed\nModel __MODEL_SHA__\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
+        label.Text=(MODEL_NAME.." LOCAL v6.5 ready | model self-test passed\nModel __MODEL_SHA__\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
             :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")
         local lastTick,lastUi=os.clock(),-math.huge
         local busy=false
@@ -290,6 +433,13 @@ task.spawn(function()
                 local observeAt=os.clock()
                 physics:observe(packet,now)
                 local observeMs=(os.clock()-observeAt)*1000
+                if calibrating then
+                    local keys={}
+                    for _,name in ipairs({'W','S'})do keys[name]=input:IsKeyDown(Enum.KeyCode[name])end
+                    keys.LMB=input:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                    calibration:observe(packet,now,keys,physics)
+                    refreshCalibration(now)
+                end
                 if not enabled or now<armAt then return end
                 stage="verifying keyboard"
                 local keyboardOk,keyboardReason=keyboard:verify()
@@ -326,7 +476,7 @@ task.spawn(function()
                 lastGround=ground
                 local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<PROFILE.physics.DOUBLEJUMP_MAX_DELAY))
                 local action=override
-                local modelMs,planningMs,entityCount=0,0,0
+                local modelMs,planningMs,entityCount,safetyMs=0,0,0,0
                 local modelRan=false
                 physics.plan=nil
                 if not action then
@@ -356,6 +506,15 @@ task.spawn(function()
                             if assisted then action,recovery=assisted,mode end
                         end
                     end
+                end
+                local proposed=table.clone(action)
+                safety.last=nil
+                if modelRan and safetyEnabled then
+                    stage='ground goal safety'
+                    local safetyAt=os.clock()
+                    local guarded,mode=safety:step(packet,action,now)
+                    safetyMs=(os.clock()-safetyAt)*1000
+                    if guarded then action,recovery=guarded,mode end
                 end
                 stage="mapping inputs"
                 local wanted,actual=Policy.keys(action,ground)
@@ -394,15 +553,16 @@ task.spawn(function()
                 assert(inputMs<200,"Executor input calls exceeded 200ms")
                 physics.decision={time=now,mode=recovery or "model",milliseconds=inferenceMs,
                     input_milliseconds=inputMs,action=table.clone(actual),model_milliseconds=modelMs,
-                    planning_milliseconds=planningMs,model_ran=modelRan,entity_count=entityCount}
+                    planning_milliseconds=planningMs,model_ran=modelRan,entity_count=entityCount,
+                    proposed_action=proposed,goal_safety=safety.last,goal_safety_milliseconds=safetyMs}
                 timing:record({time=now,model_ran=modelRan,entities=entityCount,pose_ms=poseMs,observe_ms=observeMs,
-                    model_ms=modelMs,planning_ms=planningMs,decision_ms=inferenceMs,input_ms=inputMs,schedule_late_ms=late*1000})
+                    model_ms=modelMs,planning_ms=planningMs,safety_ms=safetyMs,decision_ms=inferenceMs,input_ms=inputMs,schedule_late_ms=late*1000})
                 previous=actual;rate=timing.rate
                 if now-lastUi>=.2 then
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=(MODEL_NAME.." v6.4 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=(MODEL_NAME.." v6.5 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -429,4 +589,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.4"}
+return {started=true,version="local-6.5"}

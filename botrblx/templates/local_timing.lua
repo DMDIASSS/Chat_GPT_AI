@@ -24,7 +24,7 @@ end
 function Timing:report()
     local out={target_hz=self.target,decision_hz=self.rate,samples=#self.samples,last=self.last,
         model_calls=0,fields={}}
-    for _,key in ipairs({'pose_ms','observe_ms','model_ms','planning_ms','decision_ms','input_ms','schedule_late_ms','entities'})do
+    for _,key in ipairs({'pose_ms','observe_ms','model_ms','planning_ms','safety_ms','decision_ms','input_ms','schedule_late_ms','entities'})do
         local sum,peak=0,0
         for _,sample in ipairs(self.samples)do local n=sample[key]or 0;sum=sum+n;peak=math.max(peak,n)end
         out.fields[key]={mean=sum/math.max(1,#self.samples),max=peak}

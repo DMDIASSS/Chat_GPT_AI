@@ -25,12 +25,12 @@ local function event()
   local c={enabled=true};function c:Disconnect()self.enabled=false end
   table.insert(self.listeners,{connection=c,callback=callback});return c
  end
- function e:Fire()for _,v in ipairs(self.listeners)do if v.connection.enabled then v.callback()end end end
+ function e:Fire(...)for _,v in ipairs(self.listeners)do if v.connection.enabled then v.callback(...)end end end
  return e
 end
 local created={}
 local function object(class,name)
- local o={ClassName=class,Name=name or class,children={},Activated=event()}
+ local o={ClassName=class,Name=name or class,children={},Activated=event(),InputBegan=event(),InputChanged=event(),InputEnded=event()}
  function o:GetDescendants()local a={} local function add(parent)for _,child in pairs(parent.children)do a[#a+1]=child;add(child)end end add(self);return a end
  function o:GetChildren()local a={} for _,child in pairs(self.children)do a[#a+1]=child end return a end
  function o:IsA(c)return self.ClassName==c or c=='BasePart'and self.ClassName=='Part'end
@@ -56,8 +56,10 @@ local beat=event()
 local services={Players={LocalPlayer=player},Workspace=workspace,RunService={Heartbeat=beat}}
 local game={PlaceId=101880234193261}
 function game:GetService(name)assert(services[name],'Unexpected service '..name);return services[name]end
-local Instance={new=function(class)local o=object(class);created[#created+1]=o;return o end}
-local UDim2={new=function()return {}end,fromOffset=function()return {}end,fromScale=function()return {}end}
+local Instance={new=function(class,parent)local o=object(class);if parent then o.Parent=parent end;created[#created+1]=o;return o end}
+local UDim2={new=function(xs,xo,ys,yo)return {X={Scale=xs,Offset=xo},Y={Scale=ys,Offset=yo}}end,
+ fromOffset=function(x,y)return {X={Scale=0,Offset=x},Y={Scale=0,Offset=y}}end,
+ fromScale=function(x,y)return {X={Scale=x,Offset=0},Y={Scale=y,Offset=0}}end}
 local Color3={new=function()return {}end,fromRGB=function()return {}end}
 local Enum={Font={Code=1},TextXAlignment={Left=1},TextYAlignment={Top=1}}
 local require=function()error('Probe must not load any game modules')end
@@ -84,7 +86,7 @@ local task={wait=function(dt)
 end}
 
 Enum.KeyCode={W='W',S='S',A='A',D='D',Q='Q',E='E',LeftShift='LeftShift'}
-Enum.UserInputType={MouseButton1='MouseButton1',MouseButton2='MouseButton2'}
+Enum.UserInputType={MouseButton1='MouseButton1',MouseButton2='MouseButton2',MouseMovement='MouseMovement',Touch='Touch'}
 services.UserInputService={GetFocusedTextBox=function()return nil end,
  IsKeyDown=function(self,key)return key=='LeftShift'and now>=10 and now<20 end,
  IsMouseButtonPressed=function(self,key)return key=='MouseButton1'and now<50 end}
@@ -104,7 +106,10 @@ local function move(dt)
 end
 
 Enum.KeyCode.F6='F6';Enum.KeyCode.F8='F8'
+Enum.KeyCode.F4='F4';Enum.KeyCode.F9='F9'
+Enum.KeyCode.F10='F10'
 services.UserInputService.InputBegan=event()
+services.UserInputService.InputChanged=event();services.UserInputService.InputEnded=event()
 local packets={}
 local encoded={hello={protocol=1,token='local-test-token'}}
 local counter=0
