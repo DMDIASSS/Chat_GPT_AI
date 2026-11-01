@@ -214,15 +214,18 @@ function Policy.actions()
 end
 
 function Policy.keys(action,ground)
-    local t=ground and action[1]or -action[3]
-    local s=ground and action[2]or action[4]
+    -- Wheel-ray contact can remain true near takeoff/landing. Jump direction
+    -- must retain the actor's pitch/yaw even when that estimate says grounded.
+    local air=not ground or action[6]~=0
+    local t=air and -action[3]or action[1]
+    local s=air and action[4]or action[2]
     local keys={}
     if t>.5 then keys.W=true elseif t<-.5 then keys.S=true end
     if s>.5 then keys.D=true elseif s<-.5 then keys.A=true end
     if action[5]>.5 then keys.E=true elseif action[5]<-.5 then keys.Q=true end
     if action[6]~=0 then keys.RMB=true end
     if action[7]~=0 then keys.LMB=true end
-    if action[8]~=0 and ground then keys.SHIFT=true end
+    if action[8]~=0 and not air then keys.SHIFT=true end
     t=(keys.W and 1 or 0)-(keys.S and 1 or 0)
     s=(keys.D and 1 or 0)-(keys.A and 1 or 0)
     local r=(keys.E and 1 or 0)-(keys.Q and 1 or 0)
@@ -276,6 +279,12 @@ function Keyboard:observed()
     local observed={}
     for _,key in ipairs(names)do if self.input:IsKeyDown(codes[key])then observed[#observed+1]=key end end
     return table.concat(observed," ")
+end
+function Keyboard:matches(wanted)
+    for _,key in ipairs(names)do
+        if self.input:IsKeyDown(codes[key])~=(wanted[key]==true)then return false,key end
+    end
+    return true
 end
 
 function Keyboard:verify()
@@ -1219,7 +1228,7 @@ function Physics:observe(packet,now)
 end
 
 function Physics:report()
-    return {version="local-6.3",profile=self.profile.name,units="simulation units; seconds",
+    return {version="local-6.4",profile=self.profile.name,units="simulation units; seconds",
         studs_per_unit=self.profile.roblox_studs_per_sim_unit,arena=self.profile.arena,
         saved_physics=self.profile.physics,gravity_used=self.gravity,observed_gravity=self.observedGravity,
         gravity_samples=#self.gravitySamples,flight_position_error_median=self.error,
@@ -1597,6 +1606,7 @@ local keyboardKey={W=true,S=true,A=true,D=true,Q=true,E=true,SHIFT=true}
 local order={"W","S","A","D","Q","E","SHIFT","LMB","RMB"}
 local previous=table.create(8,0)
 local jumpAt,usedFlip,lastGround=nil,false,true
+local pendingJump=nil
 local focus=true
 local function event(key,down)
     if keyboardKey[key]then keyboard:event(key,down)
@@ -1611,11 +1621,29 @@ local function release()
         end
     end
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
+    pendingJump=nil
     keyboard:release()
     arenaAdapter:resetRecovery()
     kickoff:reset()
     intercept:reset();physics.plan=nil
     decisionAt=nil;previousPeriod=nil
+end
+local function pressOwned(key,expectedEpoch)
+    if epoch~=expectedEpoch or not enabled or not alive or not focus then release();return false end
+    held[key]=true;event(key,true)
+    if epoch~=expectedEpoch or not enabled or not alive or not focus then
+        -- A yielding press may finish after F8 already released the key.
+        held[key]=true;release();return false
+    end
+    return true
+end
+local function recordJump(request,now)
+    if request.ground then jumpAt=now else usedFlip=true end
+    local events=physics.jumpEvents or {};physics.jumpEvents=events
+    local actual=table.clone(request.actual);actual[6]=1
+    events[#events+1]={time=now,requested=table.clone(request.action),mapped=actual,
+        ground_estimate=request.ground,observed_keys=keyboard:observed(),wait_ms=(now-request.at)*1000}
+    if #events>24 then table.remove(events,1)end
 end
 local function controls()
     start.Visible=not enabled and not testingKeyboard
@@ -1631,7 +1659,8 @@ local function runtimeSnapshot(now)
         or(enabled and(now<armAt and "arming"or(lastReadReason and "waiting"or "running"))or "paused"))
     return {enabled=enabled,ready=ready,phase=phase,focused=focus,keyboard=keyboard.name,
         keyboard_observed=keyboard:observed(),held_inputs=keys,last_stop_reason=lastStopReason,
-        last_stop_time=lastStopAt,read_reason=lastReadReason,time=now}
+        last_stop_time=lastStopAt,read_reason=lastReadReason,time=now,
+        pending_jump=pendingJump~=nil,pending_jump_age=pendingJump and now-pendingJump.at or nil}
 end
 local function stop(reason)
     epoch=epoch+1;enabled=false;testingKeyboard=false;release();controls()
@@ -1648,6 +1677,8 @@ local function saveReport(filename,savedFrom)
     report.teammate_yield_enabled=intercept.supportEnabled;report.model_name=MODEL_NAME
     report.performance=timing:report()
     report.performance.last_active_age=timing.last and os.clock()-timing.last.time or nil
+    report.jump_events=physics.jumpEvents or {}
+    report.control_requirements={default_keyboard_bindings=true,invertPitch=false,aerialSafety=false}
     report.model_sha256="bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa";report.place=game.PlaceId
     local body=game:GetService("HttpService"):JSONEncode(report)
     writefile(filename,body)
@@ -2027,7 +2058,7 @@ task.spawn(function()
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=(MODEL_NAME.." LOCAL v6.3 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
+        label.Text=(MODEL_NAME.." LOCAL v6.4 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
             :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")
         local lastTick,lastUi=os.clock(),-math.huge
         local busy=false
@@ -2064,6 +2095,21 @@ task.spawn(function()
                 assert(keyboardOk,keyboardReason)
                 if not packet then
                     release();label.Text="LOCAL waiting: "..tostring(reason);return
+                end
+                if pendingJump then
+                    stage="waiting for jump direction keys"
+                    local matched,key=keyboard:matches(pendingJump.keys)
+                    assert(now-pendingJump.at<.15,"Jump direction did not reach Roblox: "..tostring(key))
+                    if not matched then return end
+                    local request=pendingJump
+                    stage="pressing deferred RMB"
+                    local inputAt=os.clock()
+                    if not pressOwned("RMB",request.epoch)then return end
+                    assert(os.clock()-inputAt<.2,"Executor input calls exceeded 200ms")
+                    recordJump(request,os.clock());pendingJump=nil
+                    previous=table.clone(previous);previous[6]=1
+                    -- Give the game a frame to consume the rising jump edge.
+                    return
                 end
                 stage="kickoff"
                 local override,recovery=kickoff:step(packet,now,pg)
@@ -2119,25 +2165,29 @@ task.spawn(function()
                     or input:IsKeyDown(Enum.KeyCode.F8)or(activeWindow and not activeWindow())then
                     stop("LOCAL stopped before applying inputs");return
                 end
-                if actual[6]==1 and previous[6]==0 then
-                    if ground then jumpAt=now else usedFlip=true end
-                end
                 local inputAt=os.clock()
                 stage="releasing inputs"
                 for _,key in ipairs(order)do
                     if held[key]and not wanted[key]then event(key,false);held[key]=nil end
                 end
                 for _,key in ipairs(order)do
-                    if wanted[key]and not held[key]then
+                    if key~="RMB"and wanted[key]and not held[key]then
                         stage="pressing "..key
-                        held[key]=true;event(key,true)
-                        if epoch~=decisionEpoch or not enabled or not focus then
-                            -- A yielding press can complete after F8 already released it.
-                            held[key]=true;release();return
-                        end
+                        if not pressOwned(key,decisionEpoch)then return end
                         assert(os.clock()-inputAt<.2,"Executor input calls exceeded 200ms")
                     end
                 end
+                if wanted.RMB and not held.RMB then
+                    local request={keys=wanted,action=table.clone(action),actual=table.clone(actual),
+                        ground=ground,at=os.clock(),epoch=decisionEpoch}
+                    stage="checking jump direction keys"
+                    if keyboard:matches(wanted)then
+                        stage="pressing RMB"
+                        if not pressOwned("RMB",decisionEpoch)then return end
+                        recordJump(request,os.clock())
+                    else pendingJump=request end
+                end
+                actual[6]=held.RMB and 1 or 0
                 local inputMs=(os.clock()-inputAt)*1000
                 stage="input timing"
                 assert(inputMs<200,"Executor input calls exceeded 200ms")
@@ -2151,7 +2201,7 @@ task.spawn(function()
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=(MODEL_NAME.." v6.3 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=(MODEL_NAME.." v6.4 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -2178,4 +2228,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.3"}
+return {started=true,version="local-6.4"}

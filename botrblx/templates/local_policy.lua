@@ -205,15 +205,18 @@ function Policy.actions()
 end
 
 function Policy.keys(action,ground)
-    local t=ground and action[1]or -action[3]
-    local s=ground and action[2]or action[4]
+    -- Wheel-ray contact can remain true near takeoff/landing. Jump direction
+    -- must retain the actor's pitch/yaw even when that estimate says grounded.
+    local air=not ground or action[6]~=0
+    local t=air and -action[3]or action[1]
+    local s=air and action[4]or action[2]
     local keys={}
     if t>.5 then keys.W=true elseif t<-.5 then keys.S=true end
     if s>.5 then keys.D=true elseif s<-.5 then keys.A=true end
     if action[5]>.5 then keys.E=true elseif action[5]<-.5 then keys.Q=true end
     if action[6]~=0 then keys.RMB=true end
     if action[7]~=0 then keys.LMB=true end
-    if action[8]~=0 and ground then keys.SHIFT=true end
+    if action[8]~=0 and not air then keys.SHIFT=true end
     t=(keys.W and 1 or 0)-(keys.S and 1 or 0)
     s=(keys.D and 1 or 0)-(keys.A and 1 or 0)
     local r=(keys.E and 1 or 0)-(keys.Q and 1 or 0)

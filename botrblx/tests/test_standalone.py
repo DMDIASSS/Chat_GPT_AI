@@ -1,6 +1,7 @@
 """Numerical and control-lifecycle checks for the actual standalone Lua runtime."""
 import copy
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -106,6 +107,21 @@ print('OBS_AND_INPUT_OK')
 '''
         self.assertIn("OBS_AND_INPUT_OK",self.run_lua(source))
 
+    def test_jump_axes_match_numeric_reference_from_game_control_mapper(self):
+        cases=json.loads((HERE/'fixtures/jump_reference.json').read_text())['cases']
+        self.assertEqual(len(cases),36)
+        source=self.module+'\nlocal cases='+export.literal(cases)+'''
+for _,case in ipairs(cases)do
+ local keys,a=Policy.keys(case.action,case.ground)
+ for key in pairs(case.keys)do assert(keys[key])end
+ for key in pairs(keys)do assert(case.keys[key])end
+ local n=case.native_axes
+ assert(a[2]==n[1]and a[4]==n[2]and a[3]==n[3]and a[5]==n[4],'Jump axes differ from game controls')
+ assert(a[3]==case.action[3]and a[4]+a[5]==case.action[4]+case.action[5],'Requested flip direction changed')
+end
+'''
+        self.run_lua(source)
+
     def client_case(self,behaviour,checks,extra="",source=None):
         prefix=(HERE/"fixtures/roblox_mock.luau").read_text(encoding="utf-8")
         extra='''
@@ -139,7 +155,7 @@ task.wait=function(dt)move(dt)end
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-6.3')
+assert(result.version=='local-6.4')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -318,7 +334,7 @@ inputKey('F6');for i=1,30 do move(1/30)end
 inputKey('F8');click('Save physics report')
 assert(savedName=='TurboBall_Physics_Report.json' and savedReport,'Report was not written')
 local report=encoded[savedReport]
-assert(report.version=='local-6.3' and report.physics_assist_enabled==false)
+assert(report.version=='local-6.4' and report.physics_assist_enabled==false)
 assert(report.place==101880234193261 and #report.model_sha256==64)
 assert(report.saved_from.enabled==false and report.saved_from.last_stop_reason=='STOPPED by F8. F6 starts again.')
 assert(#report.trace>0 and #report.trace<=150 and report.profile=='turbo_soccer_standard')
@@ -483,6 +499,78 @@ frame=function(x)
  return out
 end
 ''')
+
+    def flip_source(self):
+        return self.source.replace('local index=predict(query,entities)','local index=forcedIndex')
+
+    def flip_setup(self,delay):
+        actions=bridge.lookup_table()
+        ground=next(i+1 for i,a in enumerate(actions)if a.tolist()==[1,1,0,1,0,0,0,0])
+        back=next(i+1 for i,a in enumerate(actions)if a.tolist()==[0,0,1,0,0,1,0,1])
+        return f'local forcedIndex={ground};local backIndex={back}\n'+'''
+local delayLive=false
+local queued={};local jumpCount=0;local saved
+local originalMove=move
+move=function(dt)
+ for i=#queued,1,-1 do
+  if queued[i].at<=now+dt then physicalDown[queued[i].key]=queued[i].down or nil;table.remove(queued,i)end
+ end
+ originalMove(dt)
+end
+keypress=function(key)
+ local name=virtualCodes[key]or key
+ emit('down',key)
+ if delayLive then
+  if LIVE_DELAY>=0 then queued[#queued+1]={at=now+LIVE_DELAY,key=name,down=true}end
+ else physicalDown[name]=true end
+end
+keyrelease=function(key)
+ local name=virtualCodes[key]or key
+ emit('up',key)
+ if delayLive and LIVE_DELAY>=0 then queued[#queued+1]={at=now+LIVE_DELAY,key=name,down=false}
+ else physicalDown[name]=nil end
+end
+mouse2press=function()
+ jumpCount+=1
+ assert(physicalDown.S and not physicalDown.W,'Jump arrived without backflip pitch')
+ assert(not physicalDown.D and not physicalDown.A and not physicalDown.Q and not physicalDown.E and not physicalDown.LeftShift,'Jump arrived with stale sideways input')
+ emit('down','RMB')
+end
+writefile=function(_,body)saved=encoded[body]end
+'''.replace('LIVE_DELAY',str(delay))
+
+    def test_backflip_waits_for_queued_direction_release_and_press(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,20 do move(.02)end
+assert(physicalDown.D,'Test did not establish the previous steering input')
+forcedIndex=backIndex;delayLive=true
+for i=1,12 do move(.02)end
+assert(jumpCount==1,'Deferred jump was lost or repeated')
+inputKey('F8');click('Save physics report')
+local jump=saved.jump_events[#saved.jump_events]
+assert(jump.requested[3]==1 and jump.mapped[3]==1 and jump.mapped[4]+jump.mapped[5]==0)
+assert(jump.wait_ms>0 and jump.wait_ms<150)
+''',"click('Close')",extra=self.flip_setup(.04),source=self.flip_source())
+
+    def test_f8_cancels_queued_jump_before_axis_acknowledgment(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,20 do move(.02)end
+forcedIndex=backIndex;delayLive=true
+for i=1,4 do move(.02)end
+assert(jumpCount==0)
+inputKey('F8');for i=1,20 do move(.02)end
+assert(jumpCount==0,'Pending jump fired after F8')
+''',"click('Close')",extra=self.flip_setup(.1),source=self.flip_source())
+
+    def test_lost_direction_acknowledgment_stops_before_wrong_flip(self):
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,20 do move(.02)end
+forcedIndex=backIndex;delayLive=true
+for i=1,20 do move(.02)end
+assert(jumpCount==0,'Jump fired with missing direction keys')
+assert(saved and saved.last_error and saved.last_error.stage=='waiting for jump direction keys')
+assert(string.find(saved.last_error.reason,'Jump direction did not reach Roblox',1,true))
+''',"click('Close')",extra=self.flip_setup(-1),source=self.flip_source())
 
 
 if __name__=="__main__": unittest.main()

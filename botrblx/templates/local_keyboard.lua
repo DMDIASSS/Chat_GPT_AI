@@ -41,6 +41,12 @@ function Keyboard:observed()
     for _,key in ipairs(names)do if self.input:IsKeyDown(codes[key])then observed[#observed+1]=key end end
     return table.concat(observed," ")
 end
+function Keyboard:matches(wanted)
+    for _,key in ipairs(names)do
+        if self.input:IsKeyDown(codes[key])~=(wanted[key]==true)then return false,key end
+    end
+    return true
+end
 
 function Keyboard:verify()
     local keys=self.selected and self.owned[self.selected]

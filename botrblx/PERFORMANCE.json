@@ -1,5 +1,5 @@
 {
-  "version": "local-6.3",
+  "version": "local-6.4",
   "date": "2026-11-01",
   "original_nexto": {
     "name": "Nexto",
@@ -43,7 +43,8 @@
       }
     ],
     "reference_cases_compared": 12,
-    "max_logit_difference_between_kernels": 0
+    "max_logit_difference_between_kernels": 0,
+    "measured_version": "local-6.3"
   },
   "ground_planner_benchmark": {
     "runtime": "Cloud Luau CLI",
@@ -51,10 +52,11 @@
     "previous_ms": 0.9896473668050021,
     "current_ms": 0.5491525002677614,
     "same_ground_action": true,
-    "model_inference_included": false
+    "model_inference_included": false,
+    "measured_version": "local-6.3"
   },
   "validation": {
-    "tests_passed": 148,
+    "tests_passed": 154,
     "tests_failed": 0,
     "tests_skipped": 0,
     "prebuilt_luau_compile": true,
@@ -75,7 +77,10 @@
     "Skip discarded inference during far ground overrides and recovery; retain near-ball actor jump decisions",
     "Reuse travel integration across ground interception candidates",
     "Scripted teammate yielding defaults off and optional yielding requires active, aligned approach",
-    "Retain active-run trace while paused and capture separate phase timings and latest pose"
+    "Retain active-run trace while paused and capture separate phase timings and latest pose",
+    "Prioritize requested pitch/yaw on jumps despite lingering wheel-contact estimates; omit Shift during jumps",
+    "Require observed direction-key state before a new jump edge; cancel or time out deferred jumps safely",
+    "Report intended and mapped jump actions, observed keys and direction-delivery wait time"
   ],
   "limits": [
     "Measured cloud speedups do not guarantee a particular FPS, decision rate or win rate on the user PC.",
@@ -86,15 +91,25 @@
     "file_transport.lua": "6cea0e28784191461f21b2b425be96134e32b5a99cf4820d9ffc07e3b7e5d3d2",
     "local_arena.lua": "f89bfe48ccd8b49cae0f021c69aaaaaf79c56ddbf1e6ee1405aad3288dcf946f",
     "local_kickoff.lua": "15488463581aaa45e51df05e1fcc7aaeb210e3c4b8f1ef9f411c6b550a855014",
-    "local_keyboard.lua": "96f7f89de55b8023753efd7443289c19276861acdf7d02306b1f4db402053c91",
+    "local_keyboard.lua": "76f0f8eed707da8befdafd3248c0f60da7e8fa760248763b8a34ba9c9657ff4a",
     "local_pads.lua": "8df26791b386d58d114b195b865c6bf2e744a011d1f3de40f3e04003a2083b97",
     "http_compat.lua": "e2f86fdcf2d675f707467e6e101dd92b6d5c06c662ec1f65c5c1428c21a33dc5",
-    "local_physics.lua": "55edcd8cf94c7155be3e4865a68a2daae626927a76fa603db3ebdf382113c351",
-    "local_policy.lua": "1f9ef4447421e3accf85a1b18415fd38e5e621c02b8256ccebb9a65210a4b069",
+    "local_physics.lua": "394cc786c28d2925b234cbde7e34e9ffd795fa283c4e05a981759ed332975792",
+    "local_policy.lua": "cfddae893ef58bb5688938411bb5c6c417544a710aa543f64bb4aab69f6804be",
     "local_timing.lua": "c27a15c95ac432d07fed31aef79a2def3ebdc36d9541563c8eb46227e3be4775",
     "local_cars.lua": "5e72ca42274b11895e8164cdd6716fc8e656f21cea212e1ba84693efa5c1d983",
     "local_intercept.lua": "278e83a72d813829a2a5933dc18f06130794fa724d7c605b1493fd4ccf0bb715",
-    "standalone.lua": "996e9fd3697ee4e9210f0cf805761d1a5157ab349235dd28f02f023dd4e0031c",
+    "standalone.lua": "74e0edf09f5bbbaa10cfbef3fde5272a3461fc1cdd572452e38f13d4a2d68afd",
     "local_teams.lua": "68ca4ee0794ad9297cf1fe6f1f9140ea02dcc74f2538e0a95ddd4cb28f427b4a"
+  },
+  "jump_mapping": {
+    "ground_estimate_previously_changed_pitch_in_actions": 12,
+    "native_reference_cases": 36,
+    "source_sha256": "43d0af90a63e917fb08b5fa5349ca4ca021b65096b53f23cdf858b5f2d35711c",
+    "direction_acknowledgment_timeout_ms": 150,
+    "jump_event_history_limit": 24,
+    "latency_offset_from_reported_network_ping_ms": 0,
+    "live_backflip_issue_confirmed": false,
+    "limits": "Default keyboard bindings, pitch inversion off and aerial safety off. Reproduced mapping defect; no live validation that it caused the reported flip or goal misses."
   }
 }

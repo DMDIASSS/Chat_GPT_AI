@@ -1,4 +1,4 @@
-# TurboBall Roblox bot — Local v6.3
+# TurboBall Roblox bot — Local v6.4
 
 ## Ready-to-run original Nexto
 
@@ -16,7 +16,7 @@ are in `NEXTO_NOTICE.md` and `NEXTO_LICENSE.txt`.
    loadstring(readfile("TurboBall_Nexto.lua"))()
    ```
 
-4. Wait for **Nexto LOCAL v6.3 ready**, then press **F6**. **F8** stops.
+4. Wait for **Nexto LOCAL v6.4 ready**, then press **F6**. **F8** stops.
 
 Nexto starts with **Physics assist: OFF** and **Yield to teammate: OFF**. The actor
 chooses its actions, with the existing kickoff and bounded stuck-recovery
@@ -30,6 +30,37 @@ To rebuild from the original asset already in your project, run
 workspace, using the existing project Python. `EXPORT_LOCAL_BOT.bat` continues to
 export your private Update271 checkpoint separately. Both builds identify the
 model by name and SHA256 in diagnostics.
+
+## Jump direction and input sequencing (local v6.4)
+
+The previous mapper selected throttle while the wheel-contact estimate said
+"grounded", even for a jump action requesting forward/back pitch. Twelve jump
+actions consequently lost or reversed their requested pitch under that estimate;
+a diagonal flip could become a sideways flip. Jump actions now prioritize the
+actor's pitch/yaw and avoid the Shift/free-air-roll modifier. Ordinary ground
+driving keeps its existing throttle/steering mapping. WASD still cannot express
+fully independent throttle and pitch; jump direction takes priority during jumps.
+
+A new jump edge is sent only after Roblox observes the requested W/A/S/D/Q/E/Shift
+state, including release of the previous steering/roll keys. Immediate delivery
+adds no wait. Queued direction events defer the jump to a later frame. The controller waits
+for acknowledgment before its next model decision, without a blocking sleep loop. F8/focus loss cancels a pending jump. Missing direction
+acknowledgment stops with a named error after 150 ms instead of jumping with the
+wrong keys. The normal input-call timeout also applies to a deferred jump press.
+
+Reports include up to 24 `jump_events`: requested model action, mapped action,
+ground estimate, observed keys and wait time. These distinguish an intended
+diagonal flip from incorrect delivery. `control_requirements` records the assumed
+default bindings, pitch inversion OFF and aerial safety OFF; these are requirements,
+not a claim that the bot verified your in-game settings.
+
+Thirty-six jump mappings were compared with numeric references from the exported
+control mapper. Offline tests cover delayed direction release/press, F8 cancellation
+and a direction backend that stops responding. Nexto's weights, field dimensions
+and default assist switches are unchanged. This fixes a reproducible input issue;
+it does not establish that every near-post/crossbar miss has that cause. The game
+predicts the whole match and smooths reconciliation, so this update adds no fixed
+200 ms ball offset based on a ping estimate.
 
 ## Cadence and performance (local v6.3)
 
@@ -90,7 +121,7 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v6.3 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v6.4 ready | model self-test passed`**, then press **F6**.
    **Team: AUTO** identifies `Deadline_coolgun` from the match scoreboard and
    cross-checks the rendered nameplate relationship. It follows team changes.
    If the team cannot be identified, open the in-game scoreboard once. The
@@ -183,13 +214,13 @@ runtime coverage, but have not been live-tested in Roblox/JJSploit and are not a
 measured win-rate improvement.
 
 After replacing this folder, rerun **EXPORT_LOCAL_BOT.bat** and execute the newly
-generated private Lua file. The ready badge must show **LOCAL v6.3** for a private export. Exporting the
+generated private Lua file. The ready badge must show **LOCAL v6.4** for a private export. Exporting the
 place itself does not update a standalone script you already generated.
 
 ## Match pad detection and stop diagnostics (local v6.1)
 
 Rerun **EXPORT_LOCAL_BOT.bat** after updating this folder. Existing generated Lua
-scripts contain the previous runtime; the current ready badge is **v6.3**.
+scripts contain the previous runtime; the current ready badge is **v6.4**.
 
 The first live v6 report showed a measured standard ball radius and gravity close
 to the saved profile, but zero discovered boost pads throughout the run. The
@@ -329,7 +360,7 @@ change model weights or create a policy mesh input.
 
 Rerun **EXPORT_LOCAL_BOT.bat after installing this update**: the previous generated
 standalone script contains the previous adapter. No model weights are downloaded
-or retrained. The current package shows a **v6.3** badge after re-export.
+or retrained. The current package shows a **v6.4** badge after re-export.
 
 The game uses its own match teams. The new reader matches your name to the
 scoreboard row's team edge; it does not assume Roblox's `Player.Team` is the match

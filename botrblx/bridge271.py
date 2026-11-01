@@ -143,9 +143,11 @@ def observations(packet, previous, has_flip):
 
 def mapped_keys(action, ground):
     throttle, steer, pitch, yaw, roll, jump, boost, brake = action
-    # WASD couples throttle/pitch and steer/yaw. Preserve pitch when airborne.
-    longitudinal = throttle if ground else -pitch
-    lateral = steer if ground else yaw
+    # Jump direction takes priority over throttle even with lingering wheel
+    # contact. WASD cannot represent independent throttle and pitch.
+    air = not ground or bool(jump)
+    longitudinal = -pitch if air else throttle
+    lateral = yaw if air else steer
     keys = set()
     if longitudinal > .5: keys.add("W")
     if longitudinal < -.5: keys.add("S")
@@ -156,7 +158,7 @@ def mapped_keys(action, ground):
     if jump: keys.add("RMB")
     if boost: keys.add("LMB")
     # Shift also activates free air-roll, so use it for ground powerslide only.
-    if brake and ground: keys.add("SHIFT")
+    if brake and not air: keys.add("SHIFT")
     t = int("W" in keys)-int("S" in keys)
     s = int("D" in keys)-int("A" in keys)
     r = int("E" in keys)-int("Q" in keys)

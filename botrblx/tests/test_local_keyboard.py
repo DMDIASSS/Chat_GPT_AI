@@ -49,6 +49,20 @@ assert(keyboard:observed()=='W SHIFT')
 keyboard:release();assert(next(down)==nil)
 ''')
 
+    def test_direction_match_requires_observed_releases_and_presses(self):
+        self.run_case('''
+keypress=function()end;keyrelease=function()end
+''','''
+down.A=true;down.S=false
+assert(not keyboard:matches({S=true}),'Accepted stale steering and missing backflip pitch')
+down.S=true
+assert(not keyboard:matches({S=true}),'Ignored stale sideways steering')
+down.A=nil
+assert(keyboard:matches({S=true}),'Rejected correctly delivered backflip keys')
+down.SHIFT=true
+assert(not keyboard:matches({S=true}),'Ignored a stale air-roll modifier')
+''')
+
     def test_selects_scan_codes_after_vk_calls_silently_fail(self):
         self.run_case('''
 keypress=function(code)if scan[code]then down[scan[code]]=true end end

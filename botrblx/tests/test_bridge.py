@@ -125,6 +125,19 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(keys, {"S","D","Q","RMB","LMB"})
         np.testing.assert_array_equal(actual, [-1,1,1,1,-1,1,1,0])
 
+    def test_jump_pitch_and_flip_direction_survive_lingering_ground_contact(self):
+        for action in b.lookup_table():
+            if not action[5]:continue
+            for ground in (True,False):
+                keys,actual=b.mapped_keys(action,ground)
+                self.assertEqual(actual[2],action[2],(action,ground,keys))
+                self.assertEqual(actual[3]+actual[4],action[3]+action[4])
+                self.assertNotIn('SHIFT',keys)
+        keys,actual=b.mapped_keys([1,0,1,0,0,1,1,1],True)
+        self.assertIn('S',keys)
+        self.assertNotIn('W',keys)
+        self.assertEqual(actual[2],1,'Backflip became a forward flip near takeoff')
+
     def test_pause_and_repeated_frame_release_without_repeat_keydown(self):
         self.bridge.frame(packet())
         self.bridge.frame(packet(1))
