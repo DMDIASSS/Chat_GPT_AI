@@ -1,6 +1,6 @@
 -- Backseat Rally: Expedition. Authored game systems, not an executor script.
 return {
- Version='1.1.0', Generation=1, WorldX=100000, LaneSpacing=1800, StudMetres=.28, Step=1/60, StateRate=12, InputRate=20,
+ Version='1.1.1', AutoOpen=true, Generation=1, WorldX=100000, LaneSpacing=1800, StudMetres=.28, Step=1/60, StateRate=12, InputRate=20,
  Chunk=256, RoadStep=16, RoadWidth=28, Checkpoint=768, MaxPlayers=8,
  ReplayRate=10, ReplayPage=500, ReplayPending=4, LibrarySize=12, BestSize=8,
  Modes={

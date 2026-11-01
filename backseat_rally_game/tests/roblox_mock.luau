@@ -66,6 +66,7 @@ local queue={}
 local task={}
 local function schedule(co,at)queue[#queue+1]={co=co,at=at}end
 function task.spawn(fn,...)local args={...};schedule(coroutine.create(function()fn(table.unpack(args))end),now)end
+function task.defer(fn,...)task.spawn(fn,...)end
 function task.delay(dt,fn)schedule(coroutine.create(fn),now+dt)end
 function task.wait(dt)return coroutine.yield(dt or 1/60)end
 local function pump()
@@ -84,6 +85,7 @@ local function subclass(cls,base)
  if base=='BasePart'then return table.find({'Part','Seat','SpawnLocation','MeshPart','WedgePart'},cls)~=nil end
  if base=='BaseScript'then return cls=='Script'or cls=='LocalScript'end
  if base=='LuaSourceContainer'then return cls=='ModuleScript'or subclass(cls,'BaseScript')end
+ if base=='PostEffect'then return table.find({'BloomEffect','BlurEffect','ColorCorrectionEffect','DepthOfFieldEffect','SunRaysEffect'},cls)~=nil end
  return false
 end
 function Instance.new(cls,parent)
@@ -147,6 +149,14 @@ local function service(name)local s=Instance.new(name);s.Name=name;services[name
 local workspace=service('Workspace');workspace.CurrentCamera=Instance.new('Camera');workspace.CurrentCamera.ViewportSize=Vector2.new(1280,720)
 function workspace:GetServerTimeNow()return now end
 service('ReplicatedStorage');service('ReplicatedFirst');service('ServerScriptService');service('ServerStorage');service('StarterGui');service('Lighting')
+local content=service('ContentProvider');content.calls={}
+function content:PreloadAsync(items,callback)
+ self.calls[#self.calls+1]=items
+ local status=self.status or Enum.AssetFetchStatus.Success
+ if self.delay and self.delay>0 then task.wait(self.delay)end
+ if self.fail then error('Asset unavailable')end
+ for _,item in ipairs(items)do callback(item.Name,status)end
+end
 local sp=service('StarterPlayer');local sps=Instance.new('StarterPlayerScripts',sp);sps.Name='StarterPlayerScripts';local scs=Instance.new('StarterCharacterScripts',sp);scs.Name='StarterCharacterScripts'
 local players=service('Players');players.list={}
 function players:GetPlayers()return table.clone(self.list)end

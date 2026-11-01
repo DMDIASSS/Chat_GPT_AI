@@ -66,9 +66,72 @@
         </Properties>
         <Item class="ModuleScript" referent="RBX00000010">
           <Properties>
+            <string name="Name">AssetLoader</string>
+            <ProtectedString name="Source">-- Optional meshes never block driving or replace complete geometry before loading.
+local ContentProvider=game:GetService('ContentProvider')
+local Loader={};local entries=setmetatable({},{__mode='k'})
+local timeout=8
+local function inspect(template)
+ local visible,external=0,false
+ for _,item in ipairs(template:GetDescendants())do
+  if item:IsA('BasePart')and item.Transparency&lt;1 then
+   visible+=1
+   if item:IsA('MeshPart')then
+    if item.MeshId==''then return false,false end
+    external=true
+   end
+  elseif item:IsA('SpecialMesh')and item.MeshType==Enum.MeshType.FileMesh then
+   if item.MeshId==''then return false,false end
+   external=true
+  elseif item:IsA('SurfaceAppearance')or item:IsA('Decal')or item:IsA('Texture')then external=true end
+ end
+ return visible&gt;0,external
+end
+local function finish(entry,ok)
+ if entry.status~='loading'then return end
+ entry.status=ok and 'ready'or 'unavailable'
+ local callbacks=entry.callbacks;entry.callbacks={}
+ for _,callback in ipairs(callbacks)do task.defer(callback,ok)end
+end
+function Loader.check(template,callback)
+ if not template then if callback then task.defer(callback,false)end;return 'unavailable'end
+ local entry=entries[template]
+ if not entry then
+  entry={status='loading',callbacks={}};entries[template]=entry
+  local valid,external=inspect(template)
+  if not valid then entry.status='unavailable'
+  elseif not external then entry.status='ready'
+  else
+   task.delay(timeout,function()finish(entry,false)end)
+   task.spawn(function()
+    local failed=false;local observed=false
+    local ok=pcall(function()
+     ContentProvider:PreloadAsync({template},function(_,status)
+      observed=true
+      if status~=Enum.AssetFetchStatus.Success then failed=true end
+     end)
+    end)
+    finish(entry,ok and observed and not failed)
+   end)
+  end
+ end
+ if callback then
+  if entry.status=='loading'then entry.callbacks[#entry.callbacks+1]=callback
+  else task.defer(callback,entry.status=='ready')end
+ end
+ return entry.status
+end
+function Loader.ready(template)return Loader.check(template)=='ready'end
+return Loader
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000011">
+          <Properties>
             <string name="Name">Assets</string>
             <ProtectedString name="Source">-- Original lightweight models; optional skins are harvested from the user's place by Installer.
 local Assets={}
+local Loader=require(script.Parent.AssetLoader)
 local function color(t)return Color3.new(t[1],t[2],t[3])end
 function Assets.part(parent,name,size,cf,tint,material,shape)
  local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=cf;p.Anchored=true
@@ -115,14 +178,6 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
  local root=game:GetService('ReplicatedStorage'):FindFirstChild('BackseatExpedition')
  local library=root and root:FindFirstChild('ImportedCars')
  local template=useOriginal~=false and library and library:FindFirstChild(car.template)
- if template and not ghost then
-  local skin=template:Clone();skin.Name='Original exterior';skin.Parent=model
-  if skin.PrimaryPart then skin:PivotTo(CFrame.identity)end
-  for _,part in ipairs(model:GetChildren())do
-   if part:IsA('BasePart')and part~=body and part.Name~='Tyre'and part.Name~='Wheel'then part.Transparency=1 end
-  end
-  body.Transparency=1
- end
  local parts={}
  for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')then
   p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=not ghost
@@ -135,7 +190,26 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
   if source and source:IsA('Sound')then local sound=source:Clone();sound.Parent=body;sound.Volume=0;sound:Play();sounds[#sounds+1]=sound end
  end end
  model.Parent=parent
- return {model=model,wheels=wheels,parts=parts,spin=0,audio=sounds}
+ model:SetAttribute('VisualSource','BuiltIn')
+ local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds}
+ if template and not ghost then
+  Loader.check(template,function(ready)
+   if not ready or not model.Parent then return end
+   local skin=template:Clone()
+   if not skin.PrimaryPart then skin:Destroy();return end
+   skin.Name='Original exterior';skin:PivotTo(model:GetPivot())
+   for _,part in ipairs(skin:GetDescendants())do if part:IsA('BasePart')then
+    part.Anchored=true;part.CanCollide=false;part.CanTouch=false;part.CanQuery=false
+   end end
+   skin.Parent=model
+   -- Keep a complete body until all external assets are confirmed available.
+   for _,part in ipairs(parts)do
+    if part.Name~='Tyre'and part.Name~='Wheel'then part.Transparency=1 end
+   end
+   model:SetAttribute('VisualSource','Original')
+  end)
+ end
+ return visual
 end
 function Assets.pose(visual,s,route,offset,dt)
  local D=require(script.Parent.Dynamics)
@@ -181,12 +255,12 @@ return Assets
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000011">
+        <Item class="ModuleScript" referent="RBX00000012">
           <Properties>
             <string name="Name">Config</string>
             <ProtectedString name="Source">-- Backseat Rally: Expedition. Authored game systems, not an executor script.
 return {
- Version='1.1.0', Generation=1, WorldX=100000, LaneSpacing=1800, StudMetres=.28, Step=1/60, StateRate=12, InputRate=20,
+ Version='1.1.1', AutoOpen=true, Generation=1, WorldX=100000, LaneSpacing=1800, StudMetres=.28, Step=1/60, StateRate=12, InputRate=20,
  Chunk=256, RoadStep=16, RoadWidth=28, Checkpoint=768, MaxPlayers=8,
  ReplayRate=10, ReplayPage=500, ReplayPending=4, LibrarySize=12, BestSize=8,
  Modes={
@@ -211,7 +285,7 @@ return {
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000012">
+        <Item class="ModuleScript" referent="RBX00000013">
           <Properties>
             <string name="Name">Dynamics</string>
             <ProtectedString name="Source">-- Shared deterministic driving model. The server owns progress and outcomes.
@@ -283,7 +357,7 @@ return D
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000013">
+        <Item class="ModuleScript" referent="RBX00000014">
           <Properties>
             <string name="Name">ImportAssets</string>
             <ProtectedString name="Source">-- Clone visual templates only; source instances stay untouched.
@@ -342,7 +416,7 @@ return ImportAssets
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000014">
+        <Item class="ModuleScript" referent="RBX00000015">
           <Properties>
             <string name="Name">Replay</string>
             <ProtectedString name="Source">-- Quantized, paged CSV data; no executable replay content. ~25 KB / 50 s page.
@@ -389,7 +463,7 @@ return R
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000015">
+        <Item class="ModuleScript" referent="RBX00000016">
           <Properties>
             <string name="Name">Route</string>
             <ProtectedString name="Source">-- Continuous, forward-monotone roads: no self-crossings, jumps, or blocked lanes.
@@ -449,26 +523,26 @@ return Route
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="RBX00000016">
+      <Item class="Folder" referent="RBX00000017">
         <Properties>
           <string name="Name">Remotes</string>
         </Properties>
-        <Item class="RemoteEvent" referent="RBX00000017">
+        <Item class="RemoteEvent" referent="RBX00000018">
           <Properties>
             <string name="Name">Action</string>
           </Properties>
         </Item>
-        <Item class="RemoteFunction" referent="RBX00000018">
+        <Item class="RemoteFunction" referent="RBX00000019">
           <Properties>
             <string name="Name">Request</string>
           </Properties>
         </Item>
-        <Item class="UnreliableRemoteEvent" referent="RBX00000019">
+        <Item class="UnreliableRemoteEvent" referent="RBX0000001A">
           <Properties>
             <string name="Name">State</string>
           </Properties>
         </Item>
-        <Item class="UnreliableRemoteEvent" referent="RBX0000001A">
+        <Item class="UnreliableRemoteEvent" referent="RBX0000001B">
           <Properties>
             <string name="Name">Input</string>
           </Properties>
@@ -480,11 +554,11 @@ return Route
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="RBX0000001B">
+    <Item class="Folder" referent="RBX0000001C">
       <Properties>
         <string name="Name">BackseatExpeditionServer</string>
       </Properties>
-      <Item class="Script" referent="RBX0000001C">
+      <Item class="Script" referent="RBX0000001D">
         <Properties>
           <string name="Name">Main</string>
           <ProtectedString name="Source">local Players=game:GetService('Players')
@@ -694,7 +768,7 @@ end)
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="RBX0000001D">
+      <Item class="ModuleScript" referent="RBX0000001E">
         <Properties>
           <string name="Name">Persistence</string>
           <ProtectedString name="Source">-- Immutable replay pages + small manifests. No DataStore work on the simulation thread.
@@ -863,11 +937,11 @@ return P
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="RBX0000001E">
+      <Item class="Folder" referent="RBX0000001F">
         <Properties>
           <string name="Name">BackseatExpeditionClient</string>
         </Properties>
-        <Item class="LocalScript" referent="RBX0000001F">
+        <Item class="LocalScript" referent="RBX00000020">
           <Properties>
             <string name="Name">Main</string>
             <ProtectedString name="Source">local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage')
@@ -926,7 +1000,7 @@ local function setup(metadata,initial)
  visual=Assets.car(scene,getCar(metadata.car),false,ui.quality~='low',true)
  predicted=initial or D.new(route);readySent=false;accumulator=0;cameraMode=1;roadAt=0
  workspace.CurrentCamera.CameraType=Enum.CameraType.Scriptable;workspace.CurrentCamera.FieldOfView=72
- Lighting.ClockTime=metadata.mode=='daily'and 18.15 or 15.8
+ presence:time(metadata.mode=='daily'and 18.15 or 15.8)
 end
 local function loadGhost(id)
  if not id then return end
@@ -1141,12 +1215,16 @@ RunService.RenderStepped:Connect(function(dt)
   ui.quality=ui.quality=='high'and 'medium'or 'low';stream.quality=ui.quality;ui.qualityButton.Text='QUALITY: '..ui.quality:upper()..' · AUTO';slowTime=0
  end
 end)
--- Opt in with the launcher; the original game keeps its camera and interface.
+-- The downloaded place enters the runnable modes instead of the incomplete old garage.
+-- A Studio installation into another game can keep the opt-in launcher.
+task.defer(function()
+ if C.AutoOpen and root:GetAttribute('AutoOpen')~=false then openExpansion()end
+end)
 </ProtectedString>
             <bool name="Disabled">false</bool>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000020">
+        <Item class="ModuleScript" referent="RBX00000021">
           <Properties>
             <string name="Name">Presence</string>
             <ProtectedString name="Source">-- Local, reversible ownership of the view while the optional expansion is open.
@@ -1155,8 +1233,24 @@ local Lighting=game:GetService('Lighting')
 local RunService=game:GetService('RunService')
 local Context=game:GetService('ContextActionService')
 local Presence={};Presence.__index=Presence
+local daylight={ClockTime=15.8,Brightness=2.2,Ambient=Color3.fromRGB(114,122,114),
+ OutdoorAmbient=Color3.fromRGB(148,155,144),FogStart=800,FogEnd=6000,FogColor=Color3.fromRGB(195,213,219)}
+local atmosphere={Density=.18,Haze=.5,Glare=.1,Offset=0,Color=Color3.fromRGB(205,219,229),Decay=Color3.fromRGB(139,153,157)}
 function Presence.new(gui)
- return setmetatable({gui=gui,active=false,screens={},connections={}},Presence)
+ return setmetatable({gui=gui,active=false,screens={},connections={},environment={}},Presence)
+end
+function Presence:environmentProfile(object,profile)
+ if self.environment[object]then return end
+ local entry={before={},after=profile};self.environment[object]=entry
+ for property in pairs(profile)do entry.before[property]=object[property]end
+ for property,value in pairs(profile)do object[property]=value end
+end
+function Presence:effect(effect)
+ if effect:IsA('Atmosphere')then self:environmentProfile(effect,atmosphere)
+ elseif effect:IsA('PostEffect')then self:environmentProfile(effect,{Enabled=false})end
+end
+function Presence:time(clock)
+ if self.environment[Lighting]then self.environment[Lighting].after.ClockTime=clock;Lighting.ClockTime=clock end
 end
 function Presence:hide(screen)
  if screen==self.gui or not screen:IsA('ScreenGui')or self.screens[screen]then return end
@@ -1172,6 +1266,9 @@ function Presence:open()
  local camera=workspace.CurrentCamera
  self.camera={object=camera,cf=camera.CFrame,kind=camera.CameraType,subject=camera.CameraSubject,fov=camera.FieldOfView}
  self.clock=Lighting.ClockTime
+ self:environmentProfile(Lighting,table.clone(daylight))
+ for _,effect in ipairs(Lighting:GetChildren())do self:effect(effect)end
+ self.connections[#self.connections+1]=Lighting.ChildAdded:Connect(function(effect)self:effect(effect)end)
  local pg=Players.LocalPlayer:WaitForChild('PlayerGui')
  for _,screen in ipairs(pg:GetChildren())do self:hide(screen)end
  self.connections[#self.connections+1]=pg.ChildAdded:Connect(function(screen)self:hide(screen)end)
@@ -1179,6 +1276,11 @@ function Presence:open()
   Enum.PlayerActions.CharacterForward,Enum.PlayerActions.CharacterBackward,Enum.PlayerActions.CharacterLeft,
   Enum.PlayerActions.CharacterRight,Enum.PlayerActions.CharacterJump)
  RunService:BindToRenderStep('ExpeditionCamera',Enum.RenderPriority.Last.Value,function()
+  if self.active then for object,entry in pairs(self.environment)do
+   if object==Lighting or object.Parent then for property,value in pairs(entry.after)do
+    if object[property]~=value then object[property]=value end
+   end end
+  end end
   if self.active and self.desired then
    local current=workspace.CurrentCamera;current.CameraType=Enum.CameraType.Scriptable
    current.CFrame=self.desired;current.FieldOfView=self.fov or 72
@@ -1201,13 +1303,17 @@ function Presence:close()
   camera.CameraType=old.kind;camera.CameraSubject=old.subject;camera.CFrame=old.cf;camera.FieldOfView=old.fov
  end
  Lighting.ClockTime=self.clock
+ for object,entry in pairs(self.environment)do if object==Lighting or object.Parent then
+  for property,value in pairs(entry.before)do object[property]=value end
+ end end
+ self.environment={}
  self.desired=nil;self.camera=nil
 end
 return Presence
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000021">
+        <Item class="ModuleScript" referent="RBX00000022">
           <Properties>
             <string name="Name">ReplayPlayer</string>
             <ProtectedString name="Source">local root=game:GetService('ReplicatedStorage'):WaitForChild('BackseatExpedition')
@@ -1257,12 +1363,13 @@ return Player
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000022">
+        <Item class="ModuleScript" referent="RBX00000023">
           <Properties>
             <string name="Name">RoadStream</string>
             <ProtectedString name="Source">-- Bounded chunk window; generation jobs yield frequently and recycle parts.
 local Root=game:GetService('ReplicatedStorage'):WaitForChild('BackseatExpedition')
 local C=require(Root.Shared.Config);local Route=require(Root.Shared.Route)
+local Loader=require(Root.Shared.AssetLoader)
 local Stream={};Stream.__index=Stream
 local function rgb(a)return Color3.new(a[1],a[2],a[3])end
 function Stream.new(parent)
@@ -1309,7 +1416,7 @@ function Stream:decor(model,index)
   local at=Vector3.new(x,p.y-2,z)+offset
   local height=8+Route.random(route.seed,i*71+index)*10
   local template=biome.trees and #templates&gt;0 and self.quality~='low'and templates[(i-1)%#templates+1]
-  if template then
+  if template and Loader.ready(template)then
    local prop=template:Clone();prop.Parent=model;prop:PivotTo(CFrame.new(at)*CFrame.Angles(0,r*6,0))
    coroutine.yield()
   elseif biome.trees and i%3~=0 then
@@ -1410,12 +1517,13 @@ return Stream
 </ProtectedString>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="RBX00000023">
+        <Item class="ModuleScript" referent="RBX00000024">
           <Properties>
             <string name="Name">UI</string>
             <ProtectedString name="Source">local UI={};UI.__index=UI
 local Players=game:GetService('Players');local UIS=game:GetService('UserInputService')
 local C=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Config)
+local Assets=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Assets)
 local palette={ink=Color3.fromRGB(20,35,32),panel=Color3.fromRGB(29,48,42),card=Color3.fromRGB(41,62,52),
  light=Color3.fromRGB(242,232,207),muted=Color3.fromRGB(169,184,163),gold=Color3.fromRGB(233,180,84),red=Color3.fromRGB(224,119,91)}
 local function frame(parent,name,x,y,w,h,bg)
@@ -1448,6 +1556,14 @@ function UI.new(callbacks)
  local grad=Instance.new('UIGradient');grad.Color=ColorSequence.new(palette.ink,palette.panel);grad.Rotation=28;grad.Parent=menu
  label(menu,'BACKSEAT / EXPEDITION',34,25,760,30,19,palette.gold).Font=Enum.Font.GothamBold
  label(menu,'Find the long\nway home.',32,79,660,125,53).Font=Enum.Font.GothamBold
+ local preview=Instance.new('ViewportFrame');preview.Name='CarPreview';preview.Position=UDim2.fromOffset(420,78)
+ preview.Size=UDim2.fromOffset(260,130);preview.BackgroundTransparency=1
+ preview.Ambient=Color3.fromRGB(185,185,185);preview.LightColor=Color3.fromRGB(255,244,218)
+ preview.LightDirection=Vector3.new(-1,-1,-1);preview.Parent=menu
+ local previewCamera=Instance.new('Camera');previewCamera.FieldOfView=34
+ previewCamera.CFrame=CFrame.lookAt(Vector3.new(15,9,-19),Vector3.new(0,.5,0));previewCamera.Parent=preview
+ preview.CurrentCamera=previewCamera
+ self.previewWorld=Instance.new('WorldModel');self.previewWorld.Parent=preview
  label(menu,'A fresh road. A proper finish. Your best run, waiting as a ghost.',36,211,640,40,17,palette.muted)
  self.modeButtons={}
  for i,mode in ipairs(C.Modes)do
@@ -1549,6 +1665,12 @@ function UI:resize()
  self.scale.Scale=math.min(v.X/1220,v.Y/720)
 end
 function UI:selection()
+ if self.previewWorld and self.previewCarId~=self.car.id then
+  if self.previewCar then self.previewCar.model:Destroy()end
+  -- Show a complete car immediately, independently of external mesh permissions.
+  self.previewCar=Assets.car(self.previewWorld,self.car,false,false)
+  self.previewCarId=self.car.id
+ end
  for i,b in ipairs(self.modeButtons)do b.BackgroundColor3=C.Modes[i]==self.mode and Color3.fromRGB(61,85,63)or palette.card end
  for i,b in ipairs(self.carButtons)do
   local car=C.Cars[i];b.BackgroundColor3=car==self.car and Color3.fromRGB(61,85,63)or palette.card

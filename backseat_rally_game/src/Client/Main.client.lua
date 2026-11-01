@@ -54,7 +54,7 @@ local function setup(metadata,initial)
  visual=Assets.car(scene,getCar(metadata.car),false,ui.quality~='low',true)
  predicted=initial or D.new(route);readySent=false;accumulator=0;cameraMode=1;roadAt=0
  workspace.CurrentCamera.CameraType=Enum.CameraType.Scriptable;workspace.CurrentCamera.FieldOfView=72
- Lighting.ClockTime=metadata.mode=='daily'and 18.15 or 15.8
+ presence:time(metadata.mode=='daily'and 18.15 or 15.8)
 end
 local function loadGhost(id)
  if not id then return end
@@ -269,4 +269,8 @@ RunService.RenderStepped:Connect(function(dt)
   ui.quality=ui.quality=='high'and 'medium'or 'low';stream.quality=ui.quality;ui.qualityButton.Text='QUALITY: '..ui.quality:upper()..' · AUTO';slowTime=0
  end
 end)
--- Opt in with the launcher; the original game keeps its camera and interface.
+-- The downloaded place enters the runnable modes instead of the incomplete old garage.
+-- A Studio installation into another game can keep the opt-in launcher.
+task.defer(function()
+ if C.AutoOpen and root:GetAttribute('AutoOpen')~=false then openExpansion()end
+end)

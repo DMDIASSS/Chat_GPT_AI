@@ -1,6 +1,7 @@
 -- Bounded chunk window; generation jobs yield frequently and recycle parts.
 local Root=game:GetService('ReplicatedStorage'):WaitForChild('BackseatExpedition')
 local C=require(Root.Shared.Config);local Route=require(Root.Shared.Route)
+local Loader=require(Root.Shared.AssetLoader)
 local Stream={};Stream.__index=Stream
 local function rgb(a)return Color3.new(a[1],a[2],a[3])end
 function Stream.new(parent)
@@ -47,7 +48,7 @@ function Stream:decor(model,index)
   local at=Vector3.new(x,p.y-2,z)+offset
   local height=8+Route.random(route.seed,i*71+index)*10
   local template=biome.trees and #templates>0 and self.quality~='low'and templates[(i-1)%#templates+1]
-  if template then
+  if template and Loader.ready(template)then
    local prop=template:Clone();prop.Parent=model;prop:PivotTo(CFrame.new(at)*CFrame.Angles(0,r*6,0))
    coroutine.yield()
   elseif biome.trees and i%3~=0 then

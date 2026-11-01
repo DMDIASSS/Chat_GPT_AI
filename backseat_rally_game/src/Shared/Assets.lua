@@ -1,5 +1,6 @@
 -- Original lightweight models; optional skins are harvested from the user's place by Installer.
 local Assets={}
+local Loader=require(script.Parent.AssetLoader)
 local function color(t)return Color3.new(t[1],t[2],t[3])end
 function Assets.part(parent,name,size,cf,tint,material,shape)
  local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=cf;p.Anchored=true
@@ -46,14 +47,6 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
  local root=game:GetService('ReplicatedStorage'):FindFirstChild('BackseatExpedition')
  local library=root and root:FindFirstChild('ImportedCars')
  local template=useOriginal~=false and library and library:FindFirstChild(car.template)
- if template and not ghost then
-  local skin=template:Clone();skin.Name='Original exterior';skin.Parent=model
-  if skin.PrimaryPart then skin:PivotTo(CFrame.identity)end
-  for _,part in ipairs(model:GetChildren())do
-   if part:IsA('BasePart')and part~=body and part.Name~='Tyre'and part.Name~='Wheel'then part.Transparency=1 end
-  end
-  body.Transparency=1
- end
  local parts={}
  for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')then
   p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=not ghost
@@ -66,7 +59,26 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
   if source and source:IsA('Sound')then local sound=source:Clone();sound.Parent=body;sound.Volume=0;sound:Play();sounds[#sounds+1]=sound end
  end end
  model.Parent=parent
- return {model=model,wheels=wheels,parts=parts,spin=0,audio=sounds}
+ model:SetAttribute('VisualSource','BuiltIn')
+ local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds}
+ if template and not ghost then
+  Loader.check(template,function(ready)
+   if not ready or not model.Parent then return end
+   local skin=template:Clone()
+   if not skin.PrimaryPart then skin:Destroy();return end
+   skin.Name='Original exterior';skin:PivotTo(model:GetPivot())
+   for _,part in ipairs(skin:GetDescendants())do if part:IsA('BasePart')then
+    part.Anchored=true;part.CanCollide=false;part.CanTouch=false;part.CanQuery=false
+   end end
+   skin.Parent=model
+   -- Keep a complete body until all external assets are confirmed available.
+   for _,part in ipairs(parts)do
+    if part.Name~='Tyre'and part.Name~='Wheel'then part.Transparency=1 end
+   end
+   model:SetAttribute('VisualSource','Original')
+  end)
+ end
+ return visual
 end
 function Assets.pose(visual,s,route,offset,dt)
  local D=require(script.Parent.Dynamics)

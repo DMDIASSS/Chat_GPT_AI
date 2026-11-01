@@ -1,6 +1,7 @@
 local UI={};UI.__index=UI
 local Players=game:GetService('Players');local UIS=game:GetService('UserInputService')
 local C=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Config)
+local Assets=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Assets)
 local palette={ink=Color3.fromRGB(20,35,32),panel=Color3.fromRGB(29,48,42),card=Color3.fromRGB(41,62,52),
  light=Color3.fromRGB(242,232,207),muted=Color3.fromRGB(169,184,163),gold=Color3.fromRGB(233,180,84),red=Color3.fromRGB(224,119,91)}
 local function frame(parent,name,x,y,w,h,bg)
@@ -33,6 +34,14 @@ function UI.new(callbacks)
  local grad=Instance.new('UIGradient');grad.Color=ColorSequence.new(palette.ink,palette.panel);grad.Rotation=28;grad.Parent=menu
  label(menu,'BACKSEAT / EXPEDITION',34,25,760,30,19,palette.gold).Font=Enum.Font.GothamBold
  label(menu,'Find the long\nway home.',32,79,660,125,53).Font=Enum.Font.GothamBold
+ local preview=Instance.new('ViewportFrame');preview.Name='CarPreview';preview.Position=UDim2.fromOffset(420,78)
+ preview.Size=UDim2.fromOffset(260,130);preview.BackgroundTransparency=1
+ preview.Ambient=Color3.fromRGB(185,185,185);preview.LightColor=Color3.fromRGB(255,244,218)
+ preview.LightDirection=Vector3.new(-1,-1,-1);preview.Parent=menu
+ local previewCamera=Instance.new('Camera');previewCamera.FieldOfView=34
+ previewCamera.CFrame=CFrame.lookAt(Vector3.new(15,9,-19),Vector3.new(0,.5,0));previewCamera.Parent=preview
+ preview.CurrentCamera=previewCamera
+ self.previewWorld=Instance.new('WorldModel');self.previewWorld.Parent=preview
  label(menu,'A fresh road. A proper finish. Your best run, waiting as a ghost.',36,211,640,40,17,palette.muted)
  self.modeButtons={}
  for i,mode in ipairs(C.Modes)do
@@ -134,6 +143,12 @@ function UI:resize()
  self.scale.Scale=math.min(v.X/1220,v.Y/720)
 end
 function UI:selection()
+ if self.previewWorld and self.previewCarId~=self.car.id then
+  if self.previewCar then self.previewCar.model:Destroy()end
+  -- Show a complete car immediately, independently of external mesh permissions.
+  self.previewCar=Assets.car(self.previewWorld,self.car,false,false)
+  self.previewCarId=self.car.id
+ end
  for i,b in ipairs(self.modeButtons)do b.BackgroundColor3=C.Modes[i]==self.mode and Color3.fromRGB(61,85,63)or palette.card end
  for i,b in ipairs(self.carButtons)do
   local car=C.Cars[i];b.BackgroundColor3=car==self.car and Color3.fromRGB(61,85,63)or palette.card

@@ -10,7 +10,7 @@ def pure(extra=''):
         text+='local '+('C'if name=='Config'else 'D'if name=='Dynamics'else name)+'=(function()\n'+(APP/'src/Shared'/f'{name}.lua').read_text()+'\nend)()\n'
     return text+extra
 
-def roblox(extra='',client=False,server=True):
+def roblox(extra='',client=False,server=True,before_client=''):
     text=(APP/'tests/roblox_mock.luau').read_text()+'\nlocal nodes={}\n'
     roots={'Shared':"services.ReplicatedStorage",'Server':'services.ServerScriptService','Client':'sps'}
     text+="local replicated=Instance.new('Folder',services.ReplicatedStorage);replicated.Name='BackseatExpedition'\n"
@@ -25,7 +25,7 @@ def roblox(extra='',client=False,server=True):
     for p in sorted((APP/'src').glob('*/*.lua')):
         key=str(p.relative_to(APP/'src'));text+='modules[nodes['+json.dumps(key)+']]=function(script)\n'+p.read_text()+'\nend\n'
     if server:text+="modules[nodes['Server/Main.server.lua']](nodes['Server/Main.server.lua'])\nadvance(.1)\n"
-    if client:text+="modules[nodes['Client/Main.client.lua']](nodes['Client/Main.client.lua'])\nadvance(.2,true)\n"
+    if client:text+=before_client+"\nmodules[nodes['Client/Main.client.lua']](nodes['Client/Main.client.lua'])\nadvance(.2,true)\n"
     return text+extra
 
 class GameTests(unittest.TestCase):
@@ -378,7 +378,7 @@ assert(original.Enabled and not disabled.Enabled and dynamic.Enabled,'Original U
 assert(camera.CameraType==Enum.CameraType.Custom and camera.FieldOfView==81 and camera.CFrame.Position.X==11)
 assert(services.Lighting.ClockTime==9 and next(context.bound)==nil and next(runService.bound)==nil)
 assert(not workspace:FindFirstChild('ExpeditionLocal')and not workspace:FindFirstChild('ExpeditionLocalPark'))
-''',client=True))
+''',client=True,before_client="replicated:SetAttribute('AutoOpen',false)"))
 
     def test_start_ready_and_bank_restore_character_to_its_original_position(self):
         self.run_lua(roblox('''

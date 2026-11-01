@@ -1,6 +1,6 @@
 """Build the optional expansion and, with --base-place, an additive Roblox place."""
 from pathlib import Path
-import argparse,hashlib,json,zipfile,xml.etree.ElementTree as ET
+import argparse,hashlib,json,re,zipfile,xml.etree.ElementTree as ET
 from tools.rbxl_addon import add_expansion
 APP=Path(__file__).resolve().parent
 ROOT=APP.parent
@@ -70,10 +70,13 @@ def main():
     model=xml_root();top=item(model,'Model','BackseatRallyExpansion');source(top,APP/'src/Installer.lua')
     payload=item(top,'Folder','Payload');tree(payload,True)
     write(downloads/'Backseat_Rally_Expansion.rbxmx',model)
-    extras=[]
+    extras=[];aliases=[]
     if args.base_place:
         result,report=add_expansion(args.base_place.read_bytes(),APP/'src')
         (downloads/'DM_Backseat_Rally.rbxl').write_bytes(result)
+        version=re.search(r"Version='([^']+)'",(APP/'src/Shared/Config.lua').read_text()).group(1)
+        aliases=[f'DM_Backseat_Rally_v{version}.rbxl']
+        (downloads/aliases[0]).write_bytes(result)
         (downloads/'DM_PRESERVATION.json').write_text(json.dumps(report,indent=2)+'\n')
         extras=['DM_Backseat_Rally.rbxl','DM_PRESERVATION.json']
     paths=sorted(p for p in APP.rglob('*')if p.is_file()and 'private'not in p.relative_to(APP).parts and '__pycache__'not in p.parts and p.suffix!='.pyc'and p.name!='SOURCE_HASHES.json')
@@ -84,5 +87,5 @@ def main():
     with zipfile.ZipFile(downloads/'DM_Backseat_Rally.zip','w',zipfile.ZIP_DEFLATED,compresslevel=9)as z:
         for name,data in contents.items():
             entry=zipfile.ZipInfo(name,(2026,11,2,0,0,0));entry.compress_type=zipfile.ZIP_DEFLATED;entry.external_attr=0o100644<<16;z.writestr(entry,data)
-    print(json.dumps({n:{'bytes':(downloads/n).stat().st_size,'sha256':hashlib.sha256((downloads/n).read_bytes()).hexdigest()}for n in ['Backseat_Rally_Expedition.rbxlx','Backseat_Rally_Expansion.rbxmx','DM_Backseat_Rally.zip']+extras},indent=2))
+    print(json.dumps({n:{'bytes':(downloads/n).stat().st_size,'sha256':hashlib.sha256((downloads/n).read_bytes()).hexdigest()}for n in ['Backseat_Rally_Expedition.rbxlx','Backseat_Rally_Expansion.rbxmx','DM_Backseat_Rally.zip']+extras+aliases},indent=2))
 if __name__=='__main__':main()
