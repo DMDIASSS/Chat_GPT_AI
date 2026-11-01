@@ -87,7 +87,7 @@ function Safety:step(packet,action,now)
     end
     local a={forwardSpeed>200 and -1 or 0,0,0,0,0,0,0,0}
     self.last={mode='Leave clear shot',time=now,crossing=cross.position,crossing_seconds=cross.time,
-        calibrated_geometry=self.calibration.active~=nil}
+        calibrated_geometry=self.calibration.active~=nil or self.calibration.baseline~=nil}
     return a,self.last.mode
 end
 return Safety

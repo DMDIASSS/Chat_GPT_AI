@@ -21,5 +21,6 @@ This bounds local inference cost and differs from supplying every Rocket League
 pad. It starts with ground assist and scripted teammate yielding OFF, so the
 actor chooses its driving actions with kickoff, bounded stuck recovery and the
 separate conservative ground goal-safety guard. Goal safety can be toggled while
-paused. Applying manual calibration updates goal bounds for the guards and optional
+paused. Measured numeric goal defaults are active at startup. Applying optional
+manual calibration updates goal bounds for the guards and optional
 ground planner; it does not retrain the actor.

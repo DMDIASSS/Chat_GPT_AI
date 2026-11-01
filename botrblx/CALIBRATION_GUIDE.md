@@ -1,5 +1,16 @@
 # Goal calibration and physics test
 
+**v6.8 already uses the supplied goal measurements automatically.** Run the script
+and press F6; the ready panel confirms **Measured goal defaults active**. No local
+file load or Apply step is required. The following wizard is optional for future
+measurements. Reset returns to the built-in measured goals.
+
+The defaults use the latest post and rear-wall captures. A low, high-scatter blue
+crossbar reading was replaced by the earlier consistent blue crossbar capture.
+Only the fitted numeric geometry is embedded; raw capture poses and timestamps
+are excluded. These bounds inform goal guards and optional ground aiming; the
+frozen actor's weights and observations remain unchanged.
+
 Press **F8**, then **Calibration / physics test**. The bot stays paused while you
 place or drive the car. **F4** minimizes/restores the window. Drag the title bar
 while paused. **F10** captures ground landmarks or arms the flying crossbar test, including while minimized.
@@ -73,7 +84,7 @@ retains the saved analytic collision profile.
 **Save test file** writes `TurboBall_Calibration.json` in the executor workspace.
 **Load test file** restores complete or partial measurements; review and Apply to
 activate a loaded set. No file is applied automatically. **Reset** in the geometry
-tab removes the fitted override and restores the saved goal bounds. Calibration
+tab removes the manual fitted override and restores the built-in measured goal bounds. Calibration
 does not warp the actor's observations or retrain its weights.
 
 ## Motion / physics test

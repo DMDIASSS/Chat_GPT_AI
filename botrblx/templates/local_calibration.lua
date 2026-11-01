@@ -29,7 +29,7 @@ Calibration.steps={
     {'blue_top','Blue: underside of crossbar','At the middle of the goal mouth, Press F10 to arm, then fly nose-up into the UNDERSIDE at the middle of the mouth. Contact is captured automatically.'},
     {'blue_back','Blue: back of net','Inside the blue net, touch the REAR wall. Nose-out or nose-up on the curved wall is OK. Stop moving.'}}
 function Calibration.new(profile)
-    return setmetatable({profile=profile,points={},index=1,history={},reference='bumper',tab='geometry'},Calibration)
+    return setmetatable({profile=profile,baseline=copy(profile.goal_defaults),points={},index=1,history={},reference='bumper',tab='geometry'},Calibration)
 end
 function Calibration:begin()self.crossbar=nil;self.history={};self.index=1;self.points={};self.candidate=nil end
 function Calibration:observe(packet,now,keys,physics)
@@ -242,6 +242,7 @@ end
 function Calibration:apply()self.candidate=self:fit();self.active=copy(self.candidate);return self.active end
 function Calibration:goal(team)
     if self.active then return self.active.goals[team+1]end
+    if self.baseline then return self.baseline.goals[team+1]end
     local a=self.profile.arena;local sign=team==0 and -1 or 1
     return {origin={0,sign*a.EXTENT_Y,0},side={1,0,0},normal={0,sign,0},half_width=a.MOUTH_HALF_WIDTH,
         height=a.MOUTH_HEIGHT,back_depth=a.GOAL_BACK_Y-a.EXTENT_Y,fillet=a.MOUTH_FILLET}
@@ -318,5 +319,5 @@ function Calibration:load(data)
     if loadedMotion then self.motion=loadedMotion end
     if data.reference=='bumper'or data.reference=='center'then self.reference=data.reference end
 end
-function Calibration:report()return {points=copy(self.points),candidate=copy(self.candidate),active=copy(self.active),motion=self.motion and copy(self.motion.summary)or nil}end
+function Calibration:report()return {baseline=copy(self.baseline),points=copy(self.points),candidate=copy(self.candidate),active=copy(self.active),motion=self.motion and copy(self.motion.summary)or nil}end
 return Calibration

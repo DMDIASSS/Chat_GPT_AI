@@ -19,6 +19,7 @@ class CalibrationSafetyTests(unittest.TestCase):
         for name,file in [('Arena','local_arena.lua'),('Physics','local_physics.lua'),('Calibration','local_calibration.lua'),('Safety','local_goal_safety.lua'),('Intercept','local_intercept.lua')]:
             source+='local '+name+'=(function()\n'+(ROOT/'templates'/file).read_text()+'\nend)()\n'
         source+='''
+local measuredDefaults=profile.goal_defaults;profile.goal_defaults=nil
 local arena=Arena.new(profile);local physics=Physics.new(profile,arena)
 local calibration=Calibration.new(profile);local safety=Safety.new(profile,arena,physics,calibration)
 local function packet(car,ball,velocity,team)
@@ -288,4 +289,24 @@ for i=1,2 do
  assert(first.goals[i].half_width==second.goals[i].half_width)
  for j=1,3 do assert(first.goals[i].origin[j]==second.goals[i].origin[j] and first.goals[i].normal[j]==second.goals[i].normal[j])end
 end
+''')
+
+    def test_baked_measured_goals_are_used_without_file_load_or_apply(self):
+        self.run_lua('''
+profile.goal_defaults=measuredDefaults
+local baked=Calibration.new(profile)
+assert(not baked.active and baked.baseline.source=='builtin_measurements')
+for team=0,1 do
+ local g=baked:goal(team);local expected=measuredDefaults.goals[team+1]
+ assert(g.half_width==expected.half_width and g.height==expected.height)
+ assert(g.origin[2]==expected.origin[2])
+end
+local planner=Intercept.new(profile,arena,physics);planner.calibration=baked
+assert(planner:goal(1).half_width==measuredDefaults.goals[2].half_width)
+baked.points=landmarks();baked:apply();assert(baked:goal(1).half_width==860)
+baked:begin();baked.active=nil
+assert(baked:goal(1).half_width==measuredDefaults.goals[2].half_width,'Reset lost built-in measurements')
+local report=baked:report();assert(report.baseline.goals[1].height==measuredDefaults.goals[1].height)
+baked.baseline.goals[1].height=600
+assert(measuredDefaults.goals[1].height~=600,'Runtime modified the embedded profile')
 ''')

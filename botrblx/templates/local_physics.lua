@@ -205,7 +205,7 @@ function Physics:observe(packet,now)
 end
 
 function Physics:report()
-    return {version="local-6.7",profile=self.profile.name,units="simulation units; seconds",
+    return {version="local-6.8",profile=self.profile.name,units="simulation units; seconds",
         studs_per_unit=self.profile.roblox_studs_per_sim_unit,arena=self.profile.arena,
         saved_physics=self.profile.physics,gravity_used=self.gravity,observed_gravity=self.observedGravity,
         gravity_samples=#self.gravitySamples,flight_position_error_median=self.error,

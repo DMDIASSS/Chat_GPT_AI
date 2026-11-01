@@ -28,6 +28,15 @@ class PhysicsProfileTests(unittest.TestCase):
                 with self.assertRaises(ValueError):load_arena_profile(path)
 
 
+    def test_rejects_invalid_embedded_goal_bounds_and_orientation(self):
+        for key,value in (("height",0),("half_width",True),("normal",[0,1,0]),("side",[0,0,1]),("origin",[0,0])):
+            with self.subTest(key=key),tempfile.TemporaryDirectory() as directory:
+                profile=copy.deepcopy(PROFILE);profile["goal_defaults"]["goals"][0][key]=value
+                path=Path(directory)/"invalid.json";path.write_text(json.dumps(profile))
+                with self.assertRaises(ValueError):load_arena_profile(path)
+
+
+
 @unittest.skipUnless(LUAU,"Set LUAU_BIN to exercise physics prediction")
 class PhysicsTests(unittest.TestCase):
     def run_lua(self,body):
@@ -297,6 +306,6 @@ assert(#physics.trace<=150)
 p.ball.position={9000,0,93.15};physics:observe(p,2001/30)
 assert(physics.mismatch,'Outside geometry did not flag profile mismatch')
 local report=physics:report()
-assert(report.version=='local-6.7' and report.profile_mismatch and report.arena.EXTENT_X==4096)
+assert(report.version=='local-6.8' and report.profile_mismatch and report.arena.EXTENT_X==4096)
 assert(report.saved_physics.BALLWORLD_RESTITUTION==.6)
 ''')

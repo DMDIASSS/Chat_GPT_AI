@@ -1,5 +1,5 @@
 {
-  "version": "local-6.7",
+  "version": "local-6.8",
   "date": "2026-11-01",
   "original_nexto": {
     "name": "Nexto",
@@ -97,7 +97,7 @@
     "measured_version": "local-6.3"
   },
   "validation": {
-    "tests_passed": 173,
+    "tests_passed": 175,
     "tests_failed": 0,
     "tests_skipped": 0,
     "prebuilt_luau_compile": true,
@@ -130,7 +130,8 @@
     "F9 incident marker retains up to two recent eight-second trace windows",
     "Identify unique source car dimensions even when hidden hitbox transform is stale; keep source-offset fallback explicit",
     "Flying crossbar calibration: bounded F10-armed impact capture instead of an impossible stationary nose-up pose; retain stillness checks for ground landmarks",
-    "Accept tilted concave post captures and supported nose-up rear-wall captures; keep rejection of incorrect horizontal headings and explicit Apply for existing files"
+    "Accept tilted concave post captures and supported nose-up rear-wall captures; keep rejection of incorrect horizontal headings and explicit Apply for existing files",
+    "Bake fitted numeric goal geometry into default profile and use it automatically for guards and optional ground aiming; no user Load/Apply step or raw calibration file in package"
   ],
   "limits": [
     "Measured cloud speedups do not guarantee a particular FPS, decision rate or win rate on the user PC.",
@@ -145,19 +146,19 @@
     "file_transport.lua": "6cea0e28784191461f21b2b425be96134e32b5a99cf4820d9ffc07e3b7e5d3d2",
     "http_compat.lua": "e2f86fdcf2d675f707467e6e101dd92b6d5c06c662ec1f65c5c1428c21a33dc5",
     "local_arena.lua": "b0cc75983cc9c5d0ee5fcb28655d786cad24823115495f4f6fdc1b8df1b70788",
-    "local_calibration.lua": "9df59f12daf77adb9464c5d16c23277e3aca36cd1a1db04b5b6683559a611fe7",
+    "local_calibration.lua": "40f23d324624184418ad582a450c9c28552eaf1d48a0f376b766599861e69483",
     "local_cars.lua": "5e72ca42274b11895e8164cdd6716fc8e656f21cea212e1ba84693efa5c1d983",
-    "local_goal_safety.lua": "40a62eef476a69cb71488ba895dec0aed2b294ccac8aa490270cffeb5887abab",
+    "local_goal_safety.lua": "04037e93200b666a7e002491a2d53ce5c6b99961f76357b6925c8de15866edfd",
     "local_intercept.lua": "c89e529a7be5db1e7ecec8410967da3100f5b92ce9b5211cb7f59d6de4122151",
     "local_keyboard.lua": "76f0f8eed707da8befdafd3248c0f60da7e8fa760248763b8a34ba9c9657ff4a",
     "local_kickoff.lua": "15488463581aaa45e51df05e1fcc7aaeb210e3c4b8f1ef9f411c6b550a855014",
     "local_pads.lua": "8df26791b386d58d114b195b865c6bf2e744a011d1f3de40f3e04003a2083b97",
-    "local_physics.lua": "506c1a611394eb06a3b1de4c49d0b6db6fa0a5c98872acf0c3703bdc4ddb9e2d",
+    "local_physics.lua": "dcf30a1c43b09f9c9950c6737a4f57215f9dfe5603b6f82dffeab8372de1c9db",
     "local_policy.lua": "cfddae893ef58bb5688938411bb5c6c417544a710aa543f64bb4aab69f6804be",
     "local_teams.lua": "68ca4ee0794ad9297cf1fe6f1f9140ea02dcc74f2538e0a95ddd4cb28f427b4a",
     "local_timing.lua": "ff6b98140431f3046ebdb4a80f0e2255d79600b550609275681a63197f14d3e0",
     "local_window.lua": "76dcad27ff4901dc15b6af81c8de566a9e1b0575ac177bc0868bb7699d5d1487",
-    "standalone.lua": "5fde992ddc990e272710881a4148d35cc20aef1b1d65ab0f1304db8039874464"
+    "standalone.lua": "644837c09bacec2327ece69220c1953c66fd921f1705b50e2a9fd8a6fe7d70f8"
   },
   "jump_mapping": {
     "ground_estimate_previously_changed_pitch_in_actions": 12,
@@ -185,7 +186,6 @@
   "calibration": {
     "landmarks": 9,
     "motion_recording_seconds": 20,
-    "requires_explicit_apply": true,
     "changes_actor_observations_or_weights": false,
     "changes_saved_masses": false,
     "goal_override_consumers": [
@@ -208,6 +208,11 @@
     "rear_wall_supported_pose": "Accept nose-up pose with wheels facing the rear wall; record outermost body support as approximate layout depth, not exact wall geometry.",
     "centre_heading_affects_fit": false,
     "uploaded_landmarks_replayed_locally": true,
-    "raw_uploaded_landmarks_in_public_package": false
-  }
+    "raw_uploaded_landmarks_in_public_package": false,
+    "requires_explicit_apply_for_manual_files": true,
+    "embedded_measured_defaults_active_at_startup": true,
+    "embedded_defaults_file_load_required": false,
+    "embedded_defaults_source": "Latest measured post/rear pairs and orange crossbar; earlier consistent blue crossbar replaces a low high-scatter reading."
+  },
+  "arena_profile_sha256": "3a9fe2a8459e66318a37d0f650bca46fd6127823d58cbe1687296c5e17527957"
 }

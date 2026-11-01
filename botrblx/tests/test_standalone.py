@@ -155,7 +155,7 @@ task.wait=function(dt)move(dt)end
 
     def test_standalone_owns_inputs_f8_focus_and_close(self):
         self.client_case('''
-assert(result.version=='local-6.7')
+assert(result.version=='local-6.8')
 move(.05);inputKey('F6')
 for i=1,40 do move(1/30)end
 assert(#emissions>0,'No local inputs sent')
@@ -219,6 +219,7 @@ for i=1,120 do move(.02)end
 click('Save physics report')
 assert(saved.incidents and #saved.incidents==1 and #saved.incidents[1].trace>0,'Lost marked incident')
 assert(saved.goal_safety_enabled and saved.calibration.active==nil)
+assert(saved.calibration.baseline.source=='builtin_measurements'and saved.calibration.baseline.goals[2].half_width<896,'Baked goal defaults were not active')
 ''',"click('Close')",extra='''
 local saved
 writefile=function(_,body)saved=encoded[body]end
@@ -376,7 +377,7 @@ inputKey('F6');for i=1,30 do move(1/30)end
 inputKey('F8');click('Save physics report')
 assert(savedName=='TurboBall_Physics_Report.json' and savedReport,'Report was not written')
 local report=encoded[savedReport]
-assert(report.version=='local-6.7' and report.physics_assist_enabled==false)
+assert(report.version=='local-6.8' and report.physics_assist_enabled==false)
 assert(report.place==101880234193261 and #report.model_sha256==64)
 assert(report.saved_from.enabled==false and report.saved_from.last_stop_reason=='STOPPED by F8. F6 starts again.')
 assert(#report.trace>0 and #report.trace<=150 and report.profile=='turbo_soccer_standard')

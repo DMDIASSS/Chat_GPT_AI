@@ -1241,7 +1241,7 @@ function Physics:observe(packet,now)
 end
 
 function Physics:report()
-    return {version="local-6.7",profile=self.profile.name,units="simulation units; seconds",
+    return {version="local-6.8",profile=self.profile.name,units="simulation units; seconds",
         studs_per_unit=self.profile.roblox_studs_per_sim_unit,arena=self.profile.arena,
         saved_physics=self.profile.physics,gravity_used=self.gravity,observed_gravity=self.observedGravity,
         gravity_samples=#self.gravitySamples,flight_position_error_median=self.error,
@@ -1601,7 +1601,7 @@ Calibration.steps={
     {'blue_top','Blue: underside of crossbar','At the middle of the goal mouth, Press F10 to arm, then fly nose-up into the UNDERSIDE at the middle of the mouth. Contact is captured automatically.'},
     {'blue_back','Blue: back of net','Inside the blue net, touch the REAR wall. Nose-out or nose-up on the curved wall is OK. Stop moving.'}}
 function Calibration.new(profile)
-    return setmetatable({profile=profile,points={},index=1,history={},reference='bumper',tab='geometry'},Calibration)
+    return setmetatable({profile=profile,baseline=copy(profile.goal_defaults),points={},index=1,history={},reference='bumper',tab='geometry'},Calibration)
 end
 function Calibration:begin()self.crossbar=nil;self.history={};self.index=1;self.points={};self.candidate=nil end
 function Calibration:observe(packet,now,keys,physics)
@@ -1814,6 +1814,7 @@ end
 function Calibration:apply()self.candidate=self:fit();self.active=copy(self.candidate);return self.active end
 function Calibration:goal(team)
     if self.active then return self.active.goals[team+1]end
+    if self.baseline then return self.baseline.goals[team+1]end
     local a=self.profile.arena;local sign=team==0 and -1 or 1
     return {origin={0,sign*a.EXTENT_Y,0},side={1,0,0},normal={0,sign,0},half_width=a.MOUTH_HALF_WIDTH,
         height=a.MOUTH_HEIGHT,back_depth=a.GOAL_BACK_Y-a.EXTENT_Y,fillet=a.MOUTH_FILLET}
@@ -1890,7 +1891,7 @@ function Calibration:load(data)
     if loadedMotion then self.motion=loadedMotion end
     if data.reference=='bumper'or data.reference=='center'then self.reference=data.reference end
 end
-function Calibration:report()return {points=copy(self.points),candidate=copy(self.candidate),active=copy(self.active),motion=self.motion and copy(self.motion.summary)or nil}end
+function Calibration:report()return {baseline=copy(self.baseline),points=copy(self.points),candidate=copy(self.candidate),active=copy(self.active),motion=self.motion and copy(self.motion.summary)or nil}end
 return Calibration
 
 end)()
@@ -1984,7 +1985,7 @@ function Safety:step(packet,action,now)
     end
     local a={forwardSpeed>200 and -1 or 0,0,0,0,0,0,0,0}
     self.last={mode='Leave clear shot',time=now,crossing=cross.position,crossing_seconds=cross.time,
-        calibrated_geometry=self.calibration.active~=nil}
+        calibrated_geometry=self.calibration.active~=nil or self.calibration.baseline~=nil}
     return a,self.last.mode
 end
 return Safety
@@ -2037,7 +2038,7 @@ return Window
 
 end)()
 local PROFILE=
-{["version"]=1,["name"]="turbo_soccer_standard",["provenance"]={["kind"]="numeric collision/physics specification from user-provided saved place",["place_sha256"]="00ea1fbc258e3d5e317daf5bef484368490726d006d53176e94a42375b1ee733",["geometry_source_sha256"]="d8f35aa62627d23a68ee3a51ef315c1b8b9e53ec4ba0a14cfa3f6a76dab467c0",["constants_source_sha256"]="3274f6c9d71e5e86d9708694e59599f1de71a8dfc41db0028567c0bffe8d541c"},["roblox_studs_per_sim_unit"]=0.1,["arena"]={["EXTENT_X"]=4096.0,["EXTENT_Y"]=5120.0,["HEIGHT"]=2048.0,["CORNER"]=8064.0,["EDGE_RADIUS"]=256.0,["BACK_RAMP_RADIUS"]=160.0,["CEILING_RADIUS"]=512.0,["SIDE_CORNER_RADIUS"]=852.0,["BACK_CORNER_RADIUS"]=874.0,["GOAL_HALF_WIDTH"]=893.0,["GOAL_HEIGHT"]=642.775,["GOAL_BACK_Y"]=6000.0,["GOAL_TOP_RADIUS"]=130.0,["GOAL_BOTTOM_RADIUS"]=70.0,["GOAL_LIP_RADIUS"]=80.0,["GOAL_BACK_RADIUS"]=300.0,["MOUTH_HALF_WIDTH"]=896.0,["MOUTH_HEIGHT"]=640.0,["MOUTH_FILLET"]=96.0,["MOUTH_LIP"]=8.0},["ramp_facets_degrees"]={0,11.617,22.892,33.984,45,56.016,67.108,78.383,90},["physics"]={["GRAVITY_Z"]=-650.0,["BALL_RADIUS"]=91.25,["BALL_WORLD_RADIUS"]=93.15,["BALL_REST_Z"]=93.15,["CAR_MAX_SPEED"]=2300.0,["CAR_MAX_ANG_SPEED"]=5.5,["BALL_MAX_SPEED"]=6000.0,["BALL_MAX_ANG_SPEED"]=6.0,["BALL_DRAG"]=0.03,["BOOST_USED_PER_SECOND"]=33.333333333333336,["BOOST_ACCEL_GROUND"]=991.6666666666666,["BOOST_ACCEL_AIR"]=1058.3333333333333,["DOUBLEJUMP_MAX_DELAY"]=1.25,["MAX_SUSPENSION_TRAVEL"]=12.0,["WHEEL_RAY_MIN_HIT_DIST"]=17.079519899575633,["CAR_SPAWN_REST_Z"]=17.0,["TICK_RATE"]=120,["BALLWORLD_FRICTION"]=0.35,["BALLWORLD_RESTITUTION"]=0.6,["SOLVER_ERP2"]=0.8,["RESTITUTION_VEL_THRESHOLD"]=10,["CONTACT_BREAKING_THRESHOLD"]=1,["BALL_WORLD_CONTACT_FLAT"]=0.0050000000000001155,["BALL_SLEEP_LIN_SPEED"]=40,["BALL_SLEEP_ANG_SPEED"]=1,["BALL_SLEEP_TIME"]=2,["CAR_MASS"]=180,["THROTTLE_TORQUE_AMOUNT"]=72000,["DRIVE_SPEED_TORQUE_FACTOR"]={{0,1},{1400,0.1},{1410,0}}},["car_presets"]={["standard"]={["size"]={120.50700378417969,86.69940185546875,38.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-33.75,29.5,20.7549991607666}}},["low"]={["size"]={130.427001953125,85.77989959716797,33.79999923706055},["offset"]={9.0,0.0,15.75},["front"]={["radius"]=12.0,["rest_length"]=33.95,["offset"]={50.29999923706055,31.100000381469727,15.75}},["back"]={["radius"]=13.5,["rest_length"]=33.85,["offset"]={-34.75,33.0,15.75}}},["flat"]={["size"]={131.32000732421875,87.17040252685547,31.894399642944336},["offset"]={9.008569717407227,0.0,12.094200134277344},["front"]={["radius"]=12.5,["rest_length"]=31.9242,["offset"]={49.970001220703125,27.799999237060547,12.094200134277344}},["back"]={["radius"]=17.0,["rest_length"]=27.9242,["offset"]={-35.43000030517578,20.280000686645508,12.094200134277344}}},["wedge"]={["size"]={133.99200439453125,83.02100372314453,32.79999923706055},["offset"]={12.5,0.0,11.75},["front"]={["radius"]=13.5,["rest_length"]=29.7,["offset"]={51.5,26.670000076293945,11.75}},["back"]={["radius"]=15.0,["rest_length"]=29.666,["offset"]={-35.75,35.0,11.75}}},["long"]={["size"]={129.5189971923828,84.68789672851562,36.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-34.0,29.5,20.7549991607666}}},["tall"]={["size"]={123.22000122070312,79.21029663085938,44.15909957885742},["offset"]={11.375699996948242,0.0,21.5049991607666},["front"]={["radius"]=15.0,["rest_length"]=39.505,["offset"]={51.25,25.899999618530273,21.5049991607666}},["back"]={["radius"]=15.0,["rest_length"]=39.105,["offset"]={-33.75,29.5,21.5049991607666}}}},["boost_positions"]={["big"]={{-3584.0,0.0,73.0},{3584.0,0.0,73.0},{-3072.0,4096.0,73.0},{3072.0,4096.0,73.0},{-3072.0,-4096.0,73.0},{3072.0,-4096.0,73.0}},["small"]={{0.0,-4240.0,70.0},{-1792.0,-4184.0,70.0},{1792.0,-4184.0,70.0},{-940.0,-3308.0,70.0},{940.0,-3308.0,70.0},{0.0,-2816.0,70.0},{-3584.0,-2484.0,70.0},{3584.0,-2484.0,70.0},{-1788.0,-2300.0,70.0},{1788.0,-2300.0,70.0},{-2048.0,-1036.0,70.0},{0.0,-1024.0,70.0},{2048.0,-1036.0,70.0},{-1024.0,0.0,70.0},{1024.0,0.0,70.0},{-2048.0,1036.0,70.0},{0.0,1024.0,70.0},{2048.0,1036.0,70.0},{-1788.0,2300.0,70.0},{1788.0,2300.0,70.0},{-3584.0,2484.0,70.0},{3584.0,2484.0,70.0},{0.0,2816.0,70.0},{-940.0,3308.0,70.0},{940.0,3308.0,70.0},{-1792.0,4184.0,70.0},{1792.0,4184.0,70.0},{0.0,4240.0,70.0}}},["policy_boost_limit"]=6,["recovery"]={["enabled"]=true,["stuck_seconds"]=2.2,["minimum_travel"]=45,["escape_seconds"]=0.65,["cooldown_seconds"]=3}}
+{["version"]=1,["name"]="turbo_soccer_standard",["provenance"]={["kind"]="numeric collision/physics specification from user-provided saved place",["place_sha256"]="00ea1fbc258e3d5e317daf5bef484368490726d006d53176e94a42375b1ee733",["geometry_source_sha256"]="d8f35aa62627d23a68ee3a51ef315c1b8b9e53ec4ba0a14cfa3f6a76dab467c0",["constants_source_sha256"]="3274f6c9d71e5e86d9708694e59599f1de71a8dfc41db0028567c0bffe8d541c"},["roblox_studs_per_sim_unit"]=0.1,["arena"]={["EXTENT_X"]=4096.0,["EXTENT_Y"]=5120.0,["HEIGHT"]=2048.0,["CORNER"]=8064.0,["EDGE_RADIUS"]=256.0,["BACK_RAMP_RADIUS"]=160.0,["CEILING_RADIUS"]=512.0,["SIDE_CORNER_RADIUS"]=852.0,["BACK_CORNER_RADIUS"]=874.0,["GOAL_HALF_WIDTH"]=893.0,["GOAL_HEIGHT"]=642.775,["GOAL_BACK_Y"]=6000.0,["GOAL_TOP_RADIUS"]=130.0,["GOAL_BOTTOM_RADIUS"]=70.0,["GOAL_LIP_RADIUS"]=80.0,["GOAL_BACK_RADIUS"]=300.0,["MOUTH_HALF_WIDTH"]=896.0,["MOUTH_HEIGHT"]=640.0,["MOUTH_FILLET"]=96.0,["MOUTH_LIP"]=8.0},["ramp_facets_degrees"]={0,11.617,22.892,33.984,45,56.016,67.108,78.383,90},["physics"]={["GRAVITY_Z"]=-650.0,["BALL_RADIUS"]=91.25,["BALL_WORLD_RADIUS"]=93.15,["BALL_REST_Z"]=93.15,["CAR_MAX_SPEED"]=2300.0,["CAR_MAX_ANG_SPEED"]=5.5,["BALL_MAX_SPEED"]=6000.0,["BALL_MAX_ANG_SPEED"]=6.0,["BALL_DRAG"]=0.03,["BOOST_USED_PER_SECOND"]=33.333333333333336,["BOOST_ACCEL_GROUND"]=991.6666666666666,["BOOST_ACCEL_AIR"]=1058.3333333333333,["DOUBLEJUMP_MAX_DELAY"]=1.25,["MAX_SUSPENSION_TRAVEL"]=12.0,["WHEEL_RAY_MIN_HIT_DIST"]=17.079519899575633,["CAR_SPAWN_REST_Z"]=17.0,["TICK_RATE"]=120,["BALLWORLD_FRICTION"]=0.35,["BALLWORLD_RESTITUTION"]=0.6,["SOLVER_ERP2"]=0.8,["RESTITUTION_VEL_THRESHOLD"]=10,["CONTACT_BREAKING_THRESHOLD"]=1,["BALL_WORLD_CONTACT_FLAT"]=0.0050000000000001155,["BALL_SLEEP_LIN_SPEED"]=40,["BALL_SLEEP_ANG_SPEED"]=1,["BALL_SLEEP_TIME"]=2,["CAR_MASS"]=180,["THROTTLE_TORQUE_AMOUNT"]=72000,["DRIVE_SPEED_TORQUE_FACTOR"]={{0,1},{1400,0.1},{1410,0}}},["car_presets"]={["standard"]={["size"]={120.50700378417969,86.69940185546875,38.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-33.75,29.5,20.7549991607666}}},["low"]={["size"]={130.427001953125,85.77989959716797,33.79999923706055},["offset"]={9.0,0.0,15.75},["front"]={["radius"]=12.0,["rest_length"]=33.95,["offset"]={50.29999923706055,31.100000381469727,15.75}},["back"]={["radius"]=13.5,["rest_length"]=33.85,["offset"]={-34.75,33.0,15.75}}},["flat"]={["size"]={131.32000732421875,87.17040252685547,31.894399642944336},["offset"]={9.008569717407227,0.0,12.094200134277344},["front"]={["radius"]=12.5,["rest_length"]=31.9242,["offset"]={49.970001220703125,27.799999237060547,12.094200134277344}},["back"]={["radius"]=17.0,["rest_length"]=27.9242,["offset"]={-35.43000030517578,20.280000686645508,12.094200134277344}}},["wedge"]={["size"]={133.99200439453125,83.02100372314453,32.79999923706055},["offset"]={12.5,0.0,11.75},["front"]={["radius"]=13.5,["rest_length"]=29.7,["offset"]={51.5,26.670000076293945,11.75}},["back"]={["radius"]=15.0,["rest_length"]=29.666,["offset"]={-35.75,35.0,11.75}}},["long"]={["size"]={129.5189971923828,84.68789672851562,36.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-34.0,29.5,20.7549991607666}}},["tall"]={["size"]={123.22000122070312,79.21029663085938,44.15909957885742},["offset"]={11.375699996948242,0.0,21.5049991607666},["front"]={["radius"]=15.0,["rest_length"]=39.505,["offset"]={51.25,25.899999618530273,21.5049991607666}},["back"]={["radius"]=15.0,["rest_length"]=39.105,["offset"]={-33.75,29.5,21.5049991607666}}}},["boost_positions"]={["big"]={{-3584.0,0.0,73.0},{3584.0,0.0,73.0},{-3072.0,4096.0,73.0},{3072.0,4096.0,73.0},{-3072.0,-4096.0,73.0},{3072.0,-4096.0,73.0}},["small"]={{0.0,-4240.0,70.0},{-1792.0,-4184.0,70.0},{1792.0,-4184.0,70.0},{-940.0,-3308.0,70.0},{940.0,-3308.0,70.0},{0.0,-2816.0,70.0},{-3584.0,-2484.0,70.0},{3584.0,-2484.0,70.0},{-1788.0,-2300.0,70.0},{1788.0,-2300.0,70.0},{-2048.0,-1036.0,70.0},{0.0,-1024.0,70.0},{2048.0,-1036.0,70.0},{-1024.0,0.0,70.0},{1024.0,0.0,70.0},{-2048.0,1036.0,70.0},{0.0,1024.0,70.0},{2048.0,1036.0,70.0},{-1788.0,2300.0,70.0},{1788.0,2300.0,70.0},{-3584.0,2484.0,70.0},{3584.0,2484.0,70.0},{0.0,2816.0,70.0},{-940.0,3308.0,70.0},{940.0,3308.0,70.0},{-1792.0,4184.0,70.0},{1792.0,4184.0,70.0},{0.0,4240.0,70.0}}},["policy_boost_limit"]=6,["recovery"]={["enabled"]=true,["stuck_seconds"]=2.2,["minimum_travel"]=45,["escape_seconds"]=0.65,["cooldown_seconds"]=3},["goal_defaults"]={["version"]=1,["source"]="builtin_measurements",["goals"]={{["origin"]={-0.10539187018261847,-5156.06088311565,0.0},["side"]={-0.9999997941940588,-0.0006415698245800758,0.0},["normal"]={0.0006415698245800758,-0.9999997941940588,0.0},["half_width"]=893.3817832411139,["height"]=639.0078980633016,["back_depth"]=830.1082496030729,["fillet"]=96.0,["back_reference"]="wall_supported_body"},{["origin"]={-0.5865567549764439,5137.970467167625,0.0},["side"]={-0.999943937915091,-0.01058872168209319,0.0},["normal"]={-0.01058872168209319,0.999943937915091,0.0},["half_width"]=894.5282420002634,["height"]=644.1573434119969,["back_depth"]=850.0714001682221,["fillet"]=96.0,["back_reference"]="wall_supported_body"}},["note"]="Latest measured posts and rear-wall samples; earlier consistent blue crossbar replaces a low high-scatter flight reading. Numeric fitted geometry only; no raw capture poses or timestamps.",["warnings"]={"Rear body support depth is approximate; collision profile retains its saved curved net surface."}}}
 local arenaAdapter=Arena.new(PROFILE)
 local padReader=Pads.new(PROFILE)
 local carReader=Cars.new(PROFILE,Arena)
@@ -2065,7 +2066,7 @@ local connections={}
 local function connect(signal,callback)
     local connection=signal:Connect(callback);connections[#connections+1]=connection
 end
-local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.7 | F4 minimize')
+local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.8 | F4 minimize')
 local panel=window.panel
 local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
 local label=Instance.new("TextLabel",main)
@@ -2691,8 +2692,8 @@ task.spawn(function()
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=(MODEL_NAME.." LOCAL v6.7 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
-            :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")
+        label.Text=(MODEL_NAME.." LOCAL v6.8 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
+            :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")..(calibration.baseline and "\nMeasured goal defaults active."or "")
         local lastTick,lastUi=os.clock(),-math.huge
         local busy=false
         local rate=0
@@ -2851,7 +2852,7 @@ task.spawn(function()
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=(MODEL_NAME.." v6.7 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=(MODEL_NAME.." v6.8 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -2878,4 +2879,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.7"}
+return {started=true,version="local-6.8"}

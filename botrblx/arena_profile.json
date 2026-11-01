@@ -450,5 +450,59 @@
     "minimum_travel": 45,
     "escape_seconds": 0.65,
     "cooldown_seconds": 3
+  },
+  "goal_defaults": {
+    "version": 1,
+    "source": "builtin_measurements",
+    "goals": [
+      {
+        "origin": [
+          -0.10539187018261847,
+          -5156.06088311565,
+          0.0
+        ],
+        "side": [
+          -0.9999997941940588,
+          -0.0006415698245800758,
+          0.0
+        ],
+        "normal": [
+          0.0006415698245800758,
+          -0.9999997941940588,
+          0.0
+        ],
+        "half_width": 893.3817832411139,
+        "height": 639.0078980633016,
+        "back_depth": 830.1082496030729,
+        "fillet": 96.0,
+        "back_reference": "wall_supported_body"
+      },
+      {
+        "origin": [
+          -0.5865567549764439,
+          5137.970467167625,
+          0.0
+        ],
+        "side": [
+          -0.999943937915091,
+          -0.01058872168209319,
+          0.0
+        ],
+        "normal": [
+          -0.01058872168209319,
+          0.999943937915091,
+          0.0
+        ],
+        "half_width": 894.5282420002634,
+        "height": 644.1573434119969,
+        "back_depth": 850.0714001682221,
+        "fillet": 96.0,
+        "back_reference": "wall_supported_body"
+      }
+    ],
+    "note": "Latest measured posts and rear-wall samples; earlier consistent blue crossbar replaces a low high-scatter flight reading. Numeric fitted geometry only; no raw capture poses or timestamps.",
+    "warnings": [
+      "Rear body support depth is approximate; collision profile retains its saved curved net surface."
+    ]
   }
 }

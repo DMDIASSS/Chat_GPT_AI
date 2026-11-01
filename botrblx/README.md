@@ -1,4 +1,10 @@
-# TurboBall Roblox bot — Local v6.7
+# TurboBall Roblox bot — Local v6.8
+
+Your measured goal positions, opening widths and crossbar heights are built into
+v6.8 and used automatically from startup. Run the new script and press **F6**;
+loading a calibration file or pressing Apply is unnecessary. The panel confirms
+**Measured goal defaults active**. The optional wizard can override these defaults
+with a future manual fit; Reset returns to the baked measurements.
 
 ## Ready-to-run original Nexto
 
@@ -16,7 +22,7 @@ are in `NEXTO_NOTICE.md` and `NEXTO_LICENSE.txt`.
    loadstring(readfile("TurboBall_Nexto.lua"))()
    ```
 
-4. Wait for **Nexto LOCAL v6.7 ready**, then press **F6**. **F8** stops.
+4. Wait for **Nexto LOCAL v6.8 ready**, then press **F6**. **F8** stops.
 
 Nexto starts with **Physics assist: OFF** and **Yield to teammate: OFF**. The actor
 chooses its actions, with the existing kickoff, bounded stuck recovery, and the
@@ -31,7 +37,7 @@ workspace, using the existing project Python. `EXPORT_LOCAL_BOT.bat` continues t
 export your private Update271 checkpoint separately. Both builds identify the
 model by name and SHA256 in diagnostics.
 
-## Movable window, goal calibration and physics recording (local v6.7)
+## Movable window, goal calibration and physics recording (local v6.8)
 
 **F4** minimizes/restores the window during play. Pause with **F8** to drag its
 title bar. Open **Calibration / physics test** while paused; the bot stays paused
@@ -49,14 +55,14 @@ measurements** activates the fit; **Save test file** writes
 files can be saved and resumed. See the [placement guide](CALIBRATION_GUIDE.md)
 for contact directions and the alternative centre-marker reference.
 
-Local v6.7 accepts post pitch/roll on the concave mouth and supported nose-up
+Local v6.8 accepts post pitch/roll on the concave mouth and supported nose-up
 rear-wall poses. It uses full rotated body support; the centre capture's heading
 does not rotate the fit. Existing saved landmarks can be loaded and applied
-without recapturing. Rear-wall body depth is explicitly approximate. Landmarks
+without recapturing. The current built-in measurements already apply at startup. Rear-wall body depth is explicitly approximate. Landmarks
 do not establish a persistent shooting bias; use an F9-marked physics report to
 record the wide/high shot itself.
 
-The applied goal positions, widths and heights inform Goal safety and, when
+The built-in measured goals, or an optional applied manual fit, inform Goal safety and, when
 enabled, Physics assist's ground aiming. The rear-wall samples validate and
 export the layout; they do not replace the analytic curved collision profile.
 The frozen actor's observations and weights remain unchanged.
@@ -175,7 +181,7 @@ is no file exchange, HTTP request, or Python process during driving.
    loadstring(readfile("botrblx_standalone.lua"))()
    ```
 
-5. Wait for **`LOCAL v6.7 ready | model self-test passed`**, then press **F6**.
+5. Wait for **`LOCAL v6.8 ready | model self-test passed`**, then press **F6**.
    **Team: AUTO** identifies `Deadline_coolgun` from the match scoreboard and
    cross-checks the rendered nameplate relationship. It follows team changes.
    If the team cannot be identified, open the in-game scoreboard once. The
@@ -268,13 +274,13 @@ runtime coverage, but have not been live-tested in Roblox/JJSploit and are not a
 measured win-rate improvement.
 
 After replacing this folder, rerun **EXPORT_LOCAL_BOT.bat** and execute the newly
-generated private Lua file. The ready badge must show **LOCAL v6.7** for a private export. Exporting the
+generated private Lua file. The ready badge must show **LOCAL v6.8** for a private export. Exporting the
 place itself does not update a standalone script you already generated.
 
 ## Match pad detection and stop diagnostics (local v6.1)
 
 Rerun **EXPORT_LOCAL_BOT.bat** after updating this folder. Existing generated Lua
-scripts contain the previous runtime; the current ready badge is **v6.7**.
+scripts contain the previous runtime; the current ready badge is **v6.8**.
 
 The first live v6 report showed a measured standard ball radius and gravity close
 to the saved profile, but zero discovered boost pads throughout the run. The
@@ -414,7 +420,7 @@ change model weights or create a policy mesh input.
 
 Rerun **EXPORT_LOCAL_BOT.bat after installing this update**: the previous generated
 standalone script contains the previous adapter. No model weights are downloaded
-or retrained. The current package shows a **v6.7** badge after re-export.
+or retrained. The current package shows a **v6.8** badge after re-export.
 
 The game uses its own match teams. The new reader matches your name to the
 scoreboard row's team edge; it does not assume Roblox's `Player.Team` is the match

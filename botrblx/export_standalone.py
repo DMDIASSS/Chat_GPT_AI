@@ -155,6 +155,24 @@ def load_arena_profile(path):
         any(not number(v) or v<0 for v in point) for point in curve
     ) or any(a[0]>=b[0] for a,b in zip(curve,curve[1:])):
         raise ValueError("Invalid DRIVE_SPEED_TORQUE_FACTOR curve")
+    defaults=profile.get("goal_defaults")
+    if defaults is not None:
+        if not isinstance(defaults,dict) or defaults.get("version")!=1 or not isinstance(defaults.get("goals"),list) or len(defaults["goals"])!=2:
+            raise ValueError("Invalid built-in goal defaults")
+        for team,goal in enumerate(defaults["goals"]):
+            if not isinstance(goal,dict):raise ValueError("Invalid built-in goal")
+            for key in ("origin","side","normal"):
+                v=goal.get(key)
+                if not isinstance(v,list) or len(v)!=3 or not all(number(n) for n in v):
+                    raise ValueError("Invalid goal vector: "+key)
+            for key,lo,hi in (("half_width",500,1200),("height",350,900),("back_depth",300,1400),("fillet",0,175)):
+                n=goal.get(key)
+                if not number(n) or not lo<=n<=hi:raise ValueError("Invalid goal dimension: "+key)
+            side,normal=goal["side"],goal["normal"]
+            if (abs(sum(n*n for n in side)-1)>.01 or abs(sum(n*n for n in normal)-1)>.01
+                or abs(sum(a*b for a,b in zip(side,normal)))>.01 or abs(side[2])+abs(normal[2])>1e-5
+                or normal[1]*(1 if team else -1)<.95):
+                raise ValueError("Invalid goal orientation")
     return profile
 
 
