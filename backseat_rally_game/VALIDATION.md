@@ -1,42 +1,67 @@
-# Validation — 2 November 2026
+# Validation — 2 November 2026 — 1.4.0
 
-- 42 automated tests passed using the Luau CLI and Python unittest.
-- Every authored Luau source compiles.
-- Road continuity, grade and curve bounds checked across 1,000 seeds.
-- Manual control simulation reaches a finite finish and updates a personal best.
-- Banked endless replay and ghost data survive a new storage session in the test double.
-- Replay seeking, recovery gaps, controls, bookmarks and bounded stream/cache behavior checked.
-- Storage failures preserve session access and are not reported as confirmed cloud saves.
-- Studio installation preserves existing scripts, bot models, service children and settings.
-- Ready places open the new menu automatically; optional installations and closing restore the original view.
-- The full RBXL preserves all 82,861 original instances and original hierarchy relationships.
-- Every original INST, PROP, SSTR and metadata chunk is byte identical.
-- An independent robloxapi/rbxfile decoder reads all 82,861 original instances unchanged,
-  followed by the 25 additions. Original script counts remain 490 ModuleScripts,
-  6 Scripts and 4 LocalScripts; the expansion adds 13, 1 and 1 respectively.
-- Artifact hashes and embedded sources are checked against the reviewable source files.
+91 automated tests passed with the Luau CLI and Python unittest. Every authored
+Luau source and all fourteen repaired legacy Sources compile. These are headless
+checks using a Roblox test double; they are not a Studio or GPU benchmark.
 
-- Default startup reaches the working menu and creates a road without the original garage.
-- The car preview has a complete native body independently of mesh downloads.
-- Failed and timed-out meshes preserve a complete body; successful late skins align to the current pose.
-- Imported scenery failures retain generated trees and a continuous road.
-- Legacy fog, atmosphere and blur are isolated during a run and restored on return.
+## Driving and presentation
 
-- An unpublished place initializes and spawns a complete visible server car without calling store APIs.
-- A throwing GetDataStore call cannot abort server setup or spawning.
-- A slow cloud profile does not block the starter car.
-- Offline input capture drives the car, then banking and replay playback work in session.
-- Missing-server requests display a visible start failure and release the button.
-- The clean binary standalone has a native floor/spawn, the proper LocalScript container,
-  and no imported mesh or sound instances.
-- The Sakura Pass build retains all 132,961 original instances and their hierarchy.
+- All 15 recovered car profiles use the same bounded driving solver.
+- Manual steering can finish varied courses; braking, reverse, recovery and right-turn direction checked.
+- Road continuity, curve/grade bounds and rendered/contact height agreement checked across 1,000 seeds.
+- Per-wheel load, pressure, temperature, wear, punctures, grip consequences, component damage and repair verified.
+- Tyre deflation changes wheel height/body pose; different axle balances affect contact pose.
+- Live driving stays inside the adjusted cockpit after repeated camera changes; FOV/seat adjustments apply.
+- Opaque fallback cabin/windows are hidden locally; original skins retain their source instances.
+- Replay cockpit/chase changes restore exterior visibility; headlights switch and respect quality shadow settings.
+- Cockpit, rain and impact effects allocate no instances while updating; rain has a fixed cap.
+- Impact effects fade; severe blackout is optional and replay impact screens are suppressed.
 
-No Studio GUI or live Roblox server is available in this environment. Renderer/device
-behavior, permissions for reused mesh/audio assets, production DataStores and real
-multiplayer latency still require a Studio playtest. The supplied original server
-scripts are placeholders; the new modes use their own authored backend.
+## Friends, settings and recordings
 
-All 15 recovered profiles are checked through the same solver. New checks cover axle
-load contact poses, deterministic bumps/climate, and suspension pose replay round trips.
-The old Sakura renderer has not been reproduced in Studio; overlap/rebase changes
-apply to the new rally renderer. See ASSET_EXPORT_GUIDE.md for calibration limits.
+- Actual server race actions exercise room creation, joins, ready states, shared rules/seed,
+  separate slots, all-player road-ready barrier, common countdown and synchronized clocks.
+- Live rankings, finish/DNF ordering, early finisher departure, host transfer, disconnects,
+  loading timeout/retirement and partial-launch rollback tested. Standings broadcasts are capped.
+- Service requires a stopped car near a bay, adds 15 seconds, repairs condition and applies pressure;
+  moving/out-of-bay attempts and repeated service are rejected.
+- Human co-driver input cannot steal the car; joined participants receive shared replay access.
+- Settings validation rejects nonfinite/out-of-range/unknown data; binding collisions swap safely.
+- CAS/UIS duplicate events do not duplicate actions; rebinding works, old keys stop driving,
+  settings clear held controls, and replay freecam input suspends while settings are open.
+- Settings changes coalesce into one queued write per player; saves retain existing rewards;
+  session values survive failed cloud writes and successful settings load in a fresh storage session.
+- Replay codec round-trips controls, suspension, tyre conditions, gear/RPM, health and impact events;
+  punctures/repairs do not appear before their timestamps. Legacy 11/14-field data remains readable.
+- Replay caches, pages and scrub queues remain bounded; director cuts, paused freecam movement,
+  FOV/distance limits, origin rebasing and camera/mouse cleanup checked.
+
+## Startup and preservation
+
+- Unpublished places spawn a complete native server car without opening DataStores.
+- Throwing/slow store setup cannot abort starter spawning; missing-server starts show a failure/reset.
+- Banking, replay playback and rewards work in-session without storage. Failed writes are not called cloud saves.
+- Failed/timed-out/unconfirmed imported meshes leave a complete native car; late valid skins align to its current pose.
+- Bounded road streaming retains generated scenery on asset failure; inherited fog/blur and UI/view restore on close.
+- The original exported ReplicaClient runs against the session profile/settings bridge in tests:
+  handshake, readiness, independent defaults, OnSet, validation and cleanup verified.
+- Zone self-reference, DataController duplicate initialization/warning throttle, and native input resolution tested.
+- A 109-object copy of the supplied native InputContext/Action/Binding graph retains exact property data and hierarchy.
+- The Backseat place retains all 82,861 original objects; Sakura retains all 132,961.
+  Each adds 158 objects, including the expansion, input graph copy and inert Source backups.
+- All original objects and parent relationships are retained. Exactly fourteen original Sources
+  have listed repairs, with exact original backups and before/after hashes. Other original properties remain unchanged.
+- Effective property verification rejects hidden overrides; artifact hashes/embedded authored Sources match the repository.
+- Independent robloxapi/rbxfile decoding checks original instance paths and all non-Source properties;
+  Python separately verifies the fourteen permitted Source changes and backups.
+
+Roblox Studio is unavailable here. Original-scene disappearing/rendering faults, imported
+asset permissions, exact handling feel, real network latency, production DataStore behavior
+and device frame rates still require a Studio playtest. Private media permissions cannot be
+changed by this build. The original full backend is incomplete; its session compatibility
+bridge does not restore private player data or reconstruct every original game service.
+
+The driving model uses deterministic four-contact handling and anchored visuals. It does
+not simulate soft-body destruction, deformable tyre carcasses, a full meteorological system
+or every original chassis field. Public/native fallback geometry remains necessary when
+Roblox does not grant access to an imported skin.

@@ -9,8 +9,10 @@ as separate `.rbxm` files with **right-click → Save to File…**:
 3. `ReplicatedStorage.Balancing` — the configuration tables.
 
 Keep the hierarchy intact. Send the files here. A copy where the cars already look
-correct in Studio is most useful. Also paste the first red Output error when the
-Sakura scene disappears, and say whether you were driving or viewing the old scene.
+correct in Studio is most useful. The supplied Output log identifies private media, a recursive Zone require and
+missing runtime profiles/settings/input lookups. The ready 1.4.0 binary repairs the
+identified script faults. Geometry disappearance still needs a Studio reproduction;
+please identify whether it happens in the new rally or the original scene if it persists.
 
 RBXM preserves asset references; exporting it does not grant access to private meshes
 or textures. Missing private geometry requires developer-granted access or a geometry
@@ -23,7 +25,8 @@ This assistant cannot enumerate a developer's private asset library.
 solver uses every profile. The catalog preserves engine curves, ratios, suspension,
 tyre, steering, braking and drag data from the uploaded tables. Implemented effects
 include torque/power-limited acceleration, axle-load traction, combined grip demand,
-thermal/wet grip, sprung heave/pitch/roll, and wind influence. Some original settings
+thermal/wet and load-sensitive grip, pressure loss, punctures, component damage,
+sprung heave/pitch/roll, bump/rebound damping, ABS/TCS and wind influence. Some original settings
 are retained for future calibration and do not yet drive a corresponding solver term.
 
 `rearShare` comes from `Parts.Rating.Rig.Rear`: it is a starting calibration, not a
@@ -36,7 +39,8 @@ Climate parameters live in `Config.Climate`; the current model includes ambient
 biome temperature, wetness, wind and tyre heating. It does not simulate a complete
 meteorological system, tyre carcass deformation, aquaplaning, or a full thermal engine.
 
-Generation 2 adds actual short-wave road elevation and records suspension pose in
-replays. Bump the generation when changing the road/handling model incompatibly.
+Generation 3 adds per-wheel pressure/wear/puncture replay state, shared damage
+and handling rules, and first-person driving. Short-wave road elevation and
+suspension poses remain in the renderer/replays. Bump the generation when changing the road/handling model incompatibly.
 Original models are normalized about the wheel axle center, with the per-car balance
 offset applied when placing a loaded skin. Native models stay visible when assets fail.

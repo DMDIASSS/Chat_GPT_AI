@@ -1,3 +1,14 @@
+# 1.4.0
+
+- First-person cockpit driving, instruments, headlights, adjustable camera/motion, safe rebinding and saved settings.
+- Fifteen shared car profiles gain per-wheel pressure/heat/wear/punctures, load-sensitive grip, keyboard assists, brake fade and component damage.
+- Checkpoint service bays, visible tyre deflation and optional red/severe-blackout crash effects; no soft-body destruction.
+- Shared-seed friend race rooms, readiness barrier, synchronized countdown, live standings and retirement handling in separate collision lanes.
+- Human co-driver roadbook and distance-aware calls.
+- Five replay cameras including director/freecam; bounded scrubbing and 35-field condition recordings, old codec support.
+- Targeted Zone, DataController and PlayerModule fixes, exact Source backups and cloned native input graph; session original profile/settings bridge.
+- Preservation checks detect unauthorized original property overrides and explicitly list fourteen permitted Source repairs.
+
 # DM / Expedition 1.3.0
 
 - Recover 15 vehicle profiles from uploaded Cars, CarSelect and Parts.Rating.Rig tables.

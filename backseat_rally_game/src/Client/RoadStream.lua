@@ -115,6 +115,9 @@ function Stream:build(index,entry)
   if z>=0 and (z%C.Checkpoint==0 or z==route.length and route.length>0)then
    for _,side in ipairs({-1,1})do self:part(model,'Timing post',Vector3.new(.4,7,.4),frame*CFrame.new(side*(p.width/2+2),3.5,0),{.95,.72,.29})end
    self:part(model,'Timing banner',Vector3.new(p.width+5,1.5,.3),frame*CFrame.new(0,7,0),{.14,.27,.23})
+   local service=self:part(model,'Service bay sign',Vector3.new(6,2.6,.2),frame*CFrame.new(-p.width/2-6,3,-9),{.12,.24,.21})
+   local face=Instance.new('SurfaceGui');face.Face=Enum.NormalId.Back;face.CanvasSize=Vector2.new(360,160);face.Parent=service
+   local text=Instance.new('TextLabel');text.Size=UDim2.fromScale(1,1);text.BackgroundTransparency=1;text.Text='SERVICE BAY\nSTOP · REPAIR / TYRES';text.TextScaled=true;text.TextColor3=Color3.fromRGB(240,213,154);text.Parent=face
   end
  end
  self:decor(model,index);entry.done=true

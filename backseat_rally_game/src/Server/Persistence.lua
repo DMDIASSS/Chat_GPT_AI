@@ -38,12 +38,33 @@ function P:load(userId)
  task.spawn(function()
   local ok,data=self:request(self.profiles,'GetAsync','u:'..userId)
   if ok and type(data)=='table'and data.version==1 then
+   if not profile.preferences then profile.preferences=data.preferences end
    profile.xp=tonumber(data.xp)or 0;profile.records=data.records or {};profile.bests=data.bests or {};profile.applied=data.applied or {}
   end
   profile.loading=false
   self.status[userId]=ok and 'Cloud save ready'or 'Session only · enable Studio API access for cloud saves'
  end)
  return profile
+end
+function P:flushPreferences(userId)
+ local profile=self.users[userId]
+ if not profile or not profile.preferences or not self.profiles then return true end
+ local snapshot=profile.preferences
+ local ok=pcall(function()self.profiles:UpdateAsync('u:'..userId,function(old)
+  old=type(old)=='table'and old.version==1 and old or fresh();old.preferences=snapshot;return old
+ end)end)
+ if not ok then self.status[userId]='Session only · settings save was not confirmed'end
+ return ok
+end
+function P:setPreferences(userId,snapshot)
+ local profile=self:load(userId);profile.preferences=snapshot
+ self.pendingPreferences=self.pendingPreferences or {}
+ if self.pendingPreferences[userId]then return end
+ self.pendingPreferences[userId]=true
+ -- One queued task per player, even if a slider generates many changes.
+ task.delay(2,function()
+  self.pendingPreferences[userId]=nil;self:flushPreferences(userId)
+ end)
 end
 function P:remember(key,text)
  self.cache[key]=text;table.insert(self.order,key)
@@ -120,6 +141,7 @@ function P:finish(record,reward,notify)
     local courses={};for _,r in ipairs(savedProfile.bests)do courses[r.course]=true end
     for _,r in ipairs(profile.bests)do if not r.saved and not courses[r.course]then table.insert(savedProfile.bests,r);courses[r.course]=true end end
     while #savedProfile.bests>self.config.BestSize do table.remove(savedProfile.bests)end
+    savedProfile.preferences=profile.preferences or savedProfile.preferences
     self.users[userId]=savedProfile
    elseif not self.profiles then meta.saved=false;meta.storage='Session only'
    elseif not ok then meta.saved=false;meta.storage='Session only · save index unconfirmed'end

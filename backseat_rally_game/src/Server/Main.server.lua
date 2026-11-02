@@ -3,12 +3,15 @@ local ReplicatedStorage=game:GetService('ReplicatedStorage')
 local RunService=game:GetService('RunService')
 local Workspace=game:GetService('Workspace')
 local root=ReplicatedStorage:WaitForChild('BackseatExpedition')
+local compatOK,compatError=pcall(function()require(script.Parent.LegacyProfiles).start()end)
+if not compatOK then warn('Export compatibility: '..tostring(compatError))end
 local C=require(root.Shared.Config);local Route=require(root.Shared.Route)
 local D=require(root.Shared.Dynamics);local Replay=require(root.Shared.Replay)
 local Persistence=require(script.Parent.Persistence);local storage=Persistence.new(C)
 local Assets=require(root.Shared.Assets)
 local remotes=root.Remotes;local action=remotes.Action;local request=remotes.Request;local stateEvent=remotes.State;local inputEvent=remotes.Input
-local runs,viewing,slots={}, {}, {};local ending=0;local returnPoints={}
+local runs,viewing,slots={}, {}, {};local ending=0;local returnPoints={};local races
+local Preferences=require(root.Shared.Preferences);local RaceSession=require(script.Parent.RaceSession)
 local function getCar(id)for _,car in ipairs(C.Cars)do if car.id==id then return car end end;return C.Cars[1]end
 local function getMode(id)for _,mode in ipairs(C.Modes)do if mode.id==id then return mode end end;return C.Modes[1]end
 local function tell(player,kind,data)if player and player.Parent then action:FireClient(player,kind,data)end end
@@ -39,7 +42,7 @@ local function packet(run)
  return {id=run.record.meta.id,owner=run.player.UserId,name=run.player.DisplayName,mode=run.mode.id,seed=run.route.seed,length=run.route.length,
   car=run.car.id,slot=run.slot,s=D.copy(run.s),clock=run.clock,penalty=run.penalty,nextGate=run.nextGate,
   missed=run.missed or false,status=run.status,originZ=origin(run).Z,course=run.record.meta.course,
-  passenger=run.passenger and run.passenger.UserId or 0,ghost=run.ghost and run.ghost.id or nil,recording=not run.record.failed}
+  race=run.race,settings=run.settings,passenger=run.passenger and run.passenger.UserId or 0,ghost=run.ghost and run.ghost.id or nil,recording=not run.record.failed}
 end
 local function recordFrame(run,flag)
  local f=Replay.frame(run.clock+run.penalty,run.s,flag,run.input);local frames=run.frames
@@ -49,6 +52,7 @@ end
 local function finish(run,reason)
  if runs[run.player]~=run then return end
  recordFrame(run)
+ if races and run.race then races:update(run.player,run.validZ,run.clock+run.penalty,reason=='finish',reason~='finish'and reason or nil)end
  runs[run.player]=nil;slots[run.slot]=nil;ending+=1
  if #run.frames>0 then storage:page(run.record,Replay.encode(run.frames),run.frames);run.frames={}end
  local meta=run.record.meta;meta.duration=run.clock+run.penalty;meta.penalty=run.penalty
@@ -67,8 +71,8 @@ local function finish(run,reason)
  end)
  task.spawn(function()local deadline=os.clock()+22;while not run.record.done and os.clock()<deadline do task.wait(.1)end;ending-=1 end)
 end
-local function start(player,data)
- if runs[player]or viewing[player]then return end
+local function start(player,data,raceId)
+ if runs[player]or viewing[player]then return nil end
  local car=getCar(data.car);local profile=storage:load(player.UserId)
  if profile.xp<car.unlock then tell(player,'notice','This car unlocks at '..car.unlock..' XP.');return end
  if profile.loading and car.unlock>0 then tell(player,'notice','Loading your unlocked cars; try again in a moment.');return end
@@ -78,11 +82,13 @@ local function start(player,data)
  local slot
  for i=1,C.MaxPlayers do if not slots[i]then slot=i;break end end
  if not slot then tell(player,'notice','All rally slots are in use. Join a co-driver seat or try again shortly.');return end
+ local settings=Preferences.sanitize({values=data.settings}).values
  local route=Route.new(seed,mode.length,C)
- local run={player=player,route=route,car=car,mode=mode,slot=slot,s=D.new(route),clock=0,penalty=0,nextGate=C.Checkpoint,
+ local run={race=raceId,settings=settings,player=player,route=route,car=car,mode=mode,slot=slot,s=D.new(route),clock=0,penalty=0,nextGate=C.Checkpoint,
   lastGate=0,validZ=0,status='loading',frames={},sample=0,input={throttle=0,steer=0,brake=1},lastInput=0,seq=-1,created=os.clock(),recoverAt=-100}
+ D.configure(run.s,settings)
  if mode.length>0 then run.nextGate=math.min(run.nextGate,mode.length)end
- run.record=storage:newRecording(player.UserId,{seed=seed,length=mode.length,mode=mode.id,car=car.id,course=route:key(mode.id,car.id),generation=C.Generation,weather=mode.weather})
+ run.record=storage:newRecording(player.UserId,{seed=seed,length=mode.length,mode=mode.id,car=car.id,course=route:key(mode.id,car.id)..':'..(settings.damage and 'damage'or 'clean')..':'..(settings.assists and 'assist'or 'raw'),setup=settings,generation=C.Generation,weather=mode.weather})
  for _,best in ipairs(profile.bests)do if best.course==run.record.meta.course then run.ghost=best;break end end
  local model=Instance.new('Model');model.Name='Rally_'..player.UserId
  local body=Instance.new('Part');body.Name='Root';body.Size=Vector3.new(6,2,10);body.Transparency=1;body.Anchored=true;body.CanCollide=false;body.Parent=model;model.PrimaryPart=body
@@ -94,17 +100,51 @@ local function start(player,data)
  end
  model.Parent=Workspace;run.model=model;model:PivotTo(worldFrame(run));runs[player]=run;slots[slot]=run
  rememberReturn(player);seatPlayer(player,model.Driver);tell(player,'start',packet(run));recordFrame(run)
+ return run
 end
+races=RaceSession.new({
+ notify=tell,active=function(player)return runs[player]or viewing[player]end,
+ launch=start,
+ validate=function(player,data)
+  local car=getCar(data.car);local profile=storage:load(player.UserId)
+  if profile.xp<car.unlock then return false,player.DisplayName..' has not unlocked that car.'end
+  return true
+ end,
+ cancel=function(player,raceId)
+  local r=runs[player]
+  if r and r.race==raceId then runs[player]=nil;slots[r.slot]=nil;r.model:Destroy();returnLobby(player);tell(player,'lobby',{})end
+ end,
+ countdown=function(members,raceId)
+  local untilTime=os.clock()+3
+  for _,p in ipairs(members)do local r=runs[p];if r and r.race==raceId then
+   r.status='countdown';r.countUntil=untilTime;broadcastRun(r,'countdown',3)
+  end end
+ end,
+})
 local lastAction={}
 action.OnServerEvent:Connect(function(player,kind,data)
  if type(kind)~='string'then return end
- local now=os.clock();if kind~='ready'and kind~='retire'and kind~='leave'and now-(lastAction[player]or -math.huge)<.12 then return end;lastAction[player]=now
+ local now=os.clock();if kind~='ready'and kind~='retire'and kind~='leave'and kind~='preferences'and now-(lastAction[player]or -math.huge)<.12 then return end;lastAction[player]=now
  data=type(data)=='table'and data or {};local run=runs[player]
- if kind=='start'then start(player,data)
- elseif kind=='ready'and run and run.status=='loading'then run.status='countdown';run.countUntil=now+3;broadcastRun(run,'countdown',3)
+ if kind=='preferences'then storage:setPreferences(player.UserId,Preferences.sanitize(data))
+ elseif kind:sub(1,4)=='race'then
+  local verb=kind:sub(5):lower();races:action(player,verb,data)
+ elseif kind=='start'then if not runs[player]and not viewing[player]then races:remove(player);start(player,data)end
+ elseif kind=='ready'and run and run.status=='loading'then
+  if run.race then races:loaded(player)else run.status='countdown';run.countUntil=now+3;broadcastRun(run,'countdown',3)end
  elseif kind=='retire'and run then finish(run,run.mode.id=='endless'and 'bank'or 'retired')
  elseif kind=='recover'and run and now-run.recoverAt>3 and run.status=='running'then
   run.recoverAt=now;run.penalty+=5;D.reset(run.s,run.route,run.lastGate);run.missed=false;recordFrame(run,1);broadcastRun(run,'notice','Recovered to checkpoint · +5 seconds')
+ elseif kind=='service'and run and run.status=='running'then
+  local near=run.s.z<80 or math.abs(run.s.z-run.lastGate)<85
+  if math.abs(run.s.v)>1.5 then tell(player,'notice','Stop the car before servicing.')
+  elseif not near then tell(player,'notice','Service is available at the start and checkpoint bays.')
+  elseif now-(run.serviceAt or -100)>5 then
+   run.serviceAt=now;run.penalty+=15;D.repair(run.s,'all',run.car)
+   local pressure=Preferences.value('tyrePressure',data.pressure)
+   D.setPressure(run.s,'all',pressure,run.car);recordFrame(run,1)
+   broadcastRun(run,'notice','Full service · tyres replaced and car repaired · +15 seconds')
+  end
  elseif kind=='bookmark'and run then
   local markers=run.record.meta.markers;if #markers<32 then markers[#markers+1]=run.clock+run.penalty end;tell(player,'notice','Replay moment marked')
  elseif kind=='join'then
@@ -118,8 +158,11 @@ action.OnServerEvent:Connect(function(player,kind,data)
  elseif kind=='leave'and viewing[player]then
   local target=viewing[player];target.passenger=nil;returnLobby(player);tell(player,'lobby',{})
  elseif kind=='call'and viewing[player]then
-  local allowed={left='LEFT · co-driver call',right='RIGHT · co-driver call',caution='CAUTION · co-driver call'}
-  if allowed[data.note]then tell(viewing[player].player,'notice',allowed[data.note])end
+  local allowed={left=true,right=true,caution=true}
+  if allowed[data.note]then
+   local target=viewing[player];local note=data.note=='caution'and 'CAUTION · co-driver'or target.route:call(target.s.z,target.s.v)
+   tell(target.player,'notice',note..' · '..player.DisplayName)
+  end
  end
 end)
 inputEvent.OnServerEvent:Connect(function(player,data)
@@ -132,7 +175,11 @@ end)
 local requestAt={}
 request.OnServerInvoke=function(player,kind,data)
  local now=os.clock();if now-(requestAt[player]or -math.huge)<.12 then return {error='Please wait a moment'}end;requestAt[player]=now
- if kind=='library'then return storage:library(player.UserId)
+ if kind=='preferences'then
+  local profile=storage:load(player.UserId);local deadline=os.clock()+4
+  while profile.loading and os.clock()<deadline do task.wait(.1)end
+  return {snapshot=Preferences.sanitize(profile.preferences),sessionOnly=not storage.profiles}
+ elseif kind=='library'then return storage:library(player.UserId)
  elseif kind=='replay'then
   local id=type(data)=='table'and data.id;local r=storage:find(player.UserId,id)
   if not r then return {error='Replay unavailable'}end
@@ -142,7 +189,7 @@ request.OnServerInvoke=function(player,kind,data)
   local text,reason=storage:getPage(player.UserId,data.id,data.index);return text and {text=text}or {error=reason}
  elseif kind=='lobby'then
   local open={};for _,r in pairs(runs)do if not r.passenger then table.insert(open,{owner=r.player.UserId,name=r.player.DisplayName,mode=r.mode.name})end end
-  return {drivers=open,library=storage:library(player.UserId)}
+  return {drivers=open,races=races:lobby(),race=races:forPlayer(player),library=storage:library(player.UserId)}
  end
  return {error='Unknown request'}
 end
@@ -160,7 +207,7 @@ RunService.Heartbeat:Connect(function(dt)
     D.step(run.s,input,run.route,run.car,C.Step);run.clock+=C.Step
     local p=run.route:point(run.s.z);local lateral=math.abs((run.s.x-p.x)/math.sqrt(1+p.dx*p.dx))
     if not run.missed and run.s.z>=run.nextGate and run.s.z<run.nextGate+30 and lateral<p.width/2+2 then
-     run.lastGate=run.nextGate;run.validZ=run.lastGate;run.s.damage=math.max(0,run.s.damage-12)
+     run.lastGate=run.nextGate;run.validZ=run.lastGate
      if run.route.length>0 and run.lastGate>=run.route.length then finish(run,'finish')
      else
       run.nextGate=run.lastGate+C.Checkpoint
@@ -170,6 +217,7 @@ RunService.Heartbeat:Connect(function(dt)
     elseif run.s.z>run.nextGate+30 then run.missed=true end
     if not run.missed and lateral<p.width/2+3 then run.validZ=math.max(run.validZ,run.s.z)end
     if runs[run.player]==run then
+    if run.race then races:update(run.player,run.validZ,run.clock+run.penalty,false)end
     run.sample+=C.Step
     if run.sample>=1/C.ReplayRate then run.sample-=1/C.ReplayRate;recordFrame(run)end
     end
@@ -188,15 +236,19 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 Players.PlayerAdded:Connect(function(player)storage:load(player.UserId)end)
 Players.PlayerRemoving:Connect(function(player)
+ task.spawn(function()storage:flushPreferences(player.UserId)end)
  if runs[player]then finish(runs[player],runs[player].mode.id=='endless'and 'bank'or 'disconnected')end
  if viewing[player]then viewing[player].passenger=nil;viewing[player]=nil end
+ races:remove(player)
  lastAction[player]=nil;requestAt[player]=nil
 end)
 for _,p in ipairs(Players:GetPlayers())do storage:load(p.UserId)end
 game:BindToClose(function()
+ local pending=0
+ for userId in pairs(storage.users)do pending+=1;task.spawn(function()storage:flushPreferences(userId);pending-=1 end)end
  local list={};for _,run in pairs(runs)do list[#list+1]=run end
  for _,run in ipairs(list)do finish(run,run.mode.id=='endless'and 'bank'or 'server closed')end
- local untilTime=os.clock()+25;while ending>0 and os.clock()<untilTime do task.wait(.1)end
+ local untilTime=os.clock()+25;while (ending>0 or pending>0)and os.clock()<untilTime do task.wait(.1)end
 end)
 -- Reuse visual templates in the expansion namespace without changing the source assets.
 task.spawn(function()

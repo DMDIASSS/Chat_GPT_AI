@@ -30,6 +30,7 @@ class StartupAssetTests(unittest.TestCase):
      for _,o in ipairs(created)do if o:IsA('TextButton')and o.Parent and o.Text==text then o.Activated:Fire();return end end
      error('Missing button '..text)
     end
+    ui.ResponsiveCanvas.GarageMenu.CourseSeed.Text='5'
     click('TAKE THE ROAD →');advance(7,true)
     local road=0;for _,o in ipairs(created)do if o.Name=='Road'and o.Parent then road+=1 end end
     assert(road>30 and ui.ResponsiveCanvas.DrivingHUD.Visible,'Starting from the default menu did not build a playable road')

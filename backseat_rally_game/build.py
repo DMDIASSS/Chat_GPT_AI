@@ -93,14 +93,20 @@ def main():
     contents={str(p.relative_to(ROOT)):p.read_bytes()for p in paths}
     for name in ['Backseat_Rally_Expedition.rbxlx','Backseat_Rally_Expansion.rbxmx',standalone,standalone_binary]+extras:contents[name]=(downloads/name).read_bytes()
     contents['START_HERE.txt']=(
-        f'1. Open {standalone_binary} directly in Roblox Studio.\n'
+        f'1. Open {stem+".rbxl" if args.base_place else standalone_binary} directly in Roblox Studio.\n'
         '2. Press Play. Keep the first car selected, then click TAKE THE ROAD.\n'
-        '3. Use W/A/S/D to drive, Space for the handbrake, R to recover.\n\n'
+        '3. W/A/S/D drive, Space handbrake, R recover, T service at checkpoint bays.\n'
+        '4. Driving is cockpit-only. F4 settings/bindings; H headlights.\n'
+        '5. RACE FRIENDS hosts a shared-start time trial; friends must join this server.\n'
+        '6. Replays: C camera, P pause, comma/period seek; freecam uses WASD/Q/E.\n\n'
         'This clean place uses its own server and native car/map geometry.\n'
         'Publishing, cloud-save access and private imported assets are optional.\n'
         'Offline replays last for this server session.\n\n'
         f'{stem}.rbxl contains the preserved uploaded scene plus the same new driving system.\n'
-        'The old exported garage has no original server backend. Use the new rally menu to drive.\n'
+        'Use the new rally menu to drive; the original backend is incomplete.\n'
+        'Fourteen narrow startup Source repairs have exact backups in ServerStorage.\n'
+        'The preservation report lists those changes; all original objects/hierarchies remain.\n'
+        f'{standalone_binary} isolates the new game from original scene/assets.\n'
     ).encode()
     hashes={name:hashlib.sha256(data).hexdigest()for name,data in contents.items()}
     contents['SOURCE_HASHES.json']=(json.dumps(hashes,indent=2)+'\n').encode()

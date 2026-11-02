@@ -1,6 +1,7 @@
 local UI={};UI.__index=UI
 local Players=game:GetService('Players');local UIS=game:GetService('UserInputService')
 local C=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Config)
+local D=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Dynamics)
 local Assets=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Assets)
 local palette={ink=Color3.fromRGB(20,35,32),panel=Color3.fromRGB(29,48,42),card=Color3.fromRGB(41,62,52),
  light=Color3.fromRGB(242,232,207),muted=Color3.fromRGB(169,184,163),gold=Color3.fromRGB(233,180,84),red=Color3.fromRGB(224,119,91)}
@@ -32,6 +33,7 @@ function UI.new(callbacks)
  self.scale=scale;self.canvas=canvas
  local menu=frame(canvas,'GarageMenu',0,0,1180,680,palette.ink);self.menu=menu
  local grad=Instance.new('UIGradient');grad.Color=ColorSequence.new(palette.ink,palette.panel);grad.Rotation=28;grad.Parent=menu
+ button(menu,'SETTINGS · F4',950,25,195,36,function()callbacks.settings()end)
  label(menu,'BACKSEAT / EXPEDITION',34,25,760,30,19,palette.gold).Font=Enum.Font.GothamBold
  label(menu,'Find the long\nway home.',32,79,660,125,53).Font=Enum.Font.GothamBold
  local preview=Instance.new('ViewportFrame');preview.Name='CarPreview';preview.Position=UDim2.fromOffset(420,78)
@@ -67,11 +69,12 @@ function UI.new(callbacks)
  label(side,'ROADBOOK / NEXT DEPARTURE',24,21,390,25,12,palette.gold)
  self.modeTitle=label(side,'',24,56,390,42,29);self.modeTitle.Font=Enum.Font.GothamBold
  self.modeDetail=label(side,'',24,103,385,50,15,palette.muted)
- label(side,'SOLO + CO-DRIVER SEAT',24,184,390,23,12,palette.gold)
+ label(side,'DRIVE / CO-DRIVE / RACE',24,184,390,23,12,palette.gold)
  self.drivers=frame(side,'Drivers',24,218,390,145,palette.card)
  button(side,'REFRESH OPEN SEATS',24,374,390,34,function()callbacks.lobby()end)
  self.saveStatus=label(side,'Loading your garage…',24,425,390,48,13,palette.muted)
- button(side,'QUALITY: MEDIUM',24,493,390,34,function()
+ button(side,'RACE FRIENDS',24,480,390,34,function()self:openRaces()end)
+ button(side,'QUALITY: MEDIUM',24,523,390,30,function()
   local order={'low','medium','high'};self.quality=order[(table.find(order,self.quality)or 2)%3+1]
   self.qualityButton.Text='QUALITY: '..self.quality:upper();callbacks.quality(self.quality)
  end)
@@ -91,7 +94,11 @@ function UI.new(callbacks)
  self.endButton=button(self.hud,'RETIRE & SAVE',947,92,210,37,function()callbacks.stop()end)
  button(self.hud,'R · CHECKPOINT',24,623,175,36,function()callbacks.recover()end)
  button(self.hud,'B · MARK MOMENT',211,623,190,36,function()callbacks.bookmark()end)
- button(self.hud,'C · CAMERA',413,623,150,36,function()callbacks.camera()end)
+ button(self.hud,'C · CENTER LOOK',413,623,150,36,function()callbacks.camera()end)
+ button(self.hud,'SETTINGS · F4',576,623,168,36,function()callbacks.settings()end)
+ self.serviceButton=button(self.hud,'T · SERVICE',756,623,175,36,function()callbacks.service()end)
+ self.standings=label(self.hud,'',946,195,212,245,14,palette.gold)
+ self.coRoadbook=label(self.hud,'',24,215,355,199,18,palette.light);self.coRoadbook.Visible=false
  self.leave=button(self.hud,'LEAVE CO-DRIVER SEAT',947,137,210,36,function()callbacks.leave()end);self.leave.Visible=false
  self.calls={}
  for i,n in ipairs({'left','right','caution'})do
@@ -131,6 +138,16 @@ function UI.new(callbacks)
  end)
  button(replay,'C · CAMERA',514,72,178,34,function()callbacks.camera()end)
  button(replay,'EXIT REPLAY',950,72,210,34,function()callbacks.exitReplay()end)
+ local race=frame(canvas,'FriendRaces',210,92,760,495,palette.panel);race.Visible=false;self.racePanel=race
+ label(race,'RALLY / FRIEND RACES',24,20,610,34,25,palette.gold).Font=Enum.Font.GothamBold
+ button(race,'CLOSE',635,20,101,34,function()race.Visible=false end)
+ label(race,'Same road, simultaneous start. Separate collision lanes. Fastest finish wins.',24,60,705,41,15,palette.muted)
+ self.raceRows=frame(race,'Rooms',24,113,712,271,palette.panel)
+ button(race,'HOST RALLY',24,401,163,38,function()callbacks.race('Create')end,true)
+ button(race,'READY',201,401,153,38,function()callbacks.race('Ready',{ready=true})end)
+ button(race,'START RACE',368,401,167,38,function()callbacks.race('Start')end,true)
+ button(race,'LEAVE ROOM',549,401,187,38,function()callbacks.race('Leave')end)
+ label(race,'Host selects seed, damage and assists in setup. Choose your car before readying. Refresh from garage for new rooms.',24,450,712,35,12,palette.muted)
  -- Native-size touch controls remain usable independently of menu scaling.
  self.touch=Instance.new('Frame');self.touch.Name='TouchControls';self.touch.Size=UDim2.fromScale(1,1);self.touch.BackgroundTransparency=1;self.touch.Visible=false;self.touch.Parent=gui
  for _,spec in ipairs({{'◀','left',18,-155},{'▶','right',104,-155},{'BRAKE','brake',-190,-155},{'GO','throttle',-104,-155}})do
@@ -157,20 +174,56 @@ function UI:selection()
   local car=C.Cars[i];b.BackgroundColor3=car==self.car and Color3.fromRGB(61,85,63)or palette.card
   b.Text=car.name..(self.xp<car.unlock and ' · '..car.unlock..' XP'or '')
  end
- self.carDescription.Text=string.format('%d kg · %d hp · %d Nm · %d:%d balance · %.1f studs wheelbase',self.car.mass,self.car.power,self.car.torque,(1-self.car.rearShare)*100,self.car.rearShare*100,self.car.wheelbase)
+ self.carDescription.Text=string.format('%d kg · %d hp · %d Nm · %d:%d balance · %.1f studs wheelbase',self.car.mass,self.car.power,self.car.torque,math.floor((1-self.car.rearShare)*100+.5),math.floor(self.car.rearShare*100+.5),self.car.wheelbase)
  self.modeTitle.Text=self.mode.name
  self.modeDetail.Text=self.mode.length==0 and 'An endless road. Bank at any point.\nEvery completed run keeps its replay.'or string.format('%.1f km · finishable seeded stage\nCheckpoint recovery adds 5 seconds.',self.mode.length*C.StudMetres/1000)
 end
 function UI:show(which)
+ if self.racePanel and which~='menu'then self.racePanel.Visible=false end
  self.menu.Visible=which=='menu';self.hud.Visible=which=='drive'or which=='replay';self.libraryPanel.Visible=which=='library';self.result.Visible=which=='result'
  self.replayControls.Visible=which=='replay';self.touch.Visible=which=='drive'and UIS.TouchEnabled
  self.mode= self.mode or C.Modes[1]
 end
 function UI:lobby(data)
+ self.races=data.races or {};self.raceData=data.race
+ if self.racePanel.Visible then self:renderRaces()end
  if data.library then self.xp=data.library.xp or 0;self.saveStatus.Text=(data.library.status or '')..'\n'..self.xp..' XP';self:selection()end
  for _,c in ipairs(self.drivers:GetChildren())do c:Destroy()end
  if #(data.drivers or {})==0 then label(self.drivers,'No open seats yet. Start a road and a friend can join you.',0,0,385,100,16,palette.muted)end
  for i,d in ipairs(data.drivers or {})do if i<=3 then button(self.drivers,d.name..' · JOIN',0,(i-1)*47,390,39,function()self.callbacks.join(d.owner)end)end end
+end
+function UI:openRaces()
+ self.racePanel.Visible=true;self:renderRaces();self.callbacks.lobby()
+end
+function UI:renderRaces()
+ for _,o in ipairs(self.raceRows:GetChildren())do o:Destroy()end
+ local race=self.raceData
+ if race then
+  label(self.raceRows,'ROOM '..race.id..'  /  SEED '..race.seed..'  /  '..race.status:upper(),0,0,710,30,16,palette.gold)
+  for i,m in ipairs(race.members or {})do
+   label(self.raceRows,(m.ready and '✓ 'or '○ ')..m.name..'   /   '..m.car..(m.userId==race.host and '   HOST'or ''),4,37+(i-1)*29,700,28,15)
+  end
+ else
+  if #(self.races or {})==0 then label(self.raceRows,'Host a rally, then ask friends in this server to join from RACE FRIENDS.',3,45,700,120,22,palette.muted)end
+  for i,room in ipairs(self.races or {})do if i<=5 then
+   button(self.raceRows,room.name..' · '..#room.members..'/8 · JOIN',0,(i-1)*50,710,43,function()self.callbacks.race('Join',{id=room.id})end)
+  end end
+ end
+end
+function UI:raceState(data)
+ self.raceData=data
+ if data and data.status=='lobby'then self.racePanel.Visible=true;self:renderRaces()
+ elseif data and data.status~='lobby'then self.racePanel.Visible=false
+ elseif self.racePanel.Visible then self:renderRaces()end
+ local lines={}
+ if data and data.status~='lobby'then
+  lines[1]='RALLY / '..data.status:upper()
+  for i,m in ipairs(data.members or {})do
+   local result=m.dnf and 'RETIRED'or(m.finished and UI.time(m.time)or string.format('%.0f m',m.z*C.StudMetres))
+   lines[#lines+1]=i..'. '..m.name..'\n   '..result
+  end
+ end
+ self.standings.Text=table.concat(lines,'\n')
 end
 function UI:library(data)
  self:show('library');self.libraryStatus.Text=data.status or '';self.xp=data.xp or self.xp
@@ -203,10 +256,20 @@ function UI:runInfo(run,s,route,clock)
  self.note.Text=run.missed and 'MISSED CHECKPOINT · press R'or route:call(s.z,s.v)
  self.timer.Text=UI.time(clock);self.speed.Text=tostring(math.floor(math.abs(s.v)*C.StudMetres*3.6+.5))
  local progress=run.length and run.length>0 and string.format('%.2f / %.2f km',math.max(0,s.z)*C.StudMetres/1000,run.length*C.StudMetres/1000)or string.format('%.2f km',math.max(0,s.z)*C.StudMetres/1000)
- self.telemetry.Text=string.format('THROTTLE %3d%%   BRAKE %3d%%   STEER %+3d%%\n%s   ·   BODY %d%%   ·   R recover / B mark / C camera',
-  (s.throttle or 0)*100,(s.brake or 0)*100,(s.steer or 0)*100,progress,100-math.floor(s.damage or 0))
+ local tyre=D.telemetry(s)
+ self.telemetry.Text=string.format('GEAR %s · %d RPM · %s\nTYRES %.0f%% · %.0f°C · %d PUNCTURES   /   ENGINE %.0f%%\n%s · BODY %d%% · service at checkpoint bays',
+  s.v<-.5 and 'R'or tostring(s.gear or 1),math.floor(s.rpm or 850),s.tcsActive and 'TCS'or(s.absActive and 'ABS'or 'RALLY'),tyre.pressure*100,tyre.temperature,tyre.punctures,tyre.engine*100,
+  progress,100-math.floor(s.damage or 0))
  self.endButton.Text=run.mode=='endless'and 'BANK RUN & SAVE'or 'RETIRE & SAVE'
  local passenger=run.passenger==Players.LocalPlayer.UserId;self.leave.Visible=passenger
+ self.coRoadbook.Visible=passenger
+ self.serviceButton.Visible=not passenger and not self.replayControls.Visible
+ if passenger then
+  local lines={'CO-DRIVER ROADBOOK'}
+  for i,lead in ipairs({2.5,5,8})do local ahead=math.max(55,math.abs(s.v)*lead);lines[#lines+1]=string.format('%d m · %s',math.floor(ahead*C.StudMetres),route:note(s.z+ahead-100))end
+  lines[#lines+1]='J / K call turn · L caution'
+  self.coRoadbook.Text=table.concat(lines,'\n')
+ end
  for _,b in ipairs(self.calls)do b.Visible=passenger end
  self.endButton.Visible=not passenger and self.replayControls.Visible==false
 end

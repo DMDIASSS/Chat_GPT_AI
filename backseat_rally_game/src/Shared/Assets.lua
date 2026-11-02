@@ -53,6 +53,10 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
   if ghost then p.Color=Color3.fromRGB(107,220,201);p.Transparency=.65;p.Material=Enum.Material.ForceField end
   parts[#parts+1]=p
  end end
+ local lights={}
+ if not ghost then for _,part in ipairs(parts)do if part.Name=='Headlamp'then
+  local light=Instance.new('SpotLight');light.Face=Enum.NormalId.Front;light.Range=60;light.Angle=64;light.Brightness=2.5;light.Enabled=false;light.Shadows=false;light.Parent=part;lights[#lights+1]=light
+ end end end
  local sounds={};local bank=withAudio and root and root:FindFirstChild('ImportedAudio')
  if bank and not ghost then for _,name in ipairs({'Idle','Run','High'})do
   local source=bank:FindFirstChild(name)
@@ -60,7 +64,7 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
  end end
  model.Parent=parent
  model:SetAttribute('VisualSource','BuiltIn')
- local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds,car=car,skinStatus=template and 'loading'or 'missing'}
+ local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds,car=car,lights=lights,skinStatus=template and 'loading'or 'missing'}
  if template and not ghost then
   Loader.check(template,function(ready)
    visual.skinStatus=ready and 'loaded'or 'unavailable'
@@ -77,23 +81,41 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
     if part.Name~='Tyre'and part.Name~='Wheel'then part.Transparency=1 end
    end
    model:SetAttribute('VisualSource','Original')
+   if visual.cockpit then visual.cockpit=nil;Assets.cockpitView(visual,true)end
   end)
  end
  return visual
+end
+function Assets.cockpitView(visual,enabled)
+ if visual.cockpit==enabled then return end;visual.cockpit=enabled
+ for _,part in ipairs(visual.model:GetDescendants())do if part:IsA('BasePart')then
+  local name=part.Name:lower()
+  if name=='cabin'or name=='windscreen'or name=='roof'or name:find('glass',1,true)or name:find('windshield',1,true)or name:find('window',1,true)then
+   visual.hidden=visual.hidden or {}
+   if enabled then if visual.hidden[part]==nil then visual.hidden[part]=part.LocalTransparencyModifier end;part.LocalTransparencyModifier=1
+   elseif visual.hidden[part]~=nil then part.LocalTransparencyModifier=visual.hidden[part];visual.hidden[part]=nil end
+  end
+ end end
+end
+function Assets.headlights(visual,enabled,quality)
+ for _,light in ipairs(visual.lights or {})do light.Enabled=enabled;light.Shadows=quality=='high'end
 end
 function Assets.pose(visual,s,route,offset,dt)
  local D=require(script.Parent.Dynamics)
  local y,pitch,roll=D.pose(s,route,visual.car)
  local cf=CFrame.new(Vector3.new(s.x,y,s.z)+offset)*CFrame.Angles(0,math.pi+s.yaw,0)*CFrame.Angles(pitch,0,roll)
  visual.model:PivotTo(cf);visual.spin=(visual.spin+s.v*(dt or 0)/visual.car.radius)%(math.pi*2)
- for _,wheel in ipairs(visual.wheels)do
+ for i,wheel in ipairs(visual.wheels)do
   local wb=visual.car.wheelbase;local com=wb*((visual.car.rearShare or .5)-.5)
   local z=(wheel.front and -wb/2 or wb/2)-com
   local pos=cf:PointToWorldSpace(Vector3.new(wheel.side*3,0,z))
   local localPos=pos-offset;local ground=route:ground(localPos.X,localPos.Z)
-  local at=Vector3.new(pos.X,ground+visual.car.radius+offset.Y,pos.Z)
-  local wc=CFrame.new(at)*cf.Rotation*CFrame.Angles(0,wheel.front and -s.steer*.32 or 0,0)*CFrame.Angles(visual.spin,0,0)
-  wheel.tyre.CFrame=wc;wheel.rim.CFrame=wc
+  local tyre=s.tyres and s.tyres[i]
+  local flatten=tyre and math.clamp(.68+.32*tyre.pressure,.70,1.06)or 1
+  wheel.tyre.Size=Vector3.new(.8,visual.car.radius*2*flatten,visual.car.radius*2)
+  local at=Vector3.new(pos.X,ground+visual.car.radius*flatten+offset.Y,pos.Z)
+  local wc=CFrame.new(at)*cf.Rotation*CFrame.Angles(0,wheel.front and -s.steer*.32 or 0,0)
+  wheel.tyre.CFrame=wc;wheel.rim.CFrame=wc*CFrame.Angles(visual.spin,0,0)
  end
  for i,sound in ipairs(visual.audio or {})do
   local speed=math.abs(s.v);local gear=(speed%32)/32

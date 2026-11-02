@@ -1,170 +1,151 @@
-# Backseat Rally / Expedition
+# DM / Rally Expedition 1.4.0
 
-An optional driving expansion added to the uploaded Backseat Rally place, plus a standalone preview.
-Solo play with an optional human co-driver, four game modes, continuous seeded roads,
-checkpoint recovery, a replay library, and saved personal-best ghosts. It contains no
-executor code or live-game injection. The full DM place retains the supplied original content.
+A playable rally expansion with 15 car profiles, first-person driving, configurable
+handling, tyre and mechanical damage, human co-driving, friend races and saved replays.
+The ready Sakura and Backseat downloads keep their supplied scenes, cars, bots and
+hierarchies. The new rally runs on its own generated stages and backend.
 
-## Download and play (1.3.0)
+## Download and play
 
-Start with **DM_Rally_Standalone_v1.3.0.rbxl**. It contains only the new driving game,
-fallback car/map geometry and its own server logic. Open it directly in Studio, press
-**Play**, keep **Orso 4** selected, then **Take the Road**. Publishing, cloud-save
-access and imported meshes are optional. The same file is available as `.rbxlx`.
+Open **DM_Sakura_Pass_v1.4.0.rbxl** in Studio and press **Play**, then **Take the Road**.
+This is the latest Sakura upload with the expansion and targeted startup repairs.
+**DM_Backseat_Rally_v1.4.0.rbxl** extends the earlier upload.
+**DM_Rally_Standalone_v1.4.0.rbxl** contains only the new game and portable geometry;
+it is useful for isolating original-scene or asset issues. Binary `.rbxl` files open
+directly; no installer command is needed. Zips contain the place, standalone files,
+installer, sources, tests, hashes and preservation report. The `.lock` file is unnecessary.
 
-**DM_Sakura_Pass_v1.3.0.rbxl** adds this driving system to the latest Sakura Pass upload,
-preserving all 132,961 original objects. **DM_Backseat_Rally_v1.3.0.rbxl** does the same
-for the earlier Backseat Rally upload. Both start the new rally menu automatically.
-The procedural road appears when a run starts. **Return to Original** restores the
-supplied scene and UI; its absent original backend is not reconstructed.
+Driving works without publishing or DataStore/mesh permission. Replays/settings are
+session-only when cloud storage is unavailable. Original exterior skins and selected
+scenery are reused after Roblox confirms their assets loaded. A complete native car
+stays visible if a skin is unavailable. External imported audio is disabled by default.
+Roblox private assets still require permission from their owner; this update cannot
+unlock them. The errors supplied so far mostly concern sounds, video and animations,
+so they do not establish why the original scene geometry disappears.
 
-**DM_Sakura_Pass.zip** / **DM_Backseat_Rally.zip** include the respective preserved place,
-clean standalone files, installer, sources, tests, hashes and preservation report.
-The Studio `.lock` file is not needed. Existing bots and other repository files remain
-unchanged. No installer command is needed for a ready-to-open place.
+## Drive, co-drive and race
 
-- **Rally Sprint:** a 1.72 km stage with a final timing gate.
-- **Expedition:** 4.59 km across pine, alpine, mesa and coastal scenery.
-- **Daily Roadbook:** a 2.29 km road shared by everyone on that UTC date.
-- **Endless Journey:** keep driving, then **Bank Run & Save** whenever you want.
+Driving remains inside the cockpit. **Settings / F4** adjusts FOV, seat position,
+mouse look sensitivity, motion, assists, damage, crash effects and cold tyre pressure.
+All keyboard bindings can be changed. Hold RMB to look around; release to recenter.
+**C** centers the live view. Cockpit instruments show speed, gear, RPM, tyre pressure
+and damage warnings. **H** switches headlights.
 
-A friend can join the spare seat through **Refresh Open Seats → Join**. The passenger
-can make left/right/caution calls and can leave without ending the driver's run.
+Defaults: W accelerate, S brake/reverse, A/D steer, Space handbrake, Down reverse,
+R recover (+5 seconds), T service, B mark a replay moment, F4 settings. Touch controls
+and gamepad left stick/R2/L2 remain available. Settings stop your driving inputs
+while open; a live multiplayer race continues. Keyboard assists smooth throttle and
+steering, with ABS/TCS and stability help; disable them for a less forgiving setup.
 
-Keyboard: **W** throttle; **S** brake/reverse; **A/D** steering; **Space** handbrake;
-**R** recover at the last checkpoint (+5 s); **B** bookmark a replay moment; **C**
-change camera. Arrow keys and touch driving buttons are supported. Gamepad left
-stick steers, R2 accelerates and L2 brakes.
+- **Rally Sprint:** 1.72 km with a finish gate.
+- **Expedition:** 4.59 km across four biomes.
+- **Daily Roadbook:** the same 2.29 km course for everyone on that UTC day.
+- **Endless Journey:** bank the run when ready.
 
-## Reuse the uploaded place's cars and props
+Friends in the same Roblox server can join an open co-driver seat. The passenger sees
+a roadbook with upcoming turns and distances, sends turn/caution calls, shares the
+recording and can leave without retiring the driver.
 
-Save a COPY of the original place first. Open that copy in Studio edit mode. Drag
-**Backseat_Rally_Expansion.rbxmx** from your computer into Workspace, then run this
-in Studio's **Command Bar**:
+**Race Friends** opens a room browser. Host a rally, choose cars, mark every driver
+ready and let the host start. All drivers receive the same seed and handling rules;
+the countdown waits until every participant's road is ready. Live standings track
+progress, finish times and retirements. These are simultaneous rally time trials on
+separate collision lanes, without car-to-car collisions. The host's damage, assists
+and pressure settings apply to everyone. Friends must join the same server first.
 
-```lua
-require(workspace.BackseatRallyExpansion.Installer).install()
-```
+## Tyres, service and crashes
 
-The installer only adds `BackseatExpedition`, `BackseatExpeditionServer` and
-`BackseatExpeditionClient` under ReplicatedStorage, ServerScriptService and
-StarterPlayerScripts. It never moves, disables or deletes existing instances or
-changes Workspace/Lighting settings. Running it again leaves the existing install
-alone. The imported package remains in Workspace for inspection; only its cloned
-runtime scripts are enabled. Studio installations into another game keep the optional
-EXPEDITION launcher (`ReplicatedStorage.BackseatExpedition.AutoOpen` attribute is false).
-Do not run the installer in the already extended DM
-place. Visual copies of the existing car exteriors and selected scenery are reused
-when suitable; scripts and constraints are removed only from these new visual copies.
+Each wheel tracks pressure, temperature, wear, load and slip. Impacts can puncture a
+tyre; leaking pressure affects grip, drag, steering pull, wheel shape and body pose.
+Wetness, biome temperature and wind affect driving. Split bump/rebound response,
+body pitch/roll and load transfer use the car's weight balance and suspension data.
 
-The ready binary copies every original instance/property chunk verbatim and retains
-all original parent relationships. `DM_PRESERVATION.json` records input/output hashes,
-object counts and the added object manifest. The supplied export has placeholders
-instead of original server code; this update supplies the new modes' server systems.
-It cannot reconstruct the old game's missing backend. The original assets and scripts
-remain present. The original map's performance is unchanged; the new road renderer
-uses the bounded streaming system described below.
+Engine, brakes, steering and suspension take mechanical damage. Large impacts can
+stop the engine; checkpoint recovery does not silently repair it. Stop in the starting
+apron or within 85 studs of the last checkpoint, then **T / Service** for repairs and
+replacement tyres (+15 seconds). Cold tyre pressure applies at start/service.
+Changes to damage/assist rules apply to the next run, keeping an active race consistent.
 
-## Spawning without cloud or asset access (1.3.0)
+Damage and screen effects are independent settings. Choose off, red flash or an
+optional brief blackout for severe impacts. Effects fade and never show graphic injury.
+There is no soft-body mesh destruction or deformable tyre carcass solver.
 
-The previous build opened DataStores before connecting spawn handlers. An unpublished
-place can throw during `GetDataStore`, aborting that server script. Initialization now
-skips cloud storage for unpublished places and catches store-creation errors elsewhere.
-The starter car can also spawn while a published game's profile is still loading.
-Replays and rewards remain usable in this server when cloud saves are unavailable.
+## Replays and ghosts
 
-The server now creates a visible native car model and seats the driver. Client visuals
-smooth its movement; they are not the only evidence of a spawned car. Driving captures
-its input directly through ContextActionService, including events marked processed by
-the default controls. Start requests have a visible failure message and reset the
-button if no car is acknowledged.
+Every run records its road, controls, suspension pose, tyre conditions, gear/RPM,
+mechanical condition and impact events. Finished stages can update their personal-best
+ghost. Retired/banked runs remain reviewable. The library keeps 12 recent runs and
+8 best courses; co-drivers receive access to their shared recording.
 
-Imported visual skins are **on by default**; external audio stays off. Cars, scenery and
-road geometry are built from native parts. The original source assets stay untouched.
-To keep only native fallback skins, set `ImportedVisuals=false` in Config;
-external audio has its own flag. No private-asset permission change is needed to drive.
+Replay cameras: **cockpit, chase, orbit, director and freecam**. C cycles cameras;
+P pauses; comma/period seek ±5 seconds. Use the timeline and 0.25–4× playback.
+RMB looks/orbits, wheel zooms/adjusts freecam FOV, WASD moves freecam, Q/E changes
+height, Shift moves faster and Alt moves precisely. The director holds roadside
+shots and changes angle automatically. Freecam moves while playback is paused.
+Camera/mouse state restores on exit. Replay memory, fetch queues and pages are bounded.
+Older 11/14-field recordings remain readable by the codec; generation 3 runs use the
+new handling/course comparison and old generation ghosts are not mixed with them.
 
-## Startup and visual assets (1.1.1)
+Publish your own copy and enable Studio API access when testing cloud saves.
+Only confirmed writes are labeled saved. Unpublished places skip DataStores entirely.
+Settings and keybindings save with the expansion profile when storage is available;
+the original game's private profiles/entitlements are not retrieved.
 
-The original export's garage waits for server code absent from that export. The ready
-DM place now opens the working expansion automatically, so no original garage selection
-is needed. The original garage and all its models remain available via Return to Original;
-this preserves the supplied content and does not reconstruct its missing backend.
+## Tuning and performance
 
-The new menu shows a complete native car preview. Driving always starts with a complete
-built-in body. Imported exteriors replace it only after ContentProvider confirms their
-assets loaded; a failure or an eight-second timeout keeps the built-in body. A late mesh
-attaches at the car's current position. Imported trees use the same loading check, with
-native trees and rocks available immediately. The original assets are not edited.
+`src/Shared/VehicleCatalog.lua` holds all 15 recovered car profiles. One
+`src/Shared/Dynamics.lua` solver uses their mass, axle balance, torque curves, power,
+gears, brakes, steering and suspension settings. `Dynamics.Tuning` controls the shared
+model; a profile's `simulation` table can override individual tuning keys.
+`Config.Climate` controls wetness, temperature effects and wind.
+`Preferences.lua` defines safe user settings and default bindings.
 
-The new modes apply a local daylight/fog profile and temporarily suspend inherited blur
-and color effects, preventing the old scene's haze from hiding the road. Closing restores
-the original values. Mesh/audio access still depends on Roblox asset permissions; this
-update handles unavailable content with complete geometry rather than requiring it.
+This is a deterministic four-contact approximation with anchored visual assemblies.
+It is not the original force-based chassis or a Dirt Rally 2.0 physics recreation.
+Some original profile fields are retained for calibration without a solver equivalent.
+The two chassis test uploads were inspected as references; their dependent code and
+private assets were not installed or executed.
 
-## Replays, ghosts and cloud saves
+Fixed 60 Hz simulation, four wheel states, capped step catch-up, bounded road windows,
+part recycling, queued generation, origin rebasing and capped replay pages limit work.
+Low/medium/high quality controls scenery and shadows; automatic quality can be disabled.
+Rain uses at most 24 reused streaks (8 on low). Cockpit/effects allocate no objects per
+frame. No DataStore writes run synchronously on the simulation heartbeat. Final GPU
+performance and multiplayer latency require Studio/device testing.
 
-All runs record automatically, including driver inputs. Finishing a stage updates
-its personal best when faster. Endless runs can be banked; retired runs can still be
-reviewed. The library retains the latest 12 runs plus up to 8 personal-best course
-records. Replay pages use immutable server-generated IDs and are scoped to the
-participant's library. Co-drivers receive access to the run they joined.
+## What is preserved and repaired
 
-Replay controls: play/pause, 0.25×/0.5×/1×/2×/4× speed, timeline seeking, ±5 seconds,
-chase / hood / orbit / free cameras, saved bookmarks and pedal/steering telemetry.
-Hold RMB to orbit; scroll to zoom. In the replay's free camera, use WASD and RMB.
-The saved ghost uses the same recorded frames and road seed; **Same Road Again**
-races that personal best. Changing the seed or car creates a different comparison.
+The Sakura build retains all **132,961** original objects; Backseat retains **82,861**.
+No original object is removed or moved. Every original binary chunk except the parent
+table is retained byte-for-byte, and all original parent pairs remain in that table.
+Fourteen original script Sources receive narrow fixes: Zone's self-require guard,
+PlayerModule input-context lookup and DataController initialization/warning behavior.
+Their exact originals are kept as inert modules in
+`ServerStorage.BackseatLegacySourceBackups`. Every other original property is unchanged.
+The preservation JSON lists each intentional Source change and its before/after hashes.
 
-To persist across servers, publish YOUR copy of the place and enable **Game Settings →
-Security → Enable Studio Access to API Services** when testing saves in Studio.
-Production servers use normal Roblox DataStores. Wait for a confirmed cloud save
-before leaving. Without storage access, the game remains playable and labels saves
-**Session only**; those recordings disappear with the server. It never claims they
-were saved to cloud. Long runs are paged while driving; memory and pending writes are
-bounded. A storage outage can leave only cached pages available. Older replay data
-is retained in DataStores even after it leaves the visible library.
+A copy of the supplied 109-object native input graph provides the fallback missing at
+runtime. A session-only compatibility bridge supplies fresh original profile/settings
+values through the actual exported ReplicaClient protocol. This addresses the reported
+recursive Zone require, missing settings, duplicate listeners and input graph waits.
+It does not rebuild the original game's entire absent server backend or prove all
+original scene rendering faults resolved. **Return to Original** restores its UI/view.
 
-## Performance design
+The `.rbxmx` installer remains an optional add-on for other places. Save a copy, insert
+it into Workspace and run `require(workspace.BackseatRallyExpansion.Installer).install()`
+in Studio's Command Bar. It adds its namespace, keeps the opt-in launcher and does not
+apply ready-binary legacy Source repairs. Do not install twice into an extended DM place.
 
-The client builds a bounded window of road chunks, yields during construction and
-recycles simple parts. It never constructs an entire endless map. Route coordinates
-are rebased every 4096 studs to limit rendering precision loss. Scenery is kept outside
-the drivable corridor; tunnels maintain clearance and bridges have protected edges.
-No NPC crowds, physics stacks, synchronous cloud writes or scene-wide per-frame scans
-are used. Quality can be changed manually and reduces automatically after sustained
-slow frames. This changes new chunk decoration, not the course or timing gates.
-
-The server runs a bounded fixed-step driving simulation and owns checkpoints,
-completion, rewards and replay frames. Clients predict/interpolate for responsiveness.
-This is a rally-focused four-contact driving model with tyre slip, braking, handbrake,
-rough shoulders and barrier contacts; it is not the original game's full suspension
-solver. Public fallback cars and scenery use authored primitives for portability.
-
-## Validation and development
-
-From the repository root:
+## Build and validate
 
 ```sh
 python -m pip install -r backseat_rally_game/requirements-build.txt
-python backseat_rally_game/build.py --base-place "/path/to/original.rbxl"
-python backseat_rally_game/build.py --name Sakura_Pass --base-place "/path/to/Sakura Pass.rbxl"
-LUAU_BIN=/path/to/luau LUAU_COMPILE_BIN=/path/to/luau-compile python -m unittest discover -s backseat_rally_game/tests -v
+python backseat_rally_game/build.py --base-place /path/to/original.rbxl
+LUAU_BIN=/path/to/luau LUAU_COMPILE_BIN=/path/to/luau-compile \
+BACKSEAT_BASE_RBXL=/path/to/original.rbxl \
+python -m unittest discover -s backseat_rally_game/tests -v
 ```
 
-Omit `--base-place` to rebuild the clean standalone files and installer. An already
-extended base is rejected. `--output-dir` selects a different artifact directory.
-The original file is read without modification. Tests cover 1,000 seeded routes,
-manual driving to a finish, replay and persistent ghost retrieval, storage failures,
-streaming limits, additive installation, automatic startup, failed/slow mesh downloads,
-optional installation, lighting isolation and restoration to the original.
-Actual Studio rendering, device controls, asset loading, production DataStores and
-multiplayer latency still need a Studio/Roblox playtest; headless tests do not measure FPS.
-
-## Vehicle and asset update
-
-Version 1.3.0 uses all 15 uploaded vehicle profiles through one configurable solver.
-See ASSET_EXPORT_GUIDE.md for supported physics effects, current approximations, and
-which Studio folders to export for a closer visual match. Original private assets
-remain dependent on their permissions. The original Sakura renderer still needs a
-Studio Output trace to diagnose any remaining disappearing-scene errors.
+See `VALIDATION.md` for checks and `ASSET_EXPORT_GUIDE.md` for authorized asset exports.
+No Roblox Studio GUI is available in the build environment; automated tests use the
+Luau CLI and a Roblox test double, not the Roblox renderer or production services.

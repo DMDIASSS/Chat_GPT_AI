@@ -6,7 +6,7 @@ local Context=game:GetService('ContextActionService')
 local UIS=game:GetService('UserInputService')
 local Presence={};Presence.__index=Presence
 local daylight={ClockTime=15.8,Brightness=2.2,Ambient=Color3.fromRGB(114,122,114),
- OutdoorAmbient=Color3.fromRGB(148,155,144),FogStart=800,FogEnd=6000,FogColor=Color3.fromRGB(195,213,219)}
+ OutdoorAmbient=Color3.fromRGB(148,155,144),GlobalShadows=false,FogStart=800,FogEnd=6000,FogColor=Color3.fromRGB(195,213,219)}
 local atmosphere={Density=.18,Haze=.5,Glare=.1,Offset=0,Color=Color3.fromRGB(205,219,229),Decay=Color3.fromRGB(139,153,157)}
 function Presence.new(gui)
  return setmetatable({gui=gui,active=false,screens={},connections={},environment={}},Presence)
@@ -32,6 +32,29 @@ function Presence:hide(screen)
   if self.active and screen.Enabled then screen.Enabled=false end
  end)
 end
+function Presence:bindKeys(map)
+ self.keyMap=map
+ if self.active then self:bindControls()end
+end
+function Presence:bindControls()
+ Context:UnbindAction('ExpeditionControls')
+ local keys={Enum.KeyCode.Thumbstick1,Enum.KeyCode.ButtonR2,Enum.KeyCode.ButtonL2}
+ for name in pairs(self.keyMap or {W=true,S=true,A=true,D=true,Space=true,Up=true,Down=true,Left=true,Right=true})do
+  local ok,key=pcall(function()return Enum.KeyCode[name]end);if ok and key then keys[#keys+1]=key end
+ end
+ Context:BindActionAtPriority('ExpeditionControls',function(_,state,input)
+  if UIS:GetFocusedTextBox()and state~=Enum.UserInputState.End and state~=Enum.UserInputState.Cancel then return Enum.ContextActionResult.Pass end
+  if self.input then self.input(input,state)end
+  return Enum.ContextActionResult.Sink
+ end,false,4000,table.unpack(keys))
+end
+function Presence:climate(conditions,quality)
+ local light=self.environment[Lighting]
+ if light then
+  light.after.FogEnd=conditions.wetness>.3 and 2600 or 6000
+  light.after.GlobalShadows=quality=='high'
+ end
+end
 function Presence:open()
  if self.active then return end
  self.active=true
@@ -44,13 +67,7 @@ function Presence:open()
  local pg=Players.LocalPlayer:WaitForChild('PlayerGui')
  for _,screen in ipairs(pg:GetChildren())do self:hide(screen)end
  self.connections[#self.connections+1]=pg.ChildAdded:Connect(function(screen)self:hide(screen)end)
- Context:BindActionAtPriority('ExpeditionControls',function(_,state,input)
-  if UIS:GetFocusedTextBox()and state~=Enum.UserInputState.End and state~=Enum.UserInputState.Cancel then return Enum.ContextActionResult.Pass end
-  if self.input then self.input(input,state)end
-  return Enum.ContextActionResult.Sink
- end,false,4000,Enum.KeyCode.W,Enum.KeyCode.S,Enum.KeyCode.A,Enum.KeyCode.D,Enum.KeyCode.Space,
-  Enum.KeyCode.Up,Enum.KeyCode.Down,Enum.KeyCode.Left,Enum.KeyCode.Right,
-  Enum.KeyCode.Thumbstick1,Enum.KeyCode.ButtonR2,Enum.KeyCode.ButtonL2)
+ self:bindControls()
  RunService:BindToRenderStep('ExpeditionCamera',Enum.RenderPriority.Last.Value,function()
   if self.active then for object,entry in pairs(self.environment)do
    if object==Lighting or object.Parent then for property,value in pairs(entry.after)do

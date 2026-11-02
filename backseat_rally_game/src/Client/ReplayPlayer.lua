@@ -5,17 +5,19 @@ function Player.new(remote,metadata)
  return setmetatable({remote=remote,meta=metadata,cache={},pending={},queue={},alive=true,errors={}},Player)
 end
 function Player:page(index)
- if not self.meta.pages[index]or self.cache[index]or self.pending[index]then return end
+ if not self.alive or not self.meta.pages[index]or self.cache[index]or self.pending[index]then return end
  self.pending[index]=true;self.queue[#self.queue+1]=index
  if self.worker then return end;self.worker=true
  task.spawn(function()
   while self.alive and #self.queue>0 do
    local i=table.remove(self.queue,1);local result
+   -- Seeking drops queued fetches for pages far from the new playhead.
+   if self.current and math.abs(i-self.current)>2 then self.pending[i]=nil;continue end
    for attempt=1,3 do
     local ok,response=pcall(function()return self.remote:InvokeServer('page',{id=self.meta.id,index=i})end)
     if ok and response and response.text then
      local decoded,frames=pcall(Codec.decode,response.text)
-     if decoded then result=frames;break else self.errors[i]='Invalid replay data'end
+     if decoded and #frames>0 then result=frames;break else self.errors[i]='Invalid replay data'end
     else self.errors[i]=ok and response and response.error or 'Connection interrupted'end
     task.wait(.5*attempt)
    end
@@ -30,9 +32,19 @@ function Player:page(index)
  end)
 end
 function Player:sample(t)
- local pages=self.meta.pages;local index=1
+ if not self.alive then return nil,'Replay closed'end
+ if type(t)~='number'or t~=t or math.abs(t)==math.huge then return nil,'Invalid replay time'end
+ local pages=self.meta.pages;if #pages==0 then return nil,'Replay has no recorded frames'end
+ local index=1
  for i,p in ipairs(pages)do if p.from<=t then index=i else break end end
- self.current=index;self:page(index);self:page(index+1)
+ self.current=index
+ -- Bound the seek queue as well as the cache; repeated scrubbing cannot build
+ -- an unbounded list of obsolete HTTP/DataStore requests.
+ for i=#self.queue,1,-1 do
+  local queued=self.queue[i]
+  if math.abs(queued-index)>2 then self.pending[queued]=nil;table.remove(self.queue,i)end
+ end
+ self:page(index);self:page(index+1)
  local frames=self.cache[index]
  if not frames then return nil,self.errors[index]or 'Loading replay…'end
  if frames[#frames][1]<t*1000 and self.cache[index+1]then
@@ -40,5 +52,5 @@ function Player:sample(t)
  end
  return Codec.sample(frames,t)
 end
-function Player:destroy()self.alive=false;self.queue={};self.cache={}end
+function Player:destroy()self.alive=false;self.queue={};self.cache={};self.pending={}end
 return Player

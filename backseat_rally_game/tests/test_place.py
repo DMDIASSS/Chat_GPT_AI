@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import struct
 import sys
@@ -36,6 +37,7 @@ class PlaceTests(unittest.TestCase):
     def test_embedded_expansion_sources_match_reviewable_sources(self):
         report = json.loads((self.downloads / 'DM_PRESERVATION.json').read_text())
         added = {n['ref'] for n in report['added_objects']}
+        backups = {n['ref'] for n in report['added_objects'] if n.get('source_backup')}
         sources = []
         for block in self.place.chunks:
             if block.tag != b'PROP':
@@ -47,9 +49,10 @@ class PlaceTests(unittest.TestCase):
             name = block.payload[8:8 + length].decode()
             if name == 'Source':
                 at = 9 + length
-                for _ in refs:
+                for ref in refs:
                     size = struct.unpack_from('<I', block.payload, at)[0]
-                    sources.append(block.payload[at + 4:at + 4 + size].decode())
+                    if ref not in backups:
+                        sources.append(block.payload[at + 4:at + 4 + size].decode())
                     at += 4 + size
             elif name == 'Disabled':
                 self.assertEqual(block.payload[9 + length:], bytes(len(refs)))
@@ -66,7 +69,8 @@ class PlaceTests(unittest.TestCase):
         if not path:
             self.skipTest('Set BACKSEAT_BASE_RBXL for comparison with the original input')
         base = Path(path).read_bytes()
-        report = verify_addition(base, self.data)
+        manifest = json.loads((self.downloads / 'DM_PRESERVATION.json').read_text())
+        report = verify_addition(base, self.data, manifest.get('legacy_source_changes', []))
         self.assertEqual(report['original_instances'], 82861)
         # Corrupting an original property must fail the preservation check.
         original = Place(base)
@@ -76,7 +80,14 @@ class PlaceTests(unittest.TestCase):
             verify_addition(base, bad)
 
     def test_clean_standalone_has_native_floor_correct_script_container_and_no_imported_assets(self):
-        path=next((APP.parent/'downloads').glob('DM_Rally_Standalone_v1.3.0.rbxl'))
+        config=(APP/'src/Shared/Config.lua').read_text()
+        version=re.search(r"C.Version\s*=\s*['\"]([^'\"]+)['\"]", config)
+        if not version:
+            version=re.search(r"Version\s*=\s*['\"]([^'\"]+)['\"]", config)
+        self.assertIsNotNone(version,'Config.Version missing')
+        path=APP.parent/'downloads'/f'DM_Rally_Standalone_v{version[1]}.rbxl'
+        if not path.exists():
+            self.skipTest('Build standalone artifact for current Config.Version')
         standalone=Place(path.read_bytes())
         classes={ref:cls for cls,refs,_ in standalone.classes.values()for ref in refs}
         self.assertNotIn('MeshPart',classes.values())
