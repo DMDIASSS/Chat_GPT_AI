@@ -1,0 +1,191 @@
+{
+  "reference_place_sha256": "d6f5822ff7ea6bcbc4dbf34a786608a5770d3dbb205fe0b28d5a2ad50ea1200e",
+  "redone_place_sha256": "5b1e1d66ec5c360e32bdb4ab1b1591739cacd7e5cfe113e8a93f776a08c2245a",
+  "measurements": [
+    {
+      "car_id": "BrennerS1",
+      "source_car": "GroupB",
+      "shell_mesh_id_matches": true,
+      "wheel_centers": {
+        "FL": {
+          "X": -2.8,
+          "Y": -0.75,
+          "Z": -4.4
+        },
+        "FR": {
+          "X": 2.8,
+          "Y": -0.75,
+          "Z": -4.4
+        },
+        "RL": {
+          "X": -2.8,
+          "Y": -0.75,
+          "Z": 3.9
+        },
+        "RR": {
+          "X": 2.8,
+          "Y": -0.75,
+          "Z": 3.9
+        }
+      },
+      "driver_eye": {
+        "X": -1.35,
+        "Y": 2.1,
+        "Z": 1
+      }
+    },
+    {
+      "car_id": "KazeRS",
+      "source_car": "Sedan",
+      "shell_mesh_id_matches": true,
+      "wheel_centers": {
+        "FL": {
+          "X": -2.6069999,
+          "Y": -0.7,
+          "Z": -4.5
+        },
+        "FR": {
+          "X": 2.6069999,
+          "Y": -0.7,
+          "Z": -4.5
+        },
+        "RL": {
+          "X": -2.6069999,
+          "Y": -0.7,
+          "Z": 4.5
+        },
+        "RR": {
+          "X": 2.6069999,
+          "Y": -0.7,
+          "Z": 4.5
+        }
+      },
+      "driver_eye": {
+        "X": -1.35,
+        "Y": 2.2,
+        "Z": 1
+      }
+    },
+    {
+      "car_id": "FalkeE3",
+      "source_car": "Saloon",
+      "shell_mesh_id_matches": true,
+      "wheel_centers": {
+        "FL": {
+          "X": -2.65,
+          "Y": -0.75,
+          "Z": -4.75
+        },
+        "FR": {
+          "X": 2.65,
+          "Y": -0.75,
+          "Z": -4.75
+        },
+        "RL": {
+          "X": -2.65,
+          "Y": -0.75,
+          "Z": 4.4
+        },
+        "RR": {
+          "X": 2.65,
+          "Y": -0.75,
+          "Z": 4.4
+        }
+      },
+      "driver_eye": {
+        "X": -1.35,
+        "Y": 2.2,
+        "Z": 1
+      }
+    },
+    {
+      "car_id": "KumoR1",
+      "source_car": "Hybrid",
+      "shell_mesh_id_matches": true,
+      "wheel_centers": {
+        "FL": {
+          "X": -2.7535,
+          "Y": -0.65,
+          "Z": -4.7
+        },
+        "FR": {
+          "X": 2.7535,
+          "Y": -0.65,
+          "Z": -4.7
+        },
+        "RL": {
+          "X": -2.7535,
+          "Y": -0.65,
+          "Z": 4.7
+        },
+        "RR": {
+          "X": 2.7535,
+          "Y": -0.65,
+          "Z": 4.7
+        }
+      },
+      "driver_eye": {
+        "X": -1.35,
+        "Y": 2.2,
+        "Z": 1
+      }
+    },
+    {
+      "car_id": "FrecciaHF",
+      "source_car": "Coupe",
+      "shell_mesh_id_matches": true,
+      "wheel_centers": {
+        "FL": {
+          "X": -2.602,
+          "Y": -0.75,
+          "Z": -5
+        },
+        "FR": {
+          "X": 2.602,
+          "Y": -0.75,
+          "Z": -5
+        },
+        "RL": {
+          "X": -2.602,
+          "Y": -0.75,
+          "Z": 4
+        },
+        "RR": {
+          "X": 2.602,
+          "Y": -0.75,
+          "Z": 4
+        }
+      },
+      "driver_eye": {
+        "X": -1.35,
+        "Y": 1.8,
+        "Z": 1
+      }
+    }
+  ],
+  "wheel_mesh_rotation": {
+    "original_Coupe_FL": [
+      -1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      -1
+    ],
+    "redone_template": [
+      0,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      -1
+    ]
+  },
+  "scope": "Measurements from the uploaded places only; no private asset-library access."
+}

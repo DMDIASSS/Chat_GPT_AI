@@ -1,0 +1,1807 @@
+<?xml version='1.0' encoding='utf-8'?>
+<roblox version="4">
+  <External>null</External>
+  <External>nil</External>
+  <Item class="Workspace" referent="RBX00000001">
+    <Properties>
+      <string name="Name">Workspace</string>
+      <bool name="StreamingEnabled">true</bool>
+      <float name="Gravity">130</float>
+    </Properties>
+    <Item class="Folder" referent="RBX00000002">
+      <Properties>
+        <string name="Name">ExpeditionPreview</string>
+      </Properties>
+      <Item class="Part" referent="RBX00000003">
+        <Properties>
+          <string name="Name">PreviewFloor</string>
+          <bool name="Anchored">true</bool>
+          <Vector3 name="size">
+            <X>160</X>
+            <Y>2</Y>
+            <Z>150</Z>
+          </Vector3>
+          <CoordinateFrame name="CFrame">
+            <X>0</X>
+            <Y>-1</Y>
+            <Z>0</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <Color3 name="Color">
+            <R>0.21</R>
+            <G>0.25</G>
+            <B>0.22</B>
+          </Color3>
+        </Properties>
+      </Item>
+      <Item class="SpawnLocation" referent="RBX00000004">
+        <Properties>
+          <string name="Name">PreviewSpawn</string>
+          <bool name="Anchored">true</bool>
+          <float name="Transparency">1</float>
+          <bool name="Neutral">true</bool>
+        </Properties>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="ReplicatedStorage" referent="RBX00000005">
+    <Properties>
+      <string name="Name">ReplicatedStorage</string>
+    </Properties>
+    <Item class="Folder" referent="RBX0000000E">
+      <Properties>
+        <string name="Name">BackseatExpedition</string>
+      </Properties>
+      <Item class="Folder" referent="RBX0000000F">
+        <Properties>
+          <string name="Name">Shared</string>
+        </Properties>
+        <Item class="ModuleScript" referent="RBX00000010">
+          <Properties>
+            <string name="Name">AssetLoader</string>
+            <ProtectedString name="Source">-- Optional meshes never block driving or replace complete geometry before loading.
+local ContentProvider=game:GetService('ContentProvider')
+local Loader={};local entries=setmetatable({},{__mode='k'})
+local timeout=8
+local function inspect(template)
+ local visible,external=0,false
+ for _,item in ipairs(template:GetDescendants())do
+  if item:IsA('BasePart')and item.Transparency&lt;1 then
+   visible+=1
+   if item:IsA('MeshPart')then
+    if item.MeshId==''then return false,false end
+    external=true
+   end
+  elseif item:IsA('SpecialMesh')and item.MeshType==Enum.MeshType.FileMesh then
+   if item.MeshId==''then return false,false end
+   external=true
+  elseif item:IsA('SurfaceAppearance')or item:IsA('Decal')or item:IsA('Texture')then external=true end
+ end
+ return visible&gt;0,external
+end
+local function finish(entry,ok)
+ if entry.status~='loading'then return end
+ entry.status=ok and 'ready'or 'unavailable'
+ local callbacks=entry.callbacks;entry.callbacks={}
+ for _,callback in ipairs(callbacks)do task.defer(callback,ok)end
+end
+function Loader.check(template,callback)
+ if not template then if callback then task.defer(callback,false)end;return 'unavailable'end
+ local entry=entries[template]
+ if not entry then
+  entry={status='loading',callbacks={}};entries[template]=entry
+  local valid,external=inspect(template)
+  if not valid then entry.status='unavailable'
+  elseif not external then entry.status='ready'
+  else
+   task.delay(timeout,function()finish(entry,false)end)
+   task.spawn(function()
+    local failed=false;local observed=false
+    local ok=pcall(function()
+     ContentProvider:PreloadAsync({template},function(_,status)
+      observed=true
+      if status~=Enum.AssetFetchStatus.Success then failed=true end
+     end)
+    end)
+    finish(entry,ok and observed and not failed)
+   end)
+  end
+ end
+ if callback then
+  if entry.status=='loading'then entry.callbacks[#entry.callbacks+1]=callback
+  else task.defer(callback,entry.status=='ready')end
+ end
+ return entry.status
+end
+function Loader.ready(template)return Loader.check(template)=='ready'end
+return Loader
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000011">
+          <Properties>
+            <string name="Name">Assets</string>
+            <ProtectedString name="Source">-- Original lightweight models; optional skins are harvested from the user's place by Installer.
+local Assets={}
+local Loader=require(script.Parent.AssetLoader)
+local function color(t)return Color3.new(t[1],t[2],t[3])end
+function Assets.part(parent,name,size,cf,tint,material,shape)
+ local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=cf;p.Anchored=true
+ p.Color=typeof(tint)=='Color3'and tint or color(tint);p.Material=material or Enum.Material.SmoothPlastic
+ p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.CastShadow=false
+ p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;if shape then p.Shape=shape end;p.Parent=parent;return p
+end
+local function box(model,name,size,position,tint,material)
+ return Assets.part(model,name,size,CFrame.new(position),tint,material)
+end
+local dark={.075,.09,.095};local glass={.14,.24,.25};local metal={.50,.55,.54}
+function Assets.car(parent,car,ghost,useOriginal,withAudio)
+ local model=Instance.new('Model');model.Name=ghost and 'SavedGhost'or car.name
+ local body=box(model,'Chassis',Vector3.new(5.7,1.55,9.4),Vector3.zero,car.color);model.PrimaryPart=body
+ box(model,'Bonnet',Vector3.new(5.55,.55,2.7),Vector3.new(0,.9,-3),car.color)
+ box(model,'Roof',Vector3.new(4.6,.35,4.7),Vector3.new(0,2.2,.4),car.color)
+ box(model,'Cabin',Vector3.new(4.5,1.5,4.3),Vector3.new(0,1.4,.4),glass)
+ box(model,'Windscreen',Vector3.new(4.5,1.25,.12),Vector3.new(0,1.5,-1.8),glass)
+ for _,side in ipairs({-1,1})do
+  box(model,'A pillar',Vector3.new(.18,1.65,.22),Vector3.new(side*2.25,1.5,-1.8),car.color)
+  box(model,'B pillar',Vector3.new(.18,1.65,.20),Vector3.new(side*2.25,1.5,.3),car.color)
+  box(model,'C pillar',Vector3.new(.18,1.65,.22),Vector3.new(side*2.25,1.5,2.4),car.color)
+  box(model,'Mirror',Vector3.new(.55,.25,.7),Vector3.new(side*3,1,-1.45),dark)
+  box(model,'Sill',Vector3.new(.15,.3,6.2),Vector3.new(side*2.9,-.4,.3),dark)
+  box(model,'Headlamp',Vector3.new(1.5,.45,.12),Vector3.new(side*1.65,.4,-4.76),{.99,.91,.64},Enum.Material.Neon)
+  box(model,'Tail lamp',Vector3.new(1.1,.32,.12),Vector3.new(side*1.85,.45,4.76),{.72,.13,.1},Enum.Material.Neon)
+ end
+ box(model,'Front bumper',Vector3.new(5.9,.55,.4),Vector3.new(0,-.3,-4.8),dark)
+ box(model,'Rear bumper',Vector3.new(5.9,.55,.4),Vector3.new(0,-.3,4.8),dark)
+ box(model,'Grille',Vector3.new(2.3,.5,.15),Vector3.new(0,.3,-4.78),dark)
+ box(model,'Rally stripe',Vector3.new(.8,.04,9.1),Vector3.new(.8,.8,0),{.94,.91,.79})
+ if car.id=='scout'then
+  box(model,'Roof rack',Vector3.new(4.9,.2,4.7),Vector3.new(0,2.5,.4),dark)
+  box(model,'Expedition case',Vector3.new(3.5,.55,2.7),Vector3.new(0,2.9,.8),{.45,.37,.24})
+ elseif car.id=='coupe'then
+  box(model,'Spoiler',Vector3.new(6,.2,.8),Vector3.new(0,1.35,4.1),dark)
+ end
+ local wheels={}
+ for _,front in ipairs({true,false})do for _,sign in ipairs({-1,1})do
+  local tyre=Assets.part(model,'Tyre',Vector3.new(.8,2.4,2.4),CFrame.new(sign*3,-1,front and -3.8 or 3.8),dark,Enum.Material.SmoothPlastic,Enum.PartType.Cylinder)
+  local rim=Assets.part(model,'Wheel',Vector3.new(.83,1.4,1.4),tyre.CFrame,metal,Enum.Material.Metal,Enum.PartType.Cylinder)
+  wheels[#wheels+1]={tyre=tyre,rim=rim,side=sign,front=front}
+ end end
+ local root=game:GetService('ReplicatedStorage'):FindFirstChild('BackseatExpedition')
+ local library=root and root:FindFirstChild('ImportedCars')
+ local template=useOriginal~=false and library and library:FindFirstChild(car.template)
+ local parts={}
+ for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')then
+  p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=not ghost
+  if ghost then p.Color=Color3.fromRGB(107,220,201);p.Transparency=.65;p.Material=Enum.Material.ForceField end
+  parts[#parts+1]=p
+ end end
+ local sounds={};local bank=withAudio and root and root:FindFirstChild('ImportedAudio')
+ if bank and not ghost then for _,name in ipairs({'Idle','Run','High'})do
+  local source=bank:FindFirstChild(name)
+  if source and source:IsA('Sound')then local sound=source:Clone();sound.Parent=body;sound.Volume=0;sound:Play();sounds[#sounds+1]=sound end
+ end end
+ model.Parent=parent
+ model:SetAttribute('VisualSource','BuiltIn')
+ local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds}
+ if template and not ghost then
+  Loader.check(template,function(ready)
+   if not ready or not model.Parent then return end
+   local skin=template:Clone()
+   if not skin.PrimaryPart then skin:Destroy();return end
+   skin.Name='Original exterior';skin:PivotTo(model:GetPivot())
+   for _,part in ipairs(skin:GetDescendants())do if part:IsA('BasePart')then
+    part.Anchored=true;part.CanCollide=false;part.CanTouch=false;part.CanQuery=false
+   end end
+   skin.Parent=model
+   -- Keep a complete body until all external assets are confirmed available.
+   for _,part in ipairs(parts)do
+    if part.Name~='Tyre'and part.Name~='Wheel'then part.Transparency=1 end
+   end
+   model:SetAttribute('VisualSource','Original')
+  end)
+ end
+ return visual
+end
+function Assets.pose(visual,s,route,offset,dt)
+ local D=require(script.Parent.Dynamics)
+ local y,pitch,roll=D.pose(s,route)
+ local cf=CFrame.new(Vector3.new(s.x,y,s.z)+offset)*CFrame.Angles(0,math.pi+s.yaw,0)*CFrame.Angles(pitch,0,roll)
+ visual.model:PivotTo(cf);visual.spin=(visual.spin+s.v*(dt or 0)/1.2)%(math.pi*2)
+ for _,wheel in ipairs(visual.wheels)do
+  local z=wheel.front and -3.8 or 3.8
+  local pos=cf:PointToWorldSpace(Vector3.new(wheel.side*3,0,z))
+  local localPos=pos-offset;local ground=route:ground(localPos.X,localPos.Z)
+  local at=Vector3.new(pos.X,ground+1.2+offset.Y,pos.Z)
+  local wc=CFrame.new(at)*cf.Rotation*CFrame.Angles(0,wheel.front and -s.steer*.32 or 0,0)*CFrame.Angles(visual.spin,0,0)
+  wheel.tyre.CFrame=wc;wheel.rim.CFrame=wc
+ end
+ for i,sound in ipairs(visual.audio or {})do
+  local speed=math.abs(s.v);local gear=(speed%32)/32
+  sound.PlaybackSpeed=math.clamp(.65+gear*.8,.5,1.6)
+  local gain=i==1 and math.clamp(1-speed/35,0,1)or(i==2 and math.clamp(speed/45,0,1)or math.clamp((speed-65)/65,0,1))
+  sound.Volume=(dt or 0)&gt;0 and gain*.17 or 0
+ end
+ return cf
+end
+function Assets.park(parent)
+ local ground=Assets.part(parent,'Service park',Vector3.new(160,2,150),CFrame.new(0,-1,0),{.21,.25,.22},Enum.Material.Asphalt)
+ ground.CanCollide=true;ground.CanQuery=true
+ for i,car in ipairs(require(script.Parent.Config).Cars)do
+  local visual=Assets.car(parent,car,false,require(script.Parent.Config).ImportedVisuals)
+  visual.model:PivotTo(CFrame.new((i-2)*20,2.2,-12)*CFrame.Angles(0,math.pi,0))
+ end
+ Assets.part(parent,'Workshop',Vector3.new(64,14,22),CFrame.new(0,7,-42),{.24,.30,.29},Enum.Material.WoodPlanks)
+ Assets.part(parent,'Roof',Vector3.new(70,1,28),CFrame.new(0,14,-42),{.12,.18,.18},Enum.Material.Metal)
+ for _,x in ipairs({-21,0,21})do Assets.part(parent,'Garage door',Vector3.new(17,10,.25),CFrame.new(x,5,-30.8),{.10,.14,.15},Enum.Material.Metal)end
+ for _,x in ipairs({-44,44})do
+  Assets.part(parent,'Lamp',Vector3.new(.5,12,.5),CFrame.new(x,6,5),metal,Enum.Material.Metal)
+  Assets.part(parent,'Lantern',Vector3.new(2,.4,3),CFrame.new(x,12,5),{.99,.79,.48},Enum.Material.Neon)
+ end
+ local sign=Assets.part(parent,'Expedition sign',Vector3.new(45,4,.4),CFrame.new(0,12,-30.5),dark)
+ local gui=Instance.new('SurfaceGui');gui.Face=Enum.NormalId.Back;gui.CanvasSize=Vector2.new(1000,100);gui.Parent=sign
+ local text=Instance.new('TextLabel');text.Size=UDim2.fromScale(1,1);text.BackgroundTransparency=1;text.Text='BACKSEAT / EXPEDITION'
+ text.TextColor3=Color3.fromRGB(239,222,183);text.Font=Enum.Font.GothamBold;text.TextScaled=true;text.Parent=gui
+end
+return Assets
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000012">
+          <Properties>
+            <string name="Name">Config</string>
+            <ProtectedString name="Source">-- Backseat Rally: Expedition. Authored game systems, not an executor script.
+return {
+ Version='1.2.0', AutoOpen=true, ImportedVisuals=false, ExternalAudio=false, Generation=1, WorldX=100000, LaneSpacing=1800, StudMetres=.28, Step=1/60, StateRate=12, InputRate=20,
+ Chunk=256, RoadStep=16, RoadWidth=28, Checkpoint=768, MaxPlayers=8,
+ ReplayRate=10, ReplayPage=500, ReplayPending=4, LibrarySize=12, BestSize=8,
+ Modes={
+  {id='sprint',name='Rally Sprint',tag='A road with an ending',length=6144,weather='clear',xp=240},
+  {id='expedition',name='Expedition',tag='Four biomes. One long drive.',length=16384,weather='clear',xp=650},
+  {id='daily',name='Daily Roadbook',tag='The same new road for everyone today',length=8192,weather='dusk',xp=340},
+  {id='endless',name='Endless Journey',tag='Keep going. Bank the run whenever you want.',length=0,weather='clear',xp=0},
+ },
+ Cars={
+  {id='hatch',name='Trail Hatch',template='Hatch',unlock=0,top=138,accel=33,grip=1,wheelbase=7.6,color={.89,.36,.16},description='Light, lively, and happy on gravel.'},
+  {id='scout',name='Safari Scout',template='OrsoSafari',unlock=500,top=128,accel=30,grip=1.12,wheelbase=8,color={.64,.72,.43},description='A planted chassis for the long way home.'},
+  {id='coupe',name='Ridge Coupe',template='Coupe',unlock=1400,top=151,accel=35,grip=.91,wheelbase=8.2,color={.28,.62,.76},description='A quick nose; treat the rear with respect.'},
+ },
+ Biomes={
+  {name='Pine Country',ground={.29,.36,.24},road={.39,.34,.27},accent={.88,.66,.28},trees=true},
+  {name='Alpine Pass',ground={.56,.60,.57},road={.40,.43,.43},accent={.72,.86,.91},snow=true},
+  {name='Red Mesa',ground={.63,.40,.25},road={.67,.51,.35},accent={.91,.67,.33},desert=true},
+  {name='North Coast',ground={.40,.51,.37},road={.36,.39,.40},accent={.80,.85,.71},coast=true},
+ },
+ Quality={low={behind=1,ahead=4,props=2,shadows=false},medium={behind=2,ahead=5,props=5,shadows=false},high={behind=2,ahead=6,props=9,shadows=true}},
+}
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000013">
+          <Properties>
+            <string name="Name">Dynamics</string>
+            <ProtectedString name="Source">-- Shared deterministic driving model. The server owns progress and outcomes.
+-- Four road contacts set chassis attitude; visual wheels have independent travel.
+local D={}
+local function wrap(a)return (a+math.pi)%(2*math.pi)-math.pi end
+local function approach(a,b,rate,dt)return a+(b-a)*(1-math.exp(-rate*dt))end
+function D.new(route)
+ local p=route:point(0)
+ return {x=p.x,z=0,v=0,lateralV=0,yaw=p.heading,steer=0,damage=0,distance=0,crashes=0,impact=0}
+end
+function D.copy(s)local out={};for k,v in pairs(s)do out[k]=v end;return out end
+function D.step(s,input,route,car,dt)
+ dt=math.clamp(dt,0,1/30);local p=route:point(s.z)
+ local _,offset=route:ground(s.x,s.z);local off=math.abs(offset)&gt;p.width/2+1
+ local grip=car.grip*(p.surface=='tarmac'and 1.22 or 1)*(off and .63 or 1)
+ s.steer=approach(s.steer,math.clamp(input.steer or 0,-1,1),9,dt)
+ local throttle=math.clamp(input.throttle or 0,-1,1);local brake=math.clamp(input.brake or 0,0,1)
+ local accel=throttle*car.accel*math.max(.72,1-s.damage*.003)*(1-.35*math.min(math.abs(s.v)/car.top,.94))
+ if throttle&lt;0 and s.v&gt;2 then accel=-58 end
+ if throttle&gt;0 and s.v&lt; -2 then accel=45 end
+ local drag=(.72+.0011*s.v*s.v+(off and 8 or 0))*(s.v&lt;0 and -1 or 1)
+ if math.abs(s.v)&lt;.3 and throttle==0 then s.v=0;drag=0 end
+ s.throttle=throttle;s.brake=brake;s.handbrake=input.handbrake==true
+ local braking=brake*66*(s.v&lt;0 and -1 or 1)
+ local nextV=s.v+(accel-drag-braking-p.dy*20)*dt
+ if brake&gt;0 and (math.abs(s.v)&lt;1.5 or s.v*nextV&lt;0)then nextV=0 end
+ s.v=math.clamp(nextV,-23,car.top*(off and .68 or 1))
+ local steerAngle=s.steer*math.rad(31)/(1+math.abs(s.v)/95)
+ local yawRate=s.v/car.wheelbase*math.tan(steerAngle)
+ local limit=grip*48/math.max(math.abs(s.v),10)
+ local excess=yawRate-math.clamp(yawRate,-limit,limit)
+ yawRate=math.clamp(yawRate,-limit,limit)+excess*.12
+ s.lateralV=approach(s.lateralV,excess*math.abs(s.v)*.22,input.handbrake and 2.1 or 5*grip,dt)
+ if input.handbrake then yawRate*=1.2;s.v*=math.exp(-.65*dt) end
+ s.yaw=wrap(s.yaw-yawRate*dt)
+ local forwardX,forwardZ=math.sin(s.yaw),math.cos(s.yaw)
+ s.x+=(forwardX*s.v+forwardZ*s.lateralV)*dt
+ s.z+=(forwardZ*s.v-forwardX*s.lateralV)*dt
+ local _,lateral,newPoint=route:ground(s.x,s.z)
+ s.impact=math.max(0,(s.impact or 0)-dt*2)
+ local barrier=newPoint.bridge or newPoint.tunnel
+ local bound=newPoint.width/2-3.1
+ if barrier and math.abs(lateral)&gt;bound then
+  local sign=lateral&lt;0 and -1 or 1
+  s.x=newPoint.x+sign*bound*math.sqrt(1+newPoint.dx*newPoint.dx)
+  local relative=wrap(s.yaw-newPoint.heading)
+  local hit=math.abs(math.sin(relative)*s.v)+math.abs(s.lateralV)
+  if hit&gt;5 and s.impact&lt;=0 then s.crashes+=1;s.damage=math.min(100,s.damage+hit*.2);s.impact=1 end
+  s.yaw=approach(s.yaw,newPoint.heading,.8,dt);s.lateralV=0;s.v*=math.exp(-2*dt)
+ elseif math.abs(lateral)&gt;newPoint.width/2+14 then
+  s.v*=math.exp(-1.8*dt)
+ end
+ s.distance+=math.abs(s.v)*dt
+ return s
+end
+function D.pose(s,route)
+ local y=route:ground(s.x,s.z);local fX,fZ=math.sin(s.yaw),math.cos(s.yaw)
+ local front=route:ground(s.x+fX*3.8,s.z+fZ*3.8)
+ local back=route:ground(s.x-fX*3.8,s.z-fZ*3.8)
+ local left=route:ground(s.x+fZ*2.8,s.z-fX*2.8)
+ local right=route:ground(s.x-fZ*2.8,s.z+fX*2.8)
+ return y+2.2,math.atan2(front-back,7.6),math.atan2(right-left,5.6)
+end
+function D.reset(s,route,z)
+ local p=route:point(z);s.x=p.x;s.z=z;s.yaw=p.heading;s.v=0;s.lateralV=0;s.steer=0;s.impact=0
+end
+return D
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000014">
+          <Properties>
+            <string name="Name">ImportAssets</string>
+            <ProtectedString name="Source">-- Clone visual templates only; source instances stay untouched.
+local ImportAssets={}
+local function safeClone(model,maxParts)
+ local clone=model:Clone();local count=0
+ for _,item in ipairs(clone:GetDescendants())do
+  if item:IsA('LuaSourceContainer')or item:IsA('RemoteEvent')or item:IsA('RemoteFunction')or item:IsA('ProximityPrompt')or item:IsA('PackageLink')or item:IsA('Constraint')or item:IsA('JointInstance')then item:Destroy()
+  elseif item:IsA('BasePart')then count+=1;item.Anchored=true;item.CanCollide=false;item.CanTouch=false;item.CanQuery=false;item.CastShadow=false
+  elseif item:IsA('Sound')or item:IsA('ParticleEmitter')or item:IsA('Light')or item:IsA('Trail')or item:IsA('Beam')then item:Destroy()end
+ end
+ if count&gt;maxParts then clone:Destroy();return nil end
+ return clone
+end
+function ImportAssets.harvest(root)
+ if not root:FindFirstChild('ImportedAudio')then
+  local audio=Instance.new('Folder');audio.Name='ImportedAudio';audio.Parent=root
+  -- Idle, mid-load and high-load loops referenced by the supplied car audio bank.
+  for i,id in ipairs({'rbxassetid://79745038579097','rbxassetid://112975795144083','rbxassetid://99444077339790'})do
+   local sound=Instance.new('Sound');sound.Name=({'Idle','Run','High'})[i]
+   sound.SoundId=id;sound.Looped=true;sound.Volume=0;sound.Parent=audio
+  end
+ end
+ if root:FindFirstChild("ImportedCars") then return #root.ImportedCars:GetChildren(),#root.ImportedProps:GetChildren() end
+ local rs=game:GetService('ReplicatedStorage');local assets=rs:FindFirstChild('Assets')
+ if not assets then return 0,0 end
+ local cars,props=0,0
+ local carFolder=Instance.new('Folder');carFolder.Name='ImportedCars';carFolder.Parent=root
+ local propFolder=Instance.new('Folder');propFolder.Name='ImportedProps';propFolder.Parent=root
+ local originals=assets:FindFirstChild('Cars')
+ for _,name in ipairs({'Hatch','OrsoSafari','Coupe'})do
+  local source=originals and originals:FindFirstChild(name)
+  local exterior=source and source:FindFirstChild('Exterior');local body=source and source:FindFirstChild('Body')
+  if exterior and body and body:IsA('BasePart')then
+   local clone=safeClone(exterior,180)
+   if clone then
+    clone.Name=name;local reference=body:Clone();reference.Name='SkinRoot';reference.Transparency=1;reference.Anchored=true;reference.CanCollide=false
+    reference:ClearAllChildren();reference.Parent=clone;clone.PrimaryPart=reference;clone:PivotTo(CFrame.identity);clone.Parent=carFolder;cars+=1
+   end
+  end
+ end
+ local stage=assets:FindFirstChild('Stage');local forest=stage and stage:FindFirstChild('Forest')
+ for _,name in ipairs({'SpruceYoung1','SpruceSlim1','Birch1','Rock1','Bush1'})do
+  local source=forest and forest:FindFirstChild(name)
+  if source and source:IsA('Model')then
+   local clone=safeClone(source,24)
+   if clone then
+    local cf,size=clone:GetBoundingBox();clone.WorldPivot=CFrame.new(cf.Position.X,cf.Position.Y-size.Y/2,cf.Position.Z)
+    clone:PivotTo(CFrame.identity);clone.Parent=propFolder;props+=1
+   end
+  end
+ end
+ return cars,props
+end
+return ImportAssets
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000015">
+          <Properties>
+            <string name="Name">Replay</string>
+            <ProtectedString name="Source">-- Quantized, paged CSV data; no executable replay content. ~25 KB / 50 s page.
+local R={}
+local function round(n)return math.floor(n+.5)end
+function R.frame(t,s,flags,input)
+ input=input or {}
+ return {round(t*1000),round(s.x*20),round(s.z*20),round(s.yaw*10000),round(s.v*10),round(s.steer*1000),round(s.damage*10),flags or 0,round((input.throttle or 0)*1000),round((input.brake or 0)*1000),input.handbrake and 1 or 0}
+end
+function R.encode(frames)
+ local rows={}
+ for i,f in ipairs(frames)do rows[i]=table.concat(f,',')end
+ return table.concat(rows,'\n')
+end
+function R.decode(text)
+ assert(type(text)=='string'and #text&lt;=100000,'Invalid replay page')
+ local frames={};local previous=-1
+ for line in text:gmatch('[^\n]+')do
+  local f={};for value in line:gmatch('[^,]+')do f[#f+1]=tonumber(value)end
+  assert(#f==11,'Invalid replay frame')
+  for _,n in ipairs(f)do assert(n==n and math.abs(n)&lt;1e12 and n==math.floor(n),'Invalid replay number')end
+  assert(f[1]&gt;=previous and f[8]&gt;=0 and f[8]&lt;=1,'Invalid replay chronology')
+  assert(math.abs(f[9])&lt;=1000 and f[10]&gt;=0 and f[10]&lt;=1000 and (f[11]==0 or f[11]==1),'Invalid recorded controls')
+  previous=f[1];frames[#frames+1]=f;assert(#frames&lt;=500,'Oversized replay page')
+ end
+ return frames
+end
+function R.state(f)
+ return {x=f[2]/20,z=f[3]/20,yaw=f[4]/10000,v=f[5]/10,steer=f[6]/1000,damage=f[7]/10,lateralV=0,distance=0,crashes=0,impact=0,throttle=f[9]/1000,brake=f[10]/1000,handbrake=f[11]==1}
+end
+function R.sample(frames,t)
+ if #frames==0 then return nil end
+ local ms=t*1000;local lo,hi=1,#frames
+ while lo&lt;hi do local mid=math.floor((lo+hi+1)/2);if frames[mid][1]&lt;=ms then lo=mid else hi=mid-1 end end
+ local a,b=frames[lo],frames[math.min(lo+1,#frames)]
+ if b[8]==1 and ms&lt;b[1]then return R.state(a)end
+ local f=math.clamp((ms-a[1])/math.max(1,b[1]-a[1]),0,1)
+ local s=R.state(a);local nextState=R.state(b)
+ for _,k in ipairs({'x','z','v','steer','damage'})do s[k]+=(nextState[k]-s[k])*f end
+ local delta=(nextState.yaw-s.yaw+math.pi)%(2*math.pi)-math.pi;s.yaw+=delta*f
+ return s
+end
+return R
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000016">
+          <Properties>
+            <string name="Name">Route</string>
+            <ProtectedString name="Source">-- Continuous, forward-monotone roads: no self-crossings, jumps, or blocked lanes.
+local Route={};Route.__index=Route
+local sin,cos,sqrt=math.sin,math.cos,math.sqrt
+local function hash(seed,index)
+ local value=(seed+(index+19)*104729)%2147483647
+ for _=1,3 do value=(value*48271)%2147483647 end
+ return value
+end
+function Route.random(seed,index)return hash(seed,index)/2147483647 end
+function Route.new(seed,length,config)
+ seed=math.floor(tonumber(seed)or 1)%1000000000
+ local self=setmetatable({seed=seed,length=length or 0,config=config},Route)
+ self.p1=Route.random(seed,1)*math.pi*2;self.p2=Route.random(seed,2)*math.pi*2
+ self.p3=Route.random(seed,3)*math.pi*2
+ self.a=90+Route.random(seed,5)*30;self.b=18+Route.random(seed,7)*8
+ self.f=1/(220+Route.random(seed,8)*80);self.g=1/(62+Route.random(seed,9)*22)
+ self.x0=self.a*sin(self.p1)+self.b*sin(self.p2)
+ self.y0=11*sin(self.p3)
+ return self
+end
+function Route:point(z)
+ local c=self.config;local a,b,f,g=self.a,self.b,self.f,self.g
+ -- Fade elevation into a flat starting apron, with zero derivative at z=0.
+ local fade=math.clamp(z/160,0,1);local ease=fade*fade*(3-2*fade)
+ local dease=(z&gt;0 and z&lt;160)and 6*fade*(1-fade)/160 or 0
+ local raw=11*sin(z/280+self.p3)-self.y0+5*sin(z/510)
+ local dy=(11/280*cos(z/280+self.p3)+5/510*cos(z/510))*ease+raw*dease
+ local x=a*sin(f*z+self.p1)+b*sin(g*z+self.p2)-self.x0
+ local dx=a*f*cos(f*z+self.p1)+b*g*cos(g*z+self.p2)
+ local ddx=-a*f*f*sin(f*z+self.p1)-b*g*g*sin(g*z+self.p2)
+ local chunk=math.floor(math.max(0,z)/c.Chunk)
+ local biome=(math.floor(chunk/8)+self.seed%4)%4+1
+ local bridge=chunk%17==10;local tunnel=chunk%19==14
+ local bank=math.clamp(-ddx*6,-.055,.055)
+ return {x=x,y=8+raw*ease,z=z,dx=dx,dy=dy,heading=math.atan2(dx,1),
+  curvature=ddx/(1+dx*dx)^1.5,bank=bank,width=c.RoadWidth,biome=biome,
+  bridge=bridge,tunnel=tunnel,chunk=chunk,surface=(biome==4 or tunnel)and 'tarmac'or 'gravel'}
+end
+function Route:ground(x,z)
+ local p=self:point(z);local lateral=(x-p.x)/sqrt(1+p.dx*p.dx)
+ local shoulder=math.max(0,math.abs(lateral)-p.width/2)
+ return p.y+lateral*math.tan(p.bank)-math.min(shoulder*.13,3),lateral,p
+end
+function Route:note(z)
+ local p=self:point(z+100);local k=p.curvature
+ if p.tunnel then return 'TUNNEL · keep the line' end
+ if p.bridge then return 'BRIDGE · stay tidy' end
+ if math.abs(k)&lt;.0013 then return 'STRAIGHT · opens' end
+ local severity=math.abs(k)&gt;.004 and '3' or '5'
+ return (k&gt;0 and 'LEFT 'or 'RIGHT ')..severity..' · '..(math.abs(k)&gt;.004 and 'tightens'or 'flow')
+end
+function Route:key(mode,car)return table.concat({self.config.Generation,mode,self.seed,self.length,car},':')end
+return Route
+</ProtectedString>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="Folder" referent="RBX00000017">
+        <Properties>
+          <string name="Name">Remotes</string>
+        </Properties>
+        <Item class="RemoteEvent" referent="RBX00000018">
+          <Properties>
+            <string name="Name">Action</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteFunction" referent="RBX00000019">
+          <Properties>
+            <string name="Name">Request</string>
+          </Properties>
+        </Item>
+        <Item class="UnreliableRemoteEvent" referent="RBX0000001A">
+          <Properties>
+            <string name="Name">State</string>
+          </Properties>
+        </Item>
+        <Item class="UnreliableRemoteEvent" referent="RBX0000001B">
+          <Properties>
+            <string name="Name">Input</string>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="ServerScriptService" referent="RBX00000006">
+    <Properties>
+      <string name="Name">ServerScriptService</string>
+    </Properties>
+    <Item class="Folder" referent="RBX0000001C">
+      <Properties>
+        <string name="Name">BackseatExpeditionServer</string>
+      </Properties>
+      <Item class="Script" referent="RBX0000001D">
+        <Properties>
+          <string name="Name">Main</string>
+          <ProtectedString name="Source">local Players=game:GetService('Players')
+local ReplicatedStorage=game:GetService('ReplicatedStorage')
+local RunService=game:GetService('RunService')
+local Workspace=game:GetService('Workspace')
+local root=ReplicatedStorage:WaitForChild('BackseatExpedition')
+local C=require(root.Shared.Config);local Route=require(root.Shared.Route)
+local D=require(root.Shared.Dynamics);local Replay=require(root.Shared.Replay)
+local Persistence=require(script.Parent.Persistence);local storage=Persistence.new(C)
+local Assets=require(root.Shared.Assets)
+local remotes=root.Remotes;local action=remotes.Action;local request=remotes.Request;local stateEvent=remotes.State;local inputEvent=remotes.Input
+local runs,viewing,slots={}, {}, {};local ending=0;local returnPoints={}
+local function getCar(id)for _,car in ipairs(C.Cars)do if car.id==id then return car end end;return C.Cars[1]end
+local function getMode(id)for _,mode in ipairs(C.Modes)do if mode.id==id then return mode end end;return C.Modes[1]end
+local function tell(player,kind,data)if player and player.Parent then action:FireClient(player,kind,data)end end
+local function participants(run)
+ local out={run.player};if run.passenger and run.passenger.Parent then table.insert(out,run.passenger)end;return out
+end
+local function broadcastRun(run,kind,data)for _,p in ipairs(participants(run))do tell(p,kind,data)end end
+local function origin(run)return Vector3.new(C.WorldX+run.slot*C.LaneSpacing,0,-math.floor(run.s.z/4096)*4096)end
+local function worldFrame(run)
+ local y,pitch,roll=D.pose(run.s,run.route)
+ return CFrame.new(Vector3.new(run.s.x,y,run.s.z)+origin(run))*CFrame.Angles(0,math.pi+run.s.yaw,0)*CFrame.Angles(pitch,0,roll)
+end
+local function seatPlayer(player,seat)
+ local character=player.Character;local humanoid=character and character:FindFirstChildOfClass('Humanoid')
+ if humanoid then character:PivotTo(seat.CFrame*CFrame.new(0,3,0));seat:Sit(humanoid)end
+end
+local function rememberReturn(player)
+ if not returnPoints[player]and player.Character then returnPoints[player]=player.Character:GetPivot()end
+end
+local function returnLobby(player)
+ viewing[player]=nil
+ local character=player.Character;local h=character and character:FindFirstChildOfClass('Humanoid')
+ if h then h.Sit=false;h.Jump=true end
+ local target=returnPoints[player];returnPoints[player]=nil
+ task.delay(.15,function()if target and character and character.Parent and not runs[player]and not viewing[player]then character:PivotTo(target)end end)
+end
+local function packet(run)
+ return {id=run.record.meta.id,owner=run.player.UserId,name=run.player.DisplayName,mode=run.mode.id,seed=run.route.seed,length=run.route.length,
+  car=run.car.id,slot=run.slot,s=D.copy(run.s),clock=run.clock,penalty=run.penalty,nextGate=run.nextGate,
+  missed=run.missed or false,status=run.status,originZ=origin(run).Z,course=run.record.meta.course,
+  passenger=run.passenger and run.passenger.UserId or 0,ghost=run.ghost and run.ghost.id or nil,recording=not run.record.failed}
+end
+local function recordFrame(run,flag)
+ local f=Replay.frame(run.clock+run.penalty,run.s,flag,run.input);local frames=run.frames
+ frames[#frames+1]=f
+ if #frames&gt;=C.ReplayPage then storage:page(run.record,Replay.encode(frames),frames);run.frames={}end
+end
+local function finish(run,reason)
+ if runs[run.player]~=run then return end
+ recordFrame(run)
+ runs[run.player]=nil;slots[run.slot]=nil;ending+=1
+ if #run.frames&gt;0 then storage:page(run.record,Replay.encode(run.frames),run.frames);run.frames={}end
+ local meta=run.record.meta;meta.duration=run.clock+run.penalty;meta.penalty=run.penalty
+ meta.completed=reason=='finish';meta.banked=reason=='bank';meta.reason=reason
+ meta.distance=run.s.distance;meta.progress=run.missed and run.lastGate or run.validZ;meta.crashes=run.s.crashes
+ local reward=meta.completed and run.mode.xp or (meta.banked and math.floor(run.validZ/128)or 0)
+ if meta.completed and run.s.crashes==0 then reward+=50;meta.cleanBonus=50 end
+ meta.reward=reward
+ local members=participants(run)
+ for _,p in ipairs(members)do
+  returnLobby(p);tell(p,'result',meta)
+ end
+ run.model:Destroy()
+ storage:finish(run.record,reward,function(userId,record,status)
+  local p=Players:GetPlayerByUserId(userId);tell(p,'saved',{id=record.id,status=status,saved=record.saved})
+ end)
+ task.spawn(function()local deadline=os.clock()+22;while not run.record.done and os.clock()&lt;deadline do task.wait(.1)end;ending-=1 end)
+end
+local function start(player,data)
+ if runs[player]or viewing[player]then return end
+ local car=getCar(data.car);local profile=storage:load(player.UserId)
+ if profile.xp&lt;car.unlock then tell(player,'notice','This car unlocks at '..car.unlock..' XP.');return end
+ if profile.loading and car.unlock&gt;0 then tell(player,'notice','Loading your unlocked cars; try again in a moment.');return end
+ local numeric=tonumber(data.seed);if not numeric or numeric~=numeric or math.abs(numeric)&gt;1e12 then numeric=math.random(1,999999999)end
+ local mode=getMode(data.mode);local seed=math.floor(numeric)%1000000000
+ if mode.id=='daily'then seed=math.floor(os.time()/86400)end
+ local slot
+ for i=1,C.MaxPlayers do if not slots[i]then slot=i;break end end
+ if not slot then tell(player,'notice','All rally slots are in use. Join a co-driver seat or try again shortly.');return end
+ local route=Route.new(seed,mode.length,C)
+ local run={player=player,route=route,car=car,mode=mode,slot=slot,s=D.new(route),clock=0,penalty=0,nextGate=C.Checkpoint,
+  lastGate=0,validZ=0,status='loading',frames={},sample=0,input={throttle=0,steer=0,brake=1},lastInput=0,seq=-1,created=os.clock(),recoverAt=-100}
+ if mode.length&gt;0 then run.nextGate=math.min(run.nextGate,mode.length)end
+ run.record=storage:newRecording(player.UserId,{seed=seed,length=mode.length,mode=mode.id,car=car.id,course=route:key(mode.id,car.id),generation=C.Generation,weather=mode.weather})
+ for _,best in ipairs(profile.bests)do if best.course==run.record.meta.course then run.ghost=best;break end end
+ local model=Instance.new('Model');model.Name='Rally_'..player.UserId
+ local body=Instance.new('Part');body.Name='Root';body.Size=Vector3.new(6,2,10);body.Transparency=1;body.Anchored=true;body.CanCollide=false;body.Parent=model;model.PrimaryPart=body
+ local serverVisual=Assets.car(model,car,false,false,false);serverVisual.model.Name='NativeCar';run.serverVisual=serverVisual
+ model:SetAttribute('ExpeditionCar',true)
+ for i,name in ipairs({'Driver','CoDriver'})do
+  local seat=Instance.new('Seat');seat.Name=name;seat.Size=Vector3.new(2,1,2);seat.Transparency=1;seat.Anchored=true;seat.CanCollide=false
+  seat.CFrame=CFrame.new(i==1 and -1.3 or 1.3,.25,0);seat.Parent=model
+ end
+ model.Parent=Workspace;run.model=model;model:PivotTo(worldFrame(run));runs[player]=run;slots[slot]=run
+ rememberReturn(player);seatPlayer(player,model.Driver);tell(player,'start',packet(run));recordFrame(run)
+end
+local lastAction={}
+action.OnServerEvent:Connect(function(player,kind,data)
+ if type(kind)~='string'then return end
+ local now=os.clock();if kind~='ready'and kind~='retire'and kind~='leave'and now-(lastAction[player]or -math.huge)&lt;.12 then return end;lastAction[player]=now
+ data=type(data)=='table'and data or {};local run=runs[player]
+ if kind=='start'then start(player,data)
+ elseif kind=='ready'and run and run.status=='loading'then run.status='countdown';run.countUntil=now+3;broadcastRun(run,'countdown',3)
+ elseif kind=='retire'and run then finish(run,run.mode.id=='endless'and 'bank'or 'retired')
+ elseif kind=='recover'and run and now-run.recoverAt&gt;3 and run.status=='running'then
+  run.recoverAt=now;run.penalty+=5;D.reset(run.s,run.route,run.lastGate);run.missed=false;recordFrame(run,1);broadcastRun(run,'notice','Recovered to checkpoint · +5 seconds')
+ elseif kind=='bookmark'and run then
+  local markers=run.record.meta.markers;if #markers&lt;32 then markers[#markers+1]=run.clock+run.penalty end;tell(player,'notice','Replay moment marked')
+ elseif kind=='join'then
+  if run or viewing[player]then return end
+  local host=Players:GetPlayerByUserId(tonumber(data.owner)or 0);local target=host and runs[host]
+  if target and not target.passenger then
+   rememberReturn(player);target.passenger=player;viewing[player]=target
+   if not table.find(target.record.meta.access,player.UserId)then table.insert(target.record.meta.access,player.UserId)end
+   seatPlayer(player,target.model.CoDriver);tell(player,'start',packet(target));tell(host,'notice',player.DisplayName..' joined as co-driver')
+  end
+ elseif kind=='leave'and viewing[player]then
+  local target=viewing[player];target.passenger=nil;returnLobby(player);tell(player,'lobby',{})
+ elseif kind=='call'and viewing[player]then
+  local allowed={left='LEFT · co-driver call',right='RIGHT · co-driver call',caution='CAUTION · co-driver call'}
+  if allowed[data.note]then tell(viewing[player].player,'notice',allowed[data.note])end
+ end
+end)
+inputEvent.OnServerEvent:Connect(function(player,data)
+ local run=runs[player];if not run or type(data)~='table'then return end
+ if type(data.seq)~='number'or data.seq%1~=0 or data.seq&lt;=run.seq then return end
+ local function unit(n)if type(n)~='number'or n~=n then return 0 end;return math.clamp(n,-1,1)end
+ run.seq=data.seq;run.lastInput=os.clock()
+ run.input={throttle=unit(data.throttle),steer=unit(data.steer),brake=math.max(0,unit(data.brake)),handbrake=data.handbrake==true}
+end)
+local requestAt={}
+request.OnServerInvoke=function(player,kind,data)
+ local now=os.clock();if now-(requestAt[player]or -math.huge)&lt;.12 then return {error='Please wait a moment'}end;requestAt[player]=now
+ if kind=='library'then return storage:library(player.UserId)
+ elseif kind=='replay'then
+  local id=type(data)=='table'and data.id;local r=storage:find(player.UserId,id)
+  if not r then return {error='Replay unavailable'}end
+  return {record=r}
+ elseif kind=='page'then
+  if type(data)~='table'then return {error='Invalid request'}end
+  local text,reason=storage:getPage(player.UserId,data.id,data.index);return text and {text=text}or {error=reason}
+ elseif kind=='lobby'then
+  local open={};for _,r in pairs(runs)do if not r.passenger then table.insert(open,{owner=r.player.UserId,name=r.player.DisplayName,mode=r.mode.name})end end
+  return {drivers=open,library=storage:library(player.UserId)}
+ end
+ return {error='Unknown request'}
+end
+local accumulated,network=0,0
+RunService.Heartbeat:Connect(function(dt)
+ accumulated=math.min(accumulated+dt,.15);local steps=0
+ while accumulated&gt;=C.Step and steps&lt;5 do
+  accumulated-=C.Step;steps+=1
+  for _,run in pairs(runs)do
+   if run.status=='loading'and os.clock()-run.created&gt;45 then finish(run,'loading cancelled')
+   elseif run.status=='countdown'then
+    if os.clock()&gt;=run.countUntil then run.status='running';broadcastRun(run,'go',{})end
+   elseif run.status=='running'then
+    local input=os.clock()-run.lastInput&lt;.6 and run.input or {throttle=0,steer=0,brake=.5}
+    D.step(run.s,input,run.route,run.car,C.Step);run.clock+=C.Step
+    local p=run.route:point(run.s.z);local lateral=math.abs((run.s.x-p.x)/math.sqrt(1+p.dx*p.dx))
+    if not run.missed and run.s.z&gt;=run.nextGate and run.s.z&lt;run.nextGate+30 and lateral&lt;p.width/2+2 then
+     run.lastGate=run.nextGate;run.validZ=run.lastGate;run.s.damage=math.max(0,run.s.damage-12)
+     if run.route.length&gt;0 and run.lastGate&gt;=run.route.length then finish(run,'finish')
+     else
+      run.nextGate=run.lastGate+C.Checkpoint
+      if run.route.length&gt;0 then run.nextGate=math.min(run.nextGate,run.route.length)end
+      broadcastRun(run,'checkpoint',{z=run.lastGate,time=run.clock+run.penalty})
+     end
+    elseif run.s.z&gt;run.nextGate+30 then run.missed=true end
+    if not run.missed and lateral&lt;p.width/2+3 then run.validZ=math.max(run.validZ,run.s.z)end
+    if runs[run.player]==run then
+    run.sample+=C.Step
+    if run.sample&gt;=1/C.ReplayRate then run.sample-=1/C.ReplayRate;recordFrame(run)end
+    end
+   end
+  end
+ end
+ network+=dt
+ if network&gt;=1/C.StateRate then
+  network=0;local list={}
+  for _,run in pairs(runs)do
+   run.model:PivotTo(worldFrame(run));Assets.pose(run.serverVisual,run.s,run.route,origin(run),1/C.StateRate);list[#list+1]=packet(run)
+   if not run.model.Driver.Occupant and os.clock()-run.created&gt;2 then seatPlayer(run.player,run.model.Driver)end
+  end
+  if #list&gt;0 then stateEvent:FireAllClients({time=Workspace:GetServerTimeNow(),runs=list})end
+ end
+end)
+Players.PlayerAdded:Connect(function(player)storage:load(player.UserId)end)
+Players.PlayerRemoving:Connect(function(player)
+ if runs[player]then finish(runs[player],runs[player].mode.id=='endless'and 'bank'or 'disconnected')end
+ if viewing[player]then viewing[player].passenger=nil;viewing[player]=nil end
+ lastAction[player]=nil;requestAt[player]=nil
+end)
+for _,p in ipairs(Players:GetPlayers())do storage:load(p.UserId)end
+game:BindToClose(function()
+ local list={};for _,run in pairs(runs)do list[#list+1]=run end
+ for _,run in ipairs(list)do finish(run,run.mode.id=='endless'and 'bank'or 'server closed')end
+ local untilTime=os.clock()+25;while ending&gt;0 and os.clock()&lt;untilTime do task.wait(.1)end
+end)
+-- Reuse visual templates in the expansion namespace without changing the source assets.
+task.spawn(function()
+ if not C.ImportedVisuals and not C.ExternalAudio then return end
+ local ok,reason=pcall(function()require(root.Shared.ImportAssets).harvest(root)end)
+ if not ok then warn('Optional original visual templates unavailable: '..tostring(reason))end
+end)
+root:SetAttribute('ServerReady',true)
+</ProtectedString>
+          <bool name="Disabled">false</bool>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="RBX0000001E">
+        <Properties>
+          <string name="Name">Persistence</string>
+          <ProtectedString name="Source">-- Immutable replay pages + small manifests. No DataStore work on the simulation thread.
+local DataStoreService=game:GetService('DataStoreService')
+local HttpService=game:GetService('HttpService')
+local P={};P.__index=P
+local function fresh()return {version=1,xp=0,records={},bests={},applied={}}end
+function P.new(config)
+ local self=setmetatable({config=config,users={},cache={},order={},status={},warned=false},P)
+ -- Opening a downloaded place is valid. Storage must never abort server startup.
+ if game.GameId~=0 then
+  local ok,profiles,replays=pcall(function()
+   return DataStoreService:GetDataStore('BRExpeditionProfiles_v1'),DataStoreService:GetDataStore('BRExpeditionReplays_v1')
+  end)
+  if ok then self.profiles=profiles;self.replays=replays end
+ end
+ return self
+end
+function P:request(store,method,key,value)
+ if not store then return false,'Session only'end
+ local last
+ for attempt=1,3 do
+  local ok,result=pcall(function()
+   if method=='GetAsync'then return store:GetAsync(key)end
+   return store:UpdateAsync(key,function()return value end)
+  end)
+  if ok then return true,result end
+  last=tostring(result)
+  if not self.warned then self.warned=true;warn('Expedition storage unavailable; replays stay in this server until storage recovers.')end
+  task.wait(math.min(2,attempt*.5))
+ end
+ return false,last
+end
+function P:load(userId)
+ if self.users[userId]then return self.users[userId]end
+ local profile=fresh();profile.loading=true;self.users[userId]=profile;self.status[userId]='Loading save…'
+ if not self.profiles then
+  profile.loading=false;self.status[userId]='Session only · ready to drive';return profile
+ end
+ task.spawn(function()
+  local ok,data=self:request(self.profiles,'GetAsync','u:'..userId)
+  if ok and type(data)=='table'and data.version==1 then
+   profile.xp=tonumber(data.xp)or 0;profile.records=data.records or {};profile.bests=data.bests or {};profile.applied=data.applied or {}
+  end
+  profile.loading=false
+  self.status[userId]=ok and 'Cloud save ready'or 'Session only · enable Studio API access for cloud saves'
+ end)
+ return profile
+end
+function P:remember(key,text)
+ self.cache[key]=text;table.insert(self.order,key)
+ while #self.order&gt;80 do local old=table.remove(self.order,1);self.cache[old]=nil end
+end
+function P:newRecording(userId,metadata)
+ metadata.id=HttpService:GenerateGUID(false);metadata.owner=userId;metadata.pages={};metadata.created=os.time()
+ metadata.access={userId};metadata.markers={};metadata.saved=false;metadata.startTime=0
+ return {meta=metadata,pending=0,failed=false,finished=false}
+end
+function P:page(record,text,frames)
+ local meta=record.meta;local index=#meta.pages+1;local key='r:'..meta.id..':'..index
+ local desc={index=index,from=frames[1][1]/1000,to=frames[#frames][1]/1000,count=#frames,key=key,saved=false}
+ meta.pages[index]=desc;self:remember(key,text)
+ if record.pending&gt;=self.config.ReplayPending then
+  record.failed=true;meta.partial=true;return
+ end
+ record.pending+=1
+ task.spawn(function()
+  local ok=self:request(self.replays,'UpdateAsync',key,text)
+  desc.saved=ok;record.failed=record.failed or not ok;record.pending-=1
+ end)
+end
+local function add(profile,meta,reward,config,durableOnly)
+ local applied=profile.applied or {};profile.applied=applied
+ if table.find(applied,meta.id)then return profile end
+ table.insert(applied,meta.id);while #applied&gt;32 do table.remove(applied,1)end
+ profile.xp=math.max(0,tonumber(profile.xp)or 0)+reward
+ if durableOnly and not meta.saved then return profile end
+ local records=profile.records or {};profile.records=records
+ table.insert(records,1,meta);while #records&gt;config.LibrarySize do table.remove(records)end
+ local bests=profile.bests or {};profile.bests=bests
+ if meta.completed or meta.banked then
+  local found
+  for i,b in ipairs(bests)do if b.course==meta.course then found=i;break end end
+  local previous=found and bests[found]
+  local faster=not previous or meta.duration&lt;previous.duration
+  local farther=not previous or (meta.progress or 0)&gt;(previous.progress or 0)
+  if not previous or (meta.banked and farther)or (not meta.banked and faster)then
+   if found then table.remove(bests,found)end
+   table.insert(bests,1,meta)
+  end
+  while #bests&gt;config.BestSize do table.remove(bests)end
+ end
+ return profile
+end
+function P:finish(record,reward,notify)
+ record.finished=true
+ task.spawn(function()
+  local deadline=os.clock()+18
+  while record.pending&gt;0 and os.clock()&lt;deadline do task.wait(.1)end
+  local meta=record.meta;local complete=#meta.pages&gt;0
+  for _,page in ipairs(meta.pages)do if not page.saved then complete=false end end
+  meta.saved=complete and not record.failed
+  -- Session-only recordings stay accessible through the in-memory page cache.
+  meta.storage=meta.saved and 'Saved to cloud'or 'Session only'
+  local okManifest=self:request(self.replays,'UpdateAsync','m:'..meta.id,meta)
+  if not okManifest then meta.saved=false;meta.storage='Session only'end
+  for _,userId in ipairs(meta.access)do
+   local profile=self:load(userId)
+   add(profile,meta,reward,self.config)
+   local savedProfile
+   local ok=self.profiles and pcall(function()
+    savedProfile=self.profiles:UpdateAsync('u:'..userId,function(old)
+     old=type(old)=='table'and old.version==1 and old or fresh()
+     return add(old,meta,reward,self.config,true)
+    end)
+   end)
+   if ok and savedProfile then
+    -- Preserve session-only clips in RAM without writing broken cloud references.
+    local seen={};for _,r in ipairs(savedProfile.records)do seen[r.id]=true end
+    for _,r in ipairs(profile.records)do if not r.saved and not seen[r.id]then table.insert(savedProfile.records,1,r);seen[r.id]=true end end
+    while #savedProfile.records&gt;self.config.LibrarySize do table.remove(savedProfile.records)end
+    local courses={};for _,r in ipairs(savedProfile.bests)do courses[r.course]=true end
+    for _,r in ipairs(profile.bests)do if not r.saved and not courses[r.course]then table.insert(savedProfile.bests,r);courses[r.course]=true end end
+    while #savedProfile.bests&gt;self.config.BestSize do table.remove(savedProfile.bests)end
+    self.users[userId]=savedProfile
+   elseif not self.profiles then meta.saved=false;meta.storage='Session only'
+   elseif not ok then meta.saved=false;meta.storage='Session only · save index unconfirmed'end
+   self.status[userId]=(meta.saved and ok)and 'Cloud save ready'or(not self.profiles and 'Session only · replay ready'or 'Session only · save was not confirmed')
+   if notify then notify(userId,meta,self.status[userId])end
+  end
+  record.done=true
+ end)
+end
+function P:find(userId,id)
+ local profile=self:load(userId)
+ for _,list in ipairs({profile.records,profile.bests})do for _,r in ipairs(list)do if r.id==id then return r end end end
+end
+function P:getPage(userId,id,index)
+ local record=self:find(userId,id)
+ if not record or type(index)~='number'or index%1~=0 then return nil,'Replay unavailable'end
+ local page=record.pages[index];if not page then return nil,'Page unavailable'end
+ local cached=self.cache[page.key];if cached then return cached end
+ if not page.saved then return nil,'This session-only page is no longer in memory'end
+ local ok,text=self:request(self.replays,'GetAsync',page.key)
+ if ok and type(text)=='string'then self:remember(page.key,text);return text end
+ return nil,'Could not load replay page; try again'
+end
+function P:library(userId)
+ local profile=self:load(userId)
+ return {xp=profile.xp,records=profile.records,bests=profile.bests,status=self.status[userId]or 'Loading save…'}
+end
+return P
+</ProtectedString>
+        </Properties>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="ServerStorage" referent="RBX00000007">
+    <Properties>
+      <string name="Name">ServerStorage</string>
+    </Properties>
+  </Item>
+  <Item class="ReplicatedFirst" referent="RBX00000008">
+    <Properties>
+      <string name="Name">ReplicatedFirst</string>
+    </Properties>
+  </Item>
+  <Item class="StarterGui" referent="RBX00000009">
+    <Properties>
+      <string name="Name">StarterGui</string>
+    </Properties>
+  </Item>
+  <Item class="StarterPlayer" referent="RBX0000000A">
+    <Properties>
+      <string name="Name">StarterPlayer</string>
+    </Properties>
+    <Item class="StarterPlayerScripts" referent="RBX0000000B">
+      <Properties>
+        <string name="Name">StarterPlayerScripts</string>
+      </Properties>
+      <Item class="Folder" referent="RBX0000001F">
+        <Properties>
+          <string name="Name">BackseatExpeditionClient</string>
+        </Properties>
+        <Item class="LocalScript" referent="RBX00000020">
+          <Properties>
+            <string name="Name">Main</string>
+            <ProtectedString name="Source">local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage')
+local RunService=game:GetService('RunService');local UIS=game:GetService('UserInputService');local Lighting=game:GetService('Lighting')
+local player=Players.LocalPlayer;local root=RS:WaitForChild('BackseatExpedition');local remotes=root.Remotes
+local C=require(root.Shared.Config);local Route=require(root.Shared.Route);local D=require(root.Shared.Dynamics);local Assets=require(root.Shared.Assets)
+local Presence=require(script.Parent.Presence);local UI=require(script.Parent.UI);local RoadStream=require(script.Parent.RoadStream);local ReplayPlayer=require(script.Parent.ReplayPlayer)
+local mode='closed';local scene,stream,visual,route,run,predicted,ghostPlayer,ghostVisual,replayPlayer
+local replayTime,replayRate,replayPaused=0,1,false
+local held={};local gamepad={steer=0,throttle=0,brake=0};local seq=0;local sent=0;local accumulator=0;local roadAt=0
+local cameraMode=1;local cameraNames={'CHASE','HOOD','ORBIT','FREE'};local orbitAngle,orbitPitch,orbitDistance=0,.35,20
+local freeFrame;local readySent=false;local noticeUntil=0;local lastFrame;local clockAt,clockValue=0,0
+local correction;local countdownUntil;local ui;local presence;local menuPark;local closing=false
+local serverParts={};local pendingStart=false;local startSerial=0
+local openExpansion,closeExpansion
+local function notice(text,seconds)if ui then ui.message.Text=tostring(text);ui.menuMessage.Text=tostring(text);noticeUntil=os.clock()+(seconds or 3)end end
+local function invoke(kind,data)
+ local ok,response=pcall(function()return remotes.Request:InvokeServer(kind,data)end)
+ if not ok then return {error='Connection interrupted; try again'}end
+ return response or {error='No response'}
+end
+local function controls()
+ local focus=UIS:GetFocusedTextBox();if focus then return {throttle=0,brake=.5,steer=0}end
+ local reversing=held.brake and predicted and predicted.v&lt;.8
+ return {throttle=held.throttle and 1 or ((held.reverse or reversing)and -1 or gamepad.throttle),
+  brake=held.brake and not reversing and 1 or gamepad.brake,steer=held.left and -1 or (held.right and 1 or gamepad.steer),handbrake=held.handbrake==true}
+end
+local function clearScene()
+ for part,old in pairs(serverParts)do if part.Parent then part.LocalTransparencyModifier=old end end;serverParts={}
+ if ghostPlayer then ghostPlayer:destroy();ghostPlayer=nil end
+ if replayPlayer then replayPlayer:destroy();replayPlayer=nil end
+ if stream then stream:destroy();stream=nil end
+ if scene then scene:Destroy();scene=nil end
+ visual=nil;ghostVisual=nil;predicted=nil;correction=nil;lastFrame=nil;freeFrame=nil;held={}
+end
+local function menuCamera()
+ if not menuPark then
+  menuPark=Instance.new('Model');menuPark.Name='ExpeditionLocalPark';menuPark.Parent=workspace
+  Assets.park(menuPark);menuPark:PivotTo(CFrame.new(C.WorldX,0,0))
+ end
+ local camera=workspace.CurrentCamera;camera.CameraType=Enum.CameraType.Scriptable
+ camera.CFrame=CFrame.lookAt(Vector3.new(C.WorldX+52,22,53),Vector3.new(C.WorldX,3,-12));camera.FieldOfView=56
+ presence:view(camera.CFrame,56)
+end
+local function getCar(id)for _,car in ipairs(C.Cars)do if car.id==id then return car end end;return C.Cars[1]end
+local function refreshLobby()
+ task.spawn(function()local data=invoke('lobby');if data.error then notice(data.error)else ui:lobby(data)end end)
+end
+local function exitToMenu()
+ clearScene();mode='menu';run=nil;ui:show('menu');menuCamera();refreshLobby()
+end
+local function setQuality(quality)if stream then stream.quality=quality end end
+local function setup(metadata,initial)
+ if menuPark then menuPark:Destroy();menuPark=nil end
+ clearScene();run=metadata;route=Route.new(metadata.seed,metadata.length,C)
+ scene=Instance.new('Folder');scene.Name='ExpeditionLocal';scene.Parent=workspace
+ stream=RoadStream.new(scene);stream.quality=ui.quality;stream:reset(route,metadata.slot or 1,metadata.originZ or 0)
+ visual=Assets.car(scene,getCar(metadata.car),false,C.ImportedVisuals and ui.quality~='low',C.ExternalAudio)
+ predicted=initial or D.new(route);readySent=false;accumulator=0;cameraMode=1;roadAt=0
+ workspace.CurrentCamera.CameraType=Enum.CameraType.Scriptable;workspace.CurrentCamera.FieldOfView=72
+ presence:time(metadata.mode=='daily'and 18.15 or 15.8)
+end
+local function loadGhost(id)
+ if not id then return end
+ local active=run and run.id
+ task.spawn(function()
+  local data=invoke('replay',{id=id})
+  if not run or run.id~=active or mode~='drive'or data.error or not data.record or data.record.generation~=C.Generation then return end
+  ghostPlayer=ReplayPlayer.new(remotes.Request,data.record);ghostVisual=Assets.car(scene,getCar(data.record.car),true,false);ghostPlayer:page(1)
+ end)
+end
+local function watch(record)
+ if record.generation~=C.Generation then notice('This replay uses a different road generation version.');return end
+ mode='replay';setup({seed=record.seed,length=record.length,slot=1,originZ=0,mode=record.mode,car=record.car,passenger=0},nil)
+ replayPlayer=ReplayPlayer.new(remotes.Request,record);replayPlayer:page(1)
+ replayTime=record.startTime or 0;replayRate=1;replayPaused=false;ui:show('replay');notice('Loading saved replay…',2)
+ for _,child in ipairs(ui.timeline:GetChildren())do if child.Name=='Moment'then child:Destroy()end end
+ for _,t in ipairs(record.markers or {})do
+  local marker=Instance.new('Frame');marker.Name='Moment';marker.Size=UDim2.fromOffset(3,16)
+  marker.Position=UDim2.new(t/math.max(record.duration,1),-1,0,0);marker.BorderSizePixel=0;marker.BackgroundColor3=Color3.fromRGB(237,126,84);marker.Parent=ui.timeline
+ end
+end
+ui=UI.new({
+ open=function()openExpansion()end,close=function()
+  if mode=='drive'then closing=true;remotes.Action:FireServer(run and run.owner~=player.UserId and 'leave'or 'retire');notice('Saving the run…')else closeExpansion()end
+ end,
+ start=function(modeId,carId,seed)
+  if mode=='drive'or pendingStart then return end
+  if mode=='replay'then clearScene();mode='menu'end
+  pendingStart=true;startSerial+=1;local serial=startSerial;ui.startButton.Text='STARTING…'
+  notice('Preparing your car and road…',8)
+  remotes.Action:FireServer('start',{mode=modeId,car=carId,seed=seed})
+  task.delay(8,function()if pendingStart and startSerial==serial then
+   pendingStart=false;ui.startButton.Text='TAKE THE ROAD →';notice('Unable to start the run. Please try again.',8)
+  end end)
+ end,
+ library=function()task.spawn(function()local data=invoke('library');if data.error then notice(data.error)else ui:library(data)end end)end,
+ lobby=refreshLobby,quality=setQuality,
+ stop=function()if mode=='drive'then remotes.Action:FireServer('retire')end end,
+ recover=function()if mode=='drive'then remotes.Action:FireServer('recover')end end,
+ bookmark=function()if mode=='drive'then remotes.Action:FireServer('bookmark')end end,
+ camera=function()cameraMode=cameraMode%(mode=='replay'and 4 or 3)+1;freeFrame=workspace.CurrentCamera.CFrame;notice(cameraNames[cameraMode]..' CAMERA',1.5)end,
+ join=function(owner)remotes.Action:FireServer('join',{owner=owner})end,
+ leave=function()remotes.Action:FireServer('leave')end,
+ call=function(note)remotes.Action:FireServer('call',{note=note})end,
+ touch=function(key,down)held[key]=down end,
+ watch=watch,
+ seek=function(fraction)if replayPlayer then replayTime=math.clamp(fraction*replayPlayer.meta.duration,replayPlayer.meta.startTime or 0,replayPlayer.meta.duration)end end,
+ skip=function(delta)if replayPlayer then replayTime=math.clamp(replayTime+delta,replayPlayer.meta.startTime or 0,replayPlayer.meta.duration)end end,
+ pause=function()replayPaused=not replayPaused;ui.pauseButton.Text=replayPaused and 'PLAY'or 'PAUSE'end,
+ rate=function(rate)replayRate=rate end,
+ exitReplay=function()exitToMenu();task.delay(.2,function()ui.callbacks.library()end)end,
+})
+presence=Presence.new(ui.gui)
+openExpansion=function()
+ if presence.active then return end
+ presence:open();mode='menu';closing=false;ui.canvas.Visible=true;ui.launcher.Visible=false;ui.closeButton.Visible=true
+ ui:show('menu');menuCamera();refreshLobby()
+end
+closeExpansion=function()
+ clearScene();if menuPark then menuPark:Destroy();menuPark=nil end
+ mode='closed';run=nil;closing=false;countdownUntil=nil;held={};gamepad={steer=0,throttle=0,brake=0}
+ ui.canvas.Visible=false;ui.touch.Visible=false;ui.closeButton.Visible=false;ui.launcher.Visible=true
+ presence:close()
+end
+local keyMap={W='throttle',S='brake',A='left',D='right',Space='handbrake',Down='reverse',Up='throttle',Left='left',Right='right'}
+presence.input=function(input,state)
+ if mode~='drive'and mode~='replay'then return end
+ local ended=state==Enum.UserInputState.End or state==Enum.UserInputState.Cancel
+ local key=keyMap[input.KeyCode.Name]
+ if key then held[key]=not ended
+ elseif input.KeyCode==Enum.KeyCode.Thumbstick1 then gamepad.steer=ended and 0 or input.Position.X
+ elseif input.KeyCode==Enum.KeyCode.ButtonR2 then gamepad.throttle=ended and 0 or input.Position.Z
+ elseif input.KeyCode==Enum.KeyCode.ButtonL2 then gamepad.brake=ended and 0 or input.Position.Z end
+end
+UIS.InputBegan:Connect(function(input,processed)
+ if mode=='closed'or processed or UIS:GetFocusedTextBox()then return end
+ local name=input.KeyCode.Name
+ if keyMap[name]then held[keyMap[name]]=true end
+ if name=='R'then ui.callbacks.recover()
+ elseif name=='B'then ui.callbacks.bookmark()
+ elseif name=='C'then ui.callbacks.camera()
+ elseif name=='J'then ui.callbacks.call('left')
+ elseif name=='K'then ui.callbacks.call('right')
+ elseif name=='L'then ui.callbacks.call('caution')
+ elseif mode=='replay'and name=='P'then ui.callbacks.pause()
+ elseif mode=='replay'and name=='Comma'then ui.callbacks.skip(-5)
+ elseif mode=='replay'and name=='Period'then ui.callbacks.skip(5)end
+end)
+UIS.InputEnded:Connect(function(input)
+ local name=input.KeyCode.Name;if keyMap[name]then held[keyMap[name]]=false end
+end)
+UIS.InputChanged:Connect(function(input)
+ if mode=='closed'then return end
+ if input.KeyCode==Enum.KeyCode.Thumbstick1 then gamepad.steer=input.Position.X
+ elseif input.KeyCode==Enum.KeyCode.ButtonR2 then gamepad.throttle=input.Position.Z
+ elseif input.KeyCode==Enum.KeyCode.ButtonL2 then gamepad.brake=input.Position.Z
+ elseif input.UserInputType==Enum.UserInputType.MouseWheel then orbitDistance=math.clamp(orbitDistance-input.Position.Z*2,8,55)end
+end)
+UIS.WindowFocusReleased:Connect(function()held={};gamepad={steer=0,throttle=0,brake=0}end)
+remotes.Action.OnClientEvent:Connect(function(kind,data)
+ if kind=='start'then
+  pendingStart=false;ui.startButton.Text='TAKE THE ROAD →'
+  if not presence.active then openExpansion()end
+  mode='drive';setup(data,D.copy(data.s));clockAt=os.clock();clockValue=data.clock;ui:show('drive');notice('Building the road ahead…',10);loadGhost(data.ghost)
+ elseif kind=='countdown'then countdownUntil=os.clock()+3;notice('3 · get ready',3)
+ elseif kind=='go'then countdownUntil=nil;if run then run.status='running'end;notice('GO · make it a good one',1.5)
+ elseif kind=='notice'then pendingStart=false;ui.startButton.Text='TAKE THE ROAD →';notice(data)
+ elseif kind=='checkpoint'then notice('CHECKPOINT / '..UI.time(data.time),1.6)
+ elseif kind=='result'then
+  if closing then closeExpansion()else clearScene();mode='result';run=nil;menuCamera();ui:resultScreen(data)end
+ elseif kind=='saved'then ui:saved(data)
+ elseif kind=='lobby'then if closing then closeExpansion()else exitToMenu()end end
+end)
+remotes.State.OnClientEvent:Connect(function(packet)
+ if mode~='drive'or not run then return end
+ for _,data in ipairs(packet.runs or {})do if data.owner==run.owner then
+  local oldOrigin=run.originZ or 0;local oldPenalty=run.penalty;run=data
+  if data.originZ~=oldOrigin then
+   local delta=Vector3.new(0,0,data.originZ-oldOrigin);stream:shift(data.originZ)
+   workspace.CurrentCamera.CFrame=workspace.CurrentCamera.CFrame+delta
+   if freeFrame then freeFrame+=delta end
+  end
+  local target=D.copy(data.s)
+  local lag=math.clamp(workspace:GetServerTimeNow()-packet.time,0,.25)
+  if data.status=='running'and data.owner==player.UserId then
+   local input=controls();local left=lag
+   while left&gt;0 do local dt=math.min(C.Step,left);D.step(target,input,route,getCar(data.car),dt);left-=dt end
+  end
+  local error=predicted and math.sqrt((predicted.x-target.x)^2+(predicted.z-target.z)^2)or 100
+  if not predicted or error&gt;18 or oldPenalty~=data.penalty then predicted=target;correction=nil else correction=target end
+  clockValue=data.clock;clockAt=os.clock()
+  break
+ end end
+end)
+local function updateCamera(cf,dt)
+ local camera=workspace.CurrentCamera
+ if cameraMode==4 then
+  freeFrame=freeFrame or camera.CFrame
+  local direction=Vector3.new((held.right and 1 or 0)-(held.left and 1 or 0),0,(held.brake and 1 or 0)-(held.throttle and 1 or 0))
+  if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)then
+   local delta=UIS:GetMouseDelta();freeFrame=CFrame.new(freeFrame.Position)*CFrame.Angles(0,-delta.X*.004,0)*freeFrame.Rotation*CFrame.Angles(-delta.Y*.004,0,0)
+  end
+  freeFrame=freeFrame*CFrame.new(direction*dt*55);camera.CFrame=freeFrame;presence:view(camera.CFrame);return
+ end
+ if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)then
+  local delta=UIS:GetMouseDelta();orbitAngle-=delta.X*.006;orbitPitch=math.clamp(orbitPitch+delta.Y*.004,-.05,1.1)
+ end
+ local target
+ if cameraMode==2 then
+  local pos=cf.Position+cf.LookVector*3.8+Vector3.new(0,2.1,0);target=CFrame.lookAt(pos,pos+cf.LookVector*40)
+ elseif cameraMode==3 then
+  local offset=Vector3.new(math.sin(orbitAngle)*orbitDistance,math.sin(orbitPitch)*orbitDistance+3,math.cos(orbitAngle)*orbitDistance)
+  target=CFrame.lookAt(cf.Position+offset,cf.Position+Vector3.new(0,.7,0))
+ else
+  local pos=cf.Position-cf.LookVector*(15+math.abs(predicted.v)*.025)+Vector3.new(0,6.3,0)
+  target=CFrame.lookAt(pos,cf.Position+cf.LookVector*9+Vector3.new(0,1.6,0))
+ end
+ camera.CFrame=lastFrame and camera.CFrame:Lerp(target,1-math.exp(-9*dt))or target
+ presence:view(camera.CFrame)
+ lastFrame=cf
+end
+local uiAt=0;local slowTime=0
+RunService.RenderStepped:Connect(function(dt)
+ if mode=='closed'then return end
+ ui:resize()
+ if countdownUntil and os.clock()&lt;countdownUntil then ui.message.Text=tostring(math.ceil(countdownUntil-os.clock()))..' · GET READY'end
+ if noticeUntil&gt;0 and os.clock()&gt;noticeUntil then ui.message.Text='';ui.menuMessage.Text='';noticeUntil=0 end
+ if mode~='drive'and mode~='replay'then return end
+ if not stream or not predicted then return end
+ local input=controls();local speed=getCar(run.car)
+ if mode=='drive'then
+  sent+=dt
+  if sent&gt;=1/C.InputRate then sent=0;seq+=1;input.seq=seq;remotes.Input:FireServer(input)end
+  accumulator=math.min(accumulator+dt,.1)
+  while accumulator&gt;=C.Step do
+   accumulator-=C.Step
+   if run.status=='running'then
+    local driving=run.owner==player.UserId and input or {throttle=predicted.throttle or 0,brake=predicted.brake or 0,steer=predicted.steer or 0,handbrake=predicted.handbrake}
+    D.step(predicted,driving,route,speed,C.Step)end
+   if correction then
+    -- Advance the correction too, so interpolation does not pull toward an old pose.
+    if run.status=='running'then
+     local driving=run.owner==player.UserId and input or {throttle=correction.throttle or 0,brake=correction.brake or 0,steer=correction.steer or 0,handbrake=correction.handbrake}
+     D.step(correction,driving,route,speed,C.Step)end
+    local blend=1-math.exp(-7*C.Step)
+    for _,k in ipairs({'x','z','v','lateralV'})do predicted[k]+=(correction[k]-predicted[k])*blend end
+    local delta=(correction.yaw-predicted.yaw+math.pi)%(math.pi*2)-math.pi;predicted.yaw+=delta*blend
+    predicted.damage=correction.damage;predicted.crashes=correction.crashes
+   end
+  end
+ else
+  local state,error=replayPlayer:sample(replayTime)
+  if state then
+   predicted=state
+   if not replayPaused and stream:ready(predicted.z)then replayTime=math.min(replayPlayer.meta.duration,replayTime+dt*replayRate)end
+   if replayTime&gt;=replayPlayer.meta.duration then replayPaused=true;ui.pauseButton.Text='PLAY'end
+  else notice(error,.5)end
+  local newOrigin=-math.floor(predicted.z/4096)*4096
+  if newOrigin~=(run.originZ or 0)then
+   local delta=Vector3.new(0,0,newOrigin-(run.originZ or 0));stream:shift(newOrigin);run.originZ=newOrigin;workspace.CurrentCamera.CFrame+=delta
+  end
+ end
+ roadAt+=dt
+ if roadAt&gt;.10 then
+  roadAt=0;stream:update(predicted.z)
+  if mode=='drive'and run then
+   local car=workspace:FindFirstChild('Rally_'..run.owner)
+   if car then for _,part in ipairs(car:GetDescendants())do if part:IsA('BasePart')and serverParts[part]==nil then
+    serverParts[part]=part.LocalTransparencyModifier;part.LocalTransparencyModifier=1
+   end end end
+  end
+ end
+ stream:work(.0025)
+ if mode=='drive'and not readySent and run.owner==player.UserId and stream:ready(predicted.z)then readySent=true;remotes.Action:FireServer('ready')end
+ local cf=Assets.pose(visual,predicted,route,stream:offset(),dt*(mode=='replay'and (replayPaused and 0 or replayRate)or 1))
+ updateCamera(cf,dt)
+ local clock=mode=='replay'and replayTime or(clockValue+(run.status=='running'and math.min(.3,os.clock()-clockAt)or 0)+(run.penalty or 0))
+ if ghostPlayer and ghostVisual then
+  local ghost=ghostPlayer:sample(clock)
+  if ghost then
+   Assets.pose(ghostVisual,ghost,route,stream:offset(),dt)
+   ui.ghost.Text=string.format('SAVED GHOST · %+0.1f m along the road',(predicted.z-ghost.z)*C.StudMetres)
+  else ui.ghost.Text='Loading saved ghost…'end
+ else ui.ghost.Text=mode=='replay'and 'SAVED REPLAY · P pause / , . seek / RMB orbit'or 'Every finished run saves a replay. Beat your time to update its ghost.'end
+ uiAt+=dt
+ if uiAt&gt;.1 then
+  uiAt=0;ui:runInfo(run,predicted,route,clock)
+  if mode=='replay'then
+   ui.playhead.Size=UDim2.fromScale(math.clamp(replayTime/math.max(1,replayPlayer.meta.duration),0,1),1)
+   ui.replayLabel.Text=UI.time(replayTime)..' / '..UI.time(replayPlayer.meta.duration)..'   '..cameraNames[cameraMode]..' CAMERA   ·   '..(replayPlayer.meta.storage or '')
+  end
+ end
+ slowTime=dt&gt;.027 and slowTime+dt or math.max(0,slowTime-dt*.35)
+ if slowTime&gt;6 and ui.quality~='low'then
+  ui.quality=ui.quality=='high'and 'medium'or 'low';stream.quality=ui.quality;ui.qualityButton.Text='QUALITY: '..ui.quality:upper()..' · AUTO';slowTime=0
+ end
+end)
+-- The downloaded place enters the runnable modes instead of the incomplete old garage.
+-- A Studio installation into another game can keep the opt-in launcher.
+task.defer(function()
+ if C.AutoOpen and root:GetAttribute('AutoOpen')~=false then openExpansion()end
+end)
+</ProtectedString>
+            <bool name="Disabled">false</bool>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000021">
+          <Properties>
+            <string name="Name">Presence</string>
+            <ProtectedString name="Source">-- Local, reversible ownership of the view while the optional expansion is open.
+local Players=game:GetService('Players')
+local Lighting=game:GetService('Lighting')
+local RunService=game:GetService('RunService')
+local Context=game:GetService('ContextActionService')
+local UIS=game:GetService('UserInputService')
+local Presence={};Presence.__index=Presence
+local daylight={ClockTime=15.8,Brightness=2.2,Ambient=Color3.fromRGB(114,122,114),
+ OutdoorAmbient=Color3.fromRGB(148,155,144),FogStart=800,FogEnd=6000,FogColor=Color3.fromRGB(195,213,219)}
+local atmosphere={Density=.18,Haze=.5,Glare=.1,Offset=0,Color=Color3.fromRGB(205,219,229),Decay=Color3.fromRGB(139,153,157)}
+function Presence.new(gui)
+ return setmetatable({gui=gui,active=false,screens={},connections={},environment={}},Presence)
+end
+function Presence:environmentProfile(object,profile)
+ if self.environment[object]then return end
+ local entry={before={},after=profile};self.environment[object]=entry
+ for property in pairs(profile)do entry.before[property]=object[property]end
+ for property,value in pairs(profile)do object[property]=value end
+end
+function Presence:effect(effect)
+ if effect:IsA('Atmosphere')then self:environmentProfile(effect,atmosphere)
+ elseif effect:IsA('PostEffect')then self:environmentProfile(effect,{Enabled=false})end
+end
+function Presence:time(clock)
+ if self.environment[Lighting]then self.environment[Lighting].after.ClockTime=clock;Lighting.ClockTime=clock end
+end
+function Presence:hide(screen)
+ if screen==self.gui or not screen:IsA('ScreenGui')or self.screens[screen]then return end
+ self.screens[screen]={enabled=screen.Enabled}
+ screen.Enabled=false
+ self.connections[#self.connections+1]=screen:GetPropertyChangedSignal('Enabled'):Connect(function()
+  if self.active and screen.Enabled then screen.Enabled=false end
+ end)
+end
+function Presence:open()
+ if self.active then return end
+ self.active=true
+ local camera=workspace.CurrentCamera
+ self.camera={object=camera,cf=camera.CFrame,kind=camera.CameraType,subject=camera.CameraSubject,fov=camera.FieldOfView}
+ self.clock=Lighting.ClockTime
+ self:environmentProfile(Lighting,table.clone(daylight))
+ for _,effect in ipairs(Lighting:GetChildren())do self:effect(effect)end
+ self.connections[#self.connections+1]=Lighting.ChildAdded:Connect(function(effect)self:effect(effect)end)
+ local pg=Players.LocalPlayer:WaitForChild('PlayerGui')
+ for _,screen in ipairs(pg:GetChildren())do self:hide(screen)end
+ self.connections[#self.connections+1]=pg.ChildAdded:Connect(function(screen)self:hide(screen)end)
+ Context:BindActionAtPriority('ExpeditionControls',function(_,state,input)
+  if UIS:GetFocusedTextBox()and state~=Enum.UserInputState.End and state~=Enum.UserInputState.Cancel then return Enum.ContextActionResult.Pass end
+  if self.input then self.input(input,state)end
+  return Enum.ContextActionResult.Sink
+ end,false,4000,Enum.KeyCode.W,Enum.KeyCode.S,Enum.KeyCode.A,Enum.KeyCode.D,Enum.KeyCode.Space,
+  Enum.KeyCode.Up,Enum.KeyCode.Down,Enum.KeyCode.Left,Enum.KeyCode.Right,
+  Enum.KeyCode.Thumbstick1,Enum.KeyCode.ButtonR2,Enum.KeyCode.ButtonL2)
+ RunService:BindToRenderStep('ExpeditionCamera',Enum.RenderPriority.Last.Value,function()
+  if self.active then for object,entry in pairs(self.environment)do
+   if object==Lighting or object.Parent then for property,value in pairs(entry.after)do
+    if object[property]~=value then object[property]=value end
+   end end
+  end end
+  if self.active and self.desired then
+   local current=workspace.CurrentCamera;current.CameraType=Enum.CameraType.Scriptable
+   current.CFrame=self.desired;current.FieldOfView=self.fov or 72
+  end
+ end)
+end
+function Presence:view(cf,fov)
+ self.desired=cf;self.fov=fov or 72
+end
+function Presence:close()
+ if not self.active then return end
+ self.active=false
+ RunService:UnbindFromRenderStep('ExpeditionCamera');Context:UnbindAction('ExpeditionControls')
+ for _,connection in ipairs(self.connections)do connection:Disconnect()end
+ self.connections={}
+ for screen,data in pairs(self.screens)do if screen.Parent then screen.Enabled=data.enabled end end
+ self.screens={}
+ local old=self.camera;local camera=workspace.CurrentCamera
+ if old and camera==old.object then
+  camera.CameraType=old.kind;camera.CameraSubject=old.subject;camera.CFrame=old.cf;camera.FieldOfView=old.fov
+ end
+ Lighting.ClockTime=self.clock
+ for object,entry in pairs(self.environment)do if object==Lighting or object.Parent then
+  for property,value in pairs(entry.before)do object[property]=value end
+ end end
+ self.environment={}
+ self.desired=nil;self.camera=nil
+end
+return Presence
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000022">
+          <Properties>
+            <string name="Name">ReplayPlayer</string>
+            <ProtectedString name="Source">local root=game:GetService('ReplicatedStorage'):WaitForChild('BackseatExpedition')
+local Codec=require(root.Shared.Replay)
+local Player={};Player.__index=Player
+function Player.new(remote,metadata)
+ return setmetatable({remote=remote,meta=metadata,cache={},pending={},queue={},alive=true,errors={}},Player)
+end
+function Player:page(index)
+ if not self.meta.pages[index]or self.cache[index]or self.pending[index]then return end
+ self.pending[index]=true;self.queue[#self.queue+1]=index
+ if self.worker then return end;self.worker=true
+ task.spawn(function()
+  while self.alive and #self.queue&gt;0 do
+   local i=table.remove(self.queue,1);local result
+   for attempt=1,3 do
+    local ok,response=pcall(function()return self.remote:InvokeServer('page',{id=self.meta.id,index=i})end)
+    if ok and response and response.text then
+     local decoded,frames=pcall(Codec.decode,response.text)
+     if decoded then result=frames;break else self.errors[i]='Invalid replay data'end
+    else self.errors[i]=ok and response and response.error or 'Connection interrupted'end
+    task.wait(.5*attempt)
+   end
+   if not self.alive then break end
+   self.cache[i]=result;self.pending[i]=nil
+   if result then self.errors[i]=nil end
+   -- A five-page moving cache bounds both ghost and replay memory.
+   for j in pairs(self.cache)do if math.abs(j-(self.current or i))&gt;2 then self.cache[j]=nil end end
+   task.wait(.18)
+  end
+  self.worker=false
+ end)
+end
+function Player:sample(t)
+ local pages=self.meta.pages;local index=1
+ for i,p in ipairs(pages)do if p.from&lt;=t then index=i else break end end
+ self.current=index;self:page(index);self:page(index+1)
+ local frames=self.cache[index]
+ if not frames then return nil,self.errors[index]or 'Loading replay…'end
+ if frames[#frames][1]&lt;t*1000 and self.cache[index+1]then
+  local joined=table.clone(frames);joined[#joined+1]=self.cache[index+1][1];return Codec.sample(joined,t)
+ end
+ return Codec.sample(frames,t)
+end
+function Player:destroy()self.alive=false;self.queue={};self.cache={}end
+return Player
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000023">
+          <Properties>
+            <string name="Name">RoadStream</string>
+            <ProtectedString name="Source">-- Bounded chunk window; generation jobs yield frequently and recycle parts.
+local Root=game:GetService('ReplicatedStorage'):WaitForChild('BackseatExpedition')
+local C=require(Root.Shared.Config);local Route=require(Root.Shared.Route)
+local Loader=require(Root.Shared.AssetLoader)
+local Stream={};Stream.__index=Stream
+local function rgb(a)return Color3.new(a[1],a[2],a[3])end
+function Stream.new(parent)
+ local folder=Instance.new('Folder');folder.Name='RallyWorld';folder.Parent=parent
+ return setmetatable({folder=folder,chunks={},queue={},pool={},quality='medium',made=0,epoch=0},Stream)
+end
+function Stream:part(parent,name,size,cf,tint,material,shape)
+ local p=table.remove(self.pool)or Instance.new('Part')
+ p.Name=name;p.Size=size;p.CFrame=cf;p.Color=rgb(tint);p.Material=material or Enum.Material.SmoothPlastic
+ p.Shape=shape or Enum.PartType.Block;p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false
+ p.CastShadow=false;p.Transparency=0;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent
+ self.made+=1;if self.made%8==0 then coroutine.yield()end
+ return p
+end
+function Stream:release(chunk)
+ for _,p in ipairs(chunk:GetChildren())do
+  if p:IsA('BasePart')and #self.pool&lt;400 then p.Parent=nil;self.pool[#self.pool+1]=p else p:Destroy()end
+ end
+ chunk:Destroy()
+end
+function Stream:reset(route,slot,originZ)
+ self.epoch+=1;self.route=route;self.slot=slot or 1;self.originZ=originZ or 0
+ for _,entry in pairs(self.chunks)do self:release(entry.model)end
+ self.chunks={};self.queue={}
+end
+function Stream:shift(originZ)
+ if originZ==self.originZ then return end
+ local delta=Vector3.new(0,0,originZ-self.originZ)
+ for _,entry in pairs(self.chunks)do
+  -- Jobs resume with the new origin, so unfinished chunks are rebuilt.
+  if entry.done then entry.model:PivotTo(entry.model:GetPivot()+delta)else entry.cancel=true end
+ end
+ self.originZ=originZ
+end
+function Stream:offset()return Vector3.new(C.WorldX+(self.slot or 1)*C.LaneSpacing,0,self.originZ or 0)end
+function Stream:decor(model,index)
+ local route=self.route;local cfg=C.Quality[self.quality];local offset=self:offset()
+ local imported=Root:FindFirstChild('ImportedProps')
+ local templates=imported and imported:GetChildren()or {}
+ local z0=index*C.Chunk;local biome=C.Biomes[route:point(z0).biome]
+ for i=1,cfg.props do
+  local r=Route.random(route.seed,index*71+i*7);local z=z0+r*C.Chunk
+  local p=route:point(z);local side=i%2==0 and 1 or -1;local x=p.x+side*(p.width/2+20+Route.random(route.seed,i+index*33)*65)
+  local at=Vector3.new(x,p.y-2,z)+offset
+  local height=8+Route.random(route.seed,i*71+index)*10
+  local template=C.ImportedVisuals and biome.trees and #templates&gt;0 and self.quality~='low'and templates[(i-1)%#templates+1]
+  if template and Loader.ready(template)then
+   local prop=template:Clone();prop.Parent=model;prop:PivotTo(CFrame.new(at)*CFrame.Angles(0,r*6,0))
+   coroutine.yield()
+  elseif biome.trees and i%3~=0 then
+   self:part(model,'Pine trunk',Vector3.new(1,height*.6,1),CFrame.new(at+Vector3.new(0,height*.3,0)),{.25,.20,.14},Enum.Material.Wood)
+   local layers=self.quality=='low'and 1 or 2
+   for level=1,layers do
+    local size=(height*.65)*(1-(level-1)*.28)
+    self:part(model,'Pine canopy',Vector3.new(size,height*.48,size),CFrame.new(at+Vector3.new(0,height*(.50+level*.16),0)),{.14,.27+level*.015,.19},Enum.Material.Grass,Enum.PartType.Ball)
+   end
+  elseif biome.desert and i%2==0 then
+   self:part(model,'Cactus',Vector3.new(1.3,height*.65,1.3),CFrame.new(at+Vector3.new(0,height*.325,0)),{.28,.42,.27})
+   self:part(model,'Cactus arm',Vector3.new(4,1,1),CFrame.new(at+Vector3.new(1,height*.4,0)),{.28,.42,.27})
+  else
+   self:part(model,'Boulder',Vector3.new(height*.7,height*.4,height*.55),CFrame.new(at+Vector3.new(0,height*.17,0))*CFrame.Angles(.12,r*4,.18),biome.snow and {.71,.74,.72}or{.39,.38,.33},Enum.Material.Slate,Enum.PartType.Ball)
+  end
+ end
+ -- Distant low-poly landforms give each biome a readable skyline.
+ local p=route:point(z0+C.Chunk/2)
+ for _,side in ipairs({-1,1})do
+  local h=biome.desert and 90 or 140
+  self:part(model,'Distant ridge',Vector3.new(240,h,320),CFrame.new(p.x+side*420,p.y+h*.25-20,z0+128)*CFrame.new(offset),biome.ground,Enum.Material.Rock,Enum.PartType.Ball)
+ end
+end
+function Stream:build(index,entry)
+ local route=self.route;local model=entry.model;local offset=self:offset();local start=index*C.Chunk
+ for z=start,start+C.Chunk-C.RoadStep,C.RoadStep do
+  if entry.cancel or entry.epoch~=self.epoch then return end
+  local a,b=route:point(z),route:point(z+C.RoadStep);local p=route:point(z+C.RoadStep/2)
+  local pos=Vector3.new((a.x+b.x)/2,(a.y+b.y)/2,z+C.RoadStep/2)+offset
+  local dir=Vector3.new(b.x-a.x,b.y-a.y,C.RoadStep)
+  -- Match the analytic heightfield, including grade across a curved, banked road.
+  local slope=math.tan(p.bank)/math.sqrt(1+p.dx*p.dx)
+  local normal=Vector3.new(-slope,1,p.dx*slope-p.dy).Unit
+  local frame=CFrame.lookAt(pos,pos+dir,normal)
+  frame=frame-frame.UpVector*.35
+  local length=dir.Magnitude+2.4;local biome=C.Biomes[p.biome]
+  self:part(model,'Road',Vector3.new(p.width,.7,length),frame,biome.road,p.surface=='tarmac'and Enum.Material.Asphalt or Enum.Material.Ground)
+  for _,side in ipairs({-1,1})do
+   self:part(model,'Shoulder',Vector3.new(3,.5,length),frame*CFrame.new(side*(p.width/2+1.5),-.18,0),biome.ground,Enum.Material.Ground)
+   if p.bridge or p.tunnel then
+    self:part(model,'Safety rail',Vector3.new(.5,2.8,length),frame*CFrame.new(side*(p.width/2+.6),1.5,0),{.57,.59,.55},Enum.Material.Metal)
+   end
+  end
+  if p.bridge and z==start then
+   local water=self:part(model,'River',Vector3.new(320,.3,C.Chunk+8),CFrame.new(p.x,-12,start+C.Chunk/2)+offset,{.16,.36,.39},Enum.Material.Glass);water.Transparency=.2
+  end
+  if p.bridge and z%64==0 then
+   for _,side in ipairs({-1,1})do self:part(model,'Bridge pier',Vector3.new(2,28,3),frame*CFrame.new(side*11,-14,0),{.36,.37,.34},Enum.Material.Concrete)end
+  end
+  if not p.bridge then self:part(model,'Land',Vector3.new(190,5,length+2),frame*CFrame.new(0,-4,0),biome.ground,Enum.Material.Grass)end
+  if z%32==0 and p.surface=='tarmac'then self:part(model,'Centre dash',Vector3.new(.25,.04,8),frame*CFrame.new(0,.38,0),{.88,.85,.68})end
+  if p.tunnel and z%32==0 then
+   self:part(model,'Tunnel roof',Vector3.new(p.width+4,2,35),frame*CFrame.new(0,13,0),{.30,.32,.32},Enum.Material.Concrete)
+   for _,side in ipairs({-1,1})do self:part(model,'Tunnel wall',Vector3.new(1,12,35),frame*CFrame.new(side*(p.width/2+1.5),6,0),{.31,.33,.32},Enum.Material.Concrete)end
+   self:part(model,'Tunnel strip',Vector3.new(.3,.15,14),frame*CFrame.new(0,11.8,0),{.9,.77,.48},Enum.Material.Neon)
+  end
+  if z&gt;=0 and (z%C.Checkpoint==0 or z==route.length and route.length&gt;0)then
+   for _,side in ipairs({-1,1})do self:part(model,'Timing post',Vector3.new(.4,7,.4),frame*CFrame.new(side*(p.width/2+2),3.5,0),{.95,.72,.29})end
+   self:part(model,'Timing banner',Vector3.new(p.width+5,1.5,.3),frame*CFrame.new(0,7,0),{.14,.27,.23})
+  end
+ end
+ self:decor(model,index);entry.done=true
+end
+function Stream:update(z)
+ if not self.route then return end
+ local cfg=C.Quality[self.quality];local centre=math.floor(math.max(0,z)/C.Chunk);local wanted={}
+ for i=math.max(-1,centre-cfg.behind),centre+cfg.ahead do wanted[i]=true end
+ for i,entry in pairs(self.chunks)do
+  if not wanted[i]or entry.cancel then entry.cancel=true;self:release(entry.model);self.chunks[i]=nil end
+ end
+ -- Prioritize the piece beneath the car and its immediate approach.
+ local order={centre,centre+1,centre-1}
+ for i=centre+2,centre+cfg.ahead do order[#order+1]=i end
+ for i=centre-2,math.max(-1,centre-cfg.behind),-1 do order[#order+1]=i end
+ for _,i in ipairs(order)do if wanted[i]and not self.chunks[i]then
+  local model=Instance.new('Model');model.Name='Road_'..i;model.Parent=self.folder
+  local entry={model=model,epoch=self.epoch};self.chunks[i]=entry
+  entry.job=coroutine.create(function()self:build(i,entry)end);self.queue[#self.queue+1]=entry
+ end end
+end
+function Stream:work(budget)
+ local began=os.clock()
+ while #self.queue&gt;0 and os.clock()-began&lt;budget do
+  local entry=self.queue[1]
+  if entry.cancel or entry.epoch~=self.epoch or coroutine.status(entry.job)=='dead'then table.remove(self.queue,1)
+  else local ok,err=coroutine.resume(entry.job);if not ok then entry.cancel=true;warn('Road generation failed: '..tostring(err));table.remove(self.queue,1)end end
+ end
+end
+function Stream:ready(z)
+ local index=math.floor(math.max(0,z)/C.Chunk)
+ return self.chunks[index]and self.chunks[index].done and self.chunks[index+1]and self.chunks[index+1].done
+end
+function Stream:destroy()
+ self.epoch+=1;for _,entry in pairs(self.chunks)do entry.cancel=true;self:release(entry.model)end
+ for _,p in ipairs(self.pool)do p:Destroy()end;self.chunks={};self.pool={};self.folder:Destroy()
+end
+return Stream
+</ProtectedString>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="RBX00000024">
+          <Properties>
+            <string name="Name">UI</string>
+            <ProtectedString name="Source">local UI={};UI.__index=UI
+local Players=game:GetService('Players');local UIS=game:GetService('UserInputService')
+local C=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Config)
+local Assets=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Assets)
+local palette={ink=Color3.fromRGB(20,35,32),panel=Color3.fromRGB(29,48,42),card=Color3.fromRGB(41,62,52),
+ light=Color3.fromRGB(242,232,207),muted=Color3.fromRGB(169,184,163),gold=Color3.fromRGB(233,180,84),red=Color3.fromRGB(224,119,91)}
+local function frame(parent,name,x,y,w,h,bg)
+ local f=Instance.new('Frame');f.Name=name;f.Position=UDim2.fromOffset(x,y);f.Size=UDim2.fromOffset(w,h);f.BackgroundColor3=bg or palette.panel;f.BorderSizePixel=0;f.Parent=parent;return f
+end
+local function label(parent,text,x,y,w,h,size,tint)
+ local t=Instance.new('TextLabel');t.Position=UDim2.fromOffset(x,y);t.Size=UDim2.fromOffset(w,h);t.BackgroundTransparency=1
+ t.Text=text;t.TextColor3=tint or palette.light;t.Font=Enum.Font.Gotham;t.TextSize=size or 16;t.TextXAlignment=Enum.TextXAlignment.Left;t.TextWrapped=true;t.Parent=parent;return t
+end
+local function button(parent,text,x,y,w,h,callback,accent)
+ local b=Instance.new('TextButton');b.Position=UDim2.fromOffset(x,y);b.Size=UDim2.fromOffset(w,h);b.BackgroundColor3=accent and palette.gold or palette.card
+ b.TextColor3=accent and palette.ink or palette.light;b.Text=text;b.Font=Enum.Font.GothamBold;b.TextSize=15;b.BorderSizePixel=0;b.AutoButtonColor=true;b.Parent=parent
+ local corner=Instance.new('UICorner');corner.CornerRadius=UDim.new(0,6);corner.Parent=b
+ if callback then b.Activated:Connect(callback)end;return b
+end
+function UI.time(seconds)
+ seconds=math.max(0,seconds or 0);return string.format('%02d:%05.2f',math.floor(seconds/60),seconds%60)
+end
+function UI.new(callbacks)
+ local gui=Instance.new('ScreenGui');gui.Name='ExpeditionUI';gui.ResetOnSpawn=false;gui.IgnoreGuiInset=true;gui.DisplayOrder=10000;gui.Parent=Players.LocalPlayer:WaitForChild('PlayerGui')
+ local self=setmetatable({gui=gui,callbacks=callbacks,mode=C.Modes[1],car=C.Cars[1],quality='medium',xp=0,speedIndex=3},UI)
+ self.launcher=button(gui,'EXPEDITION',0,0,160,40,function()callbacks.open()end,true)
+ self.launcher.Position=UDim2.new(1,-180,0,72)
+ self.closeButton=button(gui,'RETURN TO ORIGINAL',0,0,180,36,function()callbacks.close()end)
+ self.closeButton.Position=UDim2.new(1,-200,0,24);self.closeButton.Visible=false
+ local canvas=frame(gui,'ResponsiveCanvas',0,0,1180,680,palette.ink);canvas.AnchorPoint=Vector2.new(.5,.5);canvas.Position=UDim2.fromScale(.5,.5);canvas.BackgroundTransparency=1
+ local scale=Instance.new('UIScale');scale.Parent=canvas
+ self.scale=scale;self.canvas=canvas
+ local menu=frame(canvas,'GarageMenu',0,0,1180,680,palette.ink);self.menu=menu
+ local grad=Instance.new('UIGradient');grad.Color=ColorSequence.new(palette.ink,palette.panel);grad.Rotation=28;grad.Parent=menu
+ label(menu,'BACKSEAT / EXPEDITION',34,25,760,30,19,palette.gold).Font=Enum.Font.GothamBold
+ label(menu,'Find the long\nway home.',32,79,660,125,53).Font=Enum.Font.GothamBold
+ local preview=Instance.new('ViewportFrame');preview.Name='CarPreview';preview.Position=UDim2.fromOffset(420,78)
+ preview.Size=UDim2.fromOffset(260,130);preview.BackgroundTransparency=1
+ preview.Ambient=Color3.fromRGB(185,185,185);preview.LightColor=Color3.fromRGB(255,244,218)
+ preview.LightDirection=Vector3.new(-1,-1,-1);preview.Parent=menu
+ local previewCamera=Instance.new('Camera');previewCamera.FieldOfView=34
+ previewCamera.CFrame=CFrame.lookAt(Vector3.new(15,9,-19),Vector3.new(0,.5,0));previewCamera.Parent=preview
+ preview.CurrentCamera=previewCamera
+ self.previewWorld=Instance.new('WorldModel');self.previewWorld.Parent=preview
+ label(menu,'A fresh road. A proper finish. Your best run, waiting as a ghost.',36,211,640,40,17,palette.muted)
+ self.modeButtons={}
+ for i,mode in ipairs(C.Modes)do
+  local x,y=36+((i-1)%2)*318,274+math.floor((i-1)/2)*88
+  local b=button(menu,mode.name,x,y,300,76,function()self.mode=mode;self:selection()end)
+  b.Text='';label(b,mode.name,14,7,270,24,18).Font=Enum.Font.GothamBold
+  label(b,mode.tag,14,35,268,32,12,palette.muted);self.modeButtons[i]=b
+ end
+ label(menu,'YOUR GARAGE',36,463,600,22,12,palette.gold)
+ self.carButtons={}
+ for i,car in ipairs(C.Cars)do
+  local b=button(menu,car.name,36+(i-1)*210,494,196,48,function()self.car=car;self:selection()end);self.carButtons[i]=b
+ end
+ self.carDescription=label(menu,'',36,549,625,28,13,palette.muted)
+ local seed=Instance.new('TextBox');seed.Name='CourseSeed';seed.Position=UDim2.fromOffset(36,600);seed.Size=UDim2.fromOffset(155,42)
+ seed.Text='';seed.PlaceholderText='Seed · random';seed.ClearTextOnFocus=false;seed.TextColor3=palette.light;seed.PlaceholderColor3=palette.muted;seed.BackgroundColor3=palette.card;seed.TextSize=14;seed.Font=Enum.Font.Gotham;seed.Parent=menu;self.seed=seed
+ self.startButton=button(menu,'TAKE THE ROAD →',205,600,269,42,function()callbacks.start(self.mode.id,self.car.id,tonumber(seed.Text))end,true)
+ self.menuMessage=label(menu,'',36,650,640,24,14,palette.gold)
+ button(menu,'REPLAY LIBRARY',489,600,165,42,function()callbacks.library()end)
+ local side=frame(menu,'Roadbook',708,75,438,566,palette.card)
+ label(side,'ROADBOOK / NEXT DEPARTURE',24,21,390,25,12,palette.gold)
+ self.modeTitle=label(side,'',24,56,390,42,29);self.modeTitle.Font=Enum.Font.GothamBold
+ self.modeDetail=label(side,'',24,103,385,50,15,palette.muted)
+ label(side,'SOLO + CO-DRIVER SEAT',24,184,390,23,12,palette.gold)
+ self.drivers=frame(side,'Drivers',24,218,390,145,palette.card)
+ button(side,'REFRESH OPEN SEATS',24,374,390,34,function()callbacks.lobby()end)
+ self.saveStatus=label(side,'Loading your garage…',24,425,390,48,13,palette.muted)
+ button(side,'QUALITY: MEDIUM',24,493,390,34,function()
+  local order={'low','medium','high'};self.quality=order[(table.find(order,self.quality)or 2)%3+1]
+  self.qualityButton.Text='QUALITY: '..self.quality:upper();callbacks.quality(self.quality)
+ end)
+ self.qualityButton=side:GetChildren()[#side:GetChildren()]
+ -- Keep a direct reference, independent of child enumeration order.
+ for _,child in ipairs(side:GetChildren())do if child:IsA('TextButton')and child.Text=='QUALITY: MEDIUM'then self.qualityButton=child end end
+ self.hud=frame(canvas,'DrivingHUD',0,0,1180,680,palette.ink);self.hud.BackgroundTransparency=1;self.hud.Visible=false
+ local top=frame(self.hud,'Run strip',0,0,1180,66,palette.ink);top.BackgroundTransparency=.08
+ self.runSummary=label(top,'',22,9,390,48,14,palette.muted)
+ self.note=label(top,'STRAIGHT · opens',400,9,500,48,21,palette.gold);self.note.Font=Enum.Font.GothamBold
+ self.timer=label(top,'00:00.00',930,9,230,48,27);self.timer.TextXAlignment=Enum.TextXAlignment.Right
+ self.message=label(self.hud,'',170,114,840,80,27,palette.light);self.message.TextXAlignment=Enum.TextXAlignment.Center;self.message.Font=Enum.Font.GothamBold
+ self.speed=label(self.hud,'0',935,486,224,100,78);self.speed.Font=Enum.Font.GothamBold;self.speed.TextXAlignment=Enum.TextXAlignment.Right
+ label(self.hud,'KM/H',1065,584,95,22,13,palette.gold).TextXAlignment=Enum.TextXAlignment.Right
+ self.telemetry=label(self.hud,'',24,535,600,76,14,palette.muted)
+ self.ghost=label(self.hud,'',24,490,660,28,15,palette.gold)
+ self.endButton=button(self.hud,'RETIRE &amp; SAVE',947,92,210,37,function()callbacks.stop()end)
+ button(self.hud,'R · CHECKPOINT',24,623,175,36,function()callbacks.recover()end)
+ button(self.hud,'B · MARK MOMENT',211,623,190,36,function()callbacks.bookmark()end)
+ button(self.hud,'C · CAMERA',413,623,150,36,function()callbacks.camera()end)
+ self.leave=button(self.hud,'LEAVE CO-DRIVER SEAT',947,137,210,36,function()callbacks.leave()end);self.leave.Visible=false
+ self.calls={}
+ for i,n in ipairs({'left','right','caution'})do
+  local b=button(self.hud,n:upper(),24+(i-1)*132,434,122,37,function()callbacks.call(n)end);b.Visible=false;self.calls[i]=b
+ end
+ local library=frame(canvas,'ReplayLibrary',0,0,1180,680,palette.ink);library.Visible=false;self.libraryPanel=library
+ label(library,'THE ROAD, REMEMBERED.',36,34,850,48,34).Font=Enum.Font.GothamBold
+ label(library,'Saved runs and fastest ghosts · each run keeps its exact road seed',38,93,1020,32,16,palette.muted)
+ button(library,'← GARAGE',953,35,190,42,function()self:show('menu');callbacks.lobby()end)
+ local scroll=Instance.new('ScrollingFrame');scroll.Name='SavedRuns';scroll.Position=UDim2.fromOffset(36,147);scroll.Size=UDim2.fromOffset(1110,482)
+ scroll.BackgroundTransparency=1;scroll.BorderSizePixel=0;scroll.ScrollBarThickness=4;scroll.CanvasSize=UDim2.fromOffset(0,0);scroll.Parent=library;self.records=scroll
+ self.libraryStatus=label(library,'',36,640,1080,27,13,palette.muted)
+ self.result=frame(canvas,'RunResult',190,115,800,450,palette.ink);self.result.Visible=false
+ label(self.result,'ROADBOOK / RUN COMPLETE',32,28,730,25,13,palette.gold)
+ self.resultTitle=label(self.result,'Made it home.',30,82,730,60,43);self.resultTitle.Font=Enum.Font.GothamBold
+ self.resultInfo=label(self.result,'',32,164,730,104,21)
+ self.resultSaved=label(self.result,'Saving replay and ghost…',32,291,730,48,14,palette.muted)
+ self.watchButton=button(self.result,'WATCH REPLAY',32,365,230,44,function()if self.resultMeta and self.resultReady then callbacks.watch(self.resultMeta)end end)
+ button(self.result,'SAME ROAD AGAIN',278,365,230,44,function()
+  if self.resultMeta and self.resultReady then callbacks.start(self.resultMeta.mode,self.resultMeta.car,self.resultMeta.seed)end
+ end,true)
+ button(self.result,'GARAGE',524,365,245,44,function()self:show('menu');callbacks.lobby()end)
+ local replay=frame(canvas,'ReplayControls',0,563,1180,117,palette.ink);self.replayControls=replay;replay.Visible=false
+ self.replayLabel=label(replay,'',20,8,1140,23,13,palette.muted)
+ local timeline=button(replay,'',20,42,1140,16,nil);timeline.BackgroundColor3=palette.card;self.timeline=timeline
+ self.playhead=frame(timeline,'Playhead',0,0,0,16,palette.gold)
+ local drag=false
+ local function scrub(x)callbacks.seek(math.clamp((x-timeline.AbsolutePosition.X)/math.max(1,timeline.AbsoluteSize.X),0,1))end
+ timeline.InputBegan:Connect(function(event)if event.UserInputType==Enum.UserInputType.MouseButton1 or event.UserInputType==Enum.UserInputType.Touch then drag=true;scrub(event.Position.X)end end)
+ UIS.InputChanged:Connect(function(event)if drag and (event.UserInputType==Enum.UserInputType.MouseMovement or event.UserInputType==Enum.UserInputType.Touch)then scrub(event.Position.X)end end)
+ UIS.InputEnded:Connect(function(event)if event.UserInputType==Enum.UserInputType.MouseButton1 or event.UserInputType==Enum.UserInputType.Touch then drag=false end end)
+ self.pauseButton=button(replay,'PAUSE',20,72,130,34,function()callbacks.pause()end)
+ button(replay,'−5 s',163,72,100,34,function()callbacks.skip(-5)end)
+ button(replay,'+5 s',276,72,100,34,function()callbacks.skip(5)end)
+ self.rateButton=button(replay,'1×',390,72,110,34,function()
+  self.speedIndex=self.speedIndex%5+1;local speed=({.25,.5,1,2,4})[self.speedIndex];self.rateButton.Text=speed..'×';callbacks.rate(speed)
+ end)
+ button(replay,'C · CAMERA',514,72,178,34,function()callbacks.camera()end)
+ button(replay,'EXIT REPLAY',950,72,210,34,function()callbacks.exitReplay()end)
+ -- Native-size touch controls remain usable independently of menu scaling.
+ self.touch=Instance.new('Frame');self.touch.Name='TouchControls';self.touch.Size=UDim2.fromScale(1,1);self.touch.BackgroundTransparency=1;self.touch.Visible=false;self.touch.Parent=gui
+ for _,spec in ipairs({{'◀','left',18,-155},{'▶','right',104,-155},{'BRAKE','brake',-190,-155},{'GO','throttle',-104,-155}})do
+  local b=button(self.touch,spec[1],0,0,78,72,nil,spec[2]=='throttle')
+  b.Position=UDim2.new(spec[3]&lt;0 and 1 or 0,spec[3],1,spec[4]);b.TextSize=18
+  b.InputBegan:Connect(function(e)if e.UserInputType==Enum.UserInputType.Touch or e.UserInputType==Enum.UserInputType.MouseButton1 then callbacks.touch(spec[2],true)end end)
+  b.InputEnded:Connect(function(e)if e.UserInputType==Enum.UserInputType.Touch or e.UserInputType==Enum.UserInputType.MouseButton1 then callbacks.touch(spec[2],false)end end)
+ end
+ self:selection();self:resize();canvas.Visible=false;return self
+end
+function UI:resize()
+ local camera=workspace.CurrentCamera;local v=camera and camera.ViewportSize or Vector2.new(1280,720)
+ self.scale.Scale=math.min(v.X/1220,v.Y/720)
+end
+function UI:selection()
+ if self.previewWorld and self.previewCarId~=self.car.id then
+  if self.previewCar then self.previewCar.model:Destroy()end
+  -- Show a complete car immediately, independently of external mesh permissions.
+  self.previewCar=Assets.car(self.previewWorld,self.car,false,false)
+  self.previewCarId=self.car.id
+ end
+ for i,b in ipairs(self.modeButtons)do b.BackgroundColor3=C.Modes[i]==self.mode and Color3.fromRGB(61,85,63)or palette.card end
+ for i,b in ipairs(self.carButtons)do
+  local car=C.Cars[i];b.BackgroundColor3=car==self.car and Color3.fromRGB(61,85,63)or palette.card
+  b.Text=car.name..(self.xp&lt;car.unlock and ' · '..car.unlock..' XP'or '')
+ end
+ self.carDescription.Text=self.car.description
+ self.modeTitle.Text=self.mode.name
+ self.modeDetail.Text=self.mode.length==0 and 'An endless road. Bank at any point.\nEvery completed run keeps its replay.'or string.format('%.1f km · finishable seeded stage\nCheckpoint recovery adds 5 seconds.',self.mode.length*C.StudMetres/1000)
+end
+function UI:show(which)
+ self.menu.Visible=which=='menu';self.hud.Visible=which=='drive'or which=='replay';self.libraryPanel.Visible=which=='library';self.result.Visible=which=='result'
+ self.replayControls.Visible=which=='replay';self.touch.Visible=which=='drive'and UIS.TouchEnabled
+ self.mode= self.mode or C.Modes[1]
+end
+function UI:lobby(data)
+ if data.library then self.xp=data.library.xp or 0;self.saveStatus.Text=(data.library.status or '')..'\n'..self.xp..' XP';self:selection()end
+ for _,c in ipairs(self.drivers:GetChildren())do c:Destroy()end
+ if #(data.drivers or {})==0 then label(self.drivers,'No open seats yet. Start a road and a friend can join you.',0,0,385,100,16,palette.muted)end
+ for i,d in ipairs(data.drivers or {})do if i&lt;=3 then button(self.drivers,d.name..' · JOIN',0,(i-1)*47,390,39,function()self.callbacks.join(d.owner)end)end end
+end
+function UI:library(data)
+ self:show('library');self.libraryStatus.Text=data.status or '';self.xp=data.xp or self.xp
+ for _,child in ipairs(self.records:GetChildren())do child:Destroy()end
+ local list,seen={},{}
+ for _,collection in ipairs({data.records or {},data.bests or {}})do for _,r in ipairs(collection)do if not seen[r.id]then seen[r.id]=true;list[#list+1]=r end end end
+ table.sort(list,function(a,b)return a.created&gt;b.created end)
+ for i,r in ipairs(list)do
+  local row=frame(self.records,'Run',0,(i-1)*91,1090,79,palette.card)
+  label(row,(r.mode or 'rally'):upper()..' / '..(r.car or 'hatch'):upper(),16,8,510,24,17).Font=Enum.Font.GothamBold
+  label(row,'Seed '..r.seed..' · '..UI.time(r.duration)..' · '..(r.storage or 'Session only'),16,39,680,25,13,palette.muted)
+  button(row,'WATCH',801,19,120,40,function()self.callbacks.watch(r)end)
+  button(row,'RACE ROAD',935,19,140,40,function()self.callbacks.start(r.mode,r.car,r.seed)end,true)
+ end
+ if #list==0 then label(self.records,'Your first road is waiting. Finish or bank a run to save its replay.',15,60,1020,100,23,palette.muted)end
+ self.records.CanvasSize=UDim2.fromOffset(0,#list*91)
+end
+function UI:resultScreen(meta)
+ self:show('result');self.resultMeta=meta;self.resultReady=false
+ self.resultTitle.Text=meta.completed and 'Made it home.'or(meta.banked and 'A good place to stop.'or 'Every road teaches you.')
+ self.resultInfo.Text=string.format('%s     +%d XP\n%.2f km · %d contacts · %.0f s penalties',UI.time(meta.duration),meta.reward or 0,(meta.progress or 0)*C.StudMetres/1000,meta.crashes or 0,meta.penalty or 0)
+ self.resultSaved.Text='Saving replay and ghost…';self.watchButton.Text='SAVING…'
+end
+function UI:saved(data)
+ if self.resultMeta and self.resultMeta.id==data.id then self.resultReady=true;self.resultSaved.Text=data.status;self.watchButton.Text='WATCH REPLAY'end
+end
+function UI:runInfo(run,s,route,clock)
+ self.runSummary.Text=(run.mode or 'replay'):upper()..' / SEED '..run.seed..'\n'..C.Biomes[route:point(s.z).biome].name
+ self.note.Text=run.missed and 'MISSED CHECKPOINT · press R'or route:note(s.z+math.abs(s.v))
+ self.timer.Text=UI.time(clock);self.speed.Text=tostring(math.floor(math.abs(s.v)*C.StudMetres*3.6+.5))
+ local progress=run.length and run.length&gt;0 and string.format('%.2f / %.2f km',math.max(0,s.z)*C.StudMetres/1000,run.length*C.StudMetres/1000)or string.format('%.2f km',math.max(0,s.z)*C.StudMetres/1000)
+ self.telemetry.Text=string.format('THROTTLE %3d%%   BRAKE %3d%%   STEER %+3d%%\n%s   ·   BODY %d%%   ·   R recover / B mark / C camera',
+  (s.throttle or 0)*100,(s.brake or 0)*100,(s.steer or 0)*100,progress,100-math.floor(s.damage or 0))
+ self.endButton.Text=run.mode=='endless'and 'BANK RUN &amp; SAVE'or 'RETIRE &amp; SAVE'
+ local passenger=run.passenger==Players.LocalPlayer.UserId;self.leave.Visible=passenger
+ for _,b in ipairs(self.calls)do b.Visible=passenger end
+ self.endButton.Visible=not passenger and self.replayControls.Visible==false
+end
+return UI
+</ProtectedString>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+    <Item class="StarterCharacterScripts" referent="RBX0000000C">
+      <Properties>
+        <string name="Name">StarterCharacterScripts</string>
+      </Properties>
+    </Item>
+  </Item>
+  <Item class="Lighting" referent="RBX0000000D">
+    <Properties>
+      <string name="Name">Lighting</string>
+      <float name="ClockTime">15.8</float>
+      <float name="Brightness">2</float>
+      <Color3 name="Ambient">
+        <R>0.4</R>
+        <G>0.45</G>
+        <B>0.41</B>
+      </Color3>
+      <Color3 name="OutdoorAmbient">
+        <R>0.56</R>
+        <G>0.59</G>
+        <B>0.51</B>
+      </Color3>
+    </Properties>
+  </Item>
+</roblox>

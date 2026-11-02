@@ -1,0 +1,1103 @@
+{
+  "base_sha256": "be6b8add4aff71085492872588a7440427438bbec01710e1d2b3a61dad90ef93",
+  "result_sha256": "5d0025ddb2aa730712e034c6ffc4cc15cc51ded50bcf71609082b4d589e7d1ec",
+  "original_instances": 82861,
+  "result_instances": 83021,
+  "added_instances": 160,
+  "original_class_and_property_chunks_byte_identical": true,
+  "effective_original_properties_unchanged_except_listed_sources": true,
+  "effective_original_source_changes": 14,
+  "original_parent_relationships_unchanged": true,
+  "existing_scripts_disabled_moved_or_deleted": 0,
+  "legacy_source_changes": [
+    {
+      "ref": 80321,
+      "path": "ReplicatedStorage.Shared.Zone",
+      "reason": "Reject self-requiring ZonePlus references",
+      "backup_ref": 82980,
+      "before_sha256": "212d5090f9b1843e304f9fd06b61986b9b5c85f429ac76916603250dd41b45dc",
+      "after_sha256": "16959d50fbb87aafa0d9f9917317bd10647828d48b11105c6b61b7aaca5c5f72"
+    },
+    {
+      "ref": 81999,
+      "path": "StarterPlayer.PlayerModule.ControlModule",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82981,
+      "before_sha256": "647bc7b1481f2110888e15670372c658bf8946aa881a67edcdf56c6511ccffc2",
+      "after_sha256": "d5d4808ec1aa92a6f2aff3b98e924f0eb75930cfe47230f1a72d07732acd9826"
+    },
+    {
+      "ref": 82000,
+      "path": "StarterPlayer.PlayerModule.ControlModule.ClickToMoveController",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82982,
+      "before_sha256": "5137964e81285d08dfb08ab0b649d9867bbd41b685d066f9399549b6aa7cc82f",
+      "after_sha256": "78e352243a98054a68d0f63ef2b37b947141e492e3214c66893a0e3a5d29ce21"
+    },
+    {
+      "ref": 82001,
+      "path": "StarterPlayer.PlayerModule.ControlModule.ClassicThumbstick",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82983,
+      "before_sha256": "f377a29934f280d0963b36491418b0395515dd9a0bc624583936fe4ea3780e5e",
+      "after_sha256": "7e7bcad3593483cceb454dd37fd73c6e30afb7c5787f63dcf00986d2c3729dbf"
+    },
+    {
+      "ref": 82003,
+      "path": "StarterPlayer.PlayerModule.ControlModule.InputReplication",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82984,
+      "before_sha256": "4a0be4a79b190838413a05550511b4107a01d1c484fbc44eac640c424f745d15",
+      "after_sha256": "420c8580a8419ae54445f9acce3b0d367d91d0590997a54736a19173cc6a65bf"
+    },
+    {
+      "ref": 82004,
+      "path": "StarterPlayer.PlayerModule.ControlModule.DynamicThumbstick",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82985,
+      "before_sha256": "4e90c24a27f5c3289eff11e9ba9e91eac94585afd1009afb7d2edf7b34396bcb",
+      "after_sha256": "fdc002ff9a0f893953b4f26e58ff2953f1993e1735c81a466d36214123ad496c"
+    },
+    {
+      "ref": 82005,
+      "path": "StarterPlayer.PlayerModule.ControlModule.InputSlots",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82986,
+      "before_sha256": "b2ebd2bb884f92d63ac3adc934d757cd2631c0d94dad2130748b33b5eed352c7",
+      "after_sha256": "9d0593bf59bb7ad403c4318db83794cfb2621ce53051d5438faec8662c27c074"
+    },
+    {
+      "ref": 82006,
+      "path": "StarterPlayer.PlayerModule.ControlModule.VehicleController",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82987,
+      "before_sha256": "a6d42c82ca7f0fe925e9e440758ec99fa7ef96268b1730d34c13d2045211c262",
+      "after_sha256": "06e6e2b387f4c9a8093783651786a71c701c4a0118edfaaaaca2b436ff54b04b"
+    },
+    {
+      "ref": 82007,
+      "path": "StarterPlayer.PlayerModule.ControlModule.ActionController",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82988,
+      "before_sha256": "b93d6338aae0cbeac498a8bed0d8593ef4dd065a8df3948a45baccd30b5b88db",
+      "after_sha256": "9127d60b03ac890e088f6106abab0fd79e6f2f6012632276393fe375d569c560"
+    },
+    {
+      "ref": 82017,
+      "path": "StarterPlayer.PlayerModule.CameraModule.CameraInput",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82989,
+      "before_sha256": "d586ae732e3141f6e601fdca8f2f285234af29aaf11538a56dfdbf4b695e4585",
+      "after_sha256": "2d0e335981699300620f929161161356b68f8f146ee891997fa77ae65c72997c"
+    },
+    {
+      "ref": 82020,
+      "path": "StarterPlayer.PlayerModule.CameraModule.BaseCamera",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82990,
+      "before_sha256": "d3aa8ec34fc81d3b7907a37e11984f0aa4d7e5ce487ad7b2bfaff4d2c25fab4b",
+      "after_sha256": "8697ecae19465a2ec04634f9fc67b6c2c76b1b4bd0a4b11a218cba9b426900ae"
+    },
+    {
+      "ref": 82023,
+      "path": "StarterPlayer.PlayerModule.CameraModule.VRBaseCamera",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82991,
+      "before_sha256": "d2134ac18c32a8269e1aab36768f7ef205f8ddb1ff84a2c0540d997581278a20",
+      "after_sha256": "c1feab9181906d13e60c4169c594a7f4b53646c31d8583fc64686bfd0a4d5080"
+    },
+    {
+      "ref": 82024,
+      "path": "StarterPlayer.PlayerModule.CameraModule.MouseLockController",
+      "reason": "Resolve the preserved native input graph without infinite waits",
+      "backup_ref": 82992,
+      "before_sha256": "69e53deda902d7a9db81b688fd4704d336bb2a0e318790d819da962a4a825ca3",
+      "after_sha256": "80c2ccd84da45555160b609ac63126268d9411fa3b46ae694701a40539ca43b4"
+    },
+    {
+      "ref": 82340,
+      "path": "StarterPlayer.StarterPlayerScripts.Client.Init.Data.DataController",
+      "reason": "Register one replica listener and rate-limit missing-profile warnings",
+      "backup_ref": 82993,
+      "before_sha256": "4b949fa1110466a262e5d50d6b40ac524b60c59ca51d3df9e848240f3531691f",
+      "after_sha256": "83ac9adcd339f7d31a735624b1caf6136cb4ffd2a74f218165af4696f99dbcb6"
+    }
+  ],
+  "native_input_graph_objects_added": 109,
+  "added_objects": [
+    {
+      "ref": 82861,
+      "cls": "ServerScriptService",
+      "name": "ServerScriptService",
+      "parent": -1
+    },
+    {
+      "ref": 82862,
+      "cls": "Folder",
+      "name": "BackseatExpedition",
+      "parent": 46390
+    },
+    {
+      "ref": 82863,
+      "cls": "Folder",
+      "name": "Shared",
+      "parent": 82862
+    },
+    {
+      "ref": 82864,
+      "cls": "Folder",
+      "name": "Remotes",
+      "parent": 82862
+    },
+    {
+      "ref": 82865,
+      "cls": "RemoteEvent",
+      "name": "Action",
+      "parent": 82864
+    },
+    {
+      "ref": 82866,
+      "cls": "RemoteFunction",
+      "name": "Request",
+      "parent": 82864
+    },
+    {
+      "ref": 82867,
+      "cls": "RemoteEvent",
+      "name": "State",
+      "parent": 82864
+    },
+    {
+      "ref": 82868,
+      "cls": "UnreliableRemoteEvent",
+      "name": "Input",
+      "parent": 82864
+    },
+    {
+      "ref": 82869,
+      "cls": "Folder",
+      "name": "LegacyInputContexts",
+      "parent": 82862
+    },
+    {
+      "ref": 82870,
+      "cls": "InputContext",
+      "name": "CharacterContext",
+      "parent": 82869
+    },
+    {
+      "ref": 82871,
+      "cls": "InputContext",
+      "name": "CameraContext",
+      "parent": 82869
+    },
+    {
+      "ref": 82872,
+      "cls": "InputContext",
+      "name": "TransformerContext",
+      "parent": 82869
+    },
+    {
+      "ref": 82873,
+      "cls": "InputContext",
+      "name": "VehicleContext",
+      "parent": 82869
+    },
+    {
+      "ref": 82874,
+      "cls": "InputBinding",
+      "name": "MouseBinding",
+      "parent": 82948
+    },
+    {
+      "ref": 82875,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82948
+    },
+    {
+      "ref": 82876,
+      "cls": "InputBinding",
+      "name": "MouseBinding",
+      "parent": 82949
+    },
+    {
+      "ref": 82877,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82949
+    },
+    {
+      "ref": 82878,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82950
+    },
+    {
+      "ref": 82879,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82950
+    },
+    {
+      "ref": 82880,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82950
+    },
+    {
+      "ref": 82881,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82951
+    },
+    {
+      "ref": 82882,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82951
+    },
+    {
+      "ref": 82883,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82951
+    },
+    {
+      "ref": 82884,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82952
+    },
+    {
+      "ref": 82885,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82952
+    },
+    {
+      "ref": 82886,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82952
+    },
+    {
+      "ref": 82887,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82953
+    },
+    {
+      "ref": 82888,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82953
+    },
+    {
+      "ref": 82889,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82953
+    },
+    {
+      "ref": 82890,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82954
+    },
+    {
+      "ref": 82891,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82954
+    },
+    {
+      "ref": 82892,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82954
+    },
+    {
+      "ref": 82893,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82955
+    },
+    {
+      "ref": 82894,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82955
+    },
+    {
+      "ref": 82895,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82955
+    },
+    {
+      "ref": 82896,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82956
+    },
+    {
+      "ref": 82897,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82956
+    },
+    {
+      "ref": 82898,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82956
+    },
+    {
+      "ref": 82899,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82957
+    },
+    {
+      "ref": 82900,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82957
+    },
+    {
+      "ref": 82901,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82957
+    },
+    {
+      "ref": 82902,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82958
+    },
+    {
+      "ref": 82903,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82958
+    },
+    {
+      "ref": 82904,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82958
+    },
+    {
+      "ref": 82905,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82959
+    },
+    {
+      "ref": 82906,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82959
+    },
+    {
+      "ref": 82907,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82959
+    },
+    {
+      "ref": 82908,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82960
+    },
+    {
+      "ref": 82909,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82961
+    },
+    {
+      "ref": 82910,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82962
+    },
+    {
+      "ref": 82911,
+      "cls": "InputBinding",
+      "name": "RotationScriptableBinding",
+      "parent": 82963
+    },
+    {
+      "ref": 82912,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82964
+    },
+    {
+      "ref": 82913,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82964
+    },
+    {
+      "ref": 82914,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82964
+    },
+    {
+      "ref": 82915,
+      "cls": "InputBinding",
+      "name": "MicroGamepadBinding",
+      "parent": 82964
+    },
+    {
+      "ref": 82916,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82965
+    },
+    {
+      "ref": 82917,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82965
+    },
+    {
+      "ref": 82918,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82965
+    },
+    {
+      "ref": 82919,
+      "cls": "InputBinding",
+      "name": "ClickToMoveScriptableBinding",
+      "parent": 82965
+    },
+    {
+      "ref": 82920,
+      "cls": "InputBinding",
+      "name": "MicroGamepadBinding",
+      "parent": 82965
+    },
+    {
+      "ref": 82921,
+      "cls": "InputBinding",
+      "name": "KeyboardPrimaryBinding",
+      "parent": 82966
+    },
+    {
+      "ref": 82922,
+      "cls": "InputBinding",
+      "name": "KeyboardSecondaryBinding",
+      "parent": 82966
+    },
+    {
+      "ref": 82923,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82966
+    },
+    {
+      "ref": 82924,
+      "cls": "InputBinding",
+      "name": "DynamicThumbstickScriptableBinding",
+      "parent": 82966
+    },
+    {
+      "ref": 82925,
+      "cls": "InputBinding",
+      "name": "ClassicThumbstickScriptableBinding",
+      "parent": 82966
+    },
+    {
+      "ref": 82926,
+      "cls": "InputBinding",
+      "name": "ClickToMoveScriptableBinding",
+      "parent": 82966
+    },
+    {
+      "ref": 82927,
+      "cls": "InputBinding",
+      "name": "MicroGamepadBinding",
+      "parent": 82966
+    },
+    {
+      "ref": 82928,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82967
+    },
+    {
+      "ref": 82929,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82968
+    },
+    {
+      "ref": 82930,
+      "cls": "InputBinding",
+      "name": "MouseBinding",
+      "parent": 82968
+    },
+    {
+      "ref": 82931,
+      "cls": "InputBinding",
+      "name": "TrackpadBinding",
+      "parent": 82968
+    },
+    {
+      "ref": 82932,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82968
+    },
+    {
+      "ref": 82933,
+      "cls": "InputBinding",
+      "name": "MouseBinding",
+      "parent": 82969
+    },
+    {
+      "ref": 82934,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82969
+    },
+    {
+      "ref": 82935,
+      "cls": "InputBinding",
+      "name": "KeyboardPrimaryBinding",
+      "parent": 82970
+    },
+    {
+      "ref": 82936,
+      "cls": "InputBinding",
+      "name": "KeyboardSecondaryBinding",
+      "parent": 82970
+    },
+    {
+      "ref": 82937,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82971
+    },
+    {
+      "ref": 82938,
+      "cls": "InputBinding",
+      "name": "MouseBinding",
+      "parent": 82972
+    },
+    {
+      "ref": 82939,
+      "cls": "InputBinding",
+      "name": "CameraScriptableBinding",
+      "parent": 82973
+    },
+    {
+      "ref": 82940,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82974
+    },
+    {
+      "ref": 82941,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82974
+    },
+    {
+      "ref": 82942,
+      "cls": "InputBinding",
+      "name": "MouseBinding",
+      "parent": 82974
+    },
+    {
+      "ref": 82943,
+      "cls": "InputBinding",
+      "name": "TrackpadBinding",
+      "parent": 82974
+    },
+    {
+      "ref": 82944,
+      "cls": "InputBinding",
+      "name": "TouchBinding",
+      "parent": 82974
+    },
+    {
+      "ref": 82945,
+      "cls": "InputBinding",
+      "name": "MicroGamepadBinding",
+      "parent": 82974
+    },
+    {
+      "ref": 82946,
+      "cls": "InputBinding",
+      "name": "GamepadBinding",
+      "parent": 82976
+    },
+    {
+      "ref": 82947,
+      "cls": "InputBinding",
+      "name": "KeyboardBinding",
+      "parent": 82977
+    },
+    {
+      "ref": 82948,
+      "cls": "InputAction",
+      "name": "ClickToMoveAction",
+      "parent": 82870
+    },
+    {
+      "ref": 82949,
+      "cls": "InputAction",
+      "name": "ClickToMovePositionAction",
+      "parent": 82870
+    },
+    {
+      "ref": 82950,
+      "cls": "InputAction",
+      "name": "AbilityAction2",
+      "parent": 82870
+    },
+    {
+      "ref": 82951,
+      "cls": "InputAction",
+      "name": "AbilityAction3",
+      "parent": 82870
+    },
+    {
+      "ref": 82952,
+      "cls": "InputAction",
+      "name": "AbilityAction4",
+      "parent": 82870
+    },
+    {
+      "ref": 82953,
+      "cls": "InputAction",
+      "name": "AbilityAction5",
+      "parent": 82870
+    },
+    {
+      "ref": 82954,
+      "cls": "InputAction",
+      "name": "AbilityAction6",
+      "parent": 82870
+    },
+    {
+      "ref": 82955,
+      "cls": "InputAction",
+      "name": "AbilityAction7",
+      "parent": 82870
+    },
+    {
+      "ref": 82956,
+      "cls": "InputAction",
+      "name": "AbilityAction8",
+      "parent": 82870
+    },
+    {
+      "ref": 82957,
+      "cls": "InputAction",
+      "name": "AbilityAction9",
+      "parent": 82870
+    },
+    {
+      "ref": 82958,
+      "cls": "InputAction",
+      "name": "AbilityAction10",
+      "parent": 82870
+    },
+    {
+      "ref": 82959,
+      "cls": "InputAction",
+      "name": "AbilityAction11",
+      "parent": 82870
+    },
+    {
+      "ref": 82960,
+      "cls": "InputAction",
+      "name": "OverflowAction1",
+      "parent": 82870
+    },
+    {
+      "ref": 82961,
+      "cls": "InputAction",
+      "name": "OverflowAction2",
+      "parent": 82870
+    },
+    {
+      "ref": 82962,
+      "cls": "InputAction",
+      "name": "OverflowAction3",
+      "parent": 82870
+    },
+    {
+      "ref": 82963,
+      "cls": "InputAction",
+      "name": "RotationAction",
+      "parent": 82870
+    },
+    {
+      "ref": 82964,
+      "cls": "InputAction",
+      "name": "AbilityAction1",
+      "parent": 82870
+    },
+    {
+      "ref": 82965,
+      "cls": "InputAction",
+      "name": "JumpAction",
+      "parent": 82870
+    },
+    {
+      "ref": 82966,
+      "cls": "InputAction",
+      "name": "MoveAction",
+      "parent": 82870
+    },
+    {
+      "ref": 82967,
+      "cls": "InputAction",
+      "name": "CameraGamepadZoomAction",
+      "parent": 82871
+    },
+    {
+      "ref": 82968,
+      "cls": "InputAction",
+      "name": "CameraZoomAction",
+      "parent": 82871
+    },
+    {
+      "ref": 82969,
+      "cls": "InputAction",
+      "name": "CameraPanActiveAction",
+      "parent": 82871
+    },
+    {
+      "ref": 82970,
+      "cls": "InputAction",
+      "name": "MouseLockSwitchAction",
+      "parent": 82871
+    },
+    {
+      "ref": 82971,
+      "cls": "InputAction",
+      "name": "CameraGamepadResetAction",
+      "parent": 82871
+    },
+    {
+      "ref": 82972,
+      "cls": "InputAction",
+      "name": "CameraToggleAction",
+      "parent": 82871
+    },
+    {
+      "ref": 82973,
+      "cls": "InputAction",
+      "name": "CameraAction",
+      "parent": 82871
+    },
+    {
+      "ref": 82974,
+      "cls": "InputAction",
+      "name": "CameraRotationAction",
+      "parent": 82871
+    },
+    {
+      "ref": 82975,
+      "cls": "InputAction",
+      "name": "ThumbstickAction",
+      "parent": 82872
+    },
+    {
+      "ref": 82976,
+      "cls": "InputAction",
+      "name": "ThrottleAction",
+      "parent": 82873
+    },
+    {
+      "ref": 82977,
+      "cls": "InputAction",
+      "name": "SteerAction",
+      "parent": 82873
+    },
+    {
+      "ref": 82978,
+      "cls": "ServerStorage",
+      "name": "ServerStorage",
+      "parent": -1
+    },
+    {
+      "ref": 82979,
+      "cls": "Folder",
+      "name": "BackseatLegacySourceBackups",
+      "parent": 82978
+    },
+    {
+      "ref": 82980,
+      "cls": "ModuleScript",
+      "name": "80321_Zone",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82981,
+      "cls": "ModuleScript",
+      "name": "81999_ControlModule",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82982,
+      "cls": "ModuleScript",
+      "name": "82000_ClickToMoveController",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82983,
+      "cls": "ModuleScript",
+      "name": "82001_ClassicThumbstick",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82984,
+      "cls": "ModuleScript",
+      "name": "82003_InputReplication",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82985,
+      "cls": "ModuleScript",
+      "name": "82004_DynamicThumbstick",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82986,
+      "cls": "ModuleScript",
+      "name": "82005_InputSlots",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82987,
+      "cls": "ModuleScript",
+      "name": "82006_VehicleController",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82988,
+      "cls": "ModuleScript",
+      "name": "82007_ActionController",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82989,
+      "cls": "ModuleScript",
+      "name": "82017_CameraInput",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82990,
+      "cls": "ModuleScript",
+      "name": "82020_BaseCamera",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82991,
+      "cls": "ModuleScript",
+      "name": "82023_VRBaseCamera",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82992,
+      "cls": "ModuleScript",
+      "name": "82024_MouseLockController",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82993,
+      "cls": "ModuleScript",
+      "name": "82340_DataController",
+      "parent": 82979,
+      "source_backup": true
+    },
+    {
+      "ref": 82994,
+      "cls": "Folder",
+      "name": "BackseatExpeditionServer",
+      "parent": 82861
+    },
+    {
+      "ref": 82995,
+      "cls": "Folder",
+      "name": "BackseatExpeditionClient",
+      "parent": 82160
+    },
+    {
+      "ref": 82996,
+      "cls": "ModuleScript",
+      "name": "AssetLoader",
+      "parent": 82863
+    },
+    {
+      "ref": 82997,
+      "cls": "ModuleScript",
+      "name": "Assets",
+      "parent": 82863
+    },
+    {
+      "ref": 82998,
+      "cls": "ModuleScript",
+      "name": "Config",
+      "parent": 82863
+    },
+    {
+      "ref": 82999,
+      "cls": "ModuleScript",
+      "name": "Dynamics",
+      "parent": 82863
+    },
+    {
+      "ref": 83000,
+      "cls": "ModuleScript",
+      "name": "ImportAssets",
+      "parent": 82863
+    },
+    {
+      "ref": 83001,
+      "cls": "ModuleScript",
+      "name": "LegacyInput",
+      "parent": 82863
+    },
+    {
+      "ref": 83002,
+      "cls": "ModuleScript",
+      "name": "OriginalCourse",
+      "parent": 82863
+    },
+    {
+      "ref": 83003,
+      "cls": "ModuleScript",
+      "name": "OriginalStageData",
+      "parent": 82863
+    },
+    {
+      "ref": 83004,
+      "cls": "ModuleScript",
+      "name": "Preferences",
+      "parent": 82863
+    },
+    {
+      "ref": 83005,
+      "cls": "ModuleScript",
+      "name": "Replay",
+      "parent": 82863
+    },
+    {
+      "ref": 83006,
+      "cls": "ModuleScript",
+      "name": "Route",
+      "parent": 82863
+    },
+    {
+      "ref": 83007,
+      "cls": "ModuleScript",
+      "name": "VehicleCatalog",
+      "parent": 82863
+    },
+    {
+      "ref": 83008,
+      "cls": "ModuleScript",
+      "name": "LegacyProfiles",
+      "parent": 82994
+    },
+    {
+      "ref": 83009,
+      "cls": "Script",
+      "name": "Main",
+      "parent": 82994
+    },
+    {
+      "ref": 83010,
+      "cls": "ModuleScript",
+      "name": "Persistence",
+      "parent": 82994
+    },
+    {
+      "ref": 83011,
+      "cls": "ModuleScript",
+      "name": "RaceSession",
+      "parent": 82994
+    },
+    {
+      "ref": 83012,
+      "cls": "ModuleScript",
+      "name": "Cockpit",
+      "parent": 82995
+    },
+    {
+      "ref": 83013,
+      "cls": "ModuleScript",
+      "name": "Effects",
+      "parent": 82995
+    },
+    {
+      "ref": 83014,
+      "cls": "LocalScript",
+      "name": "Main",
+      "parent": 82995
+    },
+    {
+      "ref": 83015,
+      "cls": "ModuleScript",
+      "name": "Presence",
+      "parent": 82995
+    },
+    {
+      "ref": 83016,
+      "cls": "ModuleScript",
+      "name": "ReplayCamera",
+      "parent": 82995
+    },
+    {
+      "ref": 83017,
+      "cls": "ModuleScript",
+      "name": "ReplayPlayer",
+      "parent": 82995
+    },
+    {
+      "ref": 83018,
+      "cls": "ModuleScript",
+      "name": "RoadStream",
+      "parent": 82995
+    },
+    {
+      "ref": 83019,
+      "cls": "ModuleScript",
+      "name": "Settings",
+      "parent": 82995
+    },
+    {
+      "ref": 83020,
+      "cls": "ModuleScript",
+      "name": "UI",
+      "parent": 82995
+    }
+  ]
+}
