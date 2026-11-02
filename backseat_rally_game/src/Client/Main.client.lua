@@ -2,6 +2,7 @@ local Players=game:GetService('Players');local RS=game:GetService('ReplicatedSto
 local RunService=game:GetService('RunService');local UIS=game:GetService('UserInputService');local Lighting=game:GetService('Lighting')
 local player=Players.LocalPlayer;local root=RS:WaitForChild('BackseatExpedition');local remotes=root.Remotes
 local C=require(root.Shared.Config);local Route=require(root.Shared.Route);local D=require(root.Shared.Dynamics);local Assets=require(root.Shared.Assets)
+local OriginalCourse=require(root.Shared.OriginalCourse)
 local Presence=require(script.Parent.Presence);local UI=require(script.Parent.UI);local RoadStream=require(script.Parent.RoadStream);local ReplayPlayer=require(script.Parent.ReplayPlayer)
 local Settings=require(script.Parent.Settings);local ReplayCamera=require(script.Parent.ReplayCamera)
 local Cockpit=require(script.Parent.Cockpit);local Effects=require(script.Parent.Effects)
@@ -12,13 +13,28 @@ local held={};local gamepad={steer=0,throttle=0,brake=0};local seq=0;local sent=
 local cameraMode=1
 local freeFrame;local readySent=false;local noticeUntil=0;local lastFrame;local clockAt,clockValue=0,0
 local correction;local countdownUntil;local ui;local presence;local menuPark;local closing=false
-local avatarParts={};local serverParts={};local pendingStart=false;local startSerial=0
+local opponents={};local avatarParts={};local serverParts={};local pendingStart=false;local startSerial=0
 local openExpansion,closeExpansion
 local function notice(text,seconds)if ui then ui.message.Text=tostring(text);ui.menuMessage.Text=tostring(text);noticeUntil=os.clock()+(seconds or 3)end end
 local function invoke(kind,data)
  local ok,response=pcall(function()return remotes.Request:InvokeServer(kind,data)end)
  if not ok then return {error='Connection interrupted; try again'}end
  return response or {error='No response'}
+end
+local function finiteState(state)
+ if type(state)~='table'then return false end
+ for _,key in ipairs({'x','z','v','yaw'})do
+  local n=state[key];if type(n)~='number'or n~=n or math.abs(n)>=1e9 then return false end
+ end
+ local count=0
+ local function check(value,depth)
+  if type(value)=='number'then return value==value and math.abs(value)<1e9 end
+  if type(value)~='table'then return true end
+  if depth>4 then return false end
+  for _,item in pairs(value)do count+=1;if count>256 or not check(item,depth+1)then return false end end
+  return true
+ end
+ return check(state,0)
 end
 local function controls()
  local focus=UIS:GetFocusedTextBox();if focus or (settings and settings:isOpen()) then return {throttle=0,brake=.5,steer=0}end
@@ -27,6 +43,7 @@ local function controls()
   brake=held.brake and not reversing and 1 or gamepad.brake,steer=held.left and -1 or (held.right and 1 or gamepad.steer),handbrake=held.handbrake==true}
 end
 local function clearScene()
+ opponents={}
  if replayCamera then replayCamera:destroy();replayCamera=nil end
  if cockpit then cockpit:destroy();cockpit=nil end
  if effects then effects:reset()end
@@ -39,6 +56,12 @@ local function clearScene()
  visual=nil;ghostVisual=nil;predicted=nil;correction=nil;lastFrame=nil;freeFrame=nil;held={}
 end
 local function menuCamera()
+ local original=C.UseOriginalStages and OriginalCourse.default(C)
+ if original then
+  local at=original:worldPoint(0);local camera=workspace.CurrentCamera;camera.CameraType=Enum.CameraType.Scriptable
+  camera.CFrame=CFrame.lookAt(at+Vector3.new(18,12,22),at+Vector3.new(0,2,-8));camera.FieldOfView=56
+  presence:view(camera.CFrame,56);return
+ end
  if not menuPark then
   menuPark=Instance.new('Model');menuPark.Name='ExpeditionLocalPark';menuPark.Parent=workspace
   Assets.park(menuPark);menuPark:PivotTo(CFrame.new(C.WorldX,0,0))
@@ -61,14 +84,15 @@ local function setQuality(quality)
 end
 local function setup(metadata,initial)
  if menuPark then menuPark:Destroy();menuPark=nil end
- clearScene();run=metadata;route=Route.new(metadata.seed,metadata.length,C)
+ clearScene();run=metadata;route=(metadata.stage and OriginalCourse.new(metadata.stage,C,metadata.seed))or Route.new(metadata.seed,metadata.length,C)
+ presence:sceneProfile(route.original)
  scene=Instance.new('Folder');scene.Name='ExpeditionLocal';scene.Parent=workspace
  stream=RoadStream.new(scene);stream.quality=ui.quality;stream:reset(route,metadata.slot or 1,metadata.originZ or 0)
  visual=Assets.car(scene,getCar(metadata.car),false,C.ImportedVisuals,C.ExternalAudio)
  Assets.headlights(visual,headlights,ui.quality)
  predicted=initial or D.new(route);readySent=false;accumulator=0;cameraMode=1;roadAt=0;lookYaw=0;lookPitch=0
  if mode=='drive'then
-  cockpit=Cockpit.new(scene,getCar(metadata.car));Assets.cockpitView(visual,true)
+  cockpit=Cockpit.new(scene,getCar(metadata.car),{visual=visual});Assets.cockpitView(visual,true)
  end
  workspace.CurrentCamera.CameraType=Enum.CameraType.Scriptable;workspace.CurrentCamera.FieldOfView=72
  presence:time(metadata.mode=='daily'and 18.15 or 15.8)
@@ -83,8 +107,9 @@ local function loadGhost(id)
  end)
 end
 local function watch(record)
+ if record.stage and record.stage~=root:GetAttribute('OriginalStage')then notice('This replay needs the original '..record.stage..' place.');return end
  if record.generation~=C.Generation then notice('This replay uses a different road generation version.');return end
- mode='replay';setup({seed=record.seed,length=record.length,slot=1,originZ=0,mode=record.mode,car=record.car,passenger=0},nil)
+ mode='replay';setup({seed=record.seed,length=record.length,slot=1,originZ=0,mode=record.mode,stage=record.stage,stageName=record.stageName,car=record.car,passenger=0},nil)
  replayPlayer=ReplayPlayer.new(remotes.Request,record);replayPlayer:page(1)
  replayCamera=ReplayCamera.new(workspace.CurrentCamera,UIS,{cockpitFov=options.fov,canInput=function()return not settings:isOpen()end})
  replayTime=record.startTime or 0;replayRate=1;replayPaused=false;ui:show('replay');notice('Loading saved replay…',2)
@@ -98,12 +123,12 @@ ui=UI.new({
  open=function()openExpansion()end,close=function()
   if mode=='drive'then closing=true;remotes.Action:FireServer(run and run.owner~=player.UserId and 'leave'or 'retire');notice('Saving the run…')else closeExpansion()end
  end,
- start=function(modeId,carId,seed)
+ start=function(modeId,carId,seed,map)
   if mode=='drive'or pendingStart then return end
   if mode=='replay'then clearScene();mode='menu'end
   pendingStart=true;startSerial+=1;local serial=startSerial;ui.startButton.Text='STARTING…'
   notice('Preparing your car and road…',8)
-  remotes.Action:FireServer('start',{mode=modeId,car=carId,seed=seed,settings=options})
+  remotes.Action:FireServer('start',{mode=modeId,car=carId,seed=seed,map=map,settings=options})
   task.delay(8,function()if pendingStart and startSerial==serial then
    pendingStart=false;ui.startButton.Text='TAKE THE ROAD →';notice('Unable to start the run. Please try again.',8)
   end end)
@@ -233,9 +258,19 @@ remotes.Action.OnClientEvent:Connect(function(kind,data)
 end)
 remotes.State.OnClientEvent:Connect(function(packet)
  if mode~='drive'or not run then return end
- for _,data in ipairs(packet.runs or {})do if data.owner==run.owner then
+ local retained={}
+ for _,peer in ipairs(packet.nearby or {})do if route.original and peer.stage==route.stageId and peer.owner~=run.owner and finiteState(peer.s)then
+  retained[peer.owner]=true;local entry=opponents[peer.owner]
+  if not entry then
+   local v=Assets.car(scene,getCar(peer.car),false,C.ImportedVisuals,false);v.model.Name='OriginalOpponent_'..peer.owner
+   entry={visual=v,render=D.copy(peer.s)};opponents[peer.owner]=entry
+  end
+  entry.target=D.copy(peer.s)
+ end end
+ for owner,entry in pairs(opponents)do if not retained[owner]then entry.visual.model:Destroy();opponents[owner]=nil end end
+ for _,data in ipairs(packet.runs or {})do if data.owner==run.owner and finiteState(data.s)then
   local oldOrigin=run.originZ or 0;local oldPenalty=run.penalty;run=data
-  if data.originZ~=oldOrigin then
+  if not route.original and data.originZ~=oldOrigin then
    local delta=Vector3.new(0,0,data.originZ-oldOrigin);stream:shift(data.originZ)
    workspace.CurrentCamera.CFrame=workspace.CurrentCamera.CFrame+delta
    if replayCamera then replayCamera:shift(delta)end
@@ -257,11 +292,25 @@ remotes.State.OnClientEvent:Connect(function(packet)
  end end
 end)
 local function updateCamera(cf,dt)
- local camera=workspace.CurrentCamera
+ for owner,entry in pairs(opponents)do
+  local blend=1-math.exp(-12*dt)
+  for _,key in ipairs({'x','z','v','steer','bodyY','pitch','roll'})do local value=entry.target[key]
+   if value~=nil then entry.render[key]=entry.render[key]and entry.render[key]+(value-entry.render[key])*blend or value end
+  end
+  local delta=(entry.target.yaw-entry.render.yaw+math.pi)%(2*math.pi)-math.pi;entry.render.yaw+=delta*blend
+  Assets.pose(entry.visual,entry.render,route,Vector3.zero,dt)
+  local proxy=workspace:FindFirstChild('Rally_'..owner)
+  if proxy and not entry.proxyHidden then for _,part in ipairs(proxy:GetDescendants())do if part:IsA('BasePart')and serverParts[part]==nil then
+   serverParts[part]=part.LocalTransparencyModifier;part.LocalTransparencyModifier=1
+  end end;entry.proxyHidden=true end
+ end
+ local camera=presence:ensureCamera()
+ if replayCamera and replayCamera.camera~=camera then replayCamera.camera=camera end
  if mode=='replay'and replayCamera then
+  if visual.eyeOffsets and visual.eyeOffsets.Driver then replayCamera.options.cockpitOffset=visual.eyeOffsets.Driver.Position end
   replayCamera:update(cf,predicted,dt,replayTime);presence:view(camera.CFrame,camera.FieldOfView)
   local interior=replayCamera:name()=='COCKPIT';Assets.cockpitView(visual,interior)
-  if interior and not cockpit then cockpit=Cockpit.new(scene,getCar(run.car))end
+  if interior and not cockpit then cockpit=Cockpit.new(scene,getCar(run.car),{visual=visual})end
   if cockpit then cockpit:setVisible(interior)end
   return
  end
@@ -275,11 +324,14 @@ local function updateCamera(cf,dt)
  local shake=options.shake or 0
  local jitter=math.min(1,(predicted.impact or 0))*shake
  local t=os.clock()
- local view=cf*CFrame.new(passenger and 1.15 or -1.15,1.45+options.seatHeight,.35-options.seatForward)
+ local eyes=visual and visual.eyeOffsets;local originalEye=eyes and eyes[passenger and 'CoDriver'or 'Driver']
+ local baseEye=originalEye and originalEye.Position or Vector3.new(passenger and 1.15 or -1.15,1.45,.35)
+ local view=cf*CFrame.new(baseEye+Vector3.new(0,options.seatHeight,-options.seatForward))
  view=view*CFrame.Angles(lookPitch+math.sin(t*43)*jitter*.035,lookYaw,math.sin(t*37)*jitter*.02)
  -- Body motion remains readable while the user can reduce head movement.
  if lastFrame and shake==0 then
-  local flat=CFrame.new(view.Position)*CFrame.Angles(0,math.pi+predicted.yaw,0)*CFrame.Angles(lookPitch,lookYaw,0)
+  local forward=cf.LookVector;local flatDirection=Vector3.new(forward.X,0,forward.Z)
+  local flat=CFrame.lookAt(view.Position,view.Position+flatDirection)*CFrame.Angles(lookPitch,lookYaw,0)
   view=flat
  end
  camera.CFrame=view;camera.FieldOfView=options.fov;presence:view(view,options.fov);lastFrame=cf
@@ -313,6 +365,11 @@ RunService.RenderStepped:Connect(function(dt)
     predicted.damage=correction.damage;predicted.crashes=correction.crashes
    end
   end
+  if not finiteState(predicted)then
+   -- Reject a bad prediction before chunk selection or Model:PivotTo sees it.
+   predicted=finiteState(run.s)and D.copy(run.s)or D.new(route);correction=nil
+   ui.gui:SetAttribute('RecoveredInvalidState',(ui.gui:GetAttribute('RecoveredInvalidState')or 0)+1)
+  end
  else
   local state,error=replayPlayer:sample(replayTime)
   if state then
@@ -321,7 +378,7 @@ RunService.RenderStepped:Connect(function(dt)
    if replayTime>=replayPlayer.meta.duration then replayPaused=true;ui.pauseButton.Text='PLAY'end
   else notice(error,.5)end
   local newOrigin=-math.floor(predicted.z/4096)*4096
-  if newOrigin~=(run.originZ or 0)then
+  if not route.original and newOrigin~=(run.originZ or 0)then
    local delta=Vector3.new(0,0,newOrigin-(run.originZ or 0));stream:shift(newOrigin);run.originZ=newOrigin;workspace.CurrentCamera.CFrame+=delta;if replayCamera then replayCamera:shift(delta)end
   end
  end
@@ -353,7 +410,7 @@ RunService.RenderStepped:Connect(function(dt)
  uiAt+=dt
  if uiAt>.1 then
   uiAt=0;ui:runInfo(run,predicted,route,clock);presence:climate(route:conditions(predicted.z),ui.quality)
-  if C.ImportedVisuals and visual then ui.telemetry.Text..='\nOriginal body: '..visual.skinStatus end
+  if visual and ui.visualStatus then ui:visualStatus(visual)end
   if mode=='replay'then
    ui.playhead.Size=UDim2.fromScale(math.clamp(replayTime/math.max(1,replayPlayer.meta.duration),0,1),1)
    ui.replayLabel.Text=UI.time(replayTime)..' / '..UI.time(replayPlayer.meta.duration)..'   '..(replayCamera and replayCamera:name()or 'COCKPIT')..' CAMERA   ·   '..(replayPlayer.meta.storage or '')

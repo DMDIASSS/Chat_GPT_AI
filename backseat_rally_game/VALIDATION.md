@@ -1,6 +1,6 @@
-# Validation — 2 November 2026 — 1.4.0
+# Validation — 2 November 2026 — 1.5.0
 
-91 automated tests passed with the Luau CLI and Python unittest. Every authored
+115 automated tests passed with the Luau CLI and Python unittest. Every authored
 Luau source and all fourteen repaired legacy Sources compile. These are headless
 checks using a Roblox test double; they are not a Studio or GPU benchmark.
 
@@ -11,6 +11,15 @@ checks using a Roblox test double; they are not a Studio or GPU benchmark.
 - Road continuity, curve/grade bounds and rendered/contact height agreement checked across 1,000 seeds.
 - Per-wheel load, pressure, temperature, wear, punctures, grip consequences, component damage and repair verified.
 - Tyre deflation changes wheel height/body pose; different axle balances affect contact pose.
+- Original map checks cover Sakura's native route, hairpins/backtracking and source-aligned frames; a simulated driver completes the saved course within its road corridor.
+- Native original Road/Shoulder/Verge parts are reused without duplication; local appearance restores on exit.
+- Original-stage spawns use saved world coordinates and correct length; streaming replication focus follows the car and restores on exit.
+- Original world obstacle casts stop the car and generate recorded impacts.
+- Original native interiors remain usable after an external mesh failure; optional private textures do not block confirmed geometry.
+- Original driver-eye, steering and gauge attributes/parts are reused; a second dashboard never covers an original interior.
+- Detailed peer car copies render locally from compact pose packets; the server retains lightweight proxies.
+- Cached old-camera writes, foreign camera switches, removed cameras and invalid numeric poses cannot replace the managed view in the test double.
+- Checkpoint/rebase boundary checks cover the screenshot region around 768 studs and finite Focus/pose retention.
 - Live driving stays inside the adjusted cockpit after repeated camera changes; FOV/seat adjustments apply.
 - Opaque fallback cabin/windows are hidden locally; original skins retain their source instances.
 - Replay cockpit/chase changes restore exterior visibility; headlights switch and respect quality shadow settings.
@@ -48,12 +57,14 @@ checks using a Roblox test double; they are not a Studio or GPU benchmark.
 - Zone self-reference, DataController duplicate initialization/warning throttle, and native input resolution tested.
 - A 109-object copy of the supplied native InputContext/Action/Binding graph retains exact property data and hierarchy.
 - The Backseat place retains all 82,861 original objects; Sakura retains all 132,961.
-  Each adds 158 objects, including the expansion, input graph copy and inert Source backups.
+  Each adds 160 objects, including the expansion, input graph copy and inert Source backups.
 - All original objects and parent relationships are retained. Exactly fourteen original Sources
   have listed repairs, with exact original backups and before/after hashes. Other original properties remain unchanged.
 - Effective property verification rejects hidden overrides; artifact hashes/embedded authored Sources match the repository.
 - Independent robloxapi/rbxfile decoding checks original instance paths and all non-Source properties;
   Python separately verifies the fourteen permitted Source changes and backups.
+
+The collection was captured in Studio edit mode; no original driving telemetry or missing server code was recovered. Its input hash and static findings are recorded in COLLECTION_AUDIT.json.
 
 Roblox Studio is unavailable here. Original-scene disappearing/rendering faults, imported
 asset permissions, exact handling feel, real network latency, production DataStore behavior

@@ -1,10 +1,11 @@
 local UI={};UI.__index=UI
 local Players=game:GetService('Players');local UIS=game:GetService('UserInputService')
 local C=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Config)
+local OriginalCourse=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.OriginalCourse)
 local D=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Dynamics)
 local Assets=require(game:GetService('ReplicatedStorage').BackseatExpedition.Shared.Assets)
-local palette={ink=Color3.fromRGB(20,35,32),panel=Color3.fromRGB(29,48,42),card=Color3.fromRGB(41,62,52),
- light=Color3.fromRGB(242,232,207),muted=Color3.fromRGB(169,184,163),gold=Color3.fromRGB(233,180,84),red=Color3.fromRGB(224,119,91)}
+local palette={ink=Color3.fromRGB(14,19,24),panel=Color3.fromRGB(22,29,36),card=Color3.fromRGB(35,44,52),
+ light=Color3.fromRGB(241,244,246),muted=Color3.fromRGB(180,194,203),gold=Color3.fromRGB(255,194,79),red=Color3.fromRGB(239,126,99)}
 local function frame(parent,name,x,y,w,h,bg)
  local f=Instance.new('Frame');f.Name=name;f.Position=UDim2.fromOffset(x,y);f.Size=UDim2.fromOffset(w,h);f.BackgroundColor3=bg or palette.panel;f.BorderSizePixel=0;f.Parent=parent;return f
 end
@@ -24,6 +25,7 @@ end
 function UI.new(callbacks)
  local gui=Instance.new('ScreenGui');gui.Name='ExpeditionUI';gui.ResetOnSpawn=false;gui.IgnoreGuiInset=true;gui.DisplayOrder=10000;gui.Parent=Players.LocalPlayer:WaitForChild('PlayerGui')
  local self=setmetatable({gui=gui,callbacks=callbacks,mode=C.Modes[1],car=C.Cars[1],quality='medium',xp=0,speedIndex=3},UI)
+ self.originalCourse=C.UseOriginalStages and OriginalCourse.default(C);self.useOriginal=self.originalCourse~=nil
  self.launcher=button(gui,'EXPEDITION',0,0,160,40,function()callbacks.open()end,true)
  self.launcher.Position=UDim2.new(1,-180,0,72)
  self.closeButton=button(gui,'RETURN TO ORIGINAL',0,0,180,36,function()callbacks.close()end)
@@ -59,10 +61,13 @@ function UI.new(callbacks)
  for i,car in ipairs(C.Cars)do
   local b=button(garage,car.name,(i-1)*210,0,196,48,function()self.car=car;self:selection()end);self.carButtons[i]=b
  end
+ self.courseButton=button(menu,'MAP: ORIGINAL',36,574,618,22,function()
+  if self.originalCourse then self.useOriginal=not self.useOriginal;self:selection()end
+ end)
  self.carDescription=label(menu,'',36,549,625,28,13,palette.muted)
  local seed=Instance.new('TextBox');seed.Name='CourseSeed';seed.Position=UDim2.fromOffset(36,600);seed.Size=UDim2.fromOffset(155,42)
  seed.Text='';seed.PlaceholderText='Seed · random';seed.ClearTextOnFocus=false;seed.TextColor3=palette.light;seed.PlaceholderColor3=palette.muted;seed.BackgroundColor3=palette.card;seed.TextSize=14;seed.Font=Enum.Font.Gotham;seed.Parent=menu;self.seed=seed
- self.startButton=button(menu,'TAKE THE ROAD →',205,600,269,42,function()callbacks.start(self.mode.id,self.car.id,tonumber(seed.Text))end,true)
+ self.startButton=button(menu,'TAKE THE ROAD →',205,600,269,42,function()callbacks.start(self.mode.id,self.car.id,tonumber(seed.Text),self.useOriginal and 'original'or 'generated')end,true)
  self.menuMessage=label(menu,'',36,650,640,24,14,palette.gold)
  button(menu,'REPLAY LIBRARY',489,600,165,42,function()callbacks.library()end)
  local side=frame(menu,'Roadbook',708,75,438,566,palette.card)
@@ -82,24 +87,38 @@ function UI.new(callbacks)
  -- Keep a direct reference, independent of child enumeration order.
  for _,child in ipairs(side:GetChildren())do if child:IsA('TextButton')and child.Text=='QUALITY: MEDIUM'then self.qualityButton=child end end
  self.hud=frame(canvas,'DrivingHUD',0,0,1180,680,palette.ink);self.hud.BackgroundTransparency=1;self.hud.Visible=false
- local top=frame(self.hud,'Run strip',0,0,1180,66,palette.ink);top.BackgroundTransparency=.08
- self.runSummary=label(top,'',22,9,390,48,14,palette.muted)
- self.note=label(top,'STRAIGHT · opens',400,9,500,48,21,palette.gold);self.note.Font=Enum.Font.GothamBold
- self.timer=label(top,'00:00.00',930,9,230,48,27);self.timer.TextXAlignment=Enum.TextXAlignment.Right
- self.message=label(self.hud,'',170,114,840,80,27,palette.light);self.message.TextXAlignment=Enum.TextXAlignment.Center;self.message.Font=Enum.Font.GothamBold
- self.speed=label(self.hud,'0',935,486,224,100,78);self.speed.Font=Enum.Font.GothamBold;self.speed.TextXAlignment=Enum.TextXAlignment.Right
- label(self.hud,'KM/H',1065,584,95,22,13,palette.gold).TextXAlignment=Enum.TextXAlignment.Right
- self.telemetry=label(self.hud,'',24,535,600,76,14,palette.muted)
- self.ghost=label(self.hud,'',24,490,660,28,15,palette.gold)
- self.endButton=button(self.hud,'RETIRE & SAVE',947,92,210,37,function()callbacks.stop()end)
- button(self.hud,'R · CHECKPOINT',24,623,175,36,function()callbacks.recover()end)
- button(self.hud,'B · MARK MOMENT',211,623,190,36,function()callbacks.bookmark()end)
- button(self.hud,'C · CENTER LOOK',413,623,150,36,function()callbacks.camera()end)
- button(self.hud,'SETTINGS · F4',576,623,168,36,function()callbacks.settings()end)
- self.serviceButton=button(self.hud,'T · SERVICE',756,623,175,36,function()callbacks.service()end)
- self.standings=label(self.hud,'',946,195,212,245,14,palette.gold)
- self.coRoadbook=label(self.hud,'',24,215,355,199,18,palette.light);self.coRoadbook.Visible=false
- self.leave=button(self.hud,'LEAVE CO-DRIVER SEAT',947,137,210,36,function()callbacks.leave()end);self.leave.Visible=false
+ -- Keep the driving instruments below Roblox's core controls, leaving the centre clear.
+ local top=frame(self.hud,'Run strip',20,64,1140,58,palette.ink);top.BackgroundTransparency=1
+ local noteCard=frame(top,'Pacenote card',326,0,506,51,palette.ink);noteCard.BackgroundTransparency=.18
+ local corner=Instance.new('UICorner');corner.CornerRadius=UDim.new(0,8);corner.Parent=noteCard
+ self.runSummary=label(top,'',4,1,302,48,15,palette.light);self.runSummary.TextStrokeTransparency=.5
+ self.note=label(noteCard,'STRAIGHT · opens',15,0,476,51,23,palette.gold);self.note.Font=Enum.Font.GothamBold;self.note.TextXAlignment=Enum.TextXAlignment.Center
+ self.timer=label(top,'00:00.00',884,0,246,48,28);self.timer.TextXAlignment=Enum.TextXAlignment.Right;self.timer.TextStrokeTransparency=.55
+ self.message=label(self.hud,'',190,145,800,68,26,palette.light);self.message.TextXAlignment=Enum.TextXAlignment.Center;self.message.Font=Enum.Font.GothamBold;self.message.TextStrokeTransparency=.4
+ self.speed=label(self.hud,'0',960,520,194,73,62);self.speed.Font=Enum.Font.GothamBold;self.speed.TextXAlignment=Enum.TextXAlignment.Right;self.speed.TextStrokeTransparency=.55
+ label(self.hud,'KM/H',1060,595,94,20,13,palette.light).TextXAlignment=Enum.TextXAlignment.Right
+ local telemetryCard=frame(self.hud,'Telemetry card',24,532,589,66,palette.ink);telemetryCard.BackgroundTransparency=.23
+ local telemetryCorner=Instance.new('UICorner');telemetryCorner.CornerRadius=UDim.new(0,7);telemetryCorner.Parent=telemetryCard
+ self.telemetry=label(telemetryCard,'',13,3,565,60,15,palette.light)
+ self.assetStatus=label(self.hud,'',28,600,770,22,13,palette.gold)
+ self.ghost=label(self.hud,'',28,498,660,28,15,palette.gold);self.ghost.TextStrokeTransparency=.5
+ self.endButton=button(self.hud,'RETIRE & SAVE',977,133,180,31,function()callbacks.stop()end);self.endButton.TextSize=12;self.endButton.BackgroundTransparency=.16
+ local tools=frame(self.hud,'Driving tools',0,0,945,680,palette.ink);tools.BackgroundTransparency=1;self.drivingTools=tools
+ local function drivingButton(text,x,w,fn)
+  local b=button(tools,text,x,632,w,30,fn);b.TextSize=12;b.BackgroundTransparency=.16;return b
+ end
+ drivingButton('R · CHECKPOINT',24,175,function()callbacks.recover()end)
+ drivingButton('B · MARK MOMENT',211,190,function()callbacks.bookmark()end)
+ drivingButton('C · CENTER LOOK',413,150,function()callbacks.camera()end)
+ drivingButton('SETTINGS · F4',576,168,function()callbacks.settings()end)
+ self.serviceButton=drivingButton('T · SERVICE',756,175,function()callbacks.service()end)
+ self.toolToggle=button(self.hud,'HIDE CONTROLS',970,632,188,30,function()
+  self.toolsExpanded=not self.drivingTools.Visible;self.drivingTools.Visible=self.toolsExpanded
+  self.toolToggle.Text=self.toolsExpanded and 'HIDE CONTROLS'or 'CONTROLS'
+ end);self.toolToggle.TextSize=12;self.toolToggle.BackgroundTransparency=.16
+ self.standings=label(self.hud,'',946,215,212,230,15,palette.gold);self.standings.TextStrokeTransparency=.4
+ self.coRoadbook=label(self.hud,'',24,225,355,174,18,palette.light);self.coRoadbook.Visible=false;self.coRoadbook.TextStrokeTransparency=.5
+ self.leave=button(self.hud,'LEAVE CO-DRIVER SEAT',947,174,210,31,function()callbacks.leave()end);self.leave.Visible=false
  self.calls={}
  for i,n in ipairs({'left','right','caution'})do
   local b=button(self.hud,n:upper(),24+(i-1)*132,434,122,37,function()callbacks.call(n)end);b.Visible=false;self.calls[i]=b
@@ -118,7 +137,7 @@ function UI.new(callbacks)
  self.resultSaved=label(self.result,'Saving replay and ghost…',32,291,730,48,14,palette.muted)
  self.watchButton=button(self.result,'WATCH REPLAY',32,365,230,44,function()if self.resultMeta and self.resultReady then callbacks.watch(self.resultMeta)end end)
  button(self.result,'SAME ROAD AGAIN',278,365,230,44,function()
-  if self.resultMeta and self.resultReady then callbacks.start(self.resultMeta.mode,self.resultMeta.car,self.resultMeta.seed)end
+  if self.resultMeta and self.resultReady then callbacks.start(self.resultMeta.mode,self.resultMeta.car,self.resultMeta.seed,self.resultMeta.stage and 'original'or 'generated')end
  end,true)
  button(self.result,'GARAGE',524,365,245,44,function()self:show('menu');callbacks.lobby()end)
  local replay=frame(canvas,'ReplayControls',0,563,1180,117,palette.ink);self.replayControls=replay;replay.Visible=false
@@ -175,13 +194,22 @@ function UI:selection()
   b.Text=car.name..(self.xp<car.unlock and ' · '..car.unlock..' XP'or '')
  end
  self.carDescription.Text=string.format('%d kg · %d hp · %d Nm · %d:%d balance · %.1f studs wheelbase',self.car.mass,self.car.power,self.car.torque,math.floor((1-self.car.rearShare)*100+.5),math.floor(self.car.rearShare*100+.5),self.car.wheelbase)
+ self.courseButton.Text=self.useOriginal and ('MAP: '..self.originalCourse.name:upper()..' · ORIGINAL OBJECTS')or 'MAP: GENERATED · PORTABLE ALTERNATIVE'
  self.modeTitle.Text=self.mode.name
  self.modeDetail.Text=self.mode.length==0 and 'An endless road. Bank at any point.\nEvery completed run keeps its replay.'or string.format('%.1f km · finishable seeded stage\nCheckpoint recovery adds 5 seconds.',self.mode.length*C.StudMetres/1000)
+ if self.useOriginal then
+  local stage=self.originalCourse;self.modeTitle.Text=stage.name
+  self.modeDetail.Text=string.format('%.2f km · uploaded original map\n%s',stage.length*C.StudMetres/1000,stage.incomplete and 'Saved section only: later road is absent.'or 'Original roads, scenery and service park.')
+ end
 end
 function UI:show(which)
  if self.racePanel and which~='menu'then self.racePanel.Visible=false end
  self.menu.Visible=which=='menu';self.hud.Visible=which=='drive'or which=='replay';self.libraryPanel.Visible=which=='library';self.result.Visible=which=='result'
- self.replayControls.Visible=which=='replay';self.touch.Visible=which=='drive'and UIS.TouchEnabled
+ self.replayControls.Visible=which=='replay'
+ self.drivingTools.Visible=which=='drive';self.toolToggle.Visible=which=='drive'
+ self.assetStatus.Visible=which=='drive'
+ self.telemetry.Parent.Visible=which=='drive'
+ self.touch.Visible=which=='drive'and UIS.TouchEnabled
  self.mode= self.mode or C.Modes[1]
 end
 function UI:lobby(data)
@@ -236,7 +264,7 @@ function UI:library(data)
   label(row,(r.mode or 'rally'):upper()..' / '..(r.car or 'hatch'):upper(),16,8,510,24,17).Font=Enum.Font.GothamBold
   label(row,'Seed '..r.seed..' · '..UI.time(r.duration)..' · '..(r.storage or 'Session only'),16,39,680,25,13,palette.muted)
   button(row,'WATCH',801,19,120,40,function()self.callbacks.watch(r)end)
-  button(row,'RACE ROAD',935,19,140,40,function()self.callbacks.start(r.mode,r.car,r.seed)end,true)
+  button(row,'RACE ROAD',935,19,140,40,function()self.callbacks.start(r.mode,r.car,r.seed,r.stage and 'original'or 'generated')end,true)
  end
  if #list==0 then label(self.records,'Your first road is waiting. Finish or bank a run to save its replay.',15,60,1020,100,23,palette.muted)end
  self.records.CanvasSize=UDim2.fromOffset(0,#list*91)
@@ -250,20 +278,30 @@ end
 function UI:saved(data)
  if self.resultMeta and self.resultMeta.id==data.id then self.resultReady=true;self.resultSaved.Text=data.status;self.watchButton.Text='WATCH REPLAY'end
 end
+function UI:visualStatus(visual)
+ local original=visual and (visual.interiorReady or visual.interior)
+ self.assetStatus.Text=original and (visual.skinStatus=='partial'and 'ORIGINAL PARTS · SOME EXTERNAL MESHES UNAVAILABLE'or '')or (visual and visual.skinStatus=='loading'and 'LOADING ORIGINAL INTERIOR…'or 'PORTABLE COCKPIT · ORIGINAL INTERIOR NOT LOADED')
+ self.assetStatus.TextColor3=palette.gold
+end
 function UI:runInfo(run,s,route,clock)
  local climate=route:conditions(s.z)
- self.runSummary.Text=(run.mode or 'replay'):upper()..' / SEED '..run.seed..'\n'..C.Biomes[route:point(s.z).biome].name..string.format(' · %d°C · wet %d%%',climate.temperature,climate.wetness*100)
+ self.runSummary.Text=(run.stageName or (route.original and route.name)or run.mode or 'replay'):upper()..(run.stage and ''or (' / SEED '..run.seed))..'\n'..(route.original and 'Uploaded original stage'or C.Biomes[route:point(s.z).biome].name)..string.format(' · %d°C · wet %d%%',climate.temperature,climate.wetness*100)
  self.note.Text=run.missed and 'MISSED CHECKPOINT · press R'or route:call(s.z,s.v)
  self.timer.Text=UI.time(clock);self.speed.Text=tostring(math.floor(math.abs(s.v)*C.StudMetres*3.6+.5))
  local progress=run.length and run.length>0 and string.format('%.2f / %.2f km',math.max(0,s.z)*C.StudMetres/1000,run.length*C.StudMetres/1000)or string.format('%.2f km',math.max(0,s.z)*C.StudMetres/1000)
  local tyre=D.telemetry(s)
- self.telemetry.Text=string.format('GEAR %s · %d RPM · %s\nTYRES %.0f%% · %.0f°C · %d PUNCTURES   /   ENGINE %.0f%%\n%s · BODY %d%% · service at checkpoint bays',
-  s.v<-.5 and 'R'or tostring(s.gear or 1),math.floor(s.rpm or 850),s.tcsActive and 'TCS'or(s.absActive and 'ABS'or 'RALLY'),tyre.pressure*100,tyre.temperature,tyre.punctures,tyre.engine*100,
-  progress,100-math.floor(s.damage or 0))
+ self.telemetry.Text=string.format('GEAR %s   ·   %d RPM   ·   %s   ·   BODY %d%%\nTYRES %.0f%%   ·   %.0f°C   ·   %d PUNCTURES   ·   %s',
+  s.v<-.5 and 'R'or tostring(s.gear or 1),math.floor(s.rpm or 850),s.tcsActive and 'TCS'or(s.absActive and 'ABS'or 'RALLY'),100-math.floor(s.damage or 0),
+  tyre.pressure*100,tyre.temperature,tyre.punctures,progress)
  self.endButton.Text=run.mode=='endless'and 'BANK RUN & SAVE'or 'RETIRE & SAVE'
  local passenger=run.passenger==Players.LocalPlayer.UserId;self.leave.Visible=passenger
  self.coRoadbook.Visible=passenger
  self.serviceButton.Visible=not passenger and not self.replayControls.Visible
+ local expanded=self.toolsExpanded
+ if expanded==nil then expanded=math.abs(s.v)<2 or passenger end
+ self.drivingTools.Visible=expanded and not self.replayControls.Visible
+ self.toolToggle.Text=self.drivingTools.Visible and 'HIDE CONTROLS'or 'CONTROLS'
+ self.ghost.Visible=not self.replayControls.Visible and self.ghost.Text~=''and not string.find(self.ghost.Text,'Every finished run',1,true)
  if passenger then
   local lines={'CO-DRIVER ROADBOOK'}
   for i,lead in ipairs({2.5,5,8})do local ahead=math.max(55,math.abs(s.v)*lead);lines[#lines+1]=string.format('%d m · %s',math.floor(ahead*C.StudMetres),route:note(s.z+ahead-100))end

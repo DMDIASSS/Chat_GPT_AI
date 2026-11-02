@@ -1,9 +1,9 @@
 {
   "base_sha256": "b93977b54cfffbb2a13946b1caff4fb2409ec0bd9a02037392529248944ddd09",
-  "result_sha256": "59b89fd214c04d638d3dfa1f720aa790bbdc3398c62a46af46639898a9918e3d",
+  "result_sha256": "2f1c035499611d69cb2076221baf7d5dc0889b2eda41aefc76248c5b5123a1bd",
   "original_instances": 132961,
-  "result_instances": 133119,
-  "added_instances": 158,
+  "result_instances": 133121,
+  "added_instances": 160,
   "original_class_and_property_chunks_byte_identical": true,
   "effective_original_properties_unchanged_except_listed_sources": true,
   "effective_original_source_changes": 14,
@@ -988,101 +988,113 @@
     {
       "ref": 133102,
       "cls": "ModuleScript",
-      "name": "Preferences",
+      "name": "OriginalCourse",
       "parent": 132963
     },
     {
       "ref": 133103,
       "cls": "ModuleScript",
-      "name": "Replay",
+      "name": "OriginalStageData",
       "parent": 132963
     },
     {
       "ref": 133104,
       "cls": "ModuleScript",
-      "name": "Route",
+      "name": "Preferences",
       "parent": 132963
     },
     {
       "ref": 133105,
       "cls": "ModuleScript",
-      "name": "VehicleCatalog",
+      "name": "Replay",
       "parent": 132963
     },
     {
       "ref": 133106,
       "cls": "ModuleScript",
+      "name": "Route",
+      "parent": 132963
+    },
+    {
+      "ref": 133107,
+      "cls": "ModuleScript",
+      "name": "VehicleCatalog",
+      "parent": 132963
+    },
+    {
+      "ref": 133108,
+      "cls": "ModuleScript",
       "name": "LegacyProfiles",
       "parent": 133094
     },
     {
-      "ref": 133107,
+      "ref": 133109,
       "cls": "Script",
       "name": "Main",
       "parent": 133094
     },
     {
-      "ref": 133108,
+      "ref": 133110,
       "cls": "ModuleScript",
       "name": "Persistence",
       "parent": 133094
     },
     {
-      "ref": 133109,
+      "ref": 133111,
       "cls": "ModuleScript",
       "name": "RaceSession",
       "parent": 133094
     },
     {
-      "ref": 133110,
+      "ref": 133112,
       "cls": "ModuleScript",
       "name": "Cockpit",
       "parent": 133095
     },
     {
-      "ref": 133111,
+      "ref": 133113,
       "cls": "ModuleScript",
       "name": "Effects",
       "parent": 133095
     },
     {
-      "ref": 133112,
+      "ref": 133114,
       "cls": "LocalScript",
       "name": "Main",
       "parent": 133095
     },
     {
-      "ref": 133113,
+      "ref": 133115,
       "cls": "ModuleScript",
       "name": "Presence",
       "parent": 133095
     },
     {
-      "ref": 133114,
+      "ref": 133116,
       "cls": "ModuleScript",
       "name": "ReplayCamera",
       "parent": 133095
     },
     {
-      "ref": 133115,
+      "ref": 133117,
       "cls": "ModuleScript",
       "name": "ReplayPlayer",
       "parent": 133095
     },
     {
-      "ref": 133116,
+      "ref": 133118,
       "cls": "ModuleScript",
       "name": "RoadStream",
       "parent": 133095
     },
     {
-      "ref": 133117,
+      "ref": 133119,
       "cls": "ModuleScript",
       "name": "Settings",
       "parent": 133095
     },
     {
-      "ref": 133118,
+      "ref": 133120,
       "cls": "ModuleScript",
       "name": "UI",
       "parent": 133095

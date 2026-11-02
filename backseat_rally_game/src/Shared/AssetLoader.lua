@@ -1,23 +1,24 @@
--- Optional meshes never block driving or replace complete geometry before loading.
+-- Mesh geometry and optional decoration have separate availability. Never discard
+-- usable native car parts just because a private texture or sound cannot load.
 local ContentProvider=game:GetService('ContentProvider')
 local Loader={};local entries=setmetatable({},{__mode='k'})
-local timeout=8
 local function inspect(template)
- local visible,external=0,false
+ local visible,native,ids,seen=0,0,{},{}
  for _,item in ipairs(template:GetDescendants())do
   if item:IsA('BasePart')and item.Transparency<1 then
    visible+=1
-   if item:IsA('MeshPart')then
-    if item.MeshId==''then return false,false end
-    external=true
-   end
-  elseif item:IsA('SpecialMesh')and item.MeshType==Enum.MeshType.FileMesh then
-   if item.MeshId==''then return false,false end
-   external=true
-  elseif item:IsA('SurfaceAppearance')or item:IsA('Decal')or item:IsA('Texture')then external=true end
+   local mesh=item:IsA('MeshPart')and item or item:FindFirstChildOfClass('SpecialMesh')
+   local external=mesh and (mesh:IsA('MeshPart')or mesh.MeshType==Enum.MeshType.FileMesh)
+   if external then
+    local id=mesh.MeshId
+    if id and id~=''and not seen[id]then seen[id]=true;ids[#ids+1]=id end
+    if not id or id==''then ids[#ids+1]=''end
+   else native+=1 end
+  end
  end
- return visible>0,external
+ return visible,native,ids
 end
+function Loader.nativeParts(template)local _,native=inspect(template);return native end
 local function finish(entry,ok)
  if entry.status~='loading'then return end
  entry.status=ok and 'ready'or 'unavailable'
@@ -29,17 +30,18 @@ function Loader.check(template,callback)
  local entry=entries[template]
  if not entry then
   entry={status='loading',callbacks={}};entries[template]=entry
-  local valid,external=inspect(template)
-  if not valid then entry.status='unavailable'
-  elseif not external then entry.status='ready'
+  local visible,native,ids=inspect(template);entry.native=native
+  if visible==0 or table.find(ids,'')then entry.status='unavailable'
+  elseif #ids==0 then entry.status='ready'
   else
-   task.delay(timeout,function()finish(entry,false)end)
+   task.delay(8,function()finish(entry,false)end)
    task.spawn(function()
-    local failed=false;local observed=false
+    local failed,observed=false,false
     local ok=pcall(function()
-     ContentProvider:PreloadAsync({template},function(_,status)
-      observed=true
-      if status~=Enum.AssetFetchStatus.Success then failed=true end
+     -- Only required geometry IDs: an optional decal/SurfaceAppearance failure
+     -- must not suppress an otherwise working exterior or original interior.
+     ContentProvider:PreloadAsync(ids,function(_,status)
+      observed=true;if status~=Enum.AssetFetchStatus.Success then failed=true end
      end)
     end)
     finish(entry,ok and observed and not failed)
@@ -47,8 +49,7 @@ function Loader.check(template,callback)
   end
  end
  if callback then
-  if entry.status=='loading'then entry.callbacks[#entry.callbacks+1]=callback
-  else task.defer(callback,entry.status=='ready')end
+  if entry.status=='loading'then entry.callbacks[#entry.callbacks+1]=callback else task.defer(callback,entry.status=='ready')end
  end
  return entry.status
 end

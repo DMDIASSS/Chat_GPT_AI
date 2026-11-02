@@ -23,11 +23,13 @@ function Stream:release(chunk)
  chunk:Destroy()
 end
 function Stream:reset(route,slot,originZ)
+ self:restoreOriginal()
  self.epoch+=1;self.route=route;self.slot=slot or 1;self.originZ=originZ or 0
  for _,entry in pairs(self.chunks)do self:release(entry.model)end
  self.chunks={};self.queue={}
 end
 function Stream:shift(originZ)
+ if self.route and self.route.original then return end
  if originZ==self.originZ then return end
  local delta=Vector3.new(0,0,originZ-self.originZ)
  for _,entry in pairs(self.chunks)do
@@ -36,7 +38,7 @@ function Stream:shift(originZ)
  end
  self.originZ=originZ
 end
-function Stream:offset()return Vector3.new(C.WorldX+(self.slot or 1)*C.LaneSpacing,0,self.originZ or 0)end
+function Stream:offset()if self.route and self.route.original then return Vector3.zero end;return Vector3.new(C.WorldX+(self.slot or 1)*C.LaneSpacing,0,self.originZ or 0)end
 function Stream:decor(model,index)
  local route=self.route;local cfg=C.Quality[self.quality];local offset=self:offset()
  local imported=Root:FindFirstChild('ImportedProps')
@@ -100,7 +102,7 @@ function Stream:build(index,entry)
   if p.bridge and z%64==0 then
    for _,side in ipairs({-1,1})do self:part(model,'Bridge pier',Vector3.new(2,28,3),frame*CFrame.new(side*11,-14,0),{.36,.37,.34},Enum.Material.Concrete)end
   end
-  if not p.bridge then self:part(model,'Land',Vector3.new(190,5,length+2),frame*CFrame.new(0,-4,0),biome.ground,Enum.Material.Grass)end
+  if not p.bridge then self:part(model,'Land',Vector3.new(190,5,math.max(.1,length-.08)),frame*CFrame.new(0,-4,0),biome.ground,Enum.Material.Grass)end
   if z%32==0 and p.surface=='tarmac'then self:part(model,'Centre dash',Vector3.new(.25,.04,8),frame*CFrame.new(0,.38,0),{.88,.85,.68})end
   if p.tunnel and z%32==0 then
    self:part(model,'Tunnel roof',Vector3.new(p.width+4,2,35),frame*CFrame.new(0,13,0),{.30,.32,.32},Enum.Material.Concrete)
@@ -122,8 +124,53 @@ function Stream:build(index,entry)
  end
  self:decor(model,index);entry.done=true
 end
+-- Reuse the baked map that was uploaded. Its visual EditableMesh is not saved,
+-- but the original invisible native road/shoulder/verge Parts contain its shape.
+-- Appearance changes are local and restored exactly when the rally closes.
+function Stream:restoreOriginal()
+ if self.originalConnection then self.originalConnection:Disconnect();self.originalConnection=nil end
+ for part,old in pairs(self.originalParts or {})do if part.Parent then
+  part.Transparency=old.transparency;part.Color=old.color;part.Material=old.material
+ end end
+ self.originalParts={};self.originalRoads={};self.originalStage=nil;self.originalCollision=nil;self.requestedAt=nil;self.requestedSection=nil
+end
+function Stream:originalAppearance(part)
+ if not part:IsA('BasePart')or self.originalParts[part]then return end
+ local name=part.Name
+ if name~='Road'and name~='Shoulder'and name~='Verge'then return end
+ self.originalParts[part]={transparency=part.Transparency,color=part.Color,material=part.Material}
+ -- Palette values from the uploaded Shared.Core.RoadProfile table.
+ local surface=part:GetAttribute('Surface')
+ local gravel=surface and surface~='Tarmac'or (not surface and self.route.stageId=='PineForest')
+ if name=='Road'then
+  part.Color=gravel and Color3.fromRGB(176,158,124)or Color3.fromRGB(66,68,74)
+  part.Material=gravel and Enum.Material.Ground or Enum.Material.Asphalt
+  self.originalRoads[#self.originalRoads+1]=part
+ elseif name=='Shoulder'then part.Color=gravel and Color3.fromRGB(158,148,112)or Color3.fromRGB(150,142,116);part.Material=Enum.Material.Ground
+ else part.Color=Color3.fromRGB(112,132,70);part.Material=Enum.Material.Grass end
+ part.Transparency=0
+end
+function Stream:updateOriginal(progress)
+ local world=workspace:FindFirstChild('World');local stage=world and world:FindFirstChild('Stage_'..self.route.stageId)
+ local collision=stage and stage:FindFirstChild('Collision')
+ if stage~=self.originalStage or collision~=self.originalCollision then
+  if self.originalConnection then self.originalConnection:Disconnect();self.originalConnection=nil end
+  self.originalStage=stage;self.originalCollision=collision
+  if collision then
+   for _,part in ipairs(collision:GetDescendants())do self:originalAppearance(part)end
+   if collision.DescendantAdded then self.originalConnection=collision.DescendantAdded:Connect(function(part)self:originalAppearance(part)end)end
+  end
+ end
+ local section=math.floor(progress/256)
+ if self.requestedSection~=section and os.clock()-(self.requestedAt or -100)>2 then
+  self.requestedSection=section;self.requestedAt=os.clock()
+  local player=game:GetService('Players').LocalPlayer;local point=self.route:worldPoint(progress+90)
+  if player and player.RequestStreamAroundAsync then task.spawn(function()pcall(function()player:RequestStreamAroundAsync(point,2)end)end)end
+ end
+end
 function Stream:update(z)
  if not self.route then return end
+ if self.route.original then self:updateOriginal(z);return end
  local cfg=C.Quality[self.quality];local centre=math.floor(math.max(0,z)/C.Chunk);local wanted={}
  for i=math.max(-1,centre-cfg.behind),centre+cfg.ahead do wanted[i]=true end
  for i,entry in pairs(self.chunks)do
@@ -140,6 +187,7 @@ function Stream:update(z)
  end end
 end
 function Stream:work(budget)
+ if self.route and self.route.original then return end
  local began=os.clock()
  while #self.queue>0 and os.clock()-began<budget do
   local entry=self.queue[1]
@@ -148,10 +196,19 @@ function Stream:work(budget)
  end
 end
 function Stream:ready(z)
+ if self.route and self.route.original then
+  local at=self.route:worldPoint(z)
+  for _,part in ipairs(self.originalRoads or {})do if part.Parent then
+   local delta=part.Position-at
+   if delta.X*delta.X+delta.Z*delta.Z<math.max(22,part.Size.Z)^2 and math.abs(delta.Y)<12 then return true end
+  end end
+  return false
+ end
  local index=math.floor(math.max(0,z)/C.Chunk)
  return self.chunks[index]and self.chunks[index].done and self.chunks[index+1]and self.chunks[index+1].done
 end
 function Stream:destroy()
+ self:restoreOriginal()
  self.epoch+=1;for _,entry in pairs(self.chunks)do entry.cancel=true;self:release(entry.model)end
  for _,p in ipairs(self.pool)do p:Destroy()end;self.chunks={};self.pool={};self.folder:Destroy()
 end

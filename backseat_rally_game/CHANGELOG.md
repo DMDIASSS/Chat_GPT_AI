@@ -1,3 +1,14 @@
+# 1.5.0
+
+- Original saved stages are the default: actual Sakura hairpins/scenery and the available Pine Forest section; generated maps are an explicit alternative.
+- Reuse native road/shoulder/verge shapes with reversible local appearance repairs. No original scenery duplication or movement.
+- Original car interiors, driver-eye attachments, steering, wheels and gauge data are reused; optional texture failures no longer reject a complete car.
+- Keep usable original native parts when external meshes fail; suppress the portable cockpit when an original interior exists.
+- Dedicated camera ownership, maintained Focus, finite-frame checks, and car replication focus address sky-only rendering paths.
+- Static original maps never use generated-lane offsets or rebasing. Progress/physics map through real hairpins; obstacle casts use the original scenery.
+- Cleaner inset HUD and collapsible utility controls.
+- Audit the supplied DM_Collection.rbxm; it confirms empty original server containers and an incomplete Pine road snapshot, not recovered server code.
+
 # 1.4.0
 
 - First-person cockpit driving, instruments, headlights, adjustable camera/motion, safe rebinding and saved settings.

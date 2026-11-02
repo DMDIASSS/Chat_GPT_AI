@@ -10,7 +10,7 @@ as separate `.rbxm` files with **right-click → Save to File…**:
 
 Keep the hierarchy intact. Send the files here. A copy where the cars already look
 correct in Studio is most useful. The supplied Output log identifies private media, a recursive Zone require and
-missing runtime profiles/settings/input lookups. The ready 1.4.0 binary repairs the
+missing runtime profiles/settings/input lookups. The ready 1.5.0 binary repairs the
 identified script faults. Geometry disappearance still needs a Studio reproduction;
 please identify whether it happens in the new rally or the original scene if it persists.
 
@@ -39,8 +39,14 @@ Climate parameters live in `Config.Climate`; the current model includes ambient
 biome temperature, wetness, wind and tyre heating. It does not simulate a complete
 meteorological system, tyre carcass deformation, aquaplaning, or a full thermal engine.
 
-Generation 3 adds per-wheel pressure/wear/puncture replay state, shared damage
+Generation 4 retains per-wheel pressure/wear/puncture replay state, shared damage
 and handling rules, and first-person driving. Short-wave road elevation and
 suspension poses remain in the renderer/replays. Bump the generation when changing the road/handling model incompatibly.
 Original models are normalized about the wheel axle center, with the per-car balance
 offset applied when placing a loaded skin. Native models stay visible when assets fail.
+
+The supplied collection has now been inspected; no repeat export of the same copy is
+needed. Original driver-eye attachments and gauge attributes are used in 1.5.0.
+The map adapter follows the uploaded baked road positions through Sakura's hairpins;
+Pine stops before the first missing section. Those stages use their actual scenery,
+while source properties and hierarchy remain preserved in the ready binary.

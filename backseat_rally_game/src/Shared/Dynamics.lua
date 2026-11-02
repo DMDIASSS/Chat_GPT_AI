@@ -190,7 +190,12 @@ function D.step(s,input,route,car,dt)
  s.yawRate=yawRate;s.yaw=wrap(s.yaw-yawRate*dt)
  local forwardX,forwardZ=math.sin(s.yaw),math.cos(s.yaw)
  s.x+=(forwardX*s.v+forwardZ*s.lateralV)*dt
- s.z+=(forwardZ*s.v-forwardX*s.lateralV)*dt
+ local advance=(forwardZ*s.v-forwardX*s.lateralV)*dt
+ if route.original then
+  advance/=math.clamp(1-p.curvature*s.x,.5,1.5)
+  s.yaw=wrap(s.yaw-p.curvature*advance)
+ end
+ s.z+=advance
  local _,lateral,newPoint=route:ground(s.x,s.z)
  s.impact=math.max(0,(s.impact or 0)-dt*2)
  local barrier=newPoint.bridge or newPoint.tunnel;local bound=newPoint.width/2-3.1

@@ -90,7 +90,7 @@ class StartupAssetTests(unittest.TestCase):
     assert(#content.calls==1,'The same template was preloaded repeatedly')
     assert(a.model:GetAttribute('VisualSource')=='Original'and b.model:GetAttribute('VisualSource')=='Original')
     local skin=a.model:FindFirstChild('Original exterior');assert(skin and a.model.Chassis.Transparency==1)
-    assert((skin.PrimaryPart.Position-(target*CFrame.new(0,0,-C.Cars[1].wheelbase*(C.Cars[1].rearShare-.5))).Position).Magnitude<.001,'Late skin attached at the old origin')
+    assert((skin.PrimaryPart.Position-(target*CFrame.new(0,C.Cars[1].radius-(C.Cars[1].rideHeight or 2.2),-C.Cars[1].wheelbase*(C.Cars[1].rearShare-.5))).Position).Magnitude<.001,'Late skin attached at the old origin')
     for _,wheel in ipairs(a.wheels)do assert(wheel.tyre.Transparency==0,'Skin hid the animated tyres')end
     assert(shell.Parent==template and shell.Transparency==0)
     '''))

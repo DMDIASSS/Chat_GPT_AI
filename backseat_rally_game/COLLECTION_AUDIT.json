@@ -1,0 +1,169 @@
+{
+  "file": "DM_Collection.rbxm",
+  "sha256": "77aec79c9a532c37f6d106a91759616a56f0c9beaf822b42c734bd09531ee9d6",
+  "captureMode": "Studio edit mode; no driving telemetry",
+  "manifestInstances": 82793,
+  "carTemplates": [
+    "City",
+    "Coupe",
+    "OrsoSafari",
+    "Compact",
+    "TestHatch",
+    "Hatch",
+    "Sedan",
+    "Saloon",
+    "Prototype",
+    "Hybrid",
+    "Crossover",
+    "GroupB",
+    "Electric",
+    "Bug",
+    "Super",
+    "Trophy"
+  ],
+  "serverScriptServiceChildren": [],
+  "serverStorageChildren": [],
+  "map": "PineForest",
+  "nativeRoadParts": 227,
+  "sceneryDescendants": 36361,
+  "collectorSkipped": [
+    {
+      "reason": "Clone unavailable (for example Archivable=false); source unchanged",
+      "path": "Workspace.Terrain"
+    },
+    {
+      "reason": "Clone unavailable (for example Archivable=false); source unchanged",
+      "path": "StarterPlayer.StarterPlayerScripts"
+    },
+    {
+      "reason": "Clone unavailable (for example Archivable=false); source unchanged",
+      "path": "StarterPlayer.StarterCharacterScripts"
+    }
+  ],
+  "carCityMeasurements": {
+    "Body": {
+      "AssemblyAngularVelocity": [
+        0,
+        0,
+        0
+      ],
+      "partMass": 829.9999389648438,
+      "Color": [
+        0.08627451211214066,
+        0.08627451211214066,
+        0.0941176488995552
+      ],
+      "CanCollide": true,
+      "CollisionGroup": "Default",
+      "Anchored": false,
+      "CustomPhysicalProperties": {
+        "density": 7.719493865966797,
+        "frictionWeight": 1,
+        "elasticity": 0.20000000298023224,
+        "elasticityWeight": 1,
+        "friction": 0.4000000059604645
+      },
+      "AssemblyLinearVelocity": [
+        0,
+        0,
+        0
+      ],
+      "CFrame": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "Transparency": 1,
+      "Massless": false,
+      "AssemblyMass": 829.9999389648438,
+      "CurrentPhysicalProperties": {
+        "density": 7.719493865966797,
+        "frictionWeight": 1,
+        "elasticity": 0.20000000298023224,
+        "elasticityWeight": 1,
+        "friction": 0.4000000059604645
+      },
+      "Material": "Enum.Material.SmoothPlastic",
+      "AssemblyCenterOfMass": [
+        0,
+        0,
+        0
+      ],
+      "Size": [
+        6,
+        1.399999976158142,
+        12.800000190734863
+      ]
+    },
+    "DriverEye": {
+      "CFrame": [
+        -1.350000023841858,
+        2.549999952316284,
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "SecondaryAxis": [
+        0,
+        1,
+        0
+      ],
+      "Axis": [
+        1,
+        0,
+        0
+      ]
+    },
+    "CoDriverEye": {
+      "CFrame": [
+        1.350000023841858,
+        2.549999952316284,
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "SecondaryAxis": [
+        0,
+        1,
+        0
+      ],
+      "Axis": [
+        1,
+        0,
+        0
+      ]
+    }
+  },
+  "findings": [
+    "ServerScriptService and ServerStorage have no original backend children.",
+    "Sixteen original car templates are present; fifteen have recovered playable profiles.",
+    "Original driver-eye attachments differ from the earlier portable cockpit offset.",
+    "The PineForest road snapshot is incomplete; the rebuilt route stops before missing geometry.",
+    "Terrain voxels were not included by the collector; the original RBXL is retained as the build base.",
+    "The original 498-script manifest is not a complete source export: StarterPlayerScripts and StarterCharacterScripts were not Archivable. Earlier RBXL copies supply those existing scripts.",
+    "A capture cannot recover missing server code or change Roblox asset permissions."
+  ]
+}

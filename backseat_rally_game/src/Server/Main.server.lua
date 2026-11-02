@@ -6,11 +6,14 @@ local root=ReplicatedStorage:WaitForChild('BackseatExpedition')
 local compatOK,compatError=pcall(function()require(script.Parent.LegacyProfiles).start()end)
 if not compatOK then warn('Export compatibility: '..tostring(compatError))end
 local C=require(root.Shared.Config);local Route=require(root.Shared.Route)
+local OriginalCourse=require(root.Shared.OriginalCourse)
+local defaultCourse=C.UseOriginalStages and OriginalCourse.default(C)
+if defaultCourse then root:SetAttribute('OriginalStage',defaultCourse.stageId)end
 local D=require(root.Shared.Dynamics);local Replay=require(root.Shared.Replay)
 local Persistence=require(script.Parent.Persistence);local storage=Persistence.new(C)
 local Assets=require(root.Shared.Assets)
 local remotes=root.Remotes;local action=remotes.Action;local request=remotes.Request;local stateEvent=remotes.State;local inputEvent=remotes.Input
-local runs,viewing,slots={}, {}, {};local ending=0;local returnPoints={};local races
+local runs,viewing,slots={}, {}, {};local ending=0;local returnPoints={};local returnFocus={};local races
 local Preferences=require(root.Shared.Preferences);local RaceSession=require(script.Parent.RaceSession)
 local function getCar(id)for _,car in ipairs(C.Cars)do if car.id==id then return car end end;return C.Cars[1]end
 local function getMode(id)for _,mode in ipairs(C.Modes)do if mode.id==id then return mode end end;return C.Modes[1]end
@@ -19,9 +22,10 @@ local function participants(run)
  local out={run.player};if run.passenger and run.passenger.Parent then table.insert(out,run.passenger)end;return out
 end
 local function broadcastRun(run,kind,data)for _,p in ipairs(participants(run))do tell(p,kind,data)end end
-local function origin(run)return Vector3.new(C.WorldX+run.slot*C.LaneSpacing,0,-math.floor(run.s.z/4096)*4096)end
+local function origin(run)if run.route.original then return Vector3.zero end;return Vector3.new(C.WorldX+run.slot*C.LaneSpacing,0,-math.floor(run.s.z/4096)*4096)end
 local function worldFrame(run)
  local y,pitch,roll=D.pose(run.s,run.route,run.car)
+ if run.route.original then return run.route:frame(run.s,Vector3.zero,y,pitch,roll)end
  return CFrame.new(Vector3.new(run.s.x,y,run.s.z)+origin(run))*CFrame.Angles(0,math.pi+run.s.yaw,0)*CFrame.Angles(pitch,0,roll)
 end
 local function seatPlayer(player,seat)
@@ -29,10 +33,12 @@ local function seatPlayer(player,seat)
  if humanoid then character:PivotTo(seat.CFrame*CFrame.new(0,3,0));seat:Sit(humanoid)end
 end
 local function rememberReturn(player)
+ if not returnFocus[player]then returnFocus[player]={part=player.ReplicationFocus}end
  if not returnPoints[player]and player.Character then returnPoints[player]=player.Character:GetPivot()end
 end
 local function returnLobby(player)
  viewing[player]=nil
+ if returnFocus[player]then player.ReplicationFocus=returnFocus[player].part;returnFocus[player]=nil end
  local character=player.Character;local h=character and character:FindFirstChildOfClass('Humanoid')
  if h then h.Sit=false;h.Jump=true end
  local target=returnPoints[player];returnPoints[player]=nil
@@ -40,7 +46,7 @@ local function returnLobby(player)
 end
 local function packet(run)
  return {id=run.record.meta.id,owner=run.player.UserId,name=run.player.DisplayName,mode=run.mode.id,seed=run.route.seed,length=run.route.length,
-  car=run.car.id,slot=run.slot,s=D.copy(run.s),clock=run.clock,penalty=run.penalty,nextGate=run.nextGate,
+  stage=run.route.stageId,stageName=run.route.name,incomplete=run.route.incomplete,car=run.car.id,slot=run.slot,s=D.copy(run.s),clock=run.clock,penalty=run.penalty,nextGate=run.nextGate,
   missed=run.missed or false,status=run.status,originZ=origin(run).Z,course=run.record.meta.course,
   race=run.race,settings=run.settings,passenger=run.passenger and run.passenger.UserId or 0,ghost=run.ghost and run.ghost.id or nil,recording=not run.record.failed}
 end
@@ -83,12 +89,13 @@ local function start(player,data,raceId)
  for i=1,C.MaxPlayers do if not slots[i]then slot=i;break end end
  if not slot then tell(player,'notice','All rally slots are in use. Join a co-driver seat or try again shortly.');return end
  local settings=Preferences.sanitize({values=data.settings}).values
- local route=Route.new(seed,mode.length,C)
+ local route=(C.UseOriginalStages and data.map~='generated'and OriginalCourse.default(C,seed))or Route.new(seed,mode.length,C)
+ local length=route.length
  local run={race=raceId,settings=settings,player=player,route=route,car=car,mode=mode,slot=slot,s=D.new(route),clock=0,penalty=0,nextGate=C.Checkpoint,
   lastGate=0,validZ=0,status='loading',frames={},sample=0,input={throttle=0,steer=0,brake=1},lastInput=0,seq=-1,created=os.clock(),recoverAt=-100}
  D.configure(run.s,settings)
- if mode.length>0 then run.nextGate=math.min(run.nextGate,mode.length)end
- run.record=storage:newRecording(player.UserId,{seed=seed,length=mode.length,mode=mode.id,car=car.id,course=route:key(mode.id,car.id)..':'..(settings.damage and 'damage'or 'clean')..':'..(settings.assists and 'assist'or 'raw'),setup=settings,generation=C.Generation,weather=mode.weather})
+ if length>0 then run.nextGate=math.min(run.nextGate,length)end
+ run.record=storage:newRecording(player.UserId,{seed=seed,length=length,stage=route.stageId,stageName=route.name,mode=mode.id,car=car.id,course=route:key(mode.id,car.id)..':'..(settings.damage and 'damage'or 'clean')..':'..(settings.assists and 'assist'or 'raw'),setup=settings,generation=C.Generation,weather=mode.weather})
  for _,best in ipairs(profile.bests)do if best.course==run.record.meta.course then run.ghost=best;break end end
  local model=Instance.new('Model');model.Name='Rally_'..player.UserId
  local body=Instance.new('Part');body.Name='Root';body.Size=Vector3.new(6,2,10);body.Transparency=1;body.Anchored=true;body.CanCollide=false;body.Parent=model;model.PrimaryPart=body
@@ -98,8 +105,16 @@ local function start(player,data,raceId)
   local seat=Instance.new('Seat');seat.Name=name;seat.Size=Vector3.new(2,1,2);seat.Transparency=1;seat.Anchored=true;seat.CanCollide=false
   seat.CFrame=CFrame.new(i==1 and -1.3 or 1.3,.25,0);seat.Parent=model
  end
- model.Parent=Workspace;run.model=model;model:PivotTo(worldFrame(run));runs[player]=run;slots[slot]=run
- rememberReturn(player);seatPlayer(player,model.Driver);tell(player,'start',packet(run));recordFrame(run)
+ model.Parent=Workspace;run.model=model
+ if route.original and Workspace.Blockcast then
+  local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Exclude;params.RespectCanCollide=true
+  local excluded={model};if player.Character then excluded[#excluded+1]=player.Character end
+  local world=Workspace:FindFirstChild('World');local stage=world and world:FindFirstChild('Stage_'..route.stageId);local collision=stage and stage:FindFirstChild('Collision')
+  if collision then excluded[#excluded+1]=collision end
+  params.FilterDescendantsInstances=excluded;run.castParams=params
+ end
+ model:PivotTo(worldFrame(run));runs[player]=run;slots[slot]=run
+ rememberReturn(player);player.ReplicationFocus=body;seatPlayer(player,model.Driver);tell(player,'start',packet(run));recordFrame(run)
  return run
 end
 races=RaceSession.new({
@@ -153,7 +168,8 @@ action.OnServerEvent:Connect(function(player,kind,data)
   if target and not target.passenger then
    rememberReturn(player);target.passenger=player;viewing[player]=target
    if not table.find(target.record.meta.access,player.UserId)then table.insert(target.record.meta.access,player.UserId)end
-   seatPlayer(player,target.model.CoDriver);tell(player,'start',packet(target));tell(host,'notice',player.DisplayName..' joined as co-driver')
+   if target.castParams and player.Character then local excluded=target.castParams.FilterDescendantsInstances;excluded[#excluded+1]=player.Character;target.castParams.FilterDescendantsInstances=excluded end
+   player.ReplicationFocus=target.model.Root;seatPlayer(player,target.model.CoDriver);tell(player,'start',packet(target));tell(host,'notice',player.DisplayName..' joined as co-driver')
   end
  elseif kind=='leave'and viewing[player]then
   local target=viewing[player];target.passenger=nil;returnLobby(player);tell(player,'lobby',{})
@@ -204,11 +220,25 @@ RunService.Heartbeat:Connect(function(dt)
     if os.clock()>=run.countUntil then run.status='running';broadcastRun(run,'go',{})end
    elseif run.status=='running'then
     local input=os.clock()-run.lastInput<.6 and run.input or {throttle=0,steer=0,brake=.5}
+    local previous,before
+    if run.castParams then previous={x=run.s.x,z=run.s.z,yaw=run.s.yaw,bodyY=run.s.bodyY,pitch=run.s.pitch,roll=run.s.roll};before=worldFrame(run)end
     D.step(run.s,input,run.route,run.car,C.Step);run.clock+=C.Step
+    if before then
+     local target=worldFrame(run);local delta=target.Position-before.Position
+     if delta.Magnitude>.0001 then
+      local hit=Workspace:Blockcast(before,Vector3.new(run.car.track or 5.6,1.3,run.car.wheelbase+1),delta,run.castParams)
+      if hit then
+       local impact=math.abs(delta.Unit:Dot(hit.Normal))*math.abs(run.s.v)
+       if (run.s.impact or 0)<=0 then D.impact(run.s,impact,0,run.car)end
+       for _,key in ipairs({'x','z','yaw','bodyY','pitch','roll'})do run.s[key]=previous[key]end
+       run.s.v*=.12;run.s.lateralV=0
+      end
+     end
+    end
     local p=run.route:point(run.s.z);local lateral=math.abs((run.s.x-p.x)/math.sqrt(1+p.dx*p.dx))
     if not run.missed and run.s.z>=run.nextGate and run.s.z<run.nextGate+30 and lateral<p.width/2+2 then
      run.lastGate=run.nextGate;run.validZ=run.lastGate
-     if run.route.length>0 and run.lastGate>=run.route.length then finish(run,'finish')
+     if run.route.length>0 and run.lastGate>=run.route.length then finish(run,run.mode.id=='endless'and 'bank'or 'finish')
      else
       run.nextGate=run.lastGate+C.Checkpoint
       if run.route.length>0 then run.nextGate=math.min(run.nextGate,run.route.length)end
@@ -226,12 +256,15 @@ RunService.Heartbeat:Connect(function(dt)
  end
  network+=dt
  if network>=1/C.StateRate then
-  network=0;local list={}
+  network=0;local nearby={}
   for _,run in pairs(runs)do
-   run.model:PivotTo(worldFrame(run));Assets.pose(run.serverVisual,run.s,run.route,origin(run),1/C.StateRate);list[#list+1]=packet(run)
+   run.model:PivotTo(worldFrame(run));Assets.pose(run.serverVisual,run.s,run.route,origin(run),1/C.StateRate);if run.route.original then
+    local pose={};for _,key in ipairs({'x','z','yaw','v','steer','bodyY','pitch','roll'})do pose[key]=run.s[key]end
+    nearby[#nearby+1]={owner=run.player.UserId,car=run.car.id,stage=run.route.stageId,s=pose}
+   end
    if not run.model.Driver.Occupant and os.clock()-run.created>2 then seatPlayer(run.player,run.model.Driver)end
   end
-  for _,run in pairs(runs)do for _,p in ipairs(participants(run))do stateEvent:FireClient(p,{time=Workspace:GetServerTimeNow(),runs={packet(run)}})end end
+  for _,run in pairs(runs)do for _,p in ipairs(participants(run))do stateEvent:FireClient(p,{time=Workspace:GetServerTimeNow(),runs={packet(run)},nearby=nearby})end end
  end
 end)
 Players.PlayerAdded:Connect(function(player)storage:load(player.UserId)end)

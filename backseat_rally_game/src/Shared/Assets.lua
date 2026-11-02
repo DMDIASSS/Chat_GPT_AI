@@ -47,6 +47,7 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
  local root=game:GetService('ReplicatedStorage'):FindFirstChild('BackseatExpedition')
  local library=root and root:FindFirstChild('ImportedCars')
  local template=useOriginal~=false and library and library:FindFirstChild(car.template)
+ if useOriginal~=false and not template and root then template=require(script.Parent.ImportAssets).getCar(root,car.template)end
  local parts={}
  for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')then
   p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=not ghost
@@ -66,22 +67,63 @@ function Assets.car(parent,car,ghost,useOriginal,withAudio)
  model:SetAttribute('VisualSource','BuiltIn')
  local visual={model=model,wheels=wheels,parts=parts,spin=0,audio=sounds,car=car,lights=lights,skinStatus=template and 'loading'or 'missing'}
  if template and not ghost then
-  Loader.check(template,function(ready)
-   visual.skinStatus=ready and 'loaded'or 'unavailable'
-   if not ready or not model.Parent then return end
-   local skin=template:Clone()
-   if not skin.PrimaryPart then skin:Destroy();return end
-   skin.Name='Original exterior';skin:PivotTo(model:GetPivot()*CFrame.new(0,0,-car.wheelbase*((car.rearShare or .5)-.5)))
-   for _,part in ipairs(skin:GetDescendants())do if part:IsA('BasePart')then
-    part.Anchored=true;part.CanCollide=false;part.CanTouch=false;part.CanQuery=false
-   end end
-   skin.Parent=model
-   -- Keep a complete body until all external assets are confirmed available.
-   for _,part in ipairs(parts)do
-    if part.Name~='Tyre'and part.Name~='Wheel'then part.Transparency=1 end
+  local skinOffset=CFrame.new(0,car.radius-(car.rideHeight or 2.2),-car.wheelbase*((car.rearShare or .5)-.5))
+  local function attachOriginal(complete)
+   if not model.Parent then return end
+   local skin=visual.skin
+   if not skin then
+    skin=template:Clone();if not skin.PrimaryPart then skin:Destroy();return end
+    skin.Name='Original exterior';skin:PivotTo(model:GetPivot()*skinOffset);skin.Parent=model;visual.skin=skin
+    for _,part in ipairs(skin:GetDescendants())do if part:IsA('BasePart')then
+     part.Anchored=true;part.CanCollide=false;part.CanTouch=false;part.CanQuery=false
+    end end
+    local cabin=skin:FindFirstChild('Interior');visual.interior=cabin
+    visual.interiorReady=cabin and (Loader.nativeParts(cabin)>0 or complete)or false
+    visual.eyeOffsets={}
+    for key,name in pairs({Driver='DriverEye',CoDriver='CoDriverEye'})do
+     local eye=skin.PrimaryPart:FindFirstChild(name)
+     if eye then visual.eyeOffsets[key]=skinOffset*eye.CFrame end
+    end
+    visual.steeringParts={}
+    local hub=cabin and cabin:FindFirstChild('SteeringHub')
+    if hub and hub:IsA('BasePart')then
+     local inverse=model:GetPivot():Inverse();local localHub=inverse*hub.CFrame
+     for _,part in ipairs(cabin:GetDescendants())do if part:IsA('BasePart')and part.Name:find('SteeringWheel',1,true)then
+      visual.steeringParts[#visual.steeringParts+1]={part=part,hub=localHub,localFrame=hub.CFrame:Inverse()*part.CFrame}
+     end end
+    end
+    visual.instrumentParts={}
+    if cabin then for _,gauge in ipairs({'Speedo','Tach'})do
+     local hub=cabin:FindFirstChild(gauge..'Hub')
+     if hub then for _,part in ipairs(cabin:GetDescendants())do
+      if part:IsA('BasePart')and (part.Name==gauge..'Needle'or part.Name==gauge..'Tail')then
+       visual.instrumentParts[#visual.instrumentParts+1]={part=part,hub=model:GetPivot():Inverse()*hub.CFrame,localFrame=hub.CFrame:Inverse()*part.CFrame,
+        kind=gauge,zero=hub:GetAttribute('ZeroAngle')or 135,finish=hub:GetAttribute('MaxAngle')or -135,max=hub:GetAttribute('MaxValue')or (gauge=='Speedo'and 200 or 8000)}
+      end
+     end end
+    end end
+    local group=skin:FindFirstChild('OriginalWheels')
+    for i,name in ipairs({'FL','FR','RL','RR'})do
+     local original=group and group:FindFirstChild(name);local wheel=wheels[i]
+     if original then
+      local relative=model:GetPivot():Inverse()*original:GetPivot();wheel.original=original;wheel.originalRotation=relative.Rotation;wheel.originalPosition=relative.Position
+      Loader.check(original,function(ready)if ready and model.Parent then wheel.tyre.Transparency=1;wheel.rim.Transparency=1 end end)
+     end
+    end
    end
-   model:SetAttribute('VisualSource','Original')
+   if complete then
+    visual.interiorReady=visual.interior~=nil
+    for _,part in ipairs(parts)do if part.Name~='Tyre'and part.Name~='Wheel'then part.Transparency=1 end end
+    model:SetAttribute('VisualSource','Original')
+   else model:SetAttribute('VisualSource','OriginalPartial')end
    if visual.cockpit then visual.cockpit=nil;Assets.cockpitView(visual,true)end
+  end
+  -- Native objects in the original car are useful immediately, even if one of
+  -- its private meshes cannot be obtained. Never throw away the whole interior.
+  if Loader.nativeParts(template)>0 then attachOriginal(false)end
+  Loader.check(template,function(ready)
+   visual.skinStatus=ready and 'loaded'or (visual.skin and 'partial'or 'unavailable')
+   if ready then attachOriginal(true)end
   end)
  end
  return visual
@@ -90,7 +132,7 @@ function Assets.cockpitView(visual,enabled)
  if visual.cockpit==enabled then return end;visual.cockpit=enabled
  for _,part in ipairs(visual.model:GetDescendants())do if part:IsA('BasePart')then
   local name=part.Name:lower()
-  if name=='cabin'or name=='windscreen'or name=='roof'or name:find('glass',1,true)or name:find('windshield',1,true)or name:find('window',1,true)then
+  if name=='cabin'or name=='windscreen'or (part.Parent==visual.model and (name=='roof'or name=='a pillar'or name=='b pillar'or name=='c pillar'))or name:find('glass',1,true)or name:find('windshield',1,true)or name:find('window',1,true)then
    visual.hidden=visual.hidden or {}
    if enabled then if visual.hidden[part]==nil then visual.hidden[part]=part.LocalTransparencyModifier end;part.LocalTransparencyModifier=1
    elseif visual.hidden[part]~=nil then part.LocalTransparencyModifier=visual.hidden[part];visual.hidden[part]=nil end
@@ -103,19 +145,25 @@ end
 function Assets.pose(visual,s,route,offset,dt)
  local D=require(script.Parent.Dynamics)
  local y,pitch,roll=D.pose(s,route,visual.car)
- local cf=CFrame.new(Vector3.new(s.x,y,s.z)+offset)*CFrame.Angles(0,math.pi+s.yaw,0)*CFrame.Angles(pitch,0,roll)
+ local cf=route.original and route:frame(s,offset,y,pitch,roll)or (CFrame.new(Vector3.new(s.x,y,s.z)+offset)*CFrame.Angles(0,math.pi+s.yaw,0)*CFrame.Angles(pitch,0,roll))
  visual.model:PivotTo(cf);visual.spin=(visual.spin+s.v*(dt or 0)/visual.car.radius)%(math.pi*2)
  for i,wheel in ipairs(visual.wheels)do
   local wb=visual.car.wheelbase;local com=wb*((visual.car.rearShare or .5)-.5)
   local z=(wheel.front and -wb/2 or wb/2)-com
-  local pos=cf:PointToWorldSpace(Vector3.new(wheel.side*3,0,z))
-  local localPos=pos-offset;local ground=route:ground(localPos.X,localPos.Z)
+  local wheelPosition=wheel.originalPosition or Vector3.new(wheel.side*3,0,z)
+  local pos=cf:PointToWorldSpace(Vector3.new(wheelPosition.X,0,wheelPosition.Z))
+  local localPos=pos-offset;local ground
+  if route.original then
+   local arm=-wheelPosition.Z
+   ground=route:ground(s.x+math.sin(s.yaw)*arm-math.cos(s.yaw)*wheelPosition.X,s.z+math.cos(s.yaw)*arm+math.sin(s.yaw)*wheelPosition.X)
+  else ground=route:ground(localPos.X,localPos.Z)end
   local tyre=s.tyres and s.tyres[i]
   local flatten=tyre and math.clamp(.68+.32*tyre.pressure,.70,1.06)or 1
   wheel.tyre.Size=Vector3.new(.8,visual.car.radius*2*flatten,visual.car.radius*2)
   local at=Vector3.new(pos.X,ground+visual.car.radius*flatten+offset.Y,pos.Z)
   local wc=CFrame.new(at)*cf.Rotation*CFrame.Angles(0,wheel.front and -s.steer*.32 or 0,0)
   wheel.tyre.CFrame=wc;wheel.rim.CFrame=wc*CFrame.Angles(visual.spin,0,0)
+  if wheel.original then wheel.original:PivotTo(wc*wheel.originalRotation*CFrame.Angles(visual.spin,0,0))end
  end
  for i,sound in ipairs(visual.audio or {})do
   local speed=math.abs(s.v);local gear=(speed%32)/32
