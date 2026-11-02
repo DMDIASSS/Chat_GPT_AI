@@ -1,0 +1,16 @@
+{
+  "behavior_checks_passed": 14,
+  "luau_sources_compiled": 26,
+  "tests": "python redone_rally/tests/test_redone.py",
+  "original_instances_preserved": 14091,
+  "result_instances": 14107,
+  "source_repairs_with_exact_backups": 13,
+  "independent_go_decode_original_paths_and_non_source_properties": "passed",
+  "archive_crc_and_exact_shipped_source_copies": "passed",
+  "studio_renderer": "not available; not tested",
+  "roblox_rigid_body_integration": "requires Studio playtest",
+  "real_network_multiplayer": "requires Studio playtest",
+  "audio_permissions_and_text_to_speech": "requires Studio playtest",
+  "place_sha256": "7c420186eb8abd129fb3384417d50764363271f33c844769a485de136dafa71e",
+  "zip_sha256": "9c1de0b9572fb18b34195055ff38edb29b5686f128c17c10996088b0613a9480"
+}

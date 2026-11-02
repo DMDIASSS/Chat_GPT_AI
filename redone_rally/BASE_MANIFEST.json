@@ -1,0 +1,151 @@
+{
+  "file_name": "Redone with poor car and codrive only good models and somewhat good proceedual physics and wheels are kinds wrongly placed.rbxl",
+  "sha256": "5b1e1d66ec5c360e32bdb4ab1b1591739cacd7e5cfe113e8a93f776a08c2245a",
+  "instances": 14091,
+  "scripts": [
+    {
+      "ref": 13519,
+      "path": "StarterPlayer.StarterPlayerScripts.RallyClient.MainClient",
+      "file": "src/StarterPlayer/StarterPlayerScripts/RallyClient/MainClient.lua",
+      "sha256": "7b88be663ee669e658e0364281108f325e9008c1cd6e3f9f1ab395e510b73bd4"
+    },
+    {
+      "ref": 13524,
+      "path": "StarterGui.RallyGui.DirtRallyHud",
+      "file": "src/StarterGui/RallyGui/DirtRallyHud.lua",
+      "sha256": "fd7dcc051cc4e0c310b32c37ceed67095479169ad8db7f37fd5ac8d3e8cb0853"
+    },
+    {
+      "ref": 13525,
+      "path": "StarterGui.RallyGui.VehicleSelectorGui",
+      "file": "src/StarterGui/RallyGui/VehicleSelectorGui.lua",
+      "sha256": "8f1019e628c487e97fdbef90e2087732dc15d7f6a6260972a747359d396a3656"
+    },
+    {
+      "ref": 13526,
+      "path": "StarterGui.RallyGui.SettingsMenuGui",
+      "file": "src/StarterGui/RallyGui/SettingsMenuGui.lua",
+      "sha256": "1bf6b3359ce5cdfd1eaa578c43411da68bdb4e452118ead9515a299459d21332"
+    },
+    {
+      "ref": 13527,
+      "path": "StarterGui.RallyGui.CompanionTabletGui",
+      "file": "src/StarterGui/RallyGui/CompanionTabletGui.lua",
+      "sha256": "2651da10be68a2f3d25b83272593152a186a216620e9f4cb4a060631464a137d"
+    },
+    {
+      "ref": 13528,
+      "path": "StarterGui.RallyGui.ReplayGui",
+      "file": "src/StarterGui/RallyGui/ReplayGui.lua",
+      "sha256": "2052721d1c0aa73ec204fee906b267c55c234f23b32f63e40cc1f31deeaa10bb"
+    },
+    {
+      "ref": 14019,
+      "path": "ReplicatedStorage.RallyShared.Config.CarProfiles",
+      "file": "src/ReplicatedStorage/RallyShared/Config/CarProfiles.lua",
+      "sha256": "7cd0d099536d8bcd57d34ba41d1d400104ae6e15d669f7ff04db2e35cc65ff03"
+    },
+    {
+      "ref": 14020,
+      "path": "ReplicatedStorage.RallyShared.Config.SurfaceConfig",
+      "file": "src/ReplicatedStorage/RallyShared/Config/SurfaceConfig.lua",
+      "sha256": "91c8e684e21e4d7cbc0a3ee6d3d360bba3af2e7787a4f4949e71afc5e63cf7e4"
+    },
+    {
+      "ref": 14022,
+      "path": "ReplicatedStorage.RallyShared.Physics.PacejkaModel",
+      "file": "src/ReplicatedStorage/RallyShared/Physics/PacejkaModel.lua",
+      "sha256": "394cccb160496b7d3785c74655afa3963134659a0f39a8ba46ec78e563a0cfbb"
+    },
+    {
+      "ref": 14023,
+      "path": "ReplicatedStorage.RallyShared.Physics.WeightTransfer",
+      "file": "src/ReplicatedStorage/RallyShared/Physics/WeightTransfer.lua",
+      "sha256": "504e6d6fac9bc1d4b1977530829cd3a40fe95e8d5a79888d6575b21f8cfdd451"
+    },
+    {
+      "ref": 14024,
+      "path": "ReplicatedStorage.RallyShared.Physics.DeformationModel",
+      "file": "src/ReplicatedStorage/RallyShared/Physics/DeformationModel.lua",
+      "sha256": "d00d920ca761d87f1b057ff82bf47edd83ad9fe7ae3d713694a1eadddec6be31"
+    },
+    {
+      "ref": 14025,
+      "path": "ReplicatedStorage.RallyShared.Physics.RaycastSuspension",
+      "file": "src/ReplicatedStorage/RallyShared/Physics/RaycastSuspension.lua",
+      "sha256": "42f52b789ce8754247673f753597349c5d91bafe9dbdeb3a5249a4ccc89c4dee"
+    },
+    {
+      "ref": 14027,
+      "path": "ReplicatedStorage.RallyShared.Remotes.StageRemotes",
+      "file": "src/ReplicatedStorage/RallyShared/Remotes/StageRemotes.lua",
+      "sha256": "ad035da6d8362e771eeeea9b4122e1b3b7eb2e6ca0ec58678962abbb669473b0"
+    },
+    {
+      "ref": 14029,
+      "path": "ReplicatedStorage.RallyShared.Splines.CatmullRom",
+      "file": "src/ReplicatedStorage/RallyShared/Splines/CatmullRom.lua",
+      "sha256": "76fd0984067ddf3f9fb862592088ca6410118e7d44ec0f298adfbefc9f8759ab"
+    },
+    {
+      "ref": 14030,
+      "path": "ReplicatedStorage.RallyShared.Splines.BishopFrame",
+      "file": "src/ReplicatedStorage/RallyShared/Splines/BishopFrame.lua",
+      "sha256": "666d888809070931aa88deccf2091476870c342d5134d147785770c0f0d27fb6"
+    },
+    {
+      "ref": 14031,
+      "path": "ReplicatedStorage.RallyShared.Splines.CurvatureAnalyzer",
+      "file": "src/ReplicatedStorage/RallyShared/Splines/CurvatureAnalyzer.lua",
+      "sha256": "c51362b2c6cd6b8c9f01bc4c5c9317acb227418da5f7e0330dfb53bac69ca0df"
+    },
+    {
+      "ref": 14032,
+      "path": "ReplicatedStorage.RallyShared.TelemetryCodec",
+      "file": "src/ReplicatedStorage/RallyShared/TelemetryCodec.lua",
+      "sha256": "9bfa1cb55dd1a73b86e33f72d148297a05729bd9c76f8dee9e98f3a922245cbf"
+    },
+    {
+      "ref": 14034,
+      "path": "ReplicatedStorage.RallyClient.VehicleController",
+      "file": "src/ReplicatedStorage/RallyClient/VehicleController.lua",
+      "sha256": "433686759e5fcf35463550666e8123843489c4d586d83c1c54d2cdf334fb8a38"
+    },
+    {
+      "ref": 14035,
+      "path": "ReplicatedStorage.RallyClient.CameraController",
+      "file": "src/ReplicatedStorage/RallyClient/CameraController.lua",
+      "sha256": "0f7bdcb7a65275f21bc67965ac79973eea731453824fcc95b2b68eaddb7ca68a"
+    },
+    {
+      "ref": 14036,
+      "path": "ReplicatedStorage.RallyClient.CoDriverClient",
+      "file": "src/ReplicatedStorage/RallyClient/CoDriverClient.lua",
+      "sha256": "84b754c9a1d4953eba7aed5427af13ecc4148698e4c51c3b6595b72a6d5183ae"
+    },
+    {
+      "ref": 14037,
+      "path": "ReplicatedStorage.RallyClient.GhostClient",
+      "file": "src/ReplicatedStorage/RallyClient/GhostClient.lua",
+      "sha256": "3ac0cb85501cc8f18ae97b488172d468b81408d6c5aa58d282ac8d5c1fccb9ef"
+    },
+    {
+      "ref": 14078,
+      "path": "ServerScriptService.RallyServer.StageManager",
+      "file": "src/ServerScriptService/RallyServer/StageManager.lua",
+      "sha256": "11aabf254aa54e1ad408c6d01235a89565009062aae465fd2775efa075d2dd87"
+    },
+    {
+      "ref": 14079,
+      "path": "ServerScriptService.RallyServer.VehicleManager",
+      "file": "src/ServerScriptService/RallyServer/VehicleManager.lua",
+      "sha256": "5c0d21ad48e6c60913d6393e4f064f482b540352d33de6581bdb70b2c1dbd6bb"
+    },
+    {
+      "ref": 14080,
+      "path": "ServerScriptService.RallyServer.MainServer",
+      "file": "src/ServerScriptService/RallyServer/MainServer.lua",
+      "sha256": "68ce93bfa931631132fa6b2385a13b2a08f68ef04dc8e48695163c6fda1c8d90"
+    }
+  ]
+}

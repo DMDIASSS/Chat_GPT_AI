@@ -1,0 +1,120 @@
+{
+  "base_sha256": "5b1e1d66ec5c360e32bdb4ab1b1591739cacd7e5cfe113e8a93f776a08c2245a",
+  "result_sha256": "7c420186eb8abd129fb3384417d50764363271f33c844769a485de136dafa71e",
+  "original_instances": 14091,
+  "result_instances": 14107,
+  "added_instances": 16,
+  "original_class_and_property_chunks_byte_identical": true,
+  "effective_original_properties_unchanged_except_listed_sources": true,
+  "effective_original_source_changes": 13,
+  "original_parent_relationships_unchanged": true,
+  "existing_scripts_disabled_moved_or_deleted": 0,
+  "version": "Redone fixes 1.0.0",
+  "base_file": "Redone with poor car and codrive only good models and somewhat good proceedual physics and wheels are kinds wrongly placed.rbxl",
+  "source_repairs": [
+    {
+      "ref": 13524,
+      "path": "StarterGui.RallyGui.DirtRallyHud",
+      "backup_ref": 14092,
+      "before_sha256": "fd7dcc051cc4e0c310b32c37ceed67095479169ad8db7f37fd5ac8d3e8cb0853",
+      "after_sha256": "3cda5c94c30e3c9dc701c196d2bb5f18dc355321ba47fec67bb206e3981d9220"
+    },
+    {
+      "ref": 13526,
+      "path": "StarterGui.RallyGui.SettingsMenuGui",
+      "backup_ref": 14093,
+      "before_sha256": "1bf6b3359ce5cdfd1eaa578c43411da68bdb4e452118ead9515a299459d21332",
+      "after_sha256": "68a1017cfc37b07048b5f1592936cb5c8efcdeeaeeb8eced27043d5bd61f8092"
+    },
+    {
+      "ref": 13528,
+      "path": "StarterGui.RallyGui.ReplayGui",
+      "backup_ref": 14094,
+      "before_sha256": "2052721d1c0aa73ec204fee906b267c55c234f23b32f63e40cc1f31deeaa10bb",
+      "after_sha256": "fa9e69614958e4a29c2b9ac70ad5beb14e0cc8c5d6344534b9863b3e05382f02"
+    },
+    {
+      "ref": 14019,
+      "path": "ReplicatedStorage.RallyShared.Config.CarProfiles",
+      "backup_ref": 14095,
+      "before_sha256": "7cd0d099536d8bcd57d34ba41d1d400104ae6e15d669f7ff04db2e35cc65ff03",
+      "after_sha256": "ec3b88091355137740a634a41f844723afc1e0b7204695381f81d8f343e9e956"
+    },
+    {
+      "ref": 14025,
+      "path": "ReplicatedStorage.RallyShared.Physics.RaycastSuspension",
+      "backup_ref": 14096,
+      "before_sha256": "42f52b789ce8754247673f753597349c5d91bafe9dbdeb3a5249a4ccc89c4dee",
+      "after_sha256": "0ff2c63512d0792a82ddb619db025015c83f278a1b5e8f92b0e95527e6efd76f"
+    },
+    {
+      "ref": 14030,
+      "path": "ReplicatedStorage.RallyShared.Splines.BishopFrame",
+      "backup_ref": 14097,
+      "before_sha256": "666d888809070931aa88deccf2091476870c342d5134d147785770c0f0d27fb6",
+      "after_sha256": "bb38a9505f811130d0143b83c29de12428621cec88e540f415c674051524afcd"
+    },
+    {
+      "ref": 14031,
+      "path": "ReplicatedStorage.RallyShared.Splines.CurvatureAnalyzer",
+      "backup_ref": 14098,
+      "before_sha256": "c51362b2c6cd6b8c9f01bc4c5c9317acb227418da5f7e0330dfb53bac69ca0df",
+      "after_sha256": "cef0522bd4518f083ee546913e56d5466525c897c4120acdbf102868c50cc849"
+    },
+    {
+      "ref": 14034,
+      "path": "ReplicatedStorage.RallyClient.VehicleController",
+      "backup_ref": 14099,
+      "before_sha256": "433686759e5fcf35463550666e8123843489c4d586d83c1c54d2cdf334fb8a38",
+      "after_sha256": "c46c931e0a2eeac7b59d20d371b3a501244a2481c905dcf8edc331b77e524b38"
+    },
+    {
+      "ref": 14035,
+      "path": "ReplicatedStorage.RallyClient.CameraController",
+      "backup_ref": 14100,
+      "before_sha256": "0f7bdcb7a65275f21bc67965ac79973eea731453824fcc95b2b68eaddb7ca68a",
+      "after_sha256": "f9dbc9e30e6d13727d0d03d280cc2a558b44a5d9b8e47dc2c443e857b4c3c0e4"
+    },
+    {
+      "ref": 14036,
+      "path": "ReplicatedStorage.RallyClient.CoDriverClient",
+      "backup_ref": 14101,
+      "before_sha256": "84b754c9a1d4953eba7aed5427af13ecc4148698e4c51c3b6595b72a6d5183ae",
+      "after_sha256": "f07fd007e502a68a473b6c8ed60a4e12cf3974122b0af1f1c97a6a6b366b1298"
+    },
+    {
+      "ref": 14078,
+      "path": "ServerScriptService.RallyServer.StageManager",
+      "backup_ref": 14102,
+      "before_sha256": "11aabf254aa54e1ad408c6d01235a89565009062aae465fd2775efa075d2dd87",
+      "after_sha256": "32596f710ed9f872c5458a70db813712212eb68f5218df654ae79d74dc171bee"
+    },
+    {
+      "ref": 14079,
+      "path": "ServerScriptService.RallyServer.VehicleManager",
+      "backup_ref": 14103,
+      "before_sha256": "5c0d21ad48e6c60913d6393e4f064f482b540352d33de6581bdb70b2c1dbd6bb",
+      "after_sha256": "9c506c971ea9e935c236002718c50dad50e551929eb082efcfb4d02eee9c0e78"
+    },
+    {
+      "ref": 14080,
+      "path": "ServerScriptService.RallyServer.MainServer",
+      "backup_ref": 14104,
+      "before_sha256": "68ce93bfa931631132fa6b2385a13b2a08f68ef04dc8e48695163c6fda1c8d90",
+      "after_sha256": "f4a7ec5bbe1bd3daf1a4bf5c206ca2e05917cef3f82001410704866d6bce9f76"
+    }
+  ],
+  "new_modules": [
+    {
+      "ref": 14105,
+      "path": "ReplicatedStorage.RallyShared.Physics.Steering",
+      "sha256": "6f858a2514094628f37fe078d3e3076c59b68152b37b9830b8984f6340d47c20"
+    },
+    {
+      "ref": 14106,
+      "path": "ReplicatedStorage.RallyShared.Splines.StageProgress",
+      "sha256": "f9e9111f021821d1c77da82e5d5cad8064f798a2e0ab1619eae2ef325953f7a1"
+    }
+  ],
+  "notes": "Original models, meshes, terrain, metadata, scripts, and hierarchy retained. Only listed Sources overridden."
+}

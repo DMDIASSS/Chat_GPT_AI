@@ -1,0 +1,52 @@
+OPEN THIS FIRST
+
+1. Extract Backseat_Rally_Redone_Fixed.zip.
+2. In Roblox Studio, choose File > Open from File and open
+   Backseat_Rally_Redone_Fixed.rbxl.
+3. Press Play. The existing server builds your procedural course and spawns a car.
+
+This uses your newest "Redone with poor car and codrive..." upload.
+It keeps that game's generator, five cars, scenery, suspension, tyres and menus.
+You do not need to install the older Expedition expansion.
+
+CHANGES
+- Fixed-speed steering rack: 60 road-wheel degrees/second, 75 when released.
+  Opposite input moves from the current wheel angle through center to the new
+  target. Overlapping A/D uses the last direction pressed.
+- Correct wheel orientation, axle placement for all five bodies, tyre visual
+  scale and suspension-based wheel positions. The car shell uses its saved origin.
+- Co-driver follows distance along the road, including hairpins and slides.
+  Correct left/right signs, quieter corner detection, long/tightens/opens notes,
+  crest consolidation, advance timing, metre countdown and next-turn chaining.
+  Built-in speech is attempted when Roblox permits it. Visual notes always work.
+- Your seeded generation and supplied tree/rock/sign models remain in use.
+  Banking direction and roadside placement on slopes are corrected.
+- Missing-map switching no longer hides the procedural stage. Switching restores
+  original transparency and collisions. Regenerating brings all players to the
+  new shared route. The driving camera follows the car for streaming/focus.
+- Live driving starts in the cockpit. Replay cameras follow a separate local
+  clone, so scrubbing no longer teleports the live physics car.
+
+CONTROLS / TUNING
+WASD / arrows: drive. Space: handbrake. E/Q: shift. T: auto/manual.
+O: settings, including wheel turn-rate scale, co-driver lead time and voice.
+R: replay after a completed run. Replay camera controls remain available there.
+Settings currently last for the current session.
+
+For permanent per-car tuning, edit:
+ReplicatedStorage > RallyShared > Config > CarProfiles
+TurnRateDegrees and ReturnRateDegrees are actual road-wheel degrees/second.
+Wheelbase, TrackWidth, AxleOffset and WheelCenterY control wheel placement.
+SurfaceConfig retains the tyre/surface friction settings.
+ServerScriptService > RallyServer > StageManager retains the generation settings.
+The source/ folder in this ZIP contains readable copies of the scripts.
+
+PRESERVATION / CHECKS
+All 14,091 original saved objects and non-Source properties are retained.
+Only the Source changes listed in PRESERVATION.json are applied.
+Exact original Sources are backed up in ServerStorage > DM_RedoneSourceBackups.
+
+Luau compilation and headless behavior/preservation tests are run in this build.
+There is no Roblox Studio renderer in the build environment. Driving feel,
+graphics, speech availability and live multiplayer still need Studio testing.
+Private asset permissions are not changed by copying a place file.
