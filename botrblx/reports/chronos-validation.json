@@ -4,8 +4,9 @@
   "model": "Chronos V2.1",
   "model_revision": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
   "targeted_tests": {
-    "passed": 28,
-    "failed": 0
+    "passed": 190,
+    "failed": 0,
+    "subtests_passed": 47
   },
   "pytorch_luau_reference_states": 8,
   "cpp_observation_and_action_reference": {
@@ -21,19 +22,34 @@
     "comparison": "self/global prefix and per-team multisets of shuffled padded rows; all masks and 90 reflected action vectors"
   },
   "luau_cli_timing_ms": {
-    "final_run_mean": 79.9724398749504,
-    "final_run_peak": 190.7179699999233,
-    "isolated_run_mean": 49.56579262501748,
-    "isolated_run_peak": 53.43036200008555
+    "baseline_cpu_ms": {
+      "mean": 59.505106,
+      "p95": 70.09893,
+      "max": 75.465991,
+      "samples": 24
+    },
+    "optimized_cpu_ms": {
+      "mean": 12.133435,
+      "p95": 18.2795,
+      "max": 19.447895,
+      "samples": 24
+    },
+    "slices_ms": {
+      "mean": 1.476845,
+      "p95": 1.798207,
+      "max": 2.429797,
+      "samples": 68
+    },
+    "slice_budget_ms": 1.5
   },
   "artifacts": {
     "TurboBall_Chronos.lua": {
-      "bytes": 20572481,
-      "sha256": "7df3cf4c3471b2396a60db7851ca5e001b2af958d0e14625ed407328e2a8554a"
+      "bytes": 20597184,
+      "sha256": "1a0498541a6e5525d2e24d47759483038eed4f63594e10ae105990dfa93b7ae8"
     },
     "TurboBall_Nexto.lua": {
-      "bytes": 2567504,
-      "sha256": "67e8610da082c15757aa839008e0fc9ea6cc2be0d8939cf30fd5eb257f2c39ee"
+      "bytes": 2588114,
+      "sha256": "622ce664bb4f18ea5fff54cd9c18fdac075d86951d8701fd5c11720f35fa8eee"
     }
   },
   "scope": [
@@ -42,9 +58,16 @@
     "F8, focus loss, input release and close lifecycle under Roblox mocks",
     "Shared Nexto artifact and cadence regression",
     "Pad cooldowns survive rescan",
-    "Arena, timing and keyboard regression tests"
+    "Arena, timing and keyboard regression tests",
+    "Cooperative cancellation while inference is suspended",
+    "Vector and scalar fallback parity",
+    "Freshness bounds and network correction rejection",
+    "Graphics defaults, streaming effects, protected cues and conditional restoration",
+    "Published artifact equals the current builder output"
   ],
   "live_roblox_test": false,
   "all_linked_bots_compared": false,
-  "command": "LUAU_BIN=... CHRONOS_ASSETS=... python -m pytest botrblx/tests/test_chronos.py botrblx/tests/test_arena.py botrblx/tests/test_timing.py botrblx/tests/test_local_keyboard.py botrblx/tests/test_standalone.py::StandaloneTests::test_ready_nexto_runtime_keeps_cadence_and_active_trace_after_pause -q -s"
+  "command": "LUAU_BIN=... CHRONOS_ASSETS=... python -m pytest botrblx/tests -q",
+  "adapter_version": "6.9",
+  "previous_release": "b2d5dc006b505fe87d33e61f9687a0b76177feb2"
 }

@@ -1,0 +1,47 @@
+{
+  "baseline_cpu_ms": {
+    "mean": 59.505106,
+    "p95": 70.09893,
+    "max": 75.465991,
+    "samples": 24
+  },
+  "optimized_cpu_ms": {
+    "mean": 12.133435,
+    "p95": 18.2795,
+    "max": 19.447895,
+    "samples": 24
+  },
+  "slices_ms": {
+    "mean": 1.476845,
+    "p95": 1.798207,
+    "max": 2.429797,
+    "samples": 68
+  },
+  "slice_budget_ms": 1.5,
+  "sliced_mean_cpu_ms": 12.527697,
+  "max_logit_error": 4.5776e-05,
+  "states": 8,
+  "baseline_revision": "b2d5dc006b505fe87d33e61f9687a0b76177feb2",
+  "backend": "native vector float32, exact-zero activation skipping",
+  "model_revision": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
+  "mode": "Luau CLI VM, no native code generation, same process and eight reference states",
+  "live_roblox_fps_measured": false,
+  "frame_budget_is_cooperative_not_a_hard_realtime_guarantee": true,
+  "cpu_speedup": 4.90422588492047,
+  "adapter_version": "6.9",
+  "benchmark_script": "botrblx/benchmark_chronos_performance.py",
+  "benchmark_script_sha256": "1761b1e8b3acc7cb5dab11b9f4f1b59d42f45306a32d9124f692c1d62ad6714e",
+  "tests": {
+    "passed": 190,
+    "failed": 0,
+    "subtests_passed": 47
+  },
+  "features": [
+    "frame-budgeted cancellable inference",
+    "original float32 weights with exact-zero activation skipping",
+    "bounded processing/input-delay prediction with ping/jitter freshness limits",
+    "reversible graphics optimization enabled by default",
+    "gameplay cues preserved",
+    "bounded startup decode/packing and scalar fallback"
+  ]
+}

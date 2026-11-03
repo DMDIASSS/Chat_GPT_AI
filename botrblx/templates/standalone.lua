@@ -12,6 +12,12 @@
 -- LOCAL_CALIBRATION_HERE
 -- LOCAL_GOAL_SAFETY_HERE
 -- LOCAL_WINDOW_HERE
+-- LOCAL_COOPERATIVE_HERE
+-- LOCAL_LATENCY_HERE
+-- LOCAL_GRAPHICS_HERE
+local RUNTIME=
+-- RUNTIME_SETTINGS_HERE
+local ADAPTER_VERSION=RUNTIME.version or '6.8'
 local PROFILE=
 -- ARENA_PROFILE_HERE
 local arenaAdapter=Arena.new(PROFILE)
@@ -29,6 +35,9 @@ local timing=Timing.new(15)
 local TEAM,manualTeam=nil,nil
 local HZ=30 -- pose sampling; policy decisions target 15 Hz (tick skip 8 at 120 Hz)
 local player=game:GetService("Players").LocalPlayer
+local latency=Latency.new(player)
+latency.enabled=RUNTIME.latency==true
+local worker,graphics,lastAppliedAt,lastJumpPress
 local pg=assert(player:FindFirstChildOfClass("PlayerGui"),"Join first")
 local teamReader=Teams.new(player)
 carReader.teams=teamReader
@@ -40,7 +49,8 @@ local connections={}
 local function connect(signal,callback)
     local connection=signal:Connect(callback);connections[#connections+1]=connection
 end
-local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.8 | F4 minimize')
+local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,
+    MODEL_NAME..' v'..ADAPTER_VERSION..' | F4 minimize',RUNTIME.cooperative and 410 or 372)
 local panel=window.panel
 local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
 local label=Instance.new("TextLabel",main)
@@ -73,6 +83,12 @@ safetyButton.Position=UDim2.fromOffset(10,296);safetyButton.Size=UDim2.fromOffse
 local markerLabel=Instance.new('TextLabel',main)
 markerLabel.Position=UDim2.fromOffset(240,296);markerLabel.Size=UDim2.fromOffset(230,28)
 markerLabel.BackgroundTransparency=1;markerLabel.TextColor3=Color3.new(1,1,1);markerLabel.Text='F9 marks a bad decision'
+local graphicsButton=Instance.new('TextButton',main)
+graphicsButton.Position=UDim2.fromOffset(10,333);graphicsButton.Size=UDim2.fromOffset(220,28)
+graphicsButton.Text='Game optimization: ON';graphicsButton.Visible=RUNTIME.cooperative==true
+local latencyButton=Instance.new('TextButton',main)
+latencyButton.Position=UDim2.fromOffset(240,333);latencyButton.Size=UDim2.fromOffset(230,28)
+latencyButton.Text='Lag compensation: ON';latencyButton.Visible=RUNTIME.cooperative==true
 gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
@@ -106,6 +122,8 @@ local function release()
         end
     end
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
+    if worker then worker:cancel()end
+    lastAppliedAt=nil;lastJumpPress=nil
     if Policy.reset then Policy.reset()end
     pendingJump=nil
     keyboard:release()
@@ -124,6 +142,7 @@ local function pressOwned(key,expectedEpoch)
     return true
 end
 local function recordJump(request,now)
+    lastJumpPress=now
     if request.ground then jumpAt=now else usedFlip=true end
     local events=physics.jumpEvents or {};physics.jumpEvents=events
     local actual=table.clone(request.actual);actual[6]=1
@@ -140,6 +159,8 @@ local function controls()
     supportButton.Visible=not enabled and not testingKeyboard
     calibrationButton.Visible=not enabled and not testingKeyboard
     safetyButton.Visible=not enabled and not testingKeyboard
+    graphicsButton.Visible=RUNTIME.cooperative==true and not enabled and not testingKeyboard
+    latencyButton.Visible=RUNTIME.cooperative==true and not enabled and not testingKeyboard
     window.mini.Visible=not enabled
     main.Visible=not calibrating
     if calView then calView.Visible=calibrating end
@@ -167,6 +188,10 @@ local function saveReport(filename,savedFrom)
     report.physics_assist_enabled=physicsEnabled;report.saved_from=savedFrom
     report.teammate_yield_enabled=intercept.supportEnabled;report.model_name=MODEL_NAME
     report.performance=timing:report()
+    report.performance.cooperative=worker and worker:report()or nil
+    report.performance.latency=RUNTIME.cooperative and latency:report()or nil
+    report.performance.graphics=graphics and graphics:report()or nil
+    report.adapter_version=ADAPTER_VERSION
     report.performance.last_active_age=timing.last and os.clock()-timing.last.time or nil
     report.jump_events=physics.jumpEvents or {}
     report.goal_safety_enabled=safetyEnabled;report.goal_safety=safety.last
@@ -230,6 +255,25 @@ safetyButton.Activated:Connect(function()
     safetyButton.Text=safetyEnabled and 'Goal safety: ON'or 'Goal safety: OFF'
     label.Text=safetyEnabled and 'Conservative ground goal guards enabled.'or 'Goal guards disabled. F6 starts.'
 end)
+graphicsButton.Activated:Connect(function()
+    if graphics then
+        graphics:setEnabled(not graphics.enabled)
+        graphicsButton.Text=graphics.enabled and 'Game optimization: ON'or 'Game optimization: OFF'
+    end
+end)
+latencyButton.Activated:Connect(function()
+    latency.enabled=not latency.enabled
+    if worker then worker:cancel()end
+    latencyButton.Text=latency.enabled and 'Lag compensation: ON'or 'Lag compensation: OFF'
+end)
+if RUNTIME.light_graphics then
+    local ok,lighting=pcall(function()return game:GetService('Lighting')end)
+    graphics=Graphics.new(world,ok and lighting or nil)
+    graphics:setEnabled(true)
+    connect(game:GetService('RunService').Heartbeat,function()
+        if alive then graphics:step(.0003)end
+    end)
+end
 do
     calView=Instance.new('Frame',window.body);calView.Name='Calibration';calView.Visible=false
     calView.Size=UDim2.fromScale(1,1);calView.BackgroundTransparency=1
@@ -359,6 +403,7 @@ connect(input.WindowFocusReleased,function()focus=false;stop("Paused: Roblox los
 connect(input.WindowFocused,function()focus=true end)
 close.Activated:Connect(function()
     alive=false;stop()
+    if graphics then graphics:close()end
     for _,connection in ipairs(connections)do connection:Disconnect()end
     gui:Destroy()
 end)
@@ -368,6 +413,15 @@ local function teamChanged()
     lastGround=true;armAt=os.clock()+.15
 end
 -- POSE_READER_HERE
+local loadYieldAt=os.clock()
+local function loadingYield(force)
+    assert(alive,'Model loading cancelled')
+    if RUNTIME.cooperative and(force or os.clock()-loadYieldAt>=.002)then
+        task.wait()
+        loadYieldAt=os.clock()
+        assert(alive,'Model loading cancelled')
+    end
+end
 local function loadTensors()
 -- MODEL_TENSORS_HERE
 end
@@ -384,13 +438,25 @@ task.spawn(function()
             assert(type(fn)=="function","Missing executor input function: "..name)
         end
         if type(activeWindow)~="function"then activeWindow=nil end
-        local predict=Policy.new(loadTensors())
+        local predict,backend=Policy.new(loadTensors(),{yieldWork=RUNTIME.cooperative and loadingYield or nil})
+        worker=RUNTIME.cooperative and Worker.new(predict)or nil
+        if worker then worker.backend=backend end
         local cases=
 -- MODEL_CASES_HERE
         local peak=0
         for _,case in ipairs(cases)do
             local began=os.clock()
-            local action,logits=predict(case.query,case.entities)
+            local action,logits
+            if worker then
+                worker:start(case.query,case.entities,{})
+                local completed
+                repeat
+                    completed=worker:step(.0015)
+                    if not completed then loadingYield(true)end
+                until completed
+                action,logits=completed.index,completed.logits
+                began=os.clock()-completed.cpu
+            else action,logits=predict(case.query,case.entities)end
             peak=math.max(peak,os.clock()-began)
             for i,value in ipairs(logits)do
                 assert(math.abs(value-case.logits[i])<.0003+math.abs(case.logits[i])*.0001,
@@ -400,20 +466,54 @@ task.spawn(function()
         end
         cases=nil
         if not alive then return end
-        assert(peak<.2,"Local inference exceeds 200ms: this runtime is too slow")
+        if not worker then assert(peak<.2,"Local inference exceeds 200ms: this runtime is too slow")end
+        if worker then worker:cancel()end
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=(MODEL_NAME.." LOCAL v6.8 ready | model self-test passed\nModel __MODEL_SHA__\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
+        label.Text=(MODEL_NAME.." LOCAL v"..ADAPTER_VERSION.." ready | model self-test passed\nModel __MODEL_SHA__\nInference CPU peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
             :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")..(calibration.baseline and "\nMeasured goal defaults active."or "")
+        if worker then label.Text..='\nSmooth scheduling active | game optimization ON'end
         local lastTick,lastUi=os.clock(),-math.huge
+        local lastFrame=os.clock()
+        local function startJob(packet,hasFlip,now)
+            packet.has_jumped=jumpAt~=nil
+            local controls=table.clone(previous)
+            local metadata={at=now,epoch=epoch,team=packet.team,scene=packet.scene_token,ground=packet.ground_estimate}
+            worker:start(function(checkpoint)
+                local projected=latency:project(packet,physics,worker.wall,checkpoint)
+                metadata.car=projected.car;metadata.ball=projected.ball;metadata.targetAt=now+latency.horizon
+                return Policy.observe(projected,controls,hasFlip)
+            end,nil,metadata)
+        end
         local busy=false
         local rate=0
-        connect(game:GetService("RunService").Heartbeat,function()
+        connect(game:GetService("RunService").Heartbeat,function(frameDt)
             if not alive or busy then return end
             local now=os.clock()
+            local completed
+            if worker then
+                latency:sample(now,frameDt or now-lastFrame);lastFrame=now
+                if enabled and(not focus or input:GetFocusedTextBox()or input:IsKeyDown(Enum.KeyCode.F8)
+                    or(activeWindow and not activeWindow()))then stop('LOCAL paused: focus/chat/F8. F6 restarts.')end
+                if not enabled or now<armAt then worker:cancel()
+                else
+                    if held.RMB and lastJumpPress and now-lastJumpPress>.12 then
+                        if not pcall(event,'RMB',false)then stop('LOCAL paused: jump release failed');return end
+                        held.RMB=nil;previous[6]=0
+                    end
+                    if lastAppliedAt and now-lastAppliedAt>.25 and held.LMB then
+                        if not pcall(event,'LMB',false)then stop('LOCAL paused: boost release failed');return end
+                        held.LMB=nil;previous[7]=0
+                    end
+                    if worker.job and now-worker.job.at>.4 then release()end
+                    local ok,result=pcall(worker.step,worker,latency:budget())
+                    if not ok then stop('LOCAL inference stopped: '..tostring(result));return end
+                    completed=result
+                end
+            end
             local sampleDue,nextSample=Timing.due(now,sampleAt,(enabled or (calibrating and calibration.crossbar))and 1/HZ or .1)
-            if not sampleDue then return end
+            if not sampleDue and not completed then return end
             sampleAt=nextSample
             local elapsed=now-lastTick;lastTick=now
             busy=true
@@ -427,13 +527,14 @@ task.spawn(function()
                 stage="reading poses"
                 local poseAt=os.clock()
                 local packet,reason=read()
+                if packet then packet.scene_token=scene end
                 local poseMs=(os.clock()-poseAt)*1000
                 if reason~=lastReadReason then physics:mark(packet and "poses ready"or "waiting",now,reason)end
                 lastReadReason=reason
                 physics.runtime=runtimeSnapshot(now)
                 stage="observing ball physics"
                 local observeAt=os.clock()
-                physics:observe(packet,now)
+                physics:observe(packet,now,worker~=nil and not physicsEnabled and not calibrating)
                 local observeMs=(os.clock()-observeAt)*1000
                 if calibrating then
                     local keys={}
@@ -469,6 +570,10 @@ task.spawn(function()
                 local decisionPeriod=override and 1/30 or period
                 if previousPeriod~=decisionPeriod then decisionAt=nil;previousPeriod=decisionPeriod end
                 local due,nextDecision,late=Timing.due(now,decisionAt,decisionPeriod)
+                if worker and not override then
+                    if completed then due=true;nextDecision=decisionAt
+                    elseif worker.job then return end
+                end
                 if not due then return end
                 decisionAt=nextDecision
                 local decisionEpoch=epoch
@@ -478,6 +583,7 @@ task.spawn(function()
                 lastGround=ground
                 local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<PROFILE.physics.DOUBLEJUMP_MAX_DELAY))
                 local action=override
+                if worker and action then worker:cancel();completed=nil end
                 local modelMs,planningMs,entityCount,safetyMs=0,0,0,0
                 local modelRan=false
                 physics.plan=nil
@@ -493,14 +599,35 @@ task.spawn(function()
                     end
                     if not action then
                         stage="model observation"
-                        packet.has_jumped=jumpAt~=nil
-                        local query,entities=Policy.observe(packet,previous,hasFlip)
-                        entityCount=entities.entity_count or #entities
-                        stage="model inference"
-                        local modelAt=os.clock()
-                        local index=predict(query,entities)
-                        modelMs=(os.clock()-modelAt)*1000;modelRan=true
-                        action=Policy.action and Policy.action(index,entities)or actions[index]
+                        if worker then
+                            if completed and latency:fresh(completed,packet,now,epoch)then
+                                modelMs=completed.cpu*1000;modelRan=true
+                                entityCount=completed.context.entity_count or 0
+                                -- Remove actions that became unavailable while the model yielded.
+                                local mask=Policy.mask(ground,packet.boost,hasFlip,packet.turtled)
+                                local index,value=nil,-math.huge
+                                for i,v in ipairs(completed.logits)do if mask[i]and v>value then index,value=i,v end end
+                                action=Policy.action(assert(index),completed.context)
+                            else
+                                if not worker.job then startJob(packet,hasFlip,now)end
+                                if now-lastUi>.25 then
+                                    lastUi=now
+                                    label.Text=(MODEL_NAME..' v'..ADAPTER_VERSION..' | %.0f FPS | computing across frames\nPing %s | lead %.0f ms | AI slice %.2f ms\nGame optimization %s | F8 stop')
+                                        :format(1/latency.frame,latency.ping and('%.0f ms'):format(latency.ping*1000)or '?',
+                                            latency.horizon*1000,worker.last_slice_ms or 0,graphics and graphics.enabled and 'ON'or 'OFF')
+                                end
+                                return
+                            end
+                        else
+                            packet.has_jumped=jumpAt~=nil
+                            local query,entities=Policy.observe(packet,previous,hasFlip)
+                            entityCount=entities.entity_count or #entities
+                            stage="model inference"
+                            local modelAt=os.clock()
+                            local index=predict(query,entities)
+                            modelMs=(os.clock()-modelAt)*1000;modelRan=true
+                            action=Policy.action and Policy.action(index,entities)or actions[index]
+                        end
                         if needsPolicy then
                             stage="ground interception"
                             local planningAt=os.clock()
@@ -552,6 +679,7 @@ task.spawn(function()
                 end
                 actual[6]=held.RMB and 1 or 0
                 local inputMs=(os.clock()-inputAt)*1000
+                if worker then latency.input=latency.input*.8+math.min(inputMs/1000,.08)*.2 end
                 stage="input timing"
                 assert(inputMs<200,"Executor input calls exceeded 200ms")
                 physics.decision={time=now,mode=recovery or "model",milliseconds=inferenceMs,
@@ -561,11 +689,12 @@ task.spawn(function()
                 timing:record({time=now,model_ran=modelRan,entities=entityCount,pose_ms=poseMs,observe_ms=observeMs,
                     model_ms=modelMs,planning_ms=planningMs,safety_ms=safetyMs,decision_ms=inferenceMs,input_ms=inputMs,schedule_late_ms=late*1000})
                 previous=actual;rate=timing.rate
+                lastAppliedAt=now
                 if now-lastUi>=.2 then
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=(MODEL_NAME.." v6.8 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=(MODEL_NAME.." v"..ADAPTER_VERSION.." | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -573,6 +702,11 @@ task.spawn(function()
                             packet.ball_radius or PROFILE.physics.BALL_RADIUS,packet.ball_size_verified and ""or "?",packet.wheel_contacts or 0,
                             physics.mismatch and "MISMATCH / model"or physics.status,physics.gravity,
                             physics.error and("%.1f units"):format(physics.error)or "unmeasured")
+                    if worker then
+                        label.Text..=('\n%.0f FPS | ping %s | AI %.2f ms slice / %.0f ms age')
+                            :format(1/latency.frame,latency.ping and('%.0f ms'):format(latency.ping*1000)or '?',
+                                worker.last_slice_ms or 0,completed and(now-completed.metadata.at)*1000 or 0)
+                    end
                 end
             end)
             busy=false
@@ -592,4 +726,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.8"}
+return {started=true,version="local-"..ADAPTER_VERSION}

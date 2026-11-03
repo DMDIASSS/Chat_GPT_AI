@@ -6,6 +6,11 @@ masks. It runs locally with this adapter. It won 30 of 32 bounded RocketSim 1v1
 first-goal episodes against original Nexto; this is not an all-bot ranking or a
 live Roblox result. See [Chronos setup, loader and verification](CHRONOS_README.md).
 
+Chronos **local v6.9** adds frame-budgeted inference, native vector math with
+exact-zero activation skipping, bounded latency compensation, and a reversible
+**Game optimization** toggle that starts on. Pause with F8 to change graphics or
+lag compensation. The window shows FPS, ping and decision age.
+
 Your measured goal positions, opening widths and crossbar heights are built into
 v6.8 and used automatically from startup. Run the new script and press **F6**;
 loading a calibration file or pressing Apply is unnecessary. The panel confirms

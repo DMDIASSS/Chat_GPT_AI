@@ -7,9 +7,9 @@ local MIRROR_PADS=
 local ACTIONS=Policy.actions()
 local max,sqrt,abs=math.max,math.sqrt,math.abs
 
-local function dense(layer,x)
+local function dense(layer,x,checkpoint)
     local w,b,width,rows=layer.w,layer.b,layer.width,layer.rows
-    local out=table.create(rows)
+    local out=layer.out
     local bulk=width-width%4
     local last=rows-rows%4
     local base=0
@@ -30,6 +30,7 @@ local function dense(layer,x)
         end
         out[r]=a0;out[r+1]=a1;out[r+2]=a2;out[r+3]=a3
         base=base+width*4
+        if checkpoint then checkpoint()end
     end
     for r=last+1,rows do
         local value=b[r]
@@ -37,6 +38,64 @@ local function dense(layer,x)
         out[r]=value;base=base+width
     end
     return out
+end
+
+local function denseVector(l,x,checkpoint)
+    local out,w,width=l.out,l.packed,l.width
+    -- ReLU creates exact zeros. Omit their multiplications, preserving order
+    -- and every model weight; no thresholding or weight pruning is involved.
+    local cols,values=l.columns,l.values
+    local count=0
+    for c=1,width do
+        if x[c]~=0 then count+=1;cols[count]=c;values[count]=x[c]end
+    end
+    local bulk=count-count%4
+    local ng=math.ceil(l.rows/3)
+    for group=1,ng,2 do
+        local a0=l.biasV[group]
+        local a1=l.biasV[group+1]or vector.zero
+        local b0,b1=(group-1)*width,group*width
+        if group<ng then
+            for k=1,bulk,4 do
+                local c0,c1,c2,c3=cols[k],cols[k+1],cols[k+2],cols[k+3]
+                local x0,x1,x2,x3=values[k],values[k+1],values[k+2],values[k+3]
+                a0=a0+w[b0+c0]*x0+w[b0+c1]*x1+w[b0+c2]*x2+w[b0+c3]*x3
+                a1=a1+w[b1+c0]*x0+w[b1+c1]*x1+w[b1+c2]*x2+w[b1+c3]*x3
+            end
+            for k=bulk+1,count do local c,v=cols[k],values[k];a0=a0+w[b0+c]*v;a1=a1+w[b1+c]*v end
+        else
+            for k=1,count do a0=a0+w[b0+cols[k]]*values[k]end
+        end
+        local r=(group-1)*3+1
+        out[r]=a0.x;if r+1<=l.rows then out[r+1]=a0.y end;if r+2<=l.rows then out[r+2]=a0.z end
+        if group<ng then
+            r+=3;out[r]=a1.x;if r+1<=l.rows then out[r+1]=a1.y end;if r+2<=l.rows then out[r+2]=a1.z end
+        end
+        if checkpoint then checkpoint()end
+    end
+    return out
+end
+
+-- Decode straight into a buffer: no multi-million-element flat number table.
+function Policy.loadChunks(chunks,layout,count,yieldWork)
+    local alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    local values={};for i=1,64 do values[string.byte(alphabet,i)]=i-1 end;values[61]=0
+    local data=buffer.create(count*4)
+    local offset=0
+    for _,part in ipairs(chunks)do
+        for i=1,#part,4 do
+            local a,b,c,d=string.byte(part,i,i+3)
+            local n=assert(values[a])*262144+assert(values[b])*4096+assert(values[c])*64+assert(values[d])
+            if offset<count*4 then buffer.writeu8(data,offset,math.floor(n/65536));offset+=1 end
+            if offset<count*4 then buffer.writeu8(data,offset,math.floor(n/256)%256);offset+=1 end
+            if offset<count*4 then buffer.writeu8(data,offset,n%256);offset+=1 end
+            if yieldWork and i%2048==1 then yieldWork()end
+        end
+    end
+    assert(offset==count*4,'Incomplete embedded Chronos model')
+    local tensors={}
+    for name,spec in pairs(layout)do tensors[name]={data=data,offset=(spec[1]-1)*4,count=spec[2]}end
+    return tensors
 end
 
 local function normalizeRelu(x,w,b)
@@ -49,15 +108,44 @@ local function normalizeRelu(x,w,b)
     for i=1,#x do x[i]=max(0,(x[i]-mean)*scale*w[i]+b[i])end
 end
 
-function Policy.new(tensors)
+function Policy.new(tensors,options)
+    options=options or {}
+    local native=options.vector~=false and type(vector)=='table'and type(vector.create)=='function'
+    local function size(v)return v.count or #v end
+    local function get(v,index)
+        if v.data then return buffer.readf32(v.data,v.offset+(index-1)*4)end
+        return v[index]
+    end
+    local function numbers(v)
+        if not v.data then return v end
+        local out=table.create(v.count)
+        for i=1,v.count do out[i]=get(v,i);if options.yieldWork and i%256==0 then options.yieldWork()end end
+        return out
+    end
     local layers={}
     local function layer(prefix,width,rows,norm)
-        local l={w=assert(tensors[prefix..'.weight']),b=assert(tensors[prefix..'.bias']),width=width,rows=rows}
-        assert(#l.w==width*rows and #l.b==rows,'Chronos tensor shape mismatch')
+        local raw=assert(tensors[prefix..'.weight'])
+        local l={b=numbers(assert(tensors[prefix..'.bias'])),width=width,rows=rows,out=table.create(rows)}
+        assert(size(raw)==width*rows and #l.b==rows,'Chronos tensor shape mismatch')
         if norm then
-            l.nw=assert(tensors[norm..'.weight']);l.nb=assert(tensors[norm..'.bias'])
+            l.nw=numbers(assert(tensors[norm..'.weight']));l.nb=numbers(assert(tensors[norm..'.bias']))
             assert(#l.nw==rows and #l.nb==rows,'Chronos normalization shape mismatch')
         end
+        if native then
+            l.packed=table.create(math.ceil(rows/3)*width);l.biasV={}
+            l.columns=table.create(width);l.values=table.create(width)
+            local index=0
+            for r=1,rows,3 do
+                local base=(r-1)*width
+                l.biasV[#l.biasV+1]=vector.create(l.b[r],l.b[r+1]or 0,l.b[r+2]or 0)
+                for c=1,width do
+                    index+=1
+                    l.packed[index]=vector.create(get(raw,base+c),r+1<=rows and get(raw,base+width+c)or 0,
+                        r+2<=rows and get(raw,base+width*2+c)or 0)
+                end
+                if options.yieldWork then options.yieldWork()end
+            end
+        else l.w=numbers(raw)end
         layers[#layers+1]=l
     end
     layer('shared.0',225,960,'shared.1')
@@ -67,12 +155,13 @@ function Policy.new(tensors)
     layer('policy.6',800,640,'policy.7')
     layer('policy.9',640,640,'policy.10')
     layer('policy.12',640,90)
-    return function(obs,context)
+    return function(obs,context,checkpoint)
         assert(#obs==225 and #context.mask==90,'Expected Chronos observation/action mask')
         local x=obs
         for _,l in ipairs(layers)do
-            x=dense(l,x)
+            x=(native and denseVector or dense)(l,x,checkpoint)
             if l.nw then normalizeRelu(x,l.nw,l.nb)end
+            if checkpoint then checkpoint()end
         end
         local best,peak=nil,-math.huge
         for i,v in ipairs(x)do
@@ -80,8 +169,8 @@ function Policy.new(tensors)
             if context.mask[i]and v>peak then best,peak=i,v end
         end
         assert(best,'Chronos action mask is empty')
-        return best,x
-    end
+        return best,table.clone(x)
+    end,native and 'vector float32'or 'scalar'
 end
 
 function Policy.mask(ground,boost,flip,turtled)

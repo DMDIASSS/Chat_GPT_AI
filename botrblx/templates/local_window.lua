@@ -1,9 +1,10 @@
 -- Draggable while paused; F4 can minimize while mouse boost is active.
 local Window={}
 Window.__index=Window
-function Window.new(gui,input,connect,canDrag,title)
+function Window.new(gui,input,connect,canDrag,title,height)
+    height=height or 372
     local panel=Instance.new('Frame',gui);panel.Name='Window'
-    panel.Size=UDim2.fromOffset(480,372);panel.Position=UDim2.fromOffset(20,20)
+    panel.Size=UDim2.fromOffset(480,height);panel.Position=UDim2.fromOffset(20,20)
     panel.BackgroundColor3=Color3.fromRGB(18,22,30)
     local header=Instance.new('TextButton',panel);header.Name='Titlebar'
     header.Position=UDim2.fromOffset(8,2);header.Size=UDim2.fromOffset(420,30)
@@ -12,8 +13,8 @@ function Window.new(gui,input,connect,canDrag,title)
     local mini=Instance.new('TextButton',panel);mini.Name='Minimize'
     mini.Position=UDim2.fromOffset(442,4);mini.Size=UDim2.fromOffset(28,26);mini.Text='–'
     local body=Instance.new('Frame',panel);body.Name='Body';body.BackgroundTransparency=1
-    body.Position=UDim2.fromOffset(0,34);body.Size=UDim2.fromOffset(480,334)
-    local self=setmetatable({panel=panel,body=body,header=header,mini=mini,minimized=false},Window)
+    body.Position=UDim2.fromOffset(0,34);body.Size=UDim2.fromOffset(480,height-38)
+    local self=setmetatable({panel=panel,body=body,header=header,mini=mini,minimized=false,height=height},Window)
     connect(mini.Activated,function()self:toggle()end)
     local drag
     connect(header.InputBegan,function(event)
@@ -37,7 +38,7 @@ function Window.new(gui,input,connect,canDrag,title)
 end
 function Window:toggle()
     self.minimized=not self.minimized;self.body.Visible=not self.minimized
-    self.panel.Size=UDim2.fromOffset(480,self.minimized and 34 or 372)
+    self.panel.Size=UDim2.fromOffset(480,self.minimized and 34 or self.height)
     self.mini.Text=self.minimized and '+'or '–'
 end
 return Window

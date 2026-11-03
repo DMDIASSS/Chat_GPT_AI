@@ -88,7 +88,7 @@ function Physics:step(ball,radius,dt)
     return touched,obstructed
 end
 
-function Physics:predict(ball,radius,seconds,stride)
+function Physics:predict(ball,radius,seconds,stride,checkpoint)
     radius=radius or self.profile.physics.BALL_RADIUS
     local state=copy(ball)
     local result={{time=0,position=table.clone(state.position),velocity=table.clone(state.velocity),bounces=0,obstructions=0}}
@@ -103,6 +103,7 @@ function Physics:predict(ball,radius,seconds,stride)
             result[#result+1]={time=tick*dt,position=table.clone(state.position),
                 velocity=table.clone(state.velocity),bounces=bounces,obstructions=obstructions}
         end
+        if checkpoint and tick%2==0 then checkpoint()end
     end
     return result
 end
@@ -127,7 +128,7 @@ end
 -- Passive calibration uses only isolated airborne positions. Finite-difference
 -- velocities from rendered frames are averages, so fitting their acceleration
 -- directly would mistake interpolation and touches for gravity.
-function Physics:observe(packet,now)
+function Physics:observe(packet,now,cheap)
     if not packet then if self.lastAt then self:reset()end;return end
     local radius=packet.ball_radius or self.profile.physics.BALL_RADIUS
     local p=packet.ball.position
@@ -137,7 +138,7 @@ function Physics:observe(packet,now)
             or distance(p,self.lastBall)>self.profile.physics.BALL_MAX_SPEED*dt+100 then self:reset()end
     end
     self.lastAt,self.lastBall,self.radius,self.team=now,table.clone(p),radius,packet.team
-    local clear=self:clearFlight(packet,radius)
+    local clear=not cheap and self:clearFlight(packet,radius)
     if not clear then self.history={};self.forecast=nil else
         local h=self.history
         h[#h+1]={at=now,p=table.clone(p)}

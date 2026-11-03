@@ -6,8 +6,10 @@ https://github.com/KingJake3113/Chronos/tree/4f8fdd27e4802d977b33b9ade4759ff6aea
 `SHARED_HEAD.lt` and `POLICY.lt` are the actual public inference archives at that
 revision. Their SHA256s and source pins are in `chronos_manifest.json`. The port
 reconstructs the published C++ Sequential configuration without retraining,
-distillation, pruning or weight quantization. Values remain float32; Luau
-accumulates arithmetic in its normal numeric representation.
+distillation, pruning or weight quantization. Values remain float32. The v6.9
+native-vector path uses float32 arithmetic and omits products with exact zero
+activations; the scalar fallback accumulates in Luau's normal numeric type.
+Both paths pass the same PyTorch numerical reference tolerances.
 
 The model configuration and observation/action conventions were read from
 `src/RLBotMain.cpp`, `inc/GigaLearnCPP/Models.h`,
@@ -32,3 +34,6 @@ Adaptation work: a Chronos-specific 225-value observation builder, reflection,
 action mask, Sequential inference and verified public weight exporter; observed
 pad transition timing; and shared adapter integration. See the validation and
 comparison reports for test scope and limitations.
+
+Local v6.9 additionally implements cooperative, cancellable model work, buffered
+weight decoding, latency/freshness handling, and reversible rendering changes.

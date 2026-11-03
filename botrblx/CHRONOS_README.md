@@ -1,9 +1,44 @@
 # TurboBall Chronos V2.1
 
 `downloads/TurboBall_Chronos.lua` contains the actual public Chronos V2.1 shared
-head and actor. It runs locally in Luau with the existing botrblx v6.8 window,
+head and actor. It runs locally in Luau with the botrblx v6.9 window,
 keyboard controls, telemetry, measured goal calibration and bounded recovery.
 There is no Python server to keep running and no model download during play.
+
+## v6.9: frame stalls, lag compensation and light graphics
+
+The old build ran the whole 3.8-million-parameter network in one frame. The new
+build packs the original float32 weights into native vectors, skips only exact
+zero input/activation products, reuses working arrays, and spreads inference
+across Heartbeats. The work budget adapts between approximately **0.75 and 3 ms
+per render frame**; it is a cooperative target, not a hard real-time guarantee.
+Loading/packing weights and startup checks also yield. A scalar fallback remains
+available when the runtime has no native vector library. The weights are not
+retrained, quantized, truncated or pruned.
+
+**Game optimization: ON** is the default. It disables shadows and decorative
+effects and lightens static materials/textures. It does not remove the ball,
+cars, boost rings, nameplates or HUD. New streamed effects are processed in
+bounded batches. Pause with **F8** to toggle it; **OFF** or **Close** restores the
+recorded properties, preserving later game/user changes where possible.
+
+**Lag compensation: ON** measures reported ping, jitter, frame time, inference
+age and input-call delay. It makes a bounded short prediction for the actor's
+inputs and rejects stale results, mode changes, respawns and large corrections.
+The saved game's MatchSession already predicts server snapshots, so adding a
+full ping again would overcorrect. The adapter therefore compensates its own
+processing/input delay and uses high ping/jitter to tighten prediction/freshness
+limits. It does not reduce the network ping itself. Unknown ping remains unknown.
+
+F8/focus loss/Close cancels suspended work before it can apply inputs. Jump
+pulses are bounded, and stale held boost is released. Normal driving skips
+expensive passive flight fitting; explicit calibration and physics assist retain
+it. The panel shows estimated FPS, ping, work-slice time and decision age.
+
+See [the same-process performance comparison](reports/chronos-performance-v6.9.json).
+Those are cloud Luau CPU measurements, not FPS measurements on the user's
+Roblox/JJSploit client. Actual frame rate and decision rate depend on the PC,
+scene, executor and connection.
 
 ## Run
 
@@ -61,11 +96,11 @@ universal champion.
 ## Runtime limits
 
 - The network contains about 3.8 million float32 parameters. The standalone file
-  is about 20.6 MB. CLI Luau parity testing measured approximately 50 ms per
-  inference on this cloud CPU; this is not a JJSploit performance measurement.
+  is about 20.6 MB. The file embeds the full model; startup still has download
+  and compilation cost even though decoding/packing is spread across frames.
 - The existing scheduler targets 15 decisions per second. Startup rejects a
-  model inference over 200 ms, and the panel reports actual cadence. A larger
-  model can run more slowly than Nexto on the user's computer.
+  numerical mismatch before enabling Start, and the panel reports actual cadence.
+  Frame slicing can reduce decision rate to preserve rendering responsiveness.
 - Roblox observations still come from rendered poses and UI. Opponent boost,
   remote jump/flip state and first-seen pad cooldowns are estimates. Unknown
   pads use zero features, rather than claiming all pads are active. Pad slots
@@ -99,6 +134,7 @@ Set `LUAU_BIN` to the Luau CLI and `CHRONOS_ASSETS` to that model folder, then r
 ```text
 python -m pytest botrblx/tests/test_chronos.py botrblx/tests/test_arena.py -q
 python botrblx/benchmark_chronos.py --assets PATH_TO_CHRONOS_RLBOT --pairs 16 --decisions 750 --output work/chronos_vs_nexto.json
+python botrblx/benchmark_chronos_performance.py --assets PATH_TO_CHRONOS_RLBOT --luau PATH_TO_LUAU --output work/chronos-performance.json
 ```
 
 The benchmark additionally needs the existing RLGym/RocketSim dependencies.

@@ -1,5 +1,6 @@
 """Build a standalone TurboBall_Chronos.lua from the pinned public Chronos model."""
 import argparse
+import base64
 import hashlib
 import json
 from pathlib import Path
@@ -10,6 +11,15 @@ from chronos import APP, MANIFEST, MIRROR_PADS, PADS, Chronos, asset_digest, dow
 from export_standalone import literal, load_arena_profile, render_standalone
 
 
+def tensor_source(tensors):
+    layout={};parts=[];offset=1
+    for name,array in tensors.items():
+        layout[name]=[offset,array.size];offset+=array.size;parts.append(array.tobytes())
+    encoded=base64.b64encode(b''.join(parts)).decode('ascii')
+    chunks='\n'.join(json.dumps(encoded[i:i+16384])+',' for i in range(0,len(encoded),16384))
+    return f'return Policy.loadChunks({{\n{chunks}\n}},{literal(layout)},{offset-1},loadingYield)'
+
+
 def source(folder):
     model = Chronos(folder)
     tensors, cases = prepare_model(model)
@@ -17,6 +27,8 @@ def source(folder):
     profile["policy_boost_limit"] = 34
     return notice() + render_standalone(tensors, cases, asset_digest(), profile=profile,
         model_name=MANIFEST["name"], physics_assist=False, policy_file="local_chronos.lua",
+        runtime_options={"cooperative":True,"light_graphics":True,"latency":True,"version":"6.9"},
+        tensor_writer=tensor_source,
         policy_replacements={"-- CHRONOS_PADS_HERE": literal(PADS.tolist()),
                              "-- CHRONOS_MIRROR_PADS_HERE": literal([i + 1 for i in MIRROR_PADS])})
 
@@ -27,7 +39,7 @@ def notice():
 -- Actual SHARED_HEAD.lt and POLICY.lt weights; no Nexto model is embedded.
 -- Model pair digest: {asset_digest()}
 -- Roblox adapter derived from botrblx local v6.8. See CHRONOS_NOTICE.md.
--- This port targets 15 Hz; its runtime self-test rejects inference over 200 ms.
+-- Frame-budgeted local inference, latency compensation, reversible light graphics.
 -- Rocket League rankings do not establish playing strength in Turbo Soccer.
 '''
 

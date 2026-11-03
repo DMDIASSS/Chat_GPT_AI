@@ -182,7 +182,8 @@ def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None,model_name="U
 
 
 def render_standalone(tensors,cases,model_sha,app_dir=APP_DIR,profile=None,model_name="Update271",
-                      physics_assist=True,policy_file="local_policy.lua",policy_replacements=None):
+                      physics_assist=True,policy_file="local_policy.lua",policy_replacements=None,
+                      runtime_options=None,tensor_writer=None):
     """Share telemetry, input ownership and UI across explicitly supported actors."""
     policy=(app_dir/"templates"/policy_file).read_text(encoding="utf-8")
     if "-- COMMON_ADAPTER_HERE" in policy:
@@ -205,6 +206,9 @@ def render_standalone(tensors,cases,model_sha,app_dir=APP_DIR,profile=None,model
     calibration=(app_dir/"templates/local_calibration.lua").read_text(encoding="utf-8")
     safety=(app_dir/"templates/local_goal_safety.lua").read_text(encoding="utf-8")
     window=(app_dir/"templates/local_window.lua").read_text(encoding="utf-8")
+    cooperative=(app_dir/"templates/local_cooperative.lua").read_text(encoding="utf-8")
+    latency=(app_dir/"templates/local_latency.lua").read_text(encoding="utf-8")
+    graphics=(app_dir/"templates/local_graphics.lua").read_text(encoding="utf-8")
     if profile is None:profile=load_arena_profile(app_dir/"arena_profile.json")
     client=(app_dir/"client271.lua").read_text(encoding="utf-8")
     pose=client.split("-- POSE_READER_BEGIN",1)[1].partition("\n")[2].split("-- POSE_READER_END",1)[0]
@@ -222,9 +226,13 @@ def render_standalone(tensors,cases,model_sha,app_dir=APP_DIR,profile=None,model
             .replace("-- LOCAL_CALIBRATION_HERE", "local Calibration=(function()\n"+calibration+"\nend)()")
             .replace("-- LOCAL_GOAL_SAFETY_HERE", "local GoalSafety=(function()\n"+safety+"\nend)()")
             .replace("-- LOCAL_WINDOW_HERE", "local Window=(function()\n"+window+"\nend)()")
+            .replace("-- LOCAL_COOPERATIVE_HERE", "local Worker=(function()\n"+cooperative+"\nend)()")
+            .replace("-- LOCAL_LATENCY_HERE", "local Latency=(function()\n"+latency+"\nend)()")
+            .replace("-- LOCAL_GRAPHICS_HERE", "local Graphics=(function()\n"+graphics+"\nend)()")
+            .replace("-- RUNTIME_SETTINGS_HERE",literal(runtime_options or {}))
             .replace("-- MODEL_SETTINGS_HERE","local MODEL_NAME="+literal(model_name)+"\nlocal physicsEnabled="+literal(physics_assist))
             .replace("-- ARENA_PROFILE_HERE",literal(profile))
-            .replace("-- MODEL_TENSORS_HERE",tensor_source(tensors))
+            .replace("-- MODEL_TENSORS_HERE",(tensor_writer or tensor_source)(tensors))
             .replace("-- MODEL_CASES_HERE",literal(cases))
             .replace("-- POSE_READER_HERE",pose)
             .replace("__MODEL_SHA__",model_sha))

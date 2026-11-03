@@ -1136,7 +1136,7 @@ function Physics:step(ball,radius,dt)
     return touched,obstructed
 end
 
-function Physics:predict(ball,radius,seconds,stride)
+function Physics:predict(ball,radius,seconds,stride,checkpoint)
     radius=radius or self.profile.physics.BALL_RADIUS
     local state=copy(ball)
     local result={{time=0,position=table.clone(state.position),velocity=table.clone(state.velocity),bounces=0,obstructions=0}}
@@ -1151,6 +1151,7 @@ function Physics:predict(ball,radius,seconds,stride)
             result[#result+1]={time=tick*dt,position=table.clone(state.position),
                 velocity=table.clone(state.velocity),bounces=bounces,obstructions=obstructions}
         end
+        if checkpoint and tick%2==0 then checkpoint()end
     end
     return result
 end
@@ -1175,7 +1176,7 @@ end
 -- Passive calibration uses only isolated airborne positions. Finite-difference
 -- velocities from rendered frames are averages, so fitting their acceleration
 -- directly would mistake interpolation and touches for gravity.
-function Physics:observe(packet,now)
+function Physics:observe(packet,now,cheap)
     if not packet then if self.lastAt then self:reset()end;return end
     local radius=packet.ball_radius or self.profile.physics.BALL_RADIUS
     local p=packet.ball.position
@@ -1185,7 +1186,7 @@ function Physics:observe(packet,now)
             or distance(p,self.lastBall)>self.profile.physics.BALL_MAX_SPEED*dt+100 then self:reset()end
     end
     self.lastAt,self.lastBall,self.radius,self.team=now,table.clone(p),radius,packet.team
-    local clear=self:clearFlight(packet,radius)
+    local clear=not cheap and self:clearFlight(packet,radius)
     if not clear then self.history={};self.forecast=nil else
         local h=self.history
         h[#h+1]={at=now,p=table.clone(p)}
@@ -2007,9 +2008,10 @@ local Window=(function()
 -- Draggable while paused; F4 can minimize while mouse boost is active.
 local Window={}
 Window.__index=Window
-function Window.new(gui,input,connect,canDrag,title)
+function Window.new(gui,input,connect,canDrag,title,height)
+    height=height or 372
     local panel=Instance.new('Frame',gui);panel.Name='Window'
-    panel.Size=UDim2.fromOffset(480,372);panel.Position=UDim2.fromOffset(20,20)
+    panel.Size=UDim2.fromOffset(480,height);panel.Position=UDim2.fromOffset(20,20)
     panel.BackgroundColor3=Color3.fromRGB(18,22,30)
     local header=Instance.new('TextButton',panel);header.Name='Titlebar'
     header.Position=UDim2.fromOffset(8,2);header.Size=UDim2.fromOffset(420,30)
@@ -2018,8 +2020,8 @@ function Window.new(gui,input,connect,canDrag,title)
     local mini=Instance.new('TextButton',panel);mini.Name='Minimize'
     mini.Position=UDim2.fromOffset(442,4);mini.Size=UDim2.fromOffset(28,26);mini.Text='–'
     local body=Instance.new('Frame',panel);body.Name='Body';body.BackgroundTransparency=1
-    body.Position=UDim2.fromOffset(0,34);body.Size=UDim2.fromOffset(480,334)
-    local self=setmetatable({panel=panel,body=body,header=header,mini=mini,minimized=false},Window)
+    body.Position=UDim2.fromOffset(0,34);body.Size=UDim2.fromOffset(480,height-38)
+    local self=setmetatable({panel=panel,body=body,header=header,mini=mini,minimized=false,height=height},Window)
     connect(mini.Activated,function()self:toggle()end)
     local drag
     connect(header.InputBegan,function(event)
@@ -2043,12 +2045,298 @@ function Window.new(gui,input,connect,canDrag,title)
 end
 function Window:toggle()
     self.minimized=not self.minimized;self.body.Visible=not self.minimized
-    self.panel.Size=UDim2.fromOffset(480,self.minimized and 34 or 372)
+    self.panel.Size=UDim2.fromOffset(480,self.minimized and 34 or self.height)
     self.mini.Text=self.minimized and '+'or '–'
 end
 return Window
 
 end)()
+local Worker=(function()
+-- One cancellable inference job. Only resume it once per Heartbeat.
+local Worker={}
+Worker.__index=Worker
+function Worker.new(predict,clock)
+    return setmetatable({predict=predict,clock=clock or os.clock,generation=0,
+        peak_slice_ms=0,cancelled=0,completed=0},Worker)
+end
+function Worker:cancel()
+    if self.job then self.cancelled+=1 end
+    self.generation+=1;self.job=nil
+end
+function Worker:start(query,context,metadata)
+    assert(not self.job,'Inference is already running')
+    local job={context=context,metadata=metadata,at=self.clock(),cpu=0,slices=0,generation=self.generation}
+    job.thread=coroutine.create(function()
+        local function checkpoint()
+            if self.clock()>=self.deadline then coroutine.yield()end
+        end
+        if type(query)=='function'then query,context=query(checkpoint);job.context=context end
+        return self.predict(query,context,checkpoint)
+    end)
+    self.job=job
+end
+function Worker:step(budget)
+    local job=self.job
+    if not job then return nil end
+    local began=self.clock()
+    self.deadline=began+math.clamp(budget or .0015,.00025,.003)
+    local ok,index,logits=coroutine.resume(job.thread)
+    local spent=self.clock()-began
+    job.cpu+=spent;job.slices+=1
+    self.peak_slice_ms=math.max(self.peak_slice_ms,spent*1000)
+    self.last_slice_ms=spent*1000
+    if not ok then self.job=nil;error(index,0)end
+    if self.job~=job or self.generation~=job.generation then return nil end
+    if coroutine.status(job.thread)=='dead'then
+        self.job=nil;self.completed+=1
+        job.index=index;job.logits=logits;job.thread=nil
+        job.wall=self.clock()-job.at
+        self.wall=self.wall and self.wall*.75+job.wall*.25 or job.wall
+        self.last=job
+        return job
+    end
+end
+function Worker:report()
+    return {busy=self.job~=nil,completed=self.completed,cancelled=self.cancelled,backend=self.backend,
+        peak_slice_ms=self.peak_slice_ms,last_slice_ms=self.last_slice_ms,
+        last_cpu_ms=self.last and self.last.cpu*1000 or nil,
+        last_wall_ms=self.last and self.last.wall*1000 or nil,
+        last_slices=self.last and self.last.slices or nil}
+end
+return Worker
+
+end)()
+local Latency=(function()
+-- Turbo Soccer already predicts server snapshots. Never add a full ping again.
+local Latency={}
+Latency.__index=Latency
+local clamp,min,max=math.clamp,math.min,math.max
+local function distance(a,b)return math.sqrt((a[1]-b[1])^2+(a[2]-b[2])^2+(a[3]-b[3])^2)end
+function Latency.new(player)
+    return setmetatable({player=player,enabled=true,pingAt=-math.huge,frame=1/120,input=0,
+        rejected=0,horizon=0},Latency)
+end
+function Latency:sample(now,dt)
+    if dt and dt>0 and dt<.25 then self.frame=self.frame*.9+dt*.1 end
+    if now-self.pingAt<.5 then return end
+    self.pingAt=now
+    local ok,seconds=pcall(function()return self.player:GetNetworkPing()end)
+    local source='GetNetworkPing'
+    if not ok or type(seconds)~='number'or seconds~=seconds or seconds<0 or seconds>3 then
+        ok,seconds=pcall(function()
+            return game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue()/1000
+        end)
+        source='Stats Data Ping'
+    end
+    if ok and type(seconds)=='number'and seconds==seconds and seconds>=0 and seconds<=3 then
+        self.jitter=self.ping and(self.jitter or 0)*.8+math.abs(seconds-self.ping)*.2 or 0
+        self.ping=self.ping and self.ping*.8+seconds*.2 or seconds
+        self.pingSource=source;self.pingSeen=now
+    elseif self.pingSeen and now-self.pingSeen>3 then self.ping=nil;self.jitter=nil end
+end
+function Latency:budget()
+    -- Preserve short frames; permit up to 3 ms on slower render loops.
+    return clamp(self.frame*.18,.00075,.003)
+end
+function Latency:lead(packet,wall)
+    if not self.enabled then self.horizon=0;return 0 end
+    local cap=.16
+    if(self.ping or 0)>.25 or(self.jitter or 0)>.04 then cap=.08 end
+    local h=(wall or .035)+self.frame+clamp(packet.sample_dt or 0,0,.07)*.5+self.input
+    self.horizon=clamp(h,0,cap)
+    return self.horizon
+end
+local function advance(body,seconds,ground,gravity)
+    local out=table.clone(body)
+    out.position=table.clone(body.position);out.velocity=table.clone(body.velocity)
+    out.forward=body.forward and table.clone(body.forward)or nil
+    out.up=body.up and table.clone(body.up)or nil
+    out.angular_velocity=table.clone(body.angular_velocity or {0,0,0})
+    for i=1,3 do out.position[i]+=body.velocity[i]*seconds end
+    if not ground then
+        out.position[3]+=.5*gravity*seconds*seconds
+        out.velocity[3]+=gravity*seconds
+    end
+    -- Small-angle orientation lead, renormalized to an orthogonal basis.
+    if out.forward and out.up then
+        local w=out.angular_velocity
+        local function rotate(v)
+            local a={v[1]+(w[2]*v[3]-w[3]*v[2])*seconds,
+                v[2]+(w[3]*v[1]-w[1]*v[3])*seconds,v[3]+(w[1]*v[2]-w[2]*v[1])*seconds}
+            local n=math.sqrt(a[1]^2+a[2]^2+a[3]^2)
+            for i=1,3 do a[i]/=max(n,1e-9)end
+            return a
+        end
+        out.forward=rotate(out.forward);out.up=rotate(out.up)
+        local f,u=out.forward,out.up
+        local dot=f[1]*u[1]+f[2]*u[2]+f[3]*u[3]
+        for i=1,3 do u[i]-=dot*f[i]end
+        local n=math.sqrt(u[1]^2+u[2]^2+u[3]^2)
+        for i=1,3 do u[i]/=max(n,1e-9)end
+    end
+    return out
+end
+function Latency:project(packet,physics,wall,checkpoint)
+    local h=self:lead(packet,wall)
+    if h==0 then return packet end
+    local out=table.clone(packet)
+    local radius=packet.ball_radius or physics.profile.physics.BALL_RADIUS
+    local future=physics:predict(packet.ball,radius,h,1000,checkpoint)
+    local last=future[#future]
+    out.ball=table.clone(packet.ball);out.ball.position=last.position;out.ball.velocity=last.velocity
+    out.car=advance(packet.car,h,packet.ground_estimate,physics.gravity)
+    out.other_cars={}
+    for _,car in ipairs(packet.other_cars or {})do
+        out.other_cars[#out.other_cars+1]=advance(car,h,car.ground_estimate,physics.gravity)
+    end
+    return out
+end
+function Latency:fresh(job,packet,now,epoch)
+    local m=job.metadata
+    local age=now-m.at
+    local limit=((self.jitter or 0)>.04 or(self.ping or 0)>.25)and .22 or .35
+    local valid=m.epoch==epoch and m.team==packet.team and m.scene==packet.scene_token
+        and age>=0 and age<=limit and m.ground==packet.ground_estimate
+    -- Account for travel since the predicted target time before checking a correction.
+    local dt=clamp(now-m.targetAt,-.2,.2)
+    local function expected(body)
+        return {body.position[1]+body.velocity[1]*dt,body.position[2]+body.velocity[2]*dt,body.position[3]+body.velocity[3]*dt}
+    end
+    valid=valid and distance(expected(m.car),packet.car.position)<260
+        and distance(expected(m.ball),packet.ball.position)<350
+    if not valid then self.rejected+=1 end
+    return valid
+end
+function Latency:report()
+    return {enabled=self.enabled,ping_ms=self.ping and self.ping*1000 or nil,ping_source=self.pingSource,
+        jitter_ms=self.jitter and self.jitter*1000 or nil,frame_ms=self.frame*1000,
+        lookahead_ms=self.horizon*1000,rejected_actions=self.rejected,
+        network_lead_ms=0,reason='Game state is already client-predicted; lead only measured AI, sampling and input delay'}
+end
+return Latency
+
+end)()
+local Graphics=(function()
+-- Bounded, reversible local rendering changes. Preserve gameplay/readout cues.
+local Graphics={}
+Graphics.__index=Graphics
+function Graphics.new(world,lighting)
+    return setmetatable({world=world,lighting=lighting,enabled=false,changes=setmetatable({},{__mode='k'}),
+        queue={},head=1,tail=0,seen=setmetatable({},{__mode='k'}),changed=0,limit=8192},Graphics)
+end
+function Graphics:remember(object,key,value)
+    local ok,old=pcall(function()return object[key]end)
+    if not ok or old==nil or old==value then return end
+    local fields=self.changes[object]
+    if not fields then fields={};self.changes[object]=fields end
+    if fields[key]then return end
+    if pcall(function()object[key]=value end)then
+        fields[key]={before=old,applied=value};self.changed+=1
+    end
+end
+function Graphics:protected(object)
+    local p=object
+    for _=1,14 do
+        if not p or p==self.world then break end
+        if p.Name=='PadRing'or p.Name=='PadHalo'or p.Name=='Nametag'or p.Name=='CarSound'or p.Name=='BallSound'then return true end
+        if p:IsA('BillboardGui')or p:IsA('GuiObject')then return true end
+        if p:IsA('Model')and p.PrimaryPart then return true end
+        p=p.Parent
+    end
+    return false
+end
+function Graphics:apply(object)
+    if object:IsA('ParticleEmitter')or object:IsA('Trail')or object:IsA('Beam')or object:IsA('Smoke')
+        or object:IsA('Fire')or object:IsA('Sparkles')or object:IsA('PostEffect')then
+        self:remember(object,'Enabled',false)
+        if object:IsA('ParticleEmitter')then self:remember(object,'Rate',0)end
+    elseif object:IsA('Light')then self:remember(object,'Shadows',false)
+    elseif object:IsA('Terrain')then
+        self:remember(object,'WaterWaveSize',0);self:remember(object,'WaterWaveSpeed',0)
+        self:remember(object,'WaterReflectance',0)
+    elseif object:IsA('BasePart')then
+        self:remember(object,'CastShadow',false)
+        if not self:protected(object)then
+            self:remember(object,'Reflectance',0)
+            if Enum.Material then self:remember(object,'Material',Enum.Material.SmoothPlastic)end
+            if object:IsA('MeshPart')then self:remember(object,'TextureID','')end
+        end
+    elseif not self:protected(object)then
+        if object:IsA('Decal')or object:IsA('Texture')then self:remember(object,'Transparency',1)
+        elseif object:IsA('SpecialMesh')then self:remember(object,'TextureId','')
+        elseif object:IsA('SurfaceAppearance')then
+            for _,key in ipairs({'ColorMap','NormalMap','RoughnessMap','MetalnessMap'})do self:remember(object,key,'')end
+        end
+    end
+end
+function Graphics:enqueue(object)
+    if not self.enabled or self.seen[object]or self.tail-self.head>=self.limit then return end
+    self.seen[object]=true;self.tail+=1;self.queue[self.tail]=object
+end
+function Graphics:setEnabled(enabled)
+    if self.closed or self.enabled==enabled then return end
+    self.enabled=enabled
+    if self.added then self.added:Disconnect();self.added=nil end
+    self.queue={};self.head=1;self.tail=0;self.children=nil;self.childAt=nil
+    self.seen=setmetatable({},{__mode='k'})
+    if enabled then
+        -- Finish restoration before recording a new baseline on a quick re-toggle.
+        self:restore()
+        if self.lighting then self:remember(self.lighting,'GlobalShadows',false)end
+        self:enqueue(self.world)
+        if self.lighting then self:enqueue(self.lighting)end
+        if self.world.DescendantAdded then
+            self.added=self.world.DescendantAdded:Connect(function(object)self:enqueue(object)end)
+        end
+        if self.lighting and self.lighting.DescendantAdded then
+            self.lightAdded=self.lighting.DescendantAdded:Connect(function(object)self:enqueue(object)end)
+        end
+    else
+        if self.lightAdded then self.lightAdded:Disconnect();self.lightAdded=nil end
+        self:restore()
+    end
+end
+function Graphics:restore()
+    for object,fields in pairs(self.changes)do
+        for key,saved in pairs(fields)do
+            pcall(function()
+                -- Do not overwrite a later game/user change to this property.
+                if object[key]==saved.applied then object[key]=saved.before end
+            end)
+        end
+    end
+    self.changes=setmetatable({},{__mode='k'});self.changed=0
+end
+function Graphics:step(budget)
+    if not self.enabled or self.closed then return end
+    local deadline=os.clock()+(budget or .00035)
+    local count=0
+    repeat
+        if self.children then
+            local object=self.children[self.childAt]
+            if object then self:enqueue(object);self.childAt+=1
+            else self.children=nil end
+        elseif self.head<=self.tail then
+            local object=self.queue[self.head];self.queue[self.head]=nil;self.head+=1
+            if object and object.Parent then
+                pcall(function()self:apply(object);self.children=object:GetChildren();self.childAt=1 end)
+            elseif object==self.world then self.children=object:GetChildren();self.childAt=1 end
+        else
+            self.queue={};self.head=1;self.tail=0;break
+        end
+        count+=1
+    until count>=48 or os.clock()>=deadline
+end
+function Graphics:close()
+    self:setEnabled(false);self.closed=true
+end
+function Graphics:report()return {enabled=self.enabled,changed_properties=self.changed,pending=math.max(0,self.tail-self.head+1)}end
+return Graphics
+
+end)()
+local RUNTIME=
+{}
+local ADAPTER_VERSION=RUNTIME.version or '6.8'
 local PROFILE=
 {["version"]=1,["name"]="turbo_soccer_standard",["provenance"]={["kind"]="numeric collision/physics specification from user-provided saved place",["place_sha256"]="00ea1fbc258e3d5e317daf5bef484368490726d006d53176e94a42375b1ee733",["geometry_source_sha256"]="d8f35aa62627d23a68ee3a51ef315c1b8b9e53ec4ba0a14cfa3f6a76dab467c0",["constants_source_sha256"]="3274f6c9d71e5e86d9708694e59599f1de71a8dfc41db0028567c0bffe8d541c"},["roblox_studs_per_sim_unit"]=0.1,["arena"]={["EXTENT_X"]=4096.0,["EXTENT_Y"]=5120.0,["HEIGHT"]=2048.0,["CORNER"]=8064.0,["EDGE_RADIUS"]=256.0,["BACK_RAMP_RADIUS"]=160.0,["CEILING_RADIUS"]=512.0,["SIDE_CORNER_RADIUS"]=852.0,["BACK_CORNER_RADIUS"]=874.0,["GOAL_HALF_WIDTH"]=893.0,["GOAL_HEIGHT"]=642.775,["GOAL_BACK_Y"]=6000.0,["GOAL_TOP_RADIUS"]=130.0,["GOAL_BOTTOM_RADIUS"]=70.0,["GOAL_LIP_RADIUS"]=80.0,["GOAL_BACK_RADIUS"]=300.0,["MOUTH_HALF_WIDTH"]=896.0,["MOUTH_HEIGHT"]=640.0,["MOUTH_FILLET"]=96.0,["MOUTH_LIP"]=8.0},["ramp_facets_degrees"]={0,11.617,22.892,33.984,45,56.016,67.108,78.383,90},["physics"]={["GRAVITY_Z"]=-650.0,["BALL_RADIUS"]=91.25,["BALL_WORLD_RADIUS"]=93.15,["BALL_REST_Z"]=93.15,["CAR_MAX_SPEED"]=2300.0,["CAR_MAX_ANG_SPEED"]=5.5,["BALL_MAX_SPEED"]=6000.0,["BALL_MAX_ANG_SPEED"]=6.0,["BALL_DRAG"]=0.03,["BOOST_USED_PER_SECOND"]=33.333333333333336,["BOOST_ACCEL_GROUND"]=991.6666666666666,["BOOST_ACCEL_AIR"]=1058.3333333333333,["DOUBLEJUMP_MAX_DELAY"]=1.25,["MAX_SUSPENSION_TRAVEL"]=12.0,["WHEEL_RAY_MIN_HIT_DIST"]=17.079519899575633,["CAR_SPAWN_REST_Z"]=17.0,["TICK_RATE"]=120,["BALLWORLD_FRICTION"]=0.35,["BALLWORLD_RESTITUTION"]=0.6,["SOLVER_ERP2"]=0.8,["RESTITUTION_VEL_THRESHOLD"]=10,["CONTACT_BREAKING_THRESHOLD"]=1,["BALL_WORLD_CONTACT_FLAT"]=0.0050000000000001155,["BALL_SLEEP_LIN_SPEED"]=40,["BALL_SLEEP_ANG_SPEED"]=1,["BALL_SLEEP_TIME"]=2,["CAR_MASS"]=180,["THROTTLE_TORQUE_AMOUNT"]=72000,["DRIVE_SPEED_TORQUE_FACTOR"]={{0,1},{1400,0.1},{1410,0}}},["car_presets"]={["standard"]={["size"]={120.50700378417969,86.69940185546875,38.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-33.75,29.5,20.7549991607666}}},["low"]={["size"]={130.427001953125,85.77989959716797,33.79999923706055},["offset"]={9.0,0.0,15.75},["front"]={["radius"]=12.0,["rest_length"]=33.95,["offset"]={50.29999923706055,31.100000381469727,15.75}},["back"]={["radius"]=13.5,["rest_length"]=33.85,["offset"]={-34.75,33.0,15.75}}},["flat"]={["size"]={131.32000732421875,87.17040252685547,31.894399642944336},["offset"]={9.008569717407227,0.0,12.094200134277344},["front"]={["radius"]=12.5,["rest_length"]=31.9242,["offset"]={49.970001220703125,27.799999237060547,12.094200134277344}},["back"]={["radius"]=17.0,["rest_length"]=27.9242,["offset"]={-35.43000030517578,20.280000686645508,12.094200134277344}}},["wedge"]={["size"]={133.99200439453125,83.02100372314453,32.79999923706055},["offset"]={12.5,0.0,11.75},["front"]={["radius"]=13.5,["rest_length"]=29.7,["offset"]={51.5,26.670000076293945,11.75}},["back"]={["radius"]=15.0,["rest_length"]=29.666,["offset"]={-35.75,35.0,11.75}}},["long"]={["size"]={129.5189971923828,84.68789672851562,36.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-34.0,29.5,20.7549991607666}}},["tall"]={["size"]={123.22000122070312,79.21029663085938,44.15909957885742},["offset"]={11.375699996948242,0.0,21.5049991607666},["front"]={["radius"]=15.0,["rest_length"]=39.505,["offset"]={51.25,25.899999618530273,21.5049991607666}},["back"]={["radius"]=15.0,["rest_length"]=39.105,["offset"]={-33.75,29.5,21.5049991607666}}}},["boost_positions"]={["big"]={{-3584.0,0.0,73.0},{3584.0,0.0,73.0},{-3072.0,4096.0,73.0},{3072.0,4096.0,73.0},{-3072.0,-4096.0,73.0},{3072.0,-4096.0,73.0}},["small"]={{0.0,-4240.0,70.0},{-1792.0,-4184.0,70.0},{1792.0,-4184.0,70.0},{-940.0,-3308.0,70.0},{940.0,-3308.0,70.0},{0.0,-2816.0,70.0},{-3584.0,-2484.0,70.0},{3584.0,-2484.0,70.0},{-1788.0,-2300.0,70.0},{1788.0,-2300.0,70.0},{-2048.0,-1036.0,70.0},{0.0,-1024.0,70.0},{2048.0,-1036.0,70.0},{-1024.0,0.0,70.0},{1024.0,0.0,70.0},{-2048.0,1036.0,70.0},{0.0,1024.0,70.0},{2048.0,1036.0,70.0},{-1788.0,2300.0,70.0},{1788.0,2300.0,70.0},{-3584.0,2484.0,70.0},{3584.0,2484.0,70.0},{0.0,2816.0,70.0},{-940.0,3308.0,70.0},{940.0,3308.0,70.0},{-1792.0,4184.0,70.0},{1792.0,4184.0,70.0},{0.0,4240.0,70.0}}},["policy_boost_limit"]=6,["recovery"]={["enabled"]=true,["stuck_seconds"]=2.2,["minimum_travel"]=45,["escape_seconds"]=0.65,["cooldown_seconds"]=3},["goal_defaults"]={["version"]=1,["source"]="builtin_measurements",["goals"]={{["origin"]={-0.10539187018261847,-5156.06088311565,0.0},["side"]={-0.9999997941940588,-0.0006415698245800758,0.0},["normal"]={0.0006415698245800758,-0.9999997941940588,0.0},["half_width"]=893.3817832411139,["height"]=639.0078980633016,["back_depth"]=830.1082496030729,["fillet"]=96.0,["back_reference"]="wall_supported_body"},{["origin"]={-0.5865567549764439,5137.970467167625,0.0},["side"]={-0.999943937915091,-0.01058872168209319,0.0},["normal"]={-0.01058872168209319,0.999943937915091,0.0},["half_width"]=894.5282420002634,["height"]=644.1573434119969,["back_depth"]=850.0714001682221,["fillet"]=96.0,["back_reference"]="wall_supported_body"}},["note"]="Latest measured posts and rear-wall samples; earlier consistent blue crossbar replaces a low high-scatter flight reading. Numeric fitted geometry only; no raw capture poses or timestamps.",["warnings"]={"Rear body support depth is approximate; collision profile retains its saved curved net surface."}}}
 local arenaAdapter=Arena.new(PROFILE)
@@ -2067,6 +2355,9 @@ local timing=Timing.new(15)
 local TEAM,manualTeam=nil,nil
 local HZ=30 -- pose sampling; policy decisions target 15 Hz (tick skip 8 at 120 Hz)
 local player=game:GetService("Players").LocalPlayer
+local latency=Latency.new(player)
+latency.enabled=RUNTIME.latency==true
+local worker,graphics,lastAppliedAt,lastJumpPress
 local pg=assert(player:FindFirstChildOfClass("PlayerGui"),"Join first")
 local teamReader=Teams.new(player)
 carReader.teams=teamReader
@@ -2078,7 +2369,8 @@ local connections={}
 local function connect(signal,callback)
     local connection=signal:Connect(callback);connections[#connections+1]=connection
 end
-local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,MODEL_NAME..' v6.8 | F4 minimize')
+local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,
+    MODEL_NAME..' v'..ADAPTER_VERSION..' | F4 minimize',RUNTIME.cooperative and 410 or 372)
 local panel=window.panel
 local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
 local label=Instance.new("TextLabel",main)
@@ -2111,6 +2403,12 @@ safetyButton.Position=UDim2.fromOffset(10,296);safetyButton.Size=UDim2.fromOffse
 local markerLabel=Instance.new('TextLabel',main)
 markerLabel.Position=UDim2.fromOffset(240,296);markerLabel.Size=UDim2.fromOffset(230,28)
 markerLabel.BackgroundTransparency=1;markerLabel.TextColor3=Color3.new(1,1,1);markerLabel.Text='F9 marks a bad decision'
+local graphicsButton=Instance.new('TextButton',main)
+graphicsButton.Position=UDim2.fromOffset(10,333);graphicsButton.Size=UDim2.fromOffset(220,28)
+graphicsButton.Text='Game optimization: ON';graphicsButton.Visible=RUNTIME.cooperative==true
+local latencyButton=Instance.new('TextButton',main)
+latencyButton.Position=UDim2.fromOffset(240,333);latencyButton.Size=UDim2.fromOffset(230,28)
+latencyButton.Text='Lag compensation: ON';latencyButton.Visible=RUNTIME.cooperative==true
 gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
@@ -2144,6 +2442,8 @@ local function release()
         end
     end
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
+    if worker then worker:cancel()end
+    lastAppliedAt=nil;lastJumpPress=nil
     if Policy.reset then Policy.reset()end
     pendingJump=nil
     keyboard:release()
@@ -2162,6 +2462,7 @@ local function pressOwned(key,expectedEpoch)
     return true
 end
 local function recordJump(request,now)
+    lastJumpPress=now
     if request.ground then jumpAt=now else usedFlip=true end
     local events=physics.jumpEvents or {};physics.jumpEvents=events
     local actual=table.clone(request.actual);actual[6]=1
@@ -2178,6 +2479,8 @@ local function controls()
     supportButton.Visible=not enabled and not testingKeyboard
     calibrationButton.Visible=not enabled and not testingKeyboard
     safetyButton.Visible=not enabled and not testingKeyboard
+    graphicsButton.Visible=RUNTIME.cooperative==true and not enabled and not testingKeyboard
+    latencyButton.Visible=RUNTIME.cooperative==true and not enabled and not testingKeyboard
     window.mini.Visible=not enabled
     main.Visible=not calibrating
     if calView then calView.Visible=calibrating end
@@ -2205,6 +2508,10 @@ local function saveReport(filename,savedFrom)
     report.physics_assist_enabled=physicsEnabled;report.saved_from=savedFrom
     report.teammate_yield_enabled=intercept.supportEnabled;report.model_name=MODEL_NAME
     report.performance=timing:report()
+    report.performance.cooperative=worker and worker:report()or nil
+    report.performance.latency=RUNTIME.cooperative and latency:report()or nil
+    report.performance.graphics=graphics and graphics:report()or nil
+    report.adapter_version=ADAPTER_VERSION
     report.performance.last_active_age=timing.last and os.clock()-timing.last.time or nil
     report.jump_events=physics.jumpEvents or {}
     report.goal_safety_enabled=safetyEnabled;report.goal_safety=safety.last
@@ -2268,6 +2575,25 @@ safetyButton.Activated:Connect(function()
     safetyButton.Text=safetyEnabled and 'Goal safety: ON'or 'Goal safety: OFF'
     label.Text=safetyEnabled and 'Conservative ground goal guards enabled.'or 'Goal guards disabled. F6 starts.'
 end)
+graphicsButton.Activated:Connect(function()
+    if graphics then
+        graphics:setEnabled(not graphics.enabled)
+        graphicsButton.Text=graphics.enabled and 'Game optimization: ON'or 'Game optimization: OFF'
+    end
+end)
+latencyButton.Activated:Connect(function()
+    latency.enabled=not latency.enabled
+    if worker then worker:cancel()end
+    latencyButton.Text=latency.enabled and 'Lag compensation: ON'or 'Lag compensation: OFF'
+end)
+if RUNTIME.light_graphics then
+    local ok,lighting=pcall(function()return game:GetService('Lighting')end)
+    graphics=Graphics.new(world,ok and lighting or nil)
+    graphics:setEnabled(true)
+    connect(game:GetService('RunService').Heartbeat,function()
+        if alive then graphics:step(.0003)end
+    end)
+end
 do
     calView=Instance.new('Frame',window.body);calView.Name='Calibration';calView.Visible=false
     calView.Size=UDim2.fromScale(1,1);calView.BackgroundTransparency=1
@@ -2397,6 +2723,7 @@ connect(input.WindowFocusReleased,function()focus=false;stop("Paused: Roblox los
 connect(input.WindowFocused,function()focus=true end)
 close.Activated:Connect(function()
     alive=false;stop()
+    if graphics then graphics:close()end
     for _,connection in ipairs(connections)do connection:Disconnect()end
     gui:Destroy()
 end)
@@ -2515,6 +2842,15 @@ local function read()
     return packet
 end
 
+local loadYieldAt=os.clock()
+local function loadingYield(force)
+    assert(alive,'Model loading cancelled')
+    if RUNTIME.cooperative and(force or os.clock()-loadYieldAt>=.002)then
+        task.wait()
+        loadYieldAt=os.clock()
+        assert(alive,'Model loading cancelled')
+    end
+end
 local function loadTensors()
 local flat=Policy.decode(table.concat({
 "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",
@@ -2685,13 +3021,25 @@ task.spawn(function()
             assert(type(fn)=="function","Missing executor input function: "..name)
         end
         if type(activeWindow)~="function"then activeWindow=nil end
-        local predict=Policy.new(loadTensors())
+        local predict,backend=Policy.new(loadTensors(),{yieldWork=RUNTIME.cooperative and loadingYield or nil})
+        worker=RUNTIME.cooperative and Worker.new(predict)or nil
+        if worker then worker.backend=backend end
         local cases=
 {{["query"]={1.0,1.0,0.0,0.0,0.0,0.0,-2.0034782886505127,0.0073913042433559895,0.27098312973976135,0.08037470281124115,-0.19620628654956818,0.0,1.0,0.0,0.0,0.0,1.0,-0.2235288769006729,0.007565442938357592,-0.13672536611557007,0.9900000095367432,0.0,1.0,0.0,0.0,-1.0,1.0,-1.0,1.0,0.0,0.0,0.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.27098312973976135,0.08037470281124115,-0.19620628654956818,0.0,1.0,0.0,0.0,0.0,1.0,-0.2235288769006729,0.007565442938357592,-0.13672536611557007,0.9900000095367432,0.0,1.0,0.0},{0.0,0.0,0.0,1.0,0.0,-0.2889759838581085,0.906924843788147,0.28029191493988037,0.26719141006469727,-0.016393955796957016,-0.4370492100715637,0.0,0.0,0.0,0.0,0.0,0.0,-0.34973013401031494,0.5370531678199768,0.27710309624671936,0.0,0.0,0.0,0.0}},["logits"]={-7.181642055511475,-6.316804885864258,-7.775899410247803,-7.3739824295043945,-9.024559020996094,-8.614173889160156,-5.668033599853516,-5.938735485076904,-6.689444541931152,-7.019793510437012,-7.979574203491211,-8.230274200439453,-4.148362159729004,-5.222583770751953,-6.369122505187988,-7.3870439529418945,-5.349751949310303,-6.346306800842285,-7.774734020233154,-8.633699417114258,-6.640641212463379,-7.648554801940918,-8.860153198242188,-9.916475296020508,-5.641916275024414,-6.307194232940674,-5.639253616333008,-6.364839553833008,-5.6891632080078125,-6.3086137771606445,-6.777521133422852,-7.848911762237549,-12.492730140686035,-14.201626777648926,-6.5930633544921875,-7.79229211807251,-12.138935089111328,-14.634688377380371,-6.6581830978393555,-7.597504615783691,-12.463845252990723,-14.913947105407715,-8.028900146484375,-9.044713973999023,-7.901208877563477,-8.955121994018555,-8.041940689086914,-8.790779113769531,-5.7613043785095215,-6.263520240783691,-5.780339241027832,-6.34096097946167,-6.892712116241455,-7.882321357727051,-12.139747619628906,-13.782875061035156,-11.85328483581543,-13.453861236572266,-6.677000045776367,-7.714232444763184,-12.416465759277344,-14.67070198059082,-7.969810485839844,-8.90390396118164,-7.862571716308594,-8.607582092285156,-5.645788192749023,-6.285159111022949,-5.689093112945557,-6.340839862823486,-6.006666660308838,-6.315612316131592,-6.646565914154053,-7.750681400299072,-12.416875839233398,-14.027883529663086,-6.640373229980469,-7.752230167388916,-12.131013870239258,-13.796199798583984,-6.839860916137695,-7.752650737762451,-12.342642784118652,-14.607404708862305,-7.880603313446045,-8.886096954345703,-7.842452049255371,-8.833101272583008,-7.780301570892334,-8.70509147644043},["action"]=13},{["query"]={1.0,1.0,0.0,0.0,0.0,0.0,-2.0034782886505127,0.0073913042433559895,0.27098312973976135,0.08037470281124115,-0.19620628654956818,0.0,1.0,0.0,0.0,0.0,1.0,-0.2235288769006729,0.007565442938357592,-0.13672536611557007,0.9900000095367432,0.0,1.0,0.0,0.0,-1.0,1.0,-1.0,1.0,0.0,0.0,0.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.27098312973976135,0.08037470281124115,-0.19620628654956818,0.0,1.0,0.0,0.0,0.0,1.0,-0.2235288769006729,0.007565442938357592,-0.13672536611557007,0.9900000095367432,0.0,1.0,0.0},{0.0,0.0,0.0,1.0,0.0,-0.2889759838581085,0.906924843788147,0.28029191493988037,0.26719141006469727,-0.016393955796957016,-0.4370492100715637,0.0,0.0,0.0,0.0,0.0,0.0,-0.34973013401031494,0.5370531678199768,0.27710309624671936,0.0,0.0,0.0,0.0},{0.0,1.0,0.0,0.0,0.0,-0.260869562625885,2.6991305351257324,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,-0.043478261679410934,2.5252175331115723,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.17391304671764374,2.351304292678833,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.3913043439388275,2.177391290664673,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.6086956262588501,2.0034782886505127,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0}},["logits"]={-2.3224692344665527,-1.4023840427398682,-2.291623115539551,-1.1241238117218018,-2.5112452507019043,-1.2056859731674194,-1.2694885730743408,-1.2720810174942017,-1.0631887912750244,-0.9691365957260132,-1.0907206535339355,-0.9586137533187866,-0.8589068651199341,-1.1944735050201416,-0.8975018262863159,-1.2398852109909058,-0.4458426833152771,-0.6951980590820312,-0.5403647422790527,-0.7357770800590515,-0.3913416564464569,-0.6918816566467285,-0.4602355360984802,-0.7323944568634033,-1.2308613061904907,-0.9117791652679443,-1.2705399990081787,-0.9350382089614868,-1.2986812591552734,-0.9188560247421265,-1.0116641521453857,-0.5071097016334534,-4.844111442565918,-4.910727500915527,-1.0215210914611816,-0.5134607553482056,-4.68905782699585,-5.045095920562744,-1.059962511062622,-0.49441295862197876,-4.8394293785095215,-5.06265926361084,-1.0318046808242798,-0.45489856600761414,-1.0350043773651123,-0.446513831615448,-1.0872982740402222,-0.4362325966358185,-1.238023281097412,-0.8587125539779663,-1.3143138885498047,-0.9117727279663086,-1.097222924232483,-0.5169084072113037,-4.874669075012207,-4.785703182220459,-5.117608070373535,-4.587902069091797,-1.097686529159546,-0.5379406809806824,-5.026526927947998,-4.9398417472839355,-1.0444936752319336,-0.4462106227874756,-1.0936250686645508,-0.42529118061065674,-1.243997573852539,-0.8988638520240784,-1.3090678453445435,-0.9148520827293396,-1.3803699016571045,-0.9345059394836426,-1.0745240449905396,-0.5183091163635254,-5.427175521850586,-5.317356109619141,-1.1222033500671387,-0.5118608474731445,-5.435479164123535,-5.086318016052246,-1.1635408401489258,-0.5247551202774048,-5.327891826629639,-5.106252670288086,-1.0164220333099365,-0.4472927451133728,-1.0617716312408447,-0.457990825176239,-1.0688403844833374,-0.45088905096054077},["action"]=21},{["query"]={1.0,1.0,0.0,0.0,0.0,0.0,-2.0034782886505127,0.0073913042433559895,0.27098312973976135,0.08037470281124115,-0.19620628654956818,0.0,1.0,0.0,0.0,0.0,1.0,-0.2235288769006729,0.007565442938357592,-0.13672536611557007,0.9900000095367432,0.0,1.0,0.0,0.0,-1.0,1.0,-1.0,1.0,0.0,0.0,0.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.27098312973976135,0.08037470281124115,-0.19620628654956818,0.0,1.0,0.0,0.0,0.0,1.0,-0.2235288769006729,0.007565442938357592,-0.13672536611557007,0.9900000095367432,0.0,1.0,0.0},{0.0,0.0,0.0,1.0,0.0,-0.2889759838581085,0.906924843788147,0.28029191493988037,0.26719141006469727,-0.016393955796957016,-0.4370492100715637,0.0,0.0,0.0,0.0,0.0,0.0,-0.34973013401031494,0.5370531678199768,0.27710309624671936,0.0,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,0.0,0.16000008583068848,0.023043477907776833,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-1.5582609176635742,2.0034782886505127,0.024347826838493347,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,1.5582609176635742,2.0034782886505127,0.023043477907776833,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-1.335652232170105,3.7843480110168457,0.024347826838493347,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,0.0,3.2278261184692383,0.023043477907776833,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,0.40869563817977905,3.441739082336426,0.024347826838493347,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0},{0.0,1.0,0.0,0.0,0.0,-0.260869562625885,2.6991305351257324,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,-0.043478261679410934,2.5252175331115723,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.17391304671764374,2.351304292678833,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.3913043439388275,2.177391290664673,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.6086956262588501,2.0034782886505127,0.0,0.10869564861059189,-0.19565217196941376,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0}},["logits"]={-6.1737847328186035,-2.832634687423706,-6.198287010192871,-2.298084020614624,-7.1998443603515625,-3.177280902862549,-2.604586124420166,-2.3676042556762695,-2.2103404998779297,-1.8248653411865234,-2.9290199279785156,-2.509765863418579,-1.3146843910217285,-2.1697888374328613,-0.7872416377067566,-1.6173572540283203,-0.3896472454071045,-1.1231777667999268,-0.05571788549423218,-0.5217018127441406,-0.9461070895195007,-1.8744964599609375,-0.4862849712371826,-1.328190803527832,-2.534437417984009,-0.9244310855865479,-2.633139133453369,-0.9422516822814941,-2.5606489181518555,-0.7806189656257629,-2.110713481903076,-0.050698041915893555,-13.201772689819336,-12.791946411132812,-2.0912442207336426,0.058234453201293945,-13.017459869384766,-13.439087867736816,-2.111320734024048,0.14141583442687988,-13.657065391540527,-13.725025177001953,-2.6989612579345703,-0.4702606201171875,-2.73588228225708,-0.45248734951019287,-2.760331153869629,-0.36135333776474,-2.5634636878967285,-0.7468065619468689,-2.6029391288757324,-0.7339259386062622,-2.3276350498199463,-0.054831862449645996,-12.826839447021484,-12.070809364318848,-14.903099060058594,-12.790800094604492,-2.2229084968566895,0.03558683395385742,-14.756865501403809,-13.656837463378906,-2.774388074874878,-0.48259198665618896,-2.8167405128479004,-0.3065904378890991,-2.523287534713745,-0.8119315505027771,-2.65906023979187,-0.7801347970962524,-2.727545738220215,-0.7546539902687073,-2.2332143783569336,-0.0036539435386657715,-14.451210021972656,-13.750401496887207,-2.293574094772339,0.03656250238418579,-15.336925506591797,-13.962310791015625,-2.3511452674865723,0.08697390556335449,-15.696649551391602,-14.268976211547852,-2.628298282623291,-0.3781854510307312,-2.758446455001831,-0.36174988746643066,-2.6784887313842773,-0.29729318618774414},["action"]=40},{["query"]={1.0,1.0,0.0,0.0,0.0,0.043478261679410934,0.3478260934352875,0.32608696818351746,-0.25341954827308655,-0.21482867002487183,0.10974442213773727,0.6000000238418579,0.800000011920929,0.0,0.0,0.0,1.0,0.20295721292495728,-0.11139459162950516,0.27752676606178284,0.8999999761581421,0.0,0.0,1.0,1.0,1.0,-1.0,1.0,0.0,0.0,1.0,0.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.07383844256401062,-0.32391467690467834,0.10974442213773727,0.0,1.0,0.0,0.0,0.0,1.0,0.229202538728714,0.0326586589217186,0.27752676606178284,0.8999999761581421,0.0,0.0,1.0},{0.0,0.0,0.0,1.0,0.0,0.334452360868454,-1.1660484075546265,-0.03241240978240967,0.6663386225700378,-0.22192515432834625,-0.5295436978340149,0.0,0.0,0.0,0.0,0.0,0.0,-0.31123197078704834,0.40446025133132935,-0.030771367251873016,0.0,0.0,0.0,0.0}},["logits"]={-15.626087188720703,-14.98776626586914,-17.996442794799805,-15.515179634094238,-18.53371810913086,-12.358097076416016,-14.486700057983398,-14.532079696655273,-16.002132415771484,-15.895533561706543,-12.444314002990723,-12.06291675567627,-13.670805931091309,-13.350007057189941,-22.032657623291016,-21.88694190979004,-16.345516204833984,-16.262298583984375,-23.95318603515625,-24.888755798339844,-11.620847702026367,-11.323984146118164,-19.72694969177246,-19.758344650268555,-13.84271240234375,-20.89783477783203,-14.713366508483887,-22.30615234375,-17.477436065673828,-25.46198272705078,-14.954767227172852,-22.910900115966797,-38.74496078491211,-52.245582580566406,-16.405929565429688,-25.515533447265625,-52.0894775390625,-68.1363525390625,-18.07585906982422,-27.898880004882812,-61.593849182128906,-74.357177734375,-13.10934066772461,-19.783740997314453,-14.190829277038574,-21.28746223449707,-16.366729736328125,-23.94393539428711,-13.372171401977539,-20.65709114074707,-16.62281608581543,-24.160152435302734,-15.269439697265625,-22.206741333007812,-17.861507415771484,-32.20794677734375,-30.35677719116211,-35.80891799926758,-17.305463790893555,-26.534536361694336,-46.09959411621094,-57.240570068359375,-11.975664138793945,-18.3566951751709,-14.900723457336426,-22.07850456237793,-14.178742408752441,-21.475881576538086,-15.503556251525879,-23.239177703857422,-17.62108612060547,-25.576431274414062,-15.507438659667969,-23.276771545410156,-6.952156066894531,-19.62270736694336,-17.427669525146484,-25.194385528564453,-10.589193344116211,-21.92999267578125,-19.227863311767578,-27.618324279785156,-29.228221893310547,-37.255950927734375,-12.446980476379395,-20.27260971069336,-13.445846557617188,-22.161029815673828,-16.346866607666016,-23.679311752319336},["action"]=75},{["query"]={1.0,1.0,0.0,0.0,0.0,0.043478261679410934,0.3478260934352875,0.32608696818351746,-0.25341954827308655,-0.21482867002487183,0.10974442213773727,0.6000000238418579,0.800000011920929,0.0,0.0,0.0,1.0,0.20295721292495728,-0.11139459162950516,0.27752676606178284,0.8999999761581421,0.0,0.0,1.0,1.0,1.0,-1.0,1.0,0.0,0.0,1.0,0.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.07383844256401062,-0.32391467690467834,0.10974442213773727,0.0,1.0,0.0,0.0,0.0,1.0,0.229202538728714,0.0326586589217186,0.27752676606178284,0.8999999761581421,0.0,0.0,1.0},{0.0,0.0,0.0,1.0,0.0,0.334452360868454,-1.1660484075546265,-0.03241240978240967,0.6663386225700378,-0.22192515432834625,-0.5295436978340149,0.0,0.0,0.0,0.0,0.0,0.0,-0.31123197078704834,0.40446025133132935,-0.030771367251873016,0.0,0.0,0.0,0.0},{0.0,1.0,0.0,0.0,0.0,-0.4521739184856415,0.09565219283103943,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,-0.17391304671764374,0.08695651590824127,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.104347825050354,0.0782608687877655,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.38260871171951294,0.06956522166728973,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.6608695983886719,0.06086954474449158,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0}},["logits"]={-0.7203188538551331,-0.40155914425849915,-1.092655062675476,-0.8670429587364197,-1.5074400901794434,-1.2997139692306519,-0.39371442794799805,-0.31753647327423096,-0.8035683631896973,-0.7997322678565979,-1.2215756177902222,-1.278196096420288,-0.17194175720214844,-0.1804657280445099,-0.13776499032974243,-0.08378803730010986,-0.6580039262771606,-0.7485073208808899,-0.6094900369644165,-0.63423752784729,-1.1328856945037842,-1.2482638359069824,-1.027428388595581,-1.1522037982940674,-0.28930404782295227,-0.06453084945678711,-0.3242742121219635,-0.051570236682891846,-0.4876708686351776,-0.19871793687343597,-0.6344218254089355,-0.42496979236602783,-0.34831005334854126,-0.31639137864112854,-0.7368655204772949,-0.5754855275154114,-0.8036732077598572,-0.7509839534759521,-0.8878359198570251,-0.7691407799720764,-1.744126319885254,-1.6344144344329834,-1.0650811195373535,-0.8613524436950684,-1.2094542980194092,-1.0069026947021484,-1.3282831907272339,-1.1562440395355225,-0.30625641345977783,-0.11417090892791748,-0.5482527017593384,-0.23034045100212097,-0.7121163010597229,-0.4777117967605591,-0.77797532081604,-0.6121404767036438,-1.2162768840789795,-1.0992507934570312,-0.951617419719696,-0.7565228343009949,-2.645256519317627,-2.380971908569336,-1.1372261047363281,-0.8753941059112549,-1.3387765884399414,-1.1795364618301392,-0.5314124822616577,-0.32061558961868286,-0.71023029088974,-0.4017336666584015,-0.8412970304489136,-0.5483079552650452,-0.9674109220504761,-0.7353517413139343,-1.7302898168563843,-1.5839263200759888,-1.1628329753875732,-0.9534507989883423,-2.6822948455810547,-2.4405465126037598,-1.3751332759857178,-1.1643035411834717,-3.513780355453491,-3.346339702606201,-1.3161988258361816,-1.1955430507659912,-1.4736284017562866,-1.3918119668960571,-1.6406978368759155,-1.5422624349594116},["action"]=28},{["query"]={1.0,1.0,0.0,0.0,0.0,0.043478261679410934,0.3478260934352875,0.32608696818351746,-0.25341954827308655,-0.21482867002487183,0.10974442213773727,0.6000000238418579,0.800000011920929,0.0,0.0,0.0,1.0,0.20295721292495728,-0.11139459162950516,0.27752676606178284,0.8999999761581421,0.0,0.0,1.0,1.0,1.0,-1.0,1.0,0.0,0.0,1.0,0.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.07383844256401062,-0.32391467690467834,0.10974442213773727,0.0,1.0,0.0,0.0,0.0,1.0,0.229202538728714,0.0326586589217186,0.27752676606178284,0.8999999761581421,0.0,0.0,1.0},{0.0,0.0,0.0,1.0,0.0,0.334452360868454,-1.1660484075546265,-0.03241240978240967,0.6663386225700378,-0.22192515432834625,-0.5295436978340149,0.0,0.0,0.0,0.0,0.0,0.0,-0.31123197078704834,0.40446025133132935,-0.030771367251873016,0.0,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,1.2799999713897705,-1.7791303396224976,-0.2956521809101105,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-1.0726957321166992,-1.2393044233322144,-0.2943478226661682,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,1.420521855354309,0.6306087374687195,-0.2956521809101105,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-1.9631304740905762,0.3189564347267151,-0.2943478226661682,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-0.5606956481933594,0.6751303672790527,-0.2956521809101105,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-0.3620869517326355,1.0914782285690308,-0.2943478226661682,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0},{0.0,1.0,0.0,0.0,0.0,-0.4521739184856415,0.09565219283103943,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,-0.17391304671764374,0.08695651590824127,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.104347825050354,0.0782608687877655,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.38260871171951294,0.06956522166728973,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.6608695983886719,0.06086954474449158,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0}},["logits"]={-0.3711024522781372,-0.3553224205970764,-0.36227720975875854,-0.3224504292011261,-0.32335561513900757,-0.16518396139144897,-0.3384672701358795,-0.3141578733921051,-0.17660409212112427,-0.2818741798400879,0.03893864154815674,-0.08518999814987183,-0.31745922565460205,-0.3245096206665039,-0.31534290313720703,-0.3087385296821594,-0.0718546211719513,-0.20489665865898132,-0.08641430735588074,-0.17572861909866333,0.21751785278320312,0.01703578233718872,0.2183358073234558,0.04992407560348511,-0.2804758548736572,-0.3184189200401306,-0.27794837951660156,-0.2820274829864502,-0.4348413646221161,-0.3592202067375183,-0.0728139579296112,0.010678708553314209,-1.6336438655853271,-1.892167568206787,-0.1404690146446228,-0.05635964870452881,-1.7320592403411865,-1.8579068183898926,-0.2577555775642395,-0.18466082215309143,-1.9856512546539307,-1.9331669807434082,0.10920274257659912,0.3161560297012329,0.0609666109085083,0.26174604892730713,-0.1072048544883728,0.10987436771392822,-0.2799839377403259,-0.32463183999061584,-0.4409041404724121,-0.3509945571422577,-0.16996803879737854,-0.030302822589874268,-2.2158281803131104,-2.1656270027160645,-0.7992857694625854,-0.7452999353408813,-0.28647592663764954,-0.20271852612495422,-2.1176204681396484,-2.007795810699463,0.04815816879272461,0.30178380012512207,-0.06747955083847046,0.08284097909927368,-0.4729998707771301,-0.4956733286380768,-0.5832082033157349,-0.5154549479484558,-0.659233570098877,-0.5857719779014587,-0.37711283564567566,-0.2814524173736572,-3.09077787399292,-2.953871726989746,-0.45064622163772583,-0.34885862469673157,-2.8989734649658203,-2.584606170654297,-0.6017643809318542,-0.4851744472980499,-2.716463565826416,-2.634688377380371,-0.13589262962341309,0.0033293962478637695,-0.19637441635131836,-0.10032454133033752,-0.31099385023117065,-0.21259713172912598},["action"]=44},{["query"]={1.0,1.0,0.0,0.0,0.0,-0.0,2.0034782886505127,0.0073913042433559895,0.3691016733646393,-0.3517415523529053,-0.20172490179538727,-0.0,-1.0,0.0,-0.0,-0.0,1.0,-0.22575603425502777,-0.044408366084098816,-0.34611308574676514,0.49000000953674316,0.0,1.0,0.0,1.0,-1.0,0.0,-1.0,0.0,0.0,0.0,1.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,-0.0,0.0,-0.3691016733646393,0.3517415523529053,-0.20172490179538727,-1.2246468525851679e-16,1.0,0.0,0.0,0.0,1.0,0.22575603425502777,0.044408366084098816,-0.34611308574676514,0.49000000953674316,0.0,1.0,0.0},{0.0,0.0,0.0,1.0,0.0,-0.25530630350112915,1.216863989830017,0.2747717499732971,0.5915378928184509,0.47121092677116394,0.41605353355407715,0.0,0.0,0.0,0.0,0.0,0.0,-0.4162544906139374,-0.042221132665872574,-0.06052389368414879,0.0,0.0,0.0,0.0}},["logits"]={-12.29292106628418,-7.589288234710693,-4.904374122619629,3.0514883995056152,0.6302318572998047,8.73386001586914,-5.703305244445801,-7.175554275512695,3.9143903255462646,4.64569616317749,10.279494285583496,11.003135681152344,-1.7448883056640625,-6.005566596984863,2.6359355449676514,-2.621516227722168,9.379962921142578,7.1653218269348145,13.991758346557617,11.992094039916992,16.34711456298828,13.101663589477539,20.928598403930664,18.913793563842773,-4.588400363922119,2.3795907497406006,-4.792255401611328,2.6897776126861572,-4.9831013679504395,3.0017974376678467,4.270109176635742,14.133499145507812,-1.5396552085876465,5.616096019744873,4.40131950378418,14.53691291809082,1.5772916078567505,6.000400543212891,4.27321195602417,14.587514877319336,-1.323814868927002,3.3535475730895996,10.304183959960938,20.882150650024414,10.711560249328613,21.38068199157715,10.144097328186035,20.983230590820312,-5.937347412109375,2.2694311141967773,-5.893664836883545,2.7333004474639893,3.377420425415039,14.038345336914062,-2.944079875946045,3.9205422401428223,-4.400754928588867,5.19942569732666,3.5687832832336426,13.753289222717285,-4.57044792175293,0.09287881851196289,9.82779312133789,20.550016403198242,10.02127456665039,20.911046981811523,-6.5895256996154785,1.727010726928711,-6.612720489501953,2.2951998710632324,-6.413755893707275,2.657132863998413,2.8084216117858887,12.919451713562012,-7.393589496612549,-1.565212368965149,3.1793251037597656,13.740972518920898,-7.383866786956787,-0.46669018268585205,3.3314905166625977,13.643638610839844,-6.606471061706543,-1.2544827461242676,9.256048202514648,19.59373664855957,9.249847412109375,20.177364349365234,9.387712478637695,20.12672233581543},["action"]=46},{["query"]={1.0,1.0,0.0,0.0,0.0,-0.0,2.0034782886505127,0.0073913042433559895,0.3691016733646393,-0.3517415523529053,-0.20172490179538727,-0.0,-1.0,0.0,-0.0,-0.0,1.0,-0.22575603425502777,-0.044408366084098816,-0.34611308574676514,0.49000000953674316,0.0,1.0,0.0,1.0,-1.0,0.0,-1.0,0.0,0.0,0.0,1.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,-0.0,0.0,-0.3691016733646393,0.3517415523529053,-0.20172490179538727,-1.2246468525851679e-16,1.0,0.0,0.0,0.0,1.0,0.22575603425502777,0.044408366084098816,-0.34611308574676514,0.49000000953674316,0.0,1.0,0.0},{0.0,0.0,0.0,1.0,0.0,-0.25530630350112915,1.216863989830017,0.2747717499732971,0.5915378928184509,0.47121092677116394,0.41605353355407715,0.0,0.0,0.0,0.0,0.0,0.0,-0.4162544906139374,-0.042221132665872574,-0.06052389368414879,0.0,0.0,0.0,0.0},{0.0,0.0,1.0,0.0,0.0,-0.260869562625885,2.6991305351257324,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,-0.043478261679410934,2.5252175331115723,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.17391304671764374,2.351304292678833,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.3913043439388275,2.177391290664673,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.6086956262588501,2.0034782886505127,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0}},["logits"]={-2.575051784515381,-2.7148337364196777,-1.3934495449066162,-1.0705819129943848,-0.3232656419277191,0.2530019283294678,-2.4487669467926025,-2.8098673820495605,-0.9404141902923584,-1.022263526916504,0.407892644405365,0.35337692499160767,-2.342975616455078,-2.743805170059204,-3.3090405464172363,-3.8365797996520996,-0.868474006652832,-0.913847804069519,-1.8934732675552368,-2.0221474170684814,0.6548647880554199,0.5194607973098755,-0.35130006074905396,-0.39356184005737305,-2.323779344558716,-3.119222402572632,-2.38224196434021,-3.258613109588623,-2.399456024169922,-3.3737502098083496,-0.9191496968269348,-1.7596359252929688,-1.0312695503234863,-2.024252414703369,-1.0077842473983765,-1.8909943103790283,-1.1601169109344482,-2.3428943157196045,-1.0075875520706177,-1.8363447189331055,-1.5692827701568604,-2.637702465057373,0.2827621102333069,-0.39120399951934814,0.32177382707595825,-0.38694286346435547,0.26325303316116333,-0.40810227394104004,-2.4852027893066406,-3.2232255935668945,-2.4745938777923584,-3.3597166538238525,-0.9622112512588501,-1.826258659362793,-0.9069560170173645,-2.0337467193603516,-1.202225685119629,-2.2456812858581543,-0.9562141299247742,-1.9521396160125732,-1.3128886222839355,-2.7416629791259766,0.35924893617630005,-0.34955841302871704,0.34791916608810425,-0.40468645095825195,-2.494910717010498,-3.2776920795440674,-2.419671058654785,-3.3134729862213135,-2.456650495529175,-3.26491117477417,-0.9707126617431641,-1.9001574516296387,-1.14935302734375,-2.2701973915100098,-0.9804114103317261,-1.8145183324813843,-1.156187891960144,-2.3987298011779785,-0.9179505705833435,-1.7865891456604004,-1.35775625705719,-2.6735005378723145,0.3209735155105591,-0.4556531310081482,0.3470498025417328,-0.4615853428840637,0.288372278213501,-0.4417140483856201},["action"]=21},{["query"]={1.0,1.0,0.0,0.0,0.0,-0.0,2.0034782886505127,0.0073913042433559895,0.3691016733646393,-0.3517415523529053,-0.20172490179538727,-0.0,-1.0,0.0,-0.0,-0.0,1.0,-0.22575603425502777,-0.044408366084098816,-0.34611308574676514,0.49000000953674316,0.0,1.0,0.0,1.0,-1.0,0.0,-1.0,0.0,0.0,0.0,1.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,-0.0,0.0,-0.3691016733646393,0.3517415523529053,-0.20172490179538727,-1.2246468525851679e-16,1.0,0.0,0.0,0.0,1.0,0.22575603425502777,0.044408366084098816,-0.34611308574676514,0.49000000953674316,0.0,1.0,0.0},{0.0,0.0,0.0,1.0,0.0,-0.25530630350112915,1.216863989830017,0.2747717499732971,0.5915378928184509,0.47121092677116394,0.41605353355407715,0.0,0.0,0.0,0.0,0.0,0.0,-0.4162544906139374,-0.042221132665872574,-0.06052389368414879,0.0,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-1.9594360229274526e-17,0.16000008583068848,0.023043477907776833,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-1.5582609176635742,2.0034782886505127,0.024347826838493347,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,1.5582609176635742,2.0034782886505127,0.023043477907776833,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-1.335652232170105,3.7843480110168457,0.024347826838493347,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-3.9529471225317617e-16,3.2278261184692383,0.023043477907776833,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,0.40869563817977905,3.441739082336426,0.024347826838493347,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0},{0.0,0.0,1.0,0.0,0.0,-0.260869562625885,2.6991305351257324,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,-0.043478261679410934,2.5252175331115723,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.17391304671764374,2.351304292678833,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.3913043439388275,2.177391290664673,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.6086956262588501,2.0034782886505127,0.0,0.10869564861059189,-0.19565217196941376,0.0,1.2246468525851679e-16,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0}},["logits"]={-4.478517055511475,-3.6226425170898438,-3.537365198135376,-2.186960220336914,-2.8583760261535645,-1.2160356044769287,-3.333589792251587,-3.5375924110412598,-2.0789129734039307,-2.0170516967773438,-0.9903757572174072,-0.9453578591346741,-2.8222575187683105,-3.2981276512145996,-3.910341501235962,-4.50457763671875,-1.4641737937927246,-1.692778468132019,-2.6501097679138184,-2.9005661010742188,-0.24795591831207275,-0.6065386533737183,-1.3729074001312256,-1.6104552745819092,-3.204792022705078,-3.7409610748291016,-3.2816624641418457,-3.889012575149536,-3.283397674560547,-3.979952335357666,-1.9897297620773315,-2.504361152648926,-3.436692714691162,-4.5486602783203125,-2.0670371055603027,-2.6309244632720947,-3.247828722000122,-4.626392364501953,-2.075186252593994,-2.5475857257843018,-3.392073154449463,-4.556717872619629,-1.1145294904708862,-1.413865566253662,-1.0945472717285156,-1.422415018081665,-1.1226146221160889,-1.3983646631240845,-3.347228765487671,-3.8120853900909424,-3.3520500659942627,-3.95198392868042,-2.0665531158447266,-2.5458285808563232,-3.2715539932250977,-4.440110206604004,-3.6984357833862305,-4.2687907218933105,-2.062983512878418,-2.675485610961914,-2.99676251411438,-4.316356658935547,-1.0075410604476929,-1.3497724533081055,-1.035444974899292,-1.3662983179092407,-3.2954695224761963,-3.8540101051330566,-3.316263437271118,-3.9021685123443604,-3.3646798133850098,-3.824721574783325,-2.0751938819885254,-2.581505298614502,-3.3730757236480713,-4.414746284484863,-2.125943183898926,-2.540259838104248,-3.1166186332702637,-4.189218997955322,-2.0146608352661133,-2.477583885192871,-3.104580879211426,-4.264252662658691,-0.9928407669067383,-1.4584511518478394,-1.0375690460205078,-1.477386713027954,-1.103520154953003,-1.4122681617736816},["action"]=21},{["query"]={1.0,1.0,0.0,0.0,0.0,-0.043478261679410934,-0.3478260934352875,0.32608696818351746,-0.16826005280017853,0.2914460003376007,-0.06117687001824379,-0.6000000238418579,-0.800000011920929,0.0,-0.0,-0.0,1.0,-0.26763835549354553,0.3327617347240448,-0.13260416686534882,0.0,0.0,0.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,1.0,1.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,-0.0,0.0,0.3094756603240967,-0.13220076262950897,-0.06117687001824379,0.0,1.0,0.0,0.0,0.0,1.0,0.4137677550315857,-0.10562637448310852,-0.13260416686534882,0.0,0.0,0.0,1.0},{0.0,0.0,0.0,1.0,0.0,-0.04528561234474182,-0.5013144016265869,-0.19275778532028198,-1.0598161220550537,0.13950741291046143,-0.13253438472747803,0.0,0.0,0.0,0.0,0.0,0.0,-0.0029610097408294678,0.3478546142578125,-0.22238017618656158,0.0,0.0,0.0,0.0}},["logits"]={-2.029463768005371,-1.7697941064834595,-4.851744174957275,-5.403741359710693,-10.676023483276367,-10.489686965942383,-0.04041910171508789,-2.2757911682128906,-2.6154944896698,-4.579028129577637,-7.150678634643555,-9.177762985229492,0.7421205043792725,-1.919069766998291,-0.7205700874328613,-3.365448474884033,0.593803882598877,-3.4367456436157227,-0.26590585708618164,-4.020783424377441,-2.806365966796875,-7.983053207397461,-2.0647764205932617,-7.131891250610352,-0.34450554847717285,-1.4759893417358398,0.418468713760376,-0.48900318145751953,-0.43180418014526367,-0.703092098236084,-3.671287775039673,-1.0948987007141113,-30.88461685180664,-34.372589111328125,-2.544553756713867,-1.0684919357299805,-25.18765640258789,-28.79792022705078,-2.5411202907562256,-0.7868208885192871,-18.078453063964844,-20.365768432617188,-7.775113582611084,-3.0002455711364746,-7.280162811279297,-2.83925199508667,-8.136015892028809,-3.5392308235168457,-0.7762789726257324,-1.568138837814331,-0.07445478439331055,-0.37048912048339844,-4.75839900970459,-1.2202563285827637,-28.399269104003906,-29.696008682250977,-9.260476112365723,-6.005801200866699,-2.3910746574401855,-0.4925704002380371,-8.286178588867188,-10.373485565185547,-7.946653842926025,-2.5710811614990234,-7.142777442932129,-2.07193660736084,-1.7365429401397705,-2.6727356910705566,-1.704157829284668,-1.9808316230773926,-1.8279366493225098,-1.589000940322876,-4.717044353485107,-2.7667219638824463,-22.861099243164062,-22.236167907714844,-4.078280925750732,-2.082185745239258,-10.666403770446777,-10.545511245727539,-4.497260093688965,-2.6184539794921875,-5.056416988372803,-6.4145073890686035,-8.777528762817383,-4.207537651062012,-8.332779884338379,-3.608088970184326,-8.797857284545898,-4.116565227508545},["action"]=13},{["query"]={1.0,1.0,0.0,0.0,0.0,-0.043478261679410934,-0.3478260934352875,0.32608696818351746,-0.16826005280017853,0.2914460003376007,-0.06117687001824379,-0.6000000238418579,-0.800000011920929,0.0,-0.0,-0.0,1.0,-0.26763835549354553,0.3327617347240448,-0.13260416686534882,0.0,0.0,0.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,1.0,1.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,-0.0,0.0,0.3094756603240967,-0.13220076262950897,-0.06117687001824379,0.0,1.0,0.0,0.0,0.0,1.0,0.4137677550315857,-0.10562637448310852,-0.13260416686534882,0.0,0.0,0.0,1.0},{0.0,0.0,0.0,1.0,0.0,-0.04528561234474182,-0.5013144016265869,-0.19275778532028198,-1.0598161220550537,0.13950741291046143,-0.13253438472747803,0.0,0.0,0.0,0.0,0.0,0.0,-0.0029610097408294678,0.3478546142578125,-0.22238017618656158,0.0,0.0,0.0,0.0},{0.0,0.0,1.0,0.0,0.0,-0.4521739184856415,0.09565219283103943,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,-0.17391304671764374,0.08695651590824127,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.104347825050354,0.0782608687877655,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.38260871171951294,0.06956522166728973,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.6608695983886719,0.06086954474449158,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0}},["logits"]={-2.7057580947875977,-2.011734962463379,-2.4124841690063477,-2.147123098373413,-2.677025556564331,-2.964815139770508,-1.9356880187988281,-1.9000818729400635,-1.7900186777114868,-1.9764010906219482,-2.5061721801757812,-3.0147900581359863,-1.569084644317627,-1.9327638149261475,-1.544865608215332,-1.8683357238769531,-1.4349358081817627,-1.9278087615966797,-1.3355613946914673,-1.7220250368118286,-2.4109647274017334,-3.12079119682312,-2.054304599761963,-2.773848056793213,-1.9682433605194092,-1.7022775411605835,-2.0640625953674316,-1.7148938179016113,-2.3276844024658203,-1.9540879726409912,-1.8497308492660522,-1.4800419807434082,-6.854089736938477,-7.032214164733887,-2.056777000427246,-1.6519439220428467,-5.5317277908325195,-5.807390213012695,-2.3684141635894775,-1.9347503185272217,-4.840268135070801,-5.118365287780762,-2.5817108154296875,-2.1858675479888916,-2.7790236473083496,-2.4115052223205566,-3.1183888912200928,-2.7544524669647217,-1.8782269954681396,-1.5323655605316162,-2.1333909034729004,-1.695472240447998,-1.687738060951233,-1.200289011001587,-7.435612678527832,-7.272600173950195,-4.235475063323975,-4.01732063293457,-2.1303277015686035,-1.5955274105072021,-4.25120210647583,-4.515527248382568,-2.409736394882202,-1.9543284177780151,-2.6944680213928223,-2.2790651321411133,-1.8620402812957764,-1.5582021474838257,-2.0741028785705566,-1.62745201587677,-2.2952229976654053,-1.82915461063385,-1.8374879360198975,-1.3064172267913818,-7.839061737060547,-7.499083042144775,-2.030339241027832,-1.4738692045211792,-6.468671798706055,-5.960306167602539,-2.347684860229492,-1.8402202129364014,-5.136185646057129,-5.278841495513916,-2.397228240966797,-2.0538363456726074,-2.517479658126831,-2.1872072219848633,-2.697093963623047,-2.464779853820801},["action"]=54},{["query"]={1.0,1.0,0.0,0.0,0.0,-0.043478261679410934,-0.3478260934352875,0.32608696818351746,-0.16826005280017853,0.2914460003376007,-0.06117687001824379,-0.6000000238418579,-0.800000011920929,0.0,-0.0,-0.0,1.0,-0.26763835549354553,0.3327617347240448,-0.13260416686534882,0.0,0.0,0.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,1.0,1.0},["entities"]={{1.0,1.0,0.0,0.0,0.0,0.0,-0.0,0.0,0.3094756603240967,-0.13220076262950897,-0.06117687001824379,0.0,1.0,0.0,0.0,0.0,1.0,0.4137677550315857,-0.10562637448310852,-0.13260416686534882,0.0,0.0,0.0,1.0},{0.0,0.0,0.0,1.0,0.0,-0.04528561234474182,-0.5013144016265869,-0.19275778532028198,-1.0598161220550537,0.13950741291046143,-0.13253438472747803,0.0,0.0,0.0,0.0,0.0,0.0,-0.0029610097408294678,0.3478546142578125,-0.22238017618656158,0.0,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,1.2799999713897705,-1.7791303396224976,-0.2956521809101105,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-1.0726957321166992,-1.2393044233322144,-0.2943478226661682,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,1.420521855354309,0.6306087374687195,-0.2956521809101105,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-1.9631304740905762,0.3189564347267151,-0.2943478226661682,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-0.5606956481933594,0.6751303672790527,-0.2956521809101105,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11999999731779099,1.0,0.0,0.0},{0.0,0.0,0.0,0.0,1.0,-0.3620869517326355,1.0914782285690308,-0.2943478226661682,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0},{0.0,0.0,1.0,0.0,0.0,-0.4521739184856415,0.09565219283103943,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,-0.17391304671764374,0.08695651590824127,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.104347825050354,0.0782608687877655,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0},{0.0,1.0,0.0,0.0,0.0,0.38260871171951294,0.06956522166728973,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.23999999463558197,0.0,1.0,1.0},{0.0,0.0,1.0,0.0,0.0,0.6608695983886719,0.06086954474449158,-0.31869566440582275,0.20434783399105072,-0.09130434691905975,0.0,0.6000000238418579,-0.800000011920929,0.0,0.0,0.0,1.0,0.0,0.0,0.09090909361839294,0.5,0.0,1.0,1.0}},["logits"]={-3.99709153175354,-2.9503278732299805,-3.6195755004882812,-3.0103116035461426,-4.3475470542907715,-4.398927688598633,-2.6536378860473633,-2.846757411956787,-2.3630199432373047,-2.7494635581970215,-3.668529987335205,-4.4630632400512695,-2.162208318710327,-2.8915202617645264,-2.229151725769043,-2.874375343322754,-1.9067718982696533,-2.6558380126953125,-1.9867866039276123,-2.513291835784912,-3.544269323348999,-4.593040466308594,-3.2335338592529297,-4.31422233581543,-2.759399890899658,-2.473477840423584,-2.832413911819458,-2.4392218589782715,-3.1342713832855225,-2.7015132904052734,-2.517634153366089,-2.1724014282226562,-11.208284378051758,-11.484045028686523,-2.718588352203369,-2.330068588256836,-9.480178833007812,-10.150862693786621,-3.0998518466949463,-2.5965864658355713,-8.765458106994629,-9.448628425598145,-3.789447069168091,-3.407503843307495,-3.9853148460388184,-3.637125015258789,-4.385018348693848,-3.9830029010772705,-2.6480650901794434,-2.2495694160461426,-2.855797052383423,-2.382965326309204,-2.331936836242676,-1.8868205547332764,-11.536745071411133,-11.354606628417969,-7.369856834411621,-6.999137878417969,-2.754540205001831,-2.2417852878570557,-7.686276912689209,-8.259450912475586,-3.5687241554260254,-3.14974308013916,-3.823986768722534,-3.4543862342834473,-2.6392791271209717,-2.3398189544677734,-2.8125431537628174,-2.371674060821533,-3.0465245246887207,-2.5561046600341797,-2.514491081237793,-2.0152716636657715,-11.84149169921875,-11.43331527709961,-2.693587303161621,-2.155424118041992,-9.891010284423828,-9.185441970825195,-3.092311382293701,-2.545914649963379,-8.354531288146973,-8.67879867553711,-3.5649843215942383,-3.2608094215393066,-3.656344413757324,-3.371461868286133,-3.8091554641723633,-3.6708357334136963},["action"]=54}}
         local peak=0
         for _,case in ipairs(cases)do
             local began=os.clock()
-            local action,logits=predict(case.query,case.entities)
+            local action,logits
+            if worker then
+                worker:start(case.query,case.entities,{})
+                local completed
+                repeat
+                    completed=worker:step(.0015)
+                    if not completed then loadingYield(true)end
+                until completed
+                action,logits=completed.index,completed.logits
+                began=os.clock()-completed.cpu
+            else action,logits=predict(case.query,case.entities)end
             peak=math.max(peak,os.clock()-began)
             for i,value in ipairs(logits)do
                 assert(math.abs(value-case.logits[i])<.0003+math.abs(case.logits[i])*.0001,
@@ -2701,20 +3049,54 @@ task.spawn(function()
         end
         cases=nil
         if not alive then return end
-        assert(peak<.2,"Local inference exceeds 200ms: this runtime is too slow")
+        if not worker then assert(peak<.2,"Local inference exceeds 200ms: this runtime is too slow")end
+        if worker then worker:cancel()end
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
-        label.Text=(MODEL_NAME.." LOCAL v6.8 ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
+        label.Text=(MODEL_NAME.." LOCAL v"..ADAPTER_VERSION.." ready | model self-test passed\nModel bf5343b5eeacac6bf7cdb75dac4a5c14ba0f94d820eae75f00a211b6119d69fa\nInference CPU peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
             :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")..(calibration.baseline and "\nMeasured goal defaults active."or "")
+        if worker then label.Text..='\nSmooth scheduling active | game optimization ON'end
         local lastTick,lastUi=os.clock(),-math.huge
+        local lastFrame=os.clock()
+        local function startJob(packet,hasFlip,now)
+            packet.has_jumped=jumpAt~=nil
+            local controls=table.clone(previous)
+            local metadata={at=now,epoch=epoch,team=packet.team,scene=packet.scene_token,ground=packet.ground_estimate}
+            worker:start(function(checkpoint)
+                local projected=latency:project(packet,physics,worker.wall,checkpoint)
+                metadata.car=projected.car;metadata.ball=projected.ball;metadata.targetAt=now+latency.horizon
+                return Policy.observe(projected,controls,hasFlip)
+            end,nil,metadata)
+        end
         local busy=false
         local rate=0
-        connect(game:GetService("RunService").Heartbeat,function()
+        connect(game:GetService("RunService").Heartbeat,function(frameDt)
             if not alive or busy then return end
             local now=os.clock()
+            local completed
+            if worker then
+                latency:sample(now,frameDt or now-lastFrame);lastFrame=now
+                if enabled and(not focus or input:GetFocusedTextBox()or input:IsKeyDown(Enum.KeyCode.F8)
+                    or(activeWindow and not activeWindow()))then stop('LOCAL paused: focus/chat/F8. F6 restarts.')end
+                if not enabled or now<armAt then worker:cancel()
+                else
+                    if held.RMB and lastJumpPress and now-lastJumpPress>.12 then
+                        if not pcall(event,'RMB',false)then stop('LOCAL paused: jump release failed');return end
+                        held.RMB=nil;previous[6]=0
+                    end
+                    if lastAppliedAt and now-lastAppliedAt>.25 and held.LMB then
+                        if not pcall(event,'LMB',false)then stop('LOCAL paused: boost release failed');return end
+                        held.LMB=nil;previous[7]=0
+                    end
+                    if worker.job and now-worker.job.at>.4 then release()end
+                    local ok,result=pcall(worker.step,worker,latency:budget())
+                    if not ok then stop('LOCAL inference stopped: '..tostring(result));return end
+                    completed=result
+                end
+            end
             local sampleDue,nextSample=Timing.due(now,sampleAt,(enabled or (calibrating and calibration.crossbar))and 1/HZ or .1)
-            if not sampleDue then return end
+            if not sampleDue and not completed then return end
             sampleAt=nextSample
             local elapsed=now-lastTick;lastTick=now
             busy=true
@@ -2728,13 +3110,14 @@ task.spawn(function()
                 stage="reading poses"
                 local poseAt=os.clock()
                 local packet,reason=read()
+                if packet then packet.scene_token=scene end
                 local poseMs=(os.clock()-poseAt)*1000
                 if reason~=lastReadReason then physics:mark(packet and "poses ready"or "waiting",now,reason)end
                 lastReadReason=reason
                 physics.runtime=runtimeSnapshot(now)
                 stage="observing ball physics"
                 local observeAt=os.clock()
-                physics:observe(packet,now)
+                physics:observe(packet,now,worker~=nil and not physicsEnabled and not calibrating)
                 local observeMs=(os.clock()-observeAt)*1000
                 if calibrating then
                     local keys={}
@@ -2770,6 +3153,10 @@ task.spawn(function()
                 local decisionPeriod=override and 1/30 or period
                 if previousPeriod~=decisionPeriod then decisionAt=nil;previousPeriod=decisionPeriod end
                 local due,nextDecision,late=Timing.due(now,decisionAt,decisionPeriod)
+                if worker and not override then
+                    if completed then due=true;nextDecision=decisionAt
+                    elseif worker.job then return end
+                end
                 if not due then return end
                 decisionAt=nextDecision
                 local decisionEpoch=epoch
@@ -2779,6 +3166,7 @@ task.spawn(function()
                 lastGround=ground
                 local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<PROFILE.physics.DOUBLEJUMP_MAX_DELAY))
                 local action=override
+                if worker and action then worker:cancel();completed=nil end
                 local modelMs,planningMs,entityCount,safetyMs=0,0,0,0
                 local modelRan=false
                 physics.plan=nil
@@ -2794,14 +3182,35 @@ task.spawn(function()
                     end
                     if not action then
                         stage="model observation"
-                        packet.has_jumped=jumpAt~=nil
-                        local query,entities=Policy.observe(packet,previous,hasFlip)
-                        entityCount=entities.entity_count or #entities
-                        stage="model inference"
-                        local modelAt=os.clock()
-                        local index=predict(query,entities)
-                        modelMs=(os.clock()-modelAt)*1000;modelRan=true
-                        action=Policy.action and Policy.action(index,entities)or actions[index]
+                        if worker then
+                            if completed and latency:fresh(completed,packet,now,epoch)then
+                                modelMs=completed.cpu*1000;modelRan=true
+                                entityCount=completed.context.entity_count or 0
+                                -- Remove actions that became unavailable while the model yielded.
+                                local mask=Policy.mask(ground,packet.boost,hasFlip,packet.turtled)
+                                local index,value=nil,-math.huge
+                                for i,v in ipairs(completed.logits)do if mask[i]and v>value then index,value=i,v end end
+                                action=Policy.action(assert(index),completed.context)
+                            else
+                                if not worker.job then startJob(packet,hasFlip,now)end
+                                if now-lastUi>.25 then
+                                    lastUi=now
+                                    label.Text=(MODEL_NAME..' v'..ADAPTER_VERSION..' | %.0f FPS | computing across frames\nPing %s | lead %.0f ms | AI slice %.2f ms\nGame optimization %s | F8 stop')
+                                        :format(1/latency.frame,latency.ping and('%.0f ms'):format(latency.ping*1000)or '?',
+                                            latency.horizon*1000,worker.last_slice_ms or 0,graphics and graphics.enabled and 'ON'or 'OFF')
+                                end
+                                return
+                            end
+                        else
+                            packet.has_jumped=jumpAt~=nil
+                            local query,entities=Policy.observe(packet,previous,hasFlip)
+                            entityCount=entities.entity_count or #entities
+                            stage="model inference"
+                            local modelAt=os.clock()
+                            local index=predict(query,entities)
+                            modelMs=(os.clock()-modelAt)*1000;modelRan=true
+                            action=Policy.action and Policy.action(index,entities)or actions[index]
+                        end
                         if needsPolicy then
                             stage="ground interception"
                             local planningAt=os.clock()
@@ -2853,6 +3262,7 @@ task.spawn(function()
                 end
                 actual[6]=held.RMB and 1 or 0
                 local inputMs=(os.clock()-inputAt)*1000
+                if worker then latency.input=latency.input*.8+math.min(inputMs/1000,.08)*.2 end
                 stage="input timing"
                 assert(inputMs<200,"Executor input calls exceeded 200ms")
                 physics.decision={time=now,mode=recovery or "model",milliseconds=inferenceMs,
@@ -2862,11 +3272,12 @@ task.spawn(function()
                 timing:record({time=now,model_ran=modelRan,entities=entityCount,pose_ms=poseMs,observe_ms=observeMs,
                     model_ms=modelMs,planning_ms=planningMs,safety_ms=safetyMs,decision_ms=inferenceMs,input_ms=inputMs,schedule_late_ms=late*1000})
                 previous=actual;rate=timing.rate
+                lastAppliedAt=now
                 if now-lastUi>=.2 then
                     stage="panel update"
                     lastUi=now
                     local names={};for _,key in ipairs(order)do if held[key]then names[#names+1]=key end end
-                    label.Text=(MODEL_NAME.." v6.8 | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
+                    label.Text=(MODEL_NAME.." v"..ADAPTER_VERSION.." | %.1f Hz | %s\nDecision %.1f ms | inputs %.1f ms | %s\n%s %s | want %s | seen %s\nOpponents %d | teammates %d | unknown %d\nPads %d/%d -> %d | car %s%s\nBall %.2f%s | contacts %d | F8 stop\nPhysics %s | g %.0f | flight error %s")
                         :format(rate,keyboard.name,inferenceMs,inputMs,recovery or "model",manualTeam==nil and "AUTO"or "MANUAL",TEAM==0 and "BLUE"or "ORANGE",table.concat(names," "),keyboard:observed(),
                             packet.opponents or 0,packet.teammates or 0,packet.unknown_cars or 0,
                             packet.boost_known or 0,packet.boost_total or 0,#(packet.boost_pads or {}),
@@ -2874,6 +3285,11 @@ task.spawn(function()
                             packet.ball_radius or PROFILE.physics.BALL_RADIUS,packet.ball_size_verified and ""or "?",packet.wheel_contacts or 0,
                             physics.mismatch and "MISMATCH / model"or physics.status,physics.gravity,
                             physics.error and("%.1f units"):format(physics.error)or "unmeasured")
+                    if worker then
+                        label.Text..=('\n%.0f FPS | ping %s | AI %.2f ms slice / %.0f ms age')
+                            :format(1/latency.frame,latency.ping and('%.0f ms'):format(latency.ping*1000)or '?',
+                                worker.last_slice_ms or 0,completed and(now-completed.metadata.at)*1000 or 0)
+                    end
                 end
             end)
             busy=false
@@ -2893,4 +3309,4 @@ task.spawn(function()
     end)
     if not ok and alive then stop("LOCAL startup stopped: "..tostring(errorText))end
 end)
-return {started=true,version="local-6.8"}
+return {started=true,version="local-"..ADAPTER_VERSION}
