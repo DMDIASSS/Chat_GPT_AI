@@ -103,6 +103,7 @@ class ModelTests(unittest.TestCase):
         cls.model = chronos.Chronos(ASSETS)
         cls.tensors, cls.cases = chronos.prepare_model(cls.model)
         cls.source = build_chronos.source(ASSETS)
+        cls.fast_source=build_chronos.source(ASSETS,build_chronos.RUNTIME_MODEL['revision'])
         cls.module = cls.source.split("local Keyboard=(function()", 1)[0]
 
     run_lua = legacy_tests.StandaloneTests.run_lua
@@ -162,6 +163,51 @@ assert(playerGui.children.Update271Standalone.destroyed)
     def test_generated_download_matches_current_builder(self):
         artifact=APP.parent/'downloads/TurboBall_Chronos.lua'
         self.assertEqual(artifact.read_bytes(),self.source.encode('utf-8'))
+        self.assertEqual((APP.parent/'downloads/TurboBall_Chronos_Fast.lua').read_bytes(),self.fast_source.encode())
+
+    def test_raw_model_artifact_preserves_every_float32_parameter(self):
+        import hashlib
+        data,layout,count=build_chronos.model_data(self.tensors)
+        artifact=(APP.parent/'downloads/ChronosV2_1_FP32.bin').read_bytes()
+        self.assertEqual(artifact,data)
+        self.assertEqual(len(artifact),count*4)
+        self.assertEqual(hashlib.sha256(data).hexdigest(),build_chronos.RUNTIME_MODEL['sha256'])
+        for name,array in self.tensors.items():
+            at,n=layout[name]
+            np.testing.assert_array_equal(np.frombuffer(artifact,dtype='<f4',count=n,offset=(at-1)*4),array.reshape(-1))
+
+    def test_fast_loader_downloads_data_once_before_enabling_inputs(self):
+        extra=self.module+'\nlocal rawTensors=(function()\n'+build_chronos.tensor_source(self.tensors)+'\nend)()\n'
+        extra+='''
+local modelBytes=buffer.tostring(rawTensors['shared.0.weight'].data);rawTensors=nil
+local downloads=0
+function game:HttpGet(url)
+ assert(playerGui:FindFirstChild('Update271Standalone'),'HTTP started before the panel existed')
+ assert(string.find(url,'/'''+build_chronos.RUNTIME_MODEL['revision']+'''/',1,true),'Unpinned model URL')
+ assert(#emissions==0,'Inputs were emitted before the model was checked')
+ downloads+=1;return modelBytes
+end
+'''
+        self.client_case('''
+assert(downloads==1 and result.version=='local-6.10')
+move(.05);inputKey('F6')
+for i=1,30 do move(1/30)end
+assert(#emissions>0,'Fast loader never reached Ready')
+assert(downloads==1,'Model was downloaded again during play')
+inputKey('F8');click('Close')
+''','',extra=extra,source=self.fast_source)
+
+    def test_fast_loader_http_error_leaves_inputs_disabled(self):
+        self.client_case('''
+local reported=false
+for _,item in ipairs(created)do
+ if item.ClassName=='TextLabel'and string.find(item.Text or '','HTTP 503',1,true)then reported=true end
+end
+assert(reported,'Startup error was hidden')
+inputKey('F6');for i=1,20 do move(1/30)end
+assert(#emissions==0,'Failed download enabled inputs')
+click('Close')
+''','',extra="function game:HttpGet(url)error('HTTP 503')end\n",source=self.fast_source)
 
     def test_buffer_loader_vector_slices_and_scalar_fallback_match(self):
         source=self.module+'\nlocal Worker=(function()\n'+(APP/'templates/local_cooperative.lua').read_text()+'\nend)()\n'
@@ -193,7 +239,7 @@ print('SLICED_PARITY_OK',#cases,'mean_cpu_ms',total/#cases,'peak_slice_ms',peak,
 
     def test_graphics_default_toggle_and_close_restore(self):
         self.client_case('''
-assert(result.version=='local-6.9')
+assert(result.version=='local-6.10')
 assert(not lighting.GlobalShadows,'Light graphics did not start enabled')
 for i=1,10 do move(1/120)end
 click('Game optimization: ON');assert(lighting.GlobalShadows)
@@ -208,8 +254,9 @@ services.Lighting=lighting
 ''')
 
     def test_f8_cancels_a_yielded_job_and_restart_uses_new_work(self):
-        needle='local predict,backend=Policy.new(loadTensors(),{yieldWork=RUNTIME.cooperative and loadingYield or nil})'
-        wrapped='''local rawPredict,backend=Policy.new(loadTensors(),{yieldWork=loadingYield})
+        needle='''local predict,backend=Policy.new(tensors,{yieldWork=RUNTIME.cooperative and loadingYield or nil,
+            progress=RUNTIME.cooperative and loadingProgress or nil})'''
+        wrapped='''local rawPredict,backend=Policy.new(tensors,{yieldWork=loadingYield})
 local function predict(q,c,checkpoint)
  if slowRuntime then
   jobsStarted+=1

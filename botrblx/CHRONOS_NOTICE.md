@@ -37,3 +37,8 @@ comparison reports for test scope and limitations.
 
 Local v6.9 additionally implements cooperative, cancellable model work, buffered
 weight decoding, latency/freshness handling, and reversible rendering changes.
+
+Local v6.10 adds bounded startup scheduling and progress/error reporting. The
+Fast loader fetches the identical public FP32 values as raw data from the
+immutable revision in `chronos_runtime.json`; inference remains local. The
+standalone artifact continues to embed those values for offline operation.

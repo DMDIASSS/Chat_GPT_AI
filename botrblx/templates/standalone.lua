@@ -15,6 +15,7 @@
 -- LOCAL_COOPERATIVE_HERE
 -- LOCAL_LATENCY_HERE
 -- LOCAL_GRAPHICS_HERE
+-- LOCAL_STARTUP_HERE
 local RUNTIME=
 -- RUNTIME_SETTINGS_HERE
 local ADAPTER_VERSION=RUNTIME.version or '6.8'
@@ -413,14 +414,23 @@ local function teamChanged()
     lastGround=true;armAt=os.clock()+.15
 end
 -- POSE_READER_HERE
-local loadYieldAt=os.clock()
+local startup=RUNTIME.cooperative and Startup.new({alive=function()return alive end,
+    render=function(stage,done,total,elapsed)
+        local progress=total and(' | %.0f%%'):format(math.clamp(done/total,0,1)*100)or ''
+        label.Text=MODEL_NAME..' LOCAL v'..ADAPTER_VERSION..': loading\n'..stage..progress..
+            ('\nElapsed %.1fs | Close cancels loading'):format(elapsed)
+    end})or nil
 local function loadingYield(force)
     assert(alive,'Model loading cancelled')
-    if RUNTIME.cooperative and(force or os.clock()-loadYieldAt>=.002)then
-        task.wait()
-        loadYieldAt=os.clock()
-        assert(alive,'Model loading cancelled')
-    end
+    if startup then startup:checkpoint(force)end
+end
+local function loadingProgress(stage,done,total)
+    if startup then startup:progress(stage,done,total)end
+end
+local function downloadModel(url,layout,count)
+    local raw=startup:download(url,count*4)
+    loadingProgress('Opening FP32 model',0,1)
+    return Policy.loadBuffer(buffer.fromstring(raw),layout,count)
 end
 local function loadTensors()
 -- MODEL_TENSORS_HERE
@@ -438,21 +448,26 @@ task.spawn(function()
             assert(type(fn)=="function","Missing executor input function: "..name)
         end
         if type(activeWindow)~="function"then activeWindow=nil end
-        local predict,backend=Policy.new(loadTensors(),{yieldWork=RUNTIME.cooperative and loadingYield or nil})
+        loadingProgress('Decoding embedded model',0,1)
+        local tensors=loadTensors()
+        local predict,backend=Policy.new(tensors,{yieldWork=RUNTIME.cooperative and loadingYield or nil,
+            progress=RUNTIME.cooperative and loadingProgress or nil})
+        tensors=nil
         worker=RUNTIME.cooperative and Worker.new(predict)or nil
         if worker then worker.backend=backend end
         local cases=
 -- MODEL_CASES_HERE
         local peak=0
-        for _,case in ipairs(cases)do
+        for caseIndex,case in ipairs(cases)do
+            loadingProgress('Checking model outputs',caseIndex-1,#cases)
             local began=os.clock()
             local action,logits
             if worker then
                 worker:start(case.query,case.entities,{})
                 local completed
                 repeat
-                    completed=worker:step(.0015)
-                    if not completed then loadingYield(true)end
+                    completed=worker:step(.0025)
+                    if not completed then loadingYield()end
                 until completed
                 action,logits=completed.index,completed.logits
                 began=os.clock()-completed.cpu
@@ -467,13 +482,13 @@ task.spawn(function()
         cases=nil
         if not alive then return end
         if not worker then assert(peak<.2,"Local inference exceeds 200ms: this runtime is too slow")end
-        if worker then worker:cancel()end
+        if worker then worker:cancel();worker.wall=nil;worker.last=nil end
         local period=1/15 -- target cadence; missed slots are skipped, never replayed in a burst
         local actions=Policy.actions()
         ready=true;start.Active=true
         label.Text=(MODEL_NAME.." LOCAL v"..ADAPTER_VERSION.." ready | model self-test passed\nModel __MODEL_SHA__\nInference CPU peak %.1f ms | target %.1f Hz\nGround assist %s | teammate yield OFF | F6 starts.")
             :format(peak*1000,1/period,physicsEnabled and "ON"or "OFF")..(calibration.baseline and "\nMeasured goal defaults active."or "")
-        if worker then label.Text..='\nSmooth scheduling active | game optimization ON'end
+        if worker then label.Text..='\nSmooth scheduling active | game optimization '..(graphics and graphics.enabled and 'ON'or 'OFF')end
         local lastTick,lastUi=os.clock(),-math.huge
         local lastFrame=os.clock()
         local function startJob(packet,hasFlip,now)

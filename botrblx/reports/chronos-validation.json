@@ -4,7 +4,7 @@
   "model": "Chronos V2.1",
   "model_revision": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
   "targeted_tests": {
-    "passed": 190,
+    "passed": 198,
     "failed": 0,
     "subtests_passed": 47
   },
@@ -44,12 +44,20 @@
   },
   "artifacts": {
     "TurboBall_Chronos.lua": {
-      "bytes": 20597184,
-      "sha256": "1a0498541a6e5525d2e24d47759483038eed4f63594e10ae105990dfa93b7ae8"
+      "bytes": 20601317,
+      "sha256": "37e077750d5889cf4fa981c1293c8eb485a891b47b0a92ebbbeea075d3f1538b"
+    },
+    "TurboBall_Chronos_Fast.lua": {
+      "bytes": 215793,
+      "sha256": "495d11fe1abb9f77306ec8616b58a1ba5e3524c881e9a7e8622c5cf1f52d7e9f"
+    },
+    "ChronosV2_1_FP32.bin": {
+      "bytes": 15285480,
+      "sha256": "eacc0beca7ffb06dc4ab745535cec26c4ebcb24d645d6fd10f5ca2700116384c"
     },
     "TurboBall_Nexto.lua": {
-      "bytes": 2588114,
-      "sha256": "622ce664bb4f18ea5fff54cd9c18fdac075d86951d8701fd5c11720f35fa8eee"
+      "bytes": 2591546,
+      "sha256": "8a951a688b1115f4fd951e08382268bc4501701b822026de112b10c18857ea5d"
     }
   },
   "scope": [
@@ -63,11 +71,17 @@
     "Vector and scalar fallback parity",
     "Freshness bounds and network correction rejection",
     "Graphics defaults, streaming effects, protected cues and conditional restoration",
-    "Published artifact equals the current builder output"
+    "Published artifact equals the current builder output",
+    "Raw binary artifact preserves every source float32 parameter",
+    "Small loader opens its panel before downloading pinned model data",
+    "Download timeout, HTTP errors, truncation, cancellation and late-reply handling",
+    "Startup batching under a synthetic 10 FPS scheduler"
   ],
   "live_roblox_test": false,
   "all_linked_bots_compared": false,
   "command": "LUAU_BIN=... CHRONOS_ASSETS=... python -m pytest botrblx/tests -q",
-  "adapter_version": "6.9",
-  "previous_release": "b2d5dc006b505fe87d33e61f9687a0b76177feb2"
+  "adapter_version": "6.10",
+  "previous_release": "2dd06519ec2cafab436d4a0fb22ae2cc60057330",
+  "startup_comparison": "chronos-startup-v6.10.json",
+  "model_data_revision": "aa6141f163cc3a059509019c178bbd527238356d"
 }

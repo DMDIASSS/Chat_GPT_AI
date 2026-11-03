@@ -1,0 +1,8 @@
+{
+  "repository": "DMDIASSS/Chat_GPT_AI",
+  "revision": "aa6141f163cc3a059509019c178bbd527238356d",
+  "path": "downloads/ChronosV2_1_FP32.bin",
+  "bytes": 15285480,
+  "sha256": "eacc0beca7ffb06dc4ab745535cec26c4ebcb24d645d6fd10f5ca2700116384c",
+  "format": "Original model.state_dict order, contiguous little-endian float32; no quantization"
+}

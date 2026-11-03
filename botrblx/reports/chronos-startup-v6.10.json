@@ -1,0 +1,27 @@
+{
+  "baseline": {
+    "cpu_seconds": 2.104411,
+    "decode_cpu_seconds": 1.545026,
+    "pack_cpu_seconds": 0.424049,
+    "test_cpu_seconds": 0.135337,
+    "decode_waits": 684,
+    "pack_waits": 176,
+    "test_waits": 74,
+    "waits": 934,
+    "estimated_seconds_at_10fps": 95.504411
+  },
+  "fast": {
+    "cpu_seconds": 0.730471,
+    "waits": 76,
+    "estimated_seconds_at_10fps": 8.330471
+  },
+  "parity_states": 8,
+  "baseline_revision": "2dd06519ec2cafab436d4a0fb22ae2cc60057330",
+  "adapter_version": "6.10",
+  "mode": "Luau CLI VM; waits counted without sleeping; model already present in memory",
+  "http_download_included": false,
+  "live_roblox_startup_measured": false,
+  "assumed_scheduler_fps": 10,
+  "raw_model_bytes": 15285480,
+  "startup_wait_reduction_factor": 12.289473684210526
+}

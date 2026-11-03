@@ -1,4 +1,4 @@
--- Chronos V2.1: full float32 weights, double accumulation, no runtime HTTP.
+-- Chronos V2.1: full float32 weights; no network calls during inference.
 -- COMMON_ADAPTER_HERE
 local PADS=
 -- CHRONOS_PADS_HERE
@@ -77,12 +77,12 @@ local function denseVector(l,x,checkpoint)
 end
 
 -- Decode straight into a buffer: no multi-million-element flat number table.
-function Policy.loadChunks(chunks,layout,count,yieldWork)
+function Policy.loadChunks(chunks,layout,count,yieldWork,progress)
     local alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
     local values={};for i=1,64 do values[string.byte(alphabet,i)]=i-1 end;values[61]=0
     local data=buffer.create(count*4)
     local offset=0
-    for _,part in ipairs(chunks)do
+    for chunkIndex,part in ipairs(chunks)do
         for i=1,#part,4 do
             local a,b,c,d=string.byte(part,i,i+3)
             local n=assert(values[a])*262144+assert(values[b])*4096+assert(values[c])*64+assert(values[d])
@@ -91,10 +91,19 @@ function Policy.loadChunks(chunks,layout,count,yieldWork)
             if offset<count*4 then buffer.writeu8(data,offset,n%256);offset+=1 end
             if yieldWork and i%2048==1 then yieldWork()end
         end
+        if progress then progress('Decoding embedded model',chunkIndex,#chunks)end
     end
     assert(offset==count*4,'Incomplete embedded Chronos model')
+    return Policy.loadBuffer(data,layout,count)
+end
+
+function Policy.loadBuffer(data,layout,count)
+    assert(buffer.len(data)==count*4,'Incomplete Chronos FP32 model')
     local tensors={}
-    for name,spec in pairs(layout)do tensors[name]={data=data,offset=(spec[1]-1)*4,count=spec[2]}end
+    for name,spec in pairs(layout)do
+        assert(spec[1]>=1 and spec[2]>=1 and spec[1]+spec[2]-1<=count,'Invalid Chronos tensor layout')
+        tensors[name]={data=data,offset=(spec[1]-1)*4,count=spec[2]}
+    end
     return tensors
 end
 
@@ -124,6 +133,8 @@ function Policy.new(tensors,options)
     end
     local layers={}
     local function layer(prefix,width,rows,norm)
+        local stage='Preparing actor layer '..tostring(#layers+1)..'/7'
+        if options.progress then options.progress(stage,0,rows)end
         local raw=assert(tensors[prefix..'.weight'])
         local l={b=numbers(assert(tensors[prefix..'.bias'])),width=width,rows=rows,out=table.create(rows)}
         assert(size(raw)==width*rows and #l.b==rows,'Chronos tensor shape mismatch')
@@ -144,9 +155,11 @@ function Policy.new(tensors,options)
                         r+2<=rows and get(raw,base+width*2+c)or 0)
                 end
                 if options.yieldWork then options.yieldWork()end
+                if options.progress then options.progress(stage,math.min(r+2,rows),rows)end
             end
         else l.w=numbers(raw)end
         layers[#layers+1]=l
+        if options.progress then options.progress(stage,rows,rows)end
     end
     layer('shared.0',225,960,'shared.1')
     layer('shared.3',960,960,'shared.4')

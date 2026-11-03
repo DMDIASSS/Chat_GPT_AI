@@ -1,9 +1,31 @@
 # TurboBall Chronos V2.1
 
 `downloads/TurboBall_Chronos.lua` contains the actual public Chronos V2.1 shared
-head and actor. It runs locally in Luau with the botrblx v6.9 window,
+head and actor. It runs locally in Luau with the botrblx v6.10 window,
 keyboard controls, telemetry, measured goal calibration and bounded recovery.
 There is no Python server to keep running and no model download during play.
+
+## v6.10: startup fix
+
+Use **`downloads/TurboBall_Chronos_Fast.lua`** for the online loader. Its panel
+opens before downloading the 15.3 MB raw FP32 model from an immutable Git commit.
+This avoids compiling a 20.6 MB Lua payload and decoding millions of Base64
+characters on the client. The original standalone file remains available for
+offline use. Both run the same full actor and check all eight reference states.
+
+The old loader yielded roughly a thousand times during preparation. At low FPS,
+those frame waits could turn a few seconds of CPU work into minutes. Preparation
+now batches work into approximately 8 ms slices; live inference retains its
+smaller frame budget. The panel shows the current stage, layer/test progress and
+elapsed time. HTTP has a 60-second timeout, preparation has a 120-second limit,
+and Close cancels loading. Late HTTP replies cannot start a cancelled load.
+No inputs are enabled until all numerical checks pass. The file size is checked
+before opening the downloaded model; its exact exported SHA256 is recorded in
+`chronos_runtime.json`, and build tests compare every float32 parameter.
+
+See [the startup comparison](reports/chronos-startup-v6.10.json). It measures
+cloud Luau CPU work and counts scheduler waits; HTTP time and live Roblox startup
+are not measured. Download speed and the executor still affect readiness.
 
 ## v6.9: frame stalls, lag compensation and light graphics
 
@@ -48,10 +70,13 @@ Turbo Soccer place `101880234193261` with the original keyboard/mouse bindings.
 For the GitHub branch containing this change:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/DMDIASSS/Chat_GPT_AI/refs/heads/botrblx-chronos/downloads/TurboBall_Chronos.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/DMDIASSS/Chat_GPT_AI/refs/heads/botrblx-chronos/downloads/TurboBall_Chronos_Fast.lua"))()
 ```
 
-For a downloaded file, put `TurboBall_Chronos.lua` in the JJSploit workspace:
+Paste only the Lua code; trailing text after `()` causes a syntax error before
+the panel can open. Clear the editor before pasting a replacement loader.
+
+For offline use, put the full `TurboBall_Chronos.lua` in the JJSploit workspace:
 
 ```lua
 loadstring(readfile("TurboBall_Chronos.lua"))()
@@ -96,8 +121,8 @@ universal champion.
 ## Runtime limits
 
 - The network contains about 3.8 million float32 parameters. The standalone file
-  is about 20.6 MB. The file embeds the full model; startup still has download
-  and compilation cost even though decoding/packing is spread across frames.
+  is about 20.6 MB. The fast loader downloads model data separately; its 15.3 MB
+  transfer still depends on the connection. Both prepare the same weights.
 - The existing scheduler targets 15 decisions per second. Startup rejects a
   numerical mismatch before enabling Start, and the panel reports actual cadence.
   Frame slicing can reduce decision rate to preserve rendering responsiveness.
@@ -115,7 +140,7 @@ universal champion.
 From the repository root, with the project's Python environment:
 
 ```text
-python botrblx/build_chronos.py --download
+python botrblx/build_chronos.py --download --fast-output downloads/TurboBall_Chronos_Fast.lua
 ```
 
 Or supply a folder already containing the two pinned `.lt` assets:
