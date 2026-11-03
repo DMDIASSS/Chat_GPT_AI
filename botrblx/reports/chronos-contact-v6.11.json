@@ -1,0 +1,19 @@
+{
+  "synthetic_kinematic_contacts": {
+    "cases": 12,
+    "straight_control_hits": 2,
+    "assisted_hits": 12
+  },
+  "cpu_ms": {
+    "mean": 0.276084,
+    "p95": 0.813709,
+    "max": 7.30899,
+    "samples": 600
+  },
+  "adapter_version": "6.11",
+  "mode": "Cloud Luau CLI VM, synthetic ground contacts",
+  "limitations": "Simplified bicycle steering and braking; the comparison uses a straight-driving dummy, not a trained actor. No car collisions, aerials, network latency or live Roblox hit rate.",
+  "reference": "Steering-angle curve and wheelbase from the saved place numeric profile; saved ball/world solver",
+  "live_roblox_measured": false,
+  "model_weights_changed": false
+}

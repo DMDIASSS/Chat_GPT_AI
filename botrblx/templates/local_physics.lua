@@ -138,7 +138,9 @@ function Physics:observe(packet,now,cheap)
             or distance(p,self.lastBall)>self.profile.physics.BALL_MAX_SPEED*dt+100 then self:reset()end
     end
     self.lastAt,self.lastBall,self.radius,self.team=now,table.clone(p),radius,packet.team
-    local clear=not cheap and self:clearFlight(packet,radius)
+    -- Gravity fitting is a few arithmetic operations on bounded history. Keep
+    -- it active in light mode; only skip the costly forecast validation there.
+    local clear=self:clearFlight(packet,radius)
     if not clear then self.history={};self.forecast=nil else
         local h=self.history
         h[#h+1]={at=now,p=table.clone(p)}
@@ -150,13 +152,13 @@ function Physics:observe(packet,now,cheap)
                 local acceleration={}
                 for i=1,3 do acceleration[i]=2*((c.p[i]-b.p[i])/dt2-(b.p[i]-a.p[i])/dt1)/(dt1+dt2)end
                 local gravity=acceleration[3]+(-math.log(1-self.profile.physics.BALL_DRAG))*packet.ball.velocity[3]
-                if sqrt(acceleration[1]^2+acceleration[2]^2)<250 and gravity< -150 and gravity> -3000 then
+                if sqrt(acceleration[1]^2+acceleration[2]^2)<250 and gravity< -20 and gravity> -3000 then
                     local samples=self.gravitySamples
                     samples[#samples+1]=gravity;if #samples>15 then table.remove(samples,1)end
                     if #samples>=6 then
                         local middle=median(samples)
                         local deviations={};for i,g in ipairs(samples)do deviations[i]=abs(g-middle)end
-                        if median(deviations)<max(35,abs(middle)*.08)then
+                        if median(deviations)<max(5,abs(middle)*.08)then
                             self.gravity=middle;self.observedGravity=middle
                             self.status=abs(middle-self.profile.physics.GRAVITY_Z)>100 and "live gravity adapted"or "flight checked"
                         end
@@ -165,7 +167,8 @@ function Physics:observe(packet,now,cheap)
                 self.lastFit=now
             end
         end
-        if self.forecast and now-self.forecast.at>=.2 then
+        if cheap then self.forecast=nil
+        elseif self.forecast and now-self.forecast.at>=.2 then
             local future=self:predict(self.forecast.ball,radius,now-self.forecast.at,1000)
             local error=distance(p,future[#future].position)
             self.errors[#self.errors+1]=error;if #self.errors>20 then table.remove(self.errors,1)end
@@ -174,7 +177,7 @@ function Physics:observe(packet,now,cheap)
             self.totalFlightErrors=self.totalFlightErrors+1
             self.forecast=nil
         end
-        if not self.forecast then self.forecast={at=now,ball=copy(packet.ball)}end
+        if not cheap and not self.forecast then self.forecast={at=now,ball=copy(packet.ball)}end
     end
     -- A gross coordinate/arena mismatch cannot safely use this ground planner.
     self.mismatch=self.arena:distance(p)<-radius*2 or(self.error or 0)>radius*2

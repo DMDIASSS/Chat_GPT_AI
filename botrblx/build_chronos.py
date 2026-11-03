@@ -43,7 +43,7 @@ def source(folder,model_revision=None):
     profile["policy_boost_limit"] = 34
     return notice() + render_standalone(tensors, cases, asset_digest(), profile=profile,
         model_name=MANIFEST["name"], physics_assist=False, policy_file="local_chronos.lua",
-        runtime_options={"cooperative":True,"light_graphics":True,"latency":True,"version":"6.10"},
+        runtime_options={"cooperative":True,"light_graphics":True,"latency":True,"contact":True,"ignore_teammates":True,"version":"6.11"},
         tensor_writer=(lambda tensors:remote_tensor_source(tensors,model_revision))if model_revision else tensor_source,
         policy_replacements={"-- CHRONOS_PADS_HERE": literal(PADS.tolist()),
                              "-- CHRONOS_MIRROR_PADS_HERE": literal([i + 1 for i in MIRROR_PADS])})

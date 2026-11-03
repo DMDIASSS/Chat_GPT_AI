@@ -16,6 +16,7 @@ function Arena.new(profile)
         self.facets[i]={math.cos((lo+hi)/2),math.sin((lo+hi)/2),math.cos((hi-lo)/2)}
     end
     local a=profile.arena
+    self.floorInset=max(a.SIDE_CORNER_RADIUS,a.BACK_CORNER_RADIUS,a.EDGE_RADIUS)
     self.sideCenter={a.EXTENT_X-a.SIDE_CORNER_RADIUS,0}
     self.sideCenter[2]=a.CORNER-self.sideCenter[1]-a.SIDE_CORNER_RADIUS*sqrt(2)
     self.backCenter={0,a.EXTENT_Y-a.BACK_CORNER_RADIUS}
@@ -85,7 +86,16 @@ function Arena:netProfile(depth,z)
     return min(floorDistance,roof,max(640-depth,back,min(self.netCorner[1]-depth,z-self.netCorner[2])))
 end
 
+-- A conservative interior region has the flat floor as its nearest surface.
+-- Keep the full curved geometry near ramps, corners, goals and the ceiling.
+function Arena:flatFloor(p)
+    local a=self.profile.arena
+    local clearance=min(a.EXTENT_X-abs(p[1]),a.EXTENT_Y-abs(p[2]),
+        (a.CORNER-abs(p[1])-abs(p[2]))*.7071067811865476)-self.floorInset
+    return p[3]<a.HEIGHT*.5 and clearance>max(p[3],0)+1
+end
 function Arena:distance(p)
+    if self:flatFloor(p)then return p[3]end
     local a=self.profile.arena
     local x,y,z=abs(p[1]),abs(p[2]),p[3]
     if y>4000 and x<a.GOAL_HALF_WIDTH+700 then
@@ -110,6 +120,7 @@ function Arena:distance(p)
 end
 
 function Arena:query(p)
+    if self:flatFloor(p)then return p[3],{0,0,1}end
     local d=self:distance(p)
     local normal={}
     for i=1,3 do

@@ -518,6 +518,7 @@ function Arena.new(profile)
         self.facets[i]={math.cos((lo+hi)/2),math.sin((lo+hi)/2),math.cos((hi-lo)/2)}
     end
     local a=profile.arena
+    self.floorInset=max(a.SIDE_CORNER_RADIUS,a.BACK_CORNER_RADIUS,a.EDGE_RADIUS)
     self.sideCenter={a.EXTENT_X-a.SIDE_CORNER_RADIUS,0}
     self.sideCenter[2]=a.CORNER-self.sideCenter[1]-a.SIDE_CORNER_RADIUS*sqrt(2)
     self.backCenter={0,a.EXTENT_Y-a.BACK_CORNER_RADIUS}
@@ -587,7 +588,16 @@ function Arena:netProfile(depth,z)
     return min(floorDistance,roof,max(640-depth,back,min(self.netCorner[1]-depth,z-self.netCorner[2])))
 end
 
+-- A conservative interior region has the flat floor as its nearest surface.
+-- Keep the full curved geometry near ramps, corners, goals and the ceiling.
+function Arena:flatFloor(p)
+    local a=self.profile.arena
+    local clearance=min(a.EXTENT_X-abs(p[1]),a.EXTENT_Y-abs(p[2]),
+        (a.CORNER-abs(p[1])-abs(p[2]))*.7071067811865476)-self.floorInset
+    return p[3]<a.HEIGHT*.5 and clearance>max(p[3],0)+1
+end
 function Arena:distance(p)
+    if self:flatFloor(p)then return p[3]end
     local a=self.profile.arena
     local x,y,z=abs(p[1]),abs(p[2]),p[3]
     if y>4000 and x<a.GOAL_HALF_WIDTH+700 then
@@ -612,6 +622,7 @@ function Arena:distance(p)
 end
 
 function Arena:query(p)
+    if self:flatFloor(p)then return p[3],{0,0,1}end
     local d=self:distance(p)
     local normal={}
     for i=1,3 do
@@ -1319,7 +1330,9 @@ function Physics:observe(packet,now,cheap)
             or distance(p,self.lastBall)>self.profile.physics.BALL_MAX_SPEED*dt+100 then self:reset()end
     end
     self.lastAt,self.lastBall,self.radius,self.team=now,table.clone(p),radius,packet.team
-    local clear=not cheap and self:clearFlight(packet,radius)
+    -- Gravity fitting is a few arithmetic operations on bounded history. Keep
+    -- it active in light mode; only skip the costly forecast validation there.
+    local clear=self:clearFlight(packet,radius)
     if not clear then self.history={};self.forecast=nil else
         local h=self.history
         h[#h+1]={at=now,p=table.clone(p)}
@@ -1331,13 +1344,13 @@ function Physics:observe(packet,now,cheap)
                 local acceleration={}
                 for i=1,3 do acceleration[i]=2*((c.p[i]-b.p[i])/dt2-(b.p[i]-a.p[i])/dt1)/(dt1+dt2)end
                 local gravity=acceleration[3]+(-math.log(1-self.profile.physics.BALL_DRAG))*packet.ball.velocity[3]
-                if sqrt(acceleration[1]^2+acceleration[2]^2)<250 and gravity< -150 and gravity> -3000 then
+                if sqrt(acceleration[1]^2+acceleration[2]^2)<250 and gravity< -20 and gravity> -3000 then
                     local samples=self.gravitySamples
                     samples[#samples+1]=gravity;if #samples>15 then table.remove(samples,1)end
                     if #samples>=6 then
                         local middle=median(samples)
                         local deviations={};for i,g in ipairs(samples)do deviations[i]=abs(g-middle)end
-                        if median(deviations)<max(35,abs(middle)*.08)then
+                        if median(deviations)<max(5,abs(middle)*.08)then
                             self.gravity=middle;self.observedGravity=middle
                             self.status=abs(middle-self.profile.physics.GRAVITY_Z)>100 and "live gravity adapted"or "flight checked"
                         end
@@ -1346,7 +1359,8 @@ function Physics:observe(packet,now,cheap)
                 self.lastFit=now
             end
         end
-        if self.forecast and now-self.forecast.at>=.2 then
+        if cheap then self.forecast=nil
+        elseif self.forecast and now-self.forecast.at>=.2 then
             local future=self:predict(self.forecast.ball,radius,now-self.forecast.at,1000)
             local error=distance(p,future[#future].position)
             self.errors[#self.errors+1]=error;if #self.errors>20 then table.remove(self.errors,1)end
@@ -1355,7 +1369,7 @@ function Physics:observe(packet,now,cheap)
             self.totalFlightErrors=self.totalFlightErrors+1
             self.forecast=nil
         end
-        if not self.forecast then self.forecast={at=now,ball=copy(packet.ball)}end
+        if not cheap and not self.forecast then self.forecast={at=now,ball=copy(packet.ball)}end
     end
     -- A gross coordinate/arena mismatch cannot safely use this ground planner.
     self.mismatch=self.arena:distance(p)<-radius*2 or(self.error or 0)>radius*2
@@ -2525,8 +2539,146 @@ end
 return Startup
 
 end)()
+local Contact=(function()
+-- Short ground-contact corrections use the game's sphere and oriented car box.
+-- The learned actor keeps jumps, aerials, walls and contested ball touches.
+local Contact={}
+Contact.__index=Contact
+local abs,min,max,sqrt=math.abs,math.min,math.max,math.sqrt
+local function dot(a,b)return a[1]*b[1]+a[2]*b[2]+a[3]*b[3]end
+local function cross(a,b)return {a[2]*b[3]-a[3]*b[2],a[3]*b[1]-a[1]*b[3],a[1]*b[2]-a[2]*b[1]}end
+local function length(a)return sqrt(dot(a,a))end
+local function distance(a,b)return sqrt((a[1]-b[1])^2+(a[2]-b[2])^2+(a[3]-b[3])^2)end
+function Contact.new(profile,arena,physics)
+    return setmetatable({profile=profile,arena=arena,physics=physics,enabled=true,corrections=0},Contact)
+end
+function Contact:reset()self.history=nil;self.acceleration={0,0,0};self.active=false;self.last=nil end
+function Contact.policyPacket(packet,ignore)
+    if not ignore then return packet end
+    local out=table.clone(packet);out.other_cars={}
+    for _,car in ipairs(packet.other_cars or {})do
+        if car.team~=packet.team then out.other_cars[#out.other_cars+1]=car end
+    end
+    return out
+end
+function Contact:observe(packet,action,now)
+    if not packet then self:reset();return end
+    local car=packet.car
+    local old=self.history
+    local key=tostring(action[1])..':'..tostring(action[7])
+    self.acceleration=self.acceleration or {0,0,0}
+    local valid=old and now-old.at>=.015 and now-old.at<=.12 and old.key==key
+        and packet.ground_estimate and old.ground and dot(car.up,old.up)>.99
+        and length(car.angular_velocity)<.7 and self.lastTeam==packet.team
+        and distance(car.position,packet.ball.position)>(packet.ball_radius or 91.25)+200
+    if valid then
+        local a={}
+        for i=1,3 do a[i]=(car.velocity[i]-old.velocity[i])/(now-old.at)end
+        -- Ignore collision impulses/corrections. A few stable straight samples
+        -- estimate current acceleration without fitting an invented speed cap.
+        if length(a)<4500 and abs(dot(a,cross(car.up,car.forward)))<450 then
+            for i=1,3 do self.acceleration[i]=self.acceleration[i]*.5+a[i]*.5 end
+        else self.acceleration={0,0,0}end
+    else self.acceleration={0,0,0}end
+    self.lastTeam=packet.team
+    self.history={at=now,key=key,velocity=table.clone(car.velocity),up=table.clone(car.up),ground=packet.ground_estimate}
+end
+function Contact:box(packet)
+    local config=self.profile.car_presets[packet.car_preset or 'standard']or self.profile.car_presets.standard
+    return config.size,config.offset
+end
+-- Exact sphere-to-OBB distance, including the collider's forward/up offset.
+function Contact:gap(car,ballPosition,radius,size,offset)
+    local right=cross(car.up,car.forward)
+    local delta={ballPosition[1]-car.position[1],ballPosition[2]-car.position[2],ballPosition[3]-car.position[3]}
+    local localPoint={dot(delta,car.forward)-offset[1],dot(delta,right)-offset[2],dot(delta,car.up)-offset[3]}
+    local sum=0
+    for i=1,3 do sum+=max(abs(localPoint[i])-size[i]/2,0)^2 end
+    return sqrt(sum)-radius,localPoint
+end
+function Contact:step(packet,base,now)
+    self.last=nil
+    local function skip()self.active=false;return nil end
+    local car,ball=packet.car,packet.ball
+    local cfg,arena=self.profile.physics,self.profile.arena
+    if not self.enabled or self.physics.mismatch or not packet.ground_estimate or car.up[3]<.94
+        or car.position[3]>85 or base[6]>0 or abs(car.position[1])>arena.EXTENT_X-350
+        or abs(car.position[2])>arena.EXTENT_Y-350 then return skip()end
+    local radius=packet.ball_radius or cfg.BALL_RADIUS
+    local size,offset=self:box(packet)
+    local currentGap,localBall=self:gap(car,ball.position,radius,size,offset)
+    if currentGap<=0 or distance(car.position,ball.position)>1100 or localBall[1]<-size[1]/2 then return skip()end
+    local speed=dot(car.velocity,car.forward)
+    if speed<200 then return skip()end
+    -- A nearby car may change the ball's trajectory. Avoid forcing a predicted
+    -- touch through another car; keep physical players even in ignore mode.
+    for _,other in ipairs(packet.other_cars or {})do
+        local delta={other.position[1]-car.position[1],other.position[2]-car.position[2],other.position[3]-car.position[3]}
+        local v=other.velocity or {0,0,0}
+        local relative={v[1]-car.velocity[1],v[2]-car.velocity[2],v[3]-car.velocity[3]}
+        local t=math.clamp(-dot(delta,relative)/max(dot(relative,relative),1),0,.22)
+        local near={delta[1]+relative[1]*t,delta[2]+relative[2]*t,delta[3]+relative[3]*t}
+        if t>0 and length(near)<max(size[1],size[2])+25 and dot(delta,car.forward)>0 then
+            local action=table.clone(base);action[1]=-1;action[7]=0;action[8]=0
+            self.last={mode='contact obstacle brake',time=t,action=action};self.active=true
+            return action,self.last.mode
+        end
+        if distance(other.position,ball.position)<radius+200 then return skip()end
+    end
+    local trajectory=self.physics:predict(ball,radius,.45,4)
+    local best,score=nil,math.huge
+    local acceleration=self.acceleration or {0,0,0}
+    for _,sample in ipairs(trajectory)do
+        local t=sample.time
+        if t>=1/30 and sample.obstructions==0 then
+            local predicted=table.clone(car);predicted.position={}
+            for i=1,3 do predicted.position[i]=car.position[i]+car.velocity[i]*t+acceleration[i]*t*t*.5 end
+            -- Use measured angular motion, rather than assuming instant turns.
+            local yaw=(car.angular_velocity[3]or 0)*t
+            local c,s=math.cos(yaw),math.sin(yaw)
+            predicted.forward={car.forward[1]*c-car.forward[2]*s,car.forward[1]*s+car.forward[2]*c,car.forward[3]}
+            predicted.up={car.up[1]*c-car.up[2]*s,car.up[1]*s+car.up[2]*c,car.up[3]}
+            local gap,localPoint=self:gap(predicted,sample.position,radius,size,offset)
+            local vertical=max(abs(localPoint[3])-size[3]/2,0)
+            if vertical<radius-5 then
+                local reach=sqrt(radius*radius-vertical*vertical)
+                local value=abs(localPoint[1]-size[1]/2-reach)
+                if value<score then
+                    score=value;best={sample=sample,localPoint=localPoint,gap=gap,reach=reach}
+                end
+            end
+        end
+    end
+    if not best or score>max(70,speed/30)then return skip()end
+    local lateral=best.localPoint[2]
+    local corridor=size[2]/2+best.reach
+    local miss=abs(lateral)>corridor-12
+    local angularSpeed=car.angular_velocity[3]or 0
+    if not miss and not self.active then return nil end
+    local frontRange=max(localBall[1]-size[1]/2,60)
+    local angle=math.atan2(lateral,frontRange)-angularSpeed*min(best.sample.time,.15)*.3
+    if abs(angle)>.8 then return skip()end
+    local action=table.clone(base)
+    action[2]=abs(angle)>.025 and(angle>0 and 1 or -1)or 0
+    action[4]=action[2];action[8]=0
+    if miss or abs(angle)>.08 then action[7]=0 end
+    if miss and best.sample.time<.2 and abs(angle)>.18 and speed>700 then action[1]=-1 end
+    self.active=true;self.corrections+=1
+    self.last={mode='ground contact correction',time=best.sample.time,target=table.clone(best.sample.position),
+        gap=best.gap,lateral=lateral,corridor=corridor,radius=radius,size=table.clone(size),offset=table.clone(offset),
+        geometry=packet.car_size_verified and 'verified collider'or(packet.car_dimensions_verified and 'verified preset dimensions'or 'source preset estimate'),
+        gravity=self.physics.gravity,speed=speed,action=table.clone(action)}
+    return action,self.last.mode
+end
+function Contact:report()
+    return {enabled=self.enabled,corrections=self.corrections,last=self.last,
+        scope='Short upright ground contacts; no learned weight changes, scripted jumps, aerial or wall overrides'}
+end
+return Contact
+
+end)()
 local RUNTIME=
-{["cooperative"]=true,["light_graphics"]=true,["latency"]=true,["version"]="6.10"}
+{["cooperative"]=true,["light_graphics"]=true,["latency"]=true,["contact"]=true,["ignore_teammates"]=true,["version"]="6.11"}
 local ADAPTER_VERSION=RUNTIME.version or '6.8'
 local PROFILE=
 {["version"]=1,["name"]="turbo_soccer_standard",["provenance"]={["kind"]="numeric collision/physics specification from user-provided saved place",["place_sha256"]="00ea1fbc258e3d5e317daf5bef484368490726d006d53176e94a42375b1ee733",["geometry_source_sha256"]="d8f35aa62627d23a68ee3a51ef315c1b8b9e53ec4ba0a14cfa3f6a76dab467c0",["constants_source_sha256"]="3274f6c9d71e5e86d9708694e59599f1de71a8dfc41db0028567c0bffe8d541c"},["roblox_studs_per_sim_unit"]=0.1,["arena"]={["EXTENT_X"]=4096.0,["EXTENT_Y"]=5120.0,["HEIGHT"]=2048.0,["CORNER"]=8064.0,["EDGE_RADIUS"]=256.0,["BACK_RAMP_RADIUS"]=160.0,["CEILING_RADIUS"]=512.0,["SIDE_CORNER_RADIUS"]=852.0,["BACK_CORNER_RADIUS"]=874.0,["GOAL_HALF_WIDTH"]=893.0,["GOAL_HEIGHT"]=642.775,["GOAL_BACK_Y"]=6000.0,["GOAL_TOP_RADIUS"]=130.0,["GOAL_BOTTOM_RADIUS"]=70.0,["GOAL_LIP_RADIUS"]=80.0,["GOAL_BACK_RADIUS"]=300.0,["MOUTH_HALF_WIDTH"]=896.0,["MOUTH_HEIGHT"]=640.0,["MOUTH_FILLET"]=96.0,["MOUTH_LIP"]=8.0},["ramp_facets_degrees"]={0,11.617,22.892,33.984,45,56.016,67.108,78.383,90},["physics"]={["GRAVITY_Z"]=-650.0,["BALL_RADIUS"]=91.25,["BALL_WORLD_RADIUS"]=93.15,["BALL_REST_Z"]=93.15,["CAR_MAX_SPEED"]=2300.0,["CAR_MAX_ANG_SPEED"]=5.5,["BALL_MAX_SPEED"]=6000.0,["BALL_MAX_ANG_SPEED"]=6.0,["BALL_DRAG"]=0.03,["BOOST_USED_PER_SECOND"]=33.333333333333336,["BOOST_ACCEL_GROUND"]=991.6666666666666,["BOOST_ACCEL_AIR"]=1058.3333333333333,["DOUBLEJUMP_MAX_DELAY"]=1.25,["MAX_SUSPENSION_TRAVEL"]=12.0,["WHEEL_RAY_MIN_HIT_DIST"]=17.079519899575633,["CAR_SPAWN_REST_Z"]=17.0,["TICK_RATE"]=120,["BALLWORLD_FRICTION"]=0.35,["BALLWORLD_RESTITUTION"]=0.6,["SOLVER_ERP2"]=0.8,["RESTITUTION_VEL_THRESHOLD"]=10,["CONTACT_BREAKING_THRESHOLD"]=1,["BALL_WORLD_CONTACT_FLAT"]=0.0050000000000001155,["BALL_SLEEP_LIN_SPEED"]=40,["BALL_SLEEP_ANG_SPEED"]=1,["BALL_SLEEP_TIME"]=2,["CAR_MASS"]=180,["THROTTLE_TORQUE_AMOUNT"]=72000,["DRIVE_SPEED_TORQUE_FACTOR"]={{0,1},{1400,0.1},{1410,0}}},["car_presets"]={["standard"]={["size"]={120.50700378417969,86.69940185546875,38.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-33.75,29.5,20.7549991607666}}},["low"]={["size"]={130.427001953125,85.77989959716797,33.79999923706055},["offset"]={9.0,0.0,15.75},["front"]={["radius"]=12.0,["rest_length"]=33.95,["offset"]={50.29999923706055,31.100000381469727,15.75}},["back"]={["radius"]=13.5,["rest_length"]=33.85,["offset"]={-34.75,33.0,15.75}}},["flat"]={["size"]={131.32000732421875,87.17040252685547,31.894399642944336},["offset"]={9.008569717407227,0.0,12.094200134277344},["front"]={["radius"]=12.5,["rest_length"]=31.9242,["offset"]={49.970001220703125,27.799999237060547,12.094200134277344}},["back"]={["radius"]=17.0,["rest_length"]=27.9242,["offset"]={-35.43000030517578,20.280000686645508,12.094200134277344}}},["wedge"]={["size"]={133.99200439453125,83.02100372314453,32.79999923706055},["offset"]={12.5,0.0,11.75},["front"]={["radius"]=13.5,["rest_length"]=29.7,["offset"]={51.5,26.670000076293945,11.75}},["back"]={["radius"]=15.0,["rest_length"]=29.666,["offset"]={-35.75,35.0,11.75}}},["long"]={["size"]={129.5189971923828,84.68789672851562,36.65909957885742},["offset"]={13.875699996948242,0.0,20.7549991607666},["front"]={["radius"]=12.5,["rest_length"]=38.755,["offset"]={51.25,25.899999618530273,20.7549991607666}},["back"]={["radius"]=15.0,["rest_length"]=37.055,["offset"]={-34.0,29.5,20.7549991607666}}},["tall"]={["size"]={123.22000122070312,79.21029663085938,44.15909957885742},["offset"]={11.375699996948242,0.0,21.5049991607666},["front"]={["radius"]=15.0,["rest_length"]=39.505,["offset"]={51.25,25.899999618530273,21.5049991607666}},["back"]={["radius"]=15.0,["rest_length"]=39.105,["offset"]={-33.75,29.5,21.5049991607666}}}},["boost_positions"]={["big"]={{-3584.0,0.0,73.0},{3584.0,0.0,73.0},{-3072.0,4096.0,73.0},{3072.0,4096.0,73.0},{-3072.0,-4096.0,73.0},{3072.0,-4096.0,73.0}},["small"]={{0.0,-4240.0,70.0},{-1792.0,-4184.0,70.0},{1792.0,-4184.0,70.0},{-940.0,-3308.0,70.0},{940.0,-3308.0,70.0},{0.0,-2816.0,70.0},{-3584.0,-2484.0,70.0},{3584.0,-2484.0,70.0},{-1788.0,-2300.0,70.0},{1788.0,-2300.0,70.0},{-2048.0,-1036.0,70.0},{0.0,-1024.0,70.0},{2048.0,-1036.0,70.0},{-1024.0,0.0,70.0},{1024.0,0.0,70.0},{-2048.0,1036.0,70.0},{0.0,1024.0,70.0},{2048.0,1036.0,70.0},{-1788.0,2300.0,70.0},{1788.0,2300.0,70.0},{-3584.0,2484.0,70.0},{3584.0,2484.0,70.0},{0.0,2816.0,70.0},{-940.0,3308.0,70.0},{940.0,3308.0,70.0},{-1792.0,4184.0,70.0},{1792.0,4184.0,70.0},{0.0,4240.0,70.0}}},["policy_boost_limit"]=34,["recovery"]={["enabled"]=true,["stuck_seconds"]=2.2,["minimum_travel"]=45,["escape_seconds"]=0.65,["cooldown_seconds"]=3},["goal_defaults"]={["version"]=1,["source"]="builtin_measurements",["goals"]={{["origin"]={-0.10539187018261847,-5156.06088311565,0.0},["side"]={-0.9999997941940588,-0.0006415698245800758,0.0},["normal"]={0.0006415698245800758,-0.9999997941940588,0.0},["half_width"]=893.3817832411139,["height"]=639.0078980633016,["back_depth"]=830.1082496030729,["fillet"]=96.0,["back_reference"]="wall_supported_body"},{["origin"]={-0.5865567549764439,5137.970467167625,0.0},["side"]={-0.999943937915091,-0.01058872168209319,0.0},["normal"]={-0.01058872168209319,0.999943937915091,0.0},["half_width"]=894.5282420002634,["height"]=644.1573434119969,["back_depth"]=850.0714001682221,["fillet"]=96.0,["back_reference"]="wall_supported_body"}},["note"]="Latest measured posts and rear-wall samples; earlier consistent blue crossbar replaces a low high-scatter flight reading. Numeric fitted geometry only; no raw capture poses or timestamps.",["warnings"]={"Rear body support depth is approximate; collision profile retains its saved curved net surface."}}}
@@ -2535,6 +2687,9 @@ local padReader=Pads.new(PROFILE)
 local carReader=Cars.new(PROFILE,Arena)
 local kickoff=Kickoff.new(PROFILE)
 local physics=Physics.new(PROFILE,arenaAdapter)
+local contact=Contact.new(PROFILE,arenaAdapter,physics)
+contact.enabled=RUNTIME.contact==true
+local ignoreTeammates=RUNTIME.ignore_teammates==true
 local intercept=Intercept.new(PROFILE,arenaAdapter,physics)
 local calibration=Calibration.new(PROFILE)
 intercept.calibration=calibration
@@ -2548,7 +2703,7 @@ local HZ=30 -- pose sampling; policy decisions target 15 Hz (tick skip 8 at 120 
 local player=game:GetService("Players").LocalPlayer
 local latency=Latency.new(player)
 latency.enabled=RUNTIME.latency==true
-local worker,graphics,lastAppliedAt,lastJumpPress
+local worker,graphics,lastAppliedAt,lastJumpPress,lastActorAction,lastActorAt
 local pg=assert(player:FindFirstChildOfClass("PlayerGui"),"Join first")
 local teamReader=Teams.new(player)
 carReader.teams=teamReader
@@ -2561,7 +2716,7 @@ local function connect(signal,callback)
     local connection=signal:Connect(callback);connections[#connections+1]=connection
 end
 local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,
-    MODEL_NAME..' v'..ADAPTER_VERSION..' | F4 minimize',RUNTIME.cooperative and 410 or 372)
+    MODEL_NAME..' v'..ADAPTER_VERSION..' | F4 minimize',RUNTIME.contact and 448 or(RUNTIME.cooperative and 410 or 372))
 local panel=window.panel
 local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
 local label=Instance.new("TextLabel",main)
@@ -2600,6 +2755,12 @@ graphicsButton.Text='Game optimization: ON';graphicsButton.Visible=RUNTIME.coope
 local latencyButton=Instance.new('TextButton',main)
 latencyButton.Position=UDim2.fromOffset(240,333);latencyButton.Size=UDim2.fromOffset(230,28)
 latencyButton.Text='Lag compensation: ON';latencyButton.Visible=RUNTIME.cooperative==true
+local contactButton=Instance.new('TextButton',main)
+contactButton.Position=UDim2.fromOffset(10,370);contactButton.Size=UDim2.fromOffset(220,28)
+contactButton.Text='Contact assist: ON';contactButton.Visible=RUNTIME.contact==true
+local ignoreButton=Instance.new('TextButton',main)
+ignoreButton.Position=UDim2.fromOffset(240,370);ignoreButton.Size=UDim2.fromOffset(230,28)
+ignoreButton.Text='Ignore teammates: ON';ignoreButton.Visible=RUNTIME.contact==true
 gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
@@ -2618,6 +2779,7 @@ local keyboardKey={W=true,S=true,A=true,D=true,Q=true,E=true,SHIFT=true}
 local order={"W","S","A","D","Q","E","SHIFT","LMB","RMB"}
 local previous=table.create(8,0)
 local jumpAt,usedFlip,lastGround=nil,false,true
+local jumpLatched=false
 local pendingJump=nil
 local focus=true
 local function event(key,down)
@@ -2633,8 +2795,10 @@ local function release()
         end
     end
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
+    jumpLatched=false
     if worker then worker:cancel()end
     lastAppliedAt=nil;lastJumpPress=nil
+    lastActorAction=nil;lastActorAt=nil;contact:reset()
     if Policy.reset then Policy.reset()end
     pendingJump=nil
     keyboard:release()
@@ -2672,6 +2836,8 @@ local function controls()
     safetyButton.Visible=not enabled and not testingKeyboard
     graphicsButton.Visible=RUNTIME.cooperative==true and not enabled and not testingKeyboard
     latencyButton.Visible=RUNTIME.cooperative==true and not enabled and not testingKeyboard
+    contactButton.Visible=RUNTIME.contact==true and not enabled and not testingKeyboard
+    ignoreButton.Visible=RUNTIME.contact==true and not enabled and not testingKeyboard
     window.mini.Visible=not enabled
     main.Visible=not calibrating
     if calView then calView.Visible=calibrating end
@@ -2698,6 +2864,7 @@ local function saveReport(filename,savedFrom)
     local report=physics:report()
     report.physics_assist_enabled=physicsEnabled;report.saved_from=savedFrom
     report.teammate_yield_enabled=intercept.supportEnabled;report.model_name=MODEL_NAME
+    report.ignore_teammates=ignoreTeammates;report.contact_assist=contact:report()
     report.performance=timing:report()
     report.performance.cooperative=worker and worker:report()or nil
     report.performance.latency=RUNTIME.cooperative and latency:report()or nil
@@ -2758,6 +2925,7 @@ end)
 supportButton.Activated:Connect(function()
     stop();intercept.supportEnabled=not intercept.supportEnabled
     supportButton.Text=intercept.supportEnabled and "Yield to teammate: ON"or "Yield to teammate: OFF"
+    if intercept.supportEnabled then ignoreTeammates=false;ignoreButton.Text='Ignore teammates: OFF'end
     label.Text=intercept.supportEnabled and "Ground assist may yield to a nearby, aligned teammate actively approaching the ball."
         or "Scripted teammate yielding disabled. F6 starts."
 end)
@@ -2765,6 +2933,18 @@ safetyButton.Activated:Connect(function()
     stop();safetyEnabled=not safetyEnabled
     safetyButton.Text=safetyEnabled and 'Goal safety: ON'or 'Goal safety: OFF'
     label.Text=safetyEnabled and 'Conservative ground goal guards enabled.'or 'Goal guards disabled. F6 starts.'
+end)
+contactButton.Activated:Connect(function()
+    if enabled or testingKeyboard then return end
+    contact.enabled=not contact.enabled;contact:reset()
+    contactButton.Text=contact.enabled and 'Contact assist: ON'or 'Contact assist: OFF'
+end)
+ignoreButton.Activated:Connect(function()
+    if enabled or testingKeyboard then return end
+    ignoreTeammates=not ignoreTeammates
+    ignoreButton.Text=ignoreTeammates and 'Ignore teammates: ON'or 'Ignore teammates: OFF'
+    if ignoreTeammates then intercept.supportEnabled=false;supportButton.Text='Yield to teammate: OFF'end
+    epoch+=1;release()
 end)
 graphicsButton.Activated:Connect(function()
     if graphics then
@@ -4355,14 +4535,16 @@ task.spawn(function()
         if worker then label.Text..='\nSmooth scheduling active | game optimization '..(graphics and graphics.enabled and 'ON'or 'OFF')end
         local lastTick,lastUi=os.clock(),-math.huge
         local lastFrame=os.clock()
+        local lastJobAt=-math.huge
         local function startJob(packet,hasFlip,now)
+            lastJobAt=now
             packet.has_jumped=jumpAt~=nil
             local controls=table.clone(previous)
             local metadata={at=now,epoch=epoch,team=packet.team,scene=packet.scene_token,ground=packet.ground_estimate}
             worker:start(function(checkpoint)
                 local projected=latency:project(packet,physics,worker.wall,checkpoint)
                 metadata.car=projected.car;metadata.ball=projected.ball;metadata.targetAt=now+latency.horizon
-                return Policy.observe(projected,controls,hasFlip)
+                return Policy.observe(Contact.policyPacket(projected,ignoreTeammates),controls,hasFlip)
             end,nil,metadata)
         end
         local busy=false
@@ -4377,9 +4559,9 @@ task.spawn(function()
                     or(activeWindow and not activeWindow()))then stop('LOCAL paused: focus/chat/F8. F6 restarts.')end
                 if not enabled or now<armAt then worker:cancel()
                 else
-                    if held.RMB and lastJumpPress and now-lastJumpPress>.12 then
+                    if held.RMB and lastJumpPress and now-lastJumpPress>.22 then
                         if not pcall(event,'RMB',false)then stop('LOCAL paused: jump release failed');return end
-                        held.RMB=nil;previous[6]=0
+                        held.RMB=nil;previous[6]=0;jumpLatched=true
                     end
                     if lastAppliedAt and now-lastAppliedAt>.25 and held.LMB then
                         if not pcall(event,'LMB',false)then stop('LOCAL paused: boost release failed');return end
@@ -4414,6 +4596,7 @@ task.spawn(function()
                 stage="observing ball physics"
                 local observeAt=os.clock()
                 physics:observe(packet,now,worker~=nil and not physicsEnabled and not calibrating)
+                if RUNTIME.contact then contact:observe(packet,previous,now)end
                 local observeMs=(os.clock()-observeAt)*1000
                 if calibrating then
                     local keys={}
@@ -4446,10 +4629,31 @@ task.spawn(function()
                 end
                 stage="kickoff"
                 local override,recovery=kickoff:step(packet,now,pg)
-                local decisionPeriod=override and 1/30 or period
+                local ground=packet.ground_estimate
+                if ground and(not lastGround or previous[6]==0)then jumpAt=nil;usedFlip=false end
+                lastGround=ground
+                local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<PROFILE.physics.DOUBLEJUMP_MAX_DELAY))
+                local learned
+                if worker and completed and latency:fresh(completed,packet,now,epoch)then
+                    local mask=Policy.mask(ground,packet.boost,hasFlip,packet.turtled)
+                    local index,value=nil,-math.huge
+                    for i,v in ipairs(completed.logits)do if mask[i]and v>value then index,value=i,v end end
+                    learned=Policy.action(assert(index),completed.context)
+                    lastActorAction=learned;lastActorAt=now
+                end
+                local contactAction,contactMode
+                local contactMs=0
+                if RUNTIME.contact and contact.enabled and not override and not held.RMB then
+                    stage='ground contact correction'
+                    local base=learned or(lastActorAt and now-lastActorAt<.35 and lastActorAction)or previous
+                    local contactAt=os.clock()
+                    contactAction,contactMode=contact:step(packet,base,now)
+                    contactMs=(os.clock()-contactAt)*1000
+                end
+                local decisionPeriod=(override or contactAction)and 1/30 or period
                 if previousPeriod~=decisionPeriod then decisionAt=nil;previousPeriod=decisionPeriod end
                 local due,nextDecision,late=Timing.due(now,decisionAt,decisionPeriod)
-                if worker and not override then
+                if worker and not override and not contactAction then
                     if completed then due=true;nextDecision=decisionAt
                     elseif worker.job then return end
                 end
@@ -4457,14 +4661,12 @@ task.spawn(function()
                 decisionAt=nextDecision
                 local decisionEpoch=epoch
                 local began=os.clock()
-                local ground=packet.ground_estimate
-                if ground and(not lastGround or previous[6]==0)then jumpAt=nil;usedFlip=false end
-                lastGround=ground
-                local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<PROFILE.physics.DOUBLEJUMP_MAX_DELAY))
-                local action=override
-                if worker and action then worker:cancel();completed=nil end
-                local modelMs,planningMs,entityCount,safetyMs=0,0,0,0
-                local modelRan=false
+                local action=override or contactAction
+                if contactAction then recovery=contactMode end
+                if worker and action and not contactAction then worker:cancel();completed=nil;learned=nil end
+                local modelMs,planningMs,entityCount,safetyMs=0,contactMs,0,0
+                local modelRan=learned~=nil
+                if learned then modelMs=completed.cpu*1000;entityCount=completed.context.entity_count or 0 end
                 physics.plan=nil
                 if not action then
                     stage="recovery"
@@ -4479,14 +4681,11 @@ task.spawn(function()
                     if not action then
                         stage="model observation"
                         if worker then
-                            if completed and latency:fresh(completed,packet,now,epoch)then
+                            if learned then
                                 modelMs=completed.cpu*1000;modelRan=true
                                 entityCount=completed.context.entity_count or 0
                                 -- Remove actions that became unavailable while the model yielded.
-                                local mask=Policy.mask(ground,packet.boost,hasFlip,packet.turtled)
-                                local index,value=nil,-math.huge
-                                for i,v in ipairs(completed.logits)do if mask[i]and v>value then index,value=i,v end end
-                                action=Policy.action(assert(index),completed.context)
+                                action=learned
                             else
                                 if not worker.job then startJob(packet,hasFlip,now)end
                                 if now-lastUi>.25 then
@@ -4499,7 +4698,7 @@ task.spawn(function()
                             end
                         else
                             packet.has_jumped=jumpAt~=nil
-                            local query,entities=Policy.observe(packet,previous,hasFlip)
+                            local query,entities=Policy.observe(Contact.policyPacket(packet,ignoreTeammates),previous,hasFlip)
                             entityCount=entities.entity_count or #entities
                             stage="model inference"
                             local modelAt=os.clock()
@@ -4516,9 +4715,10 @@ task.spawn(function()
                         end
                     end
                 end
-                local proposed=table.clone(action)
+                if worker and contactAction and not worker.job and now-lastJobAt>=period then startJob(packet,hasFlip,now)end
+                local proposed=table.clone(learned or action)
                 safety.last=nil
-                if modelRan and safetyEnabled then
+                if(modelRan or contactAction)and safetyEnabled then
                     stage='ground goal safety'
                     local safetyAt=os.clock()
                     local guarded,mode=safety:step(packet,action,now)
@@ -4527,7 +4727,11 @@ task.spawn(function()
                 end
                 stage="mapping inputs"
                 local wanted,actual=Policy.keys(action,ground)
-                local inferenceMs=(os.clock()-began)*1000
+                -- A timeout may release a held jump, but must not manufacture
+                -- a second rising edge/flip from an actor still holding jump.
+                if action[6]==0 then jumpLatched=false
+                elseif jumpLatched then wanted.RMB=nil;actual[6]=0 end
+                local inferenceMs=(os.clock()-began)*1000+contactMs
                 assert(inferenceMs<200,"Local inference exceeded 200ms")
                 -- Recheck before pressing: executor calls and prediction can yield.
                 if epoch~=decisionEpoch or not enabled or not alive or not focus or input:GetFocusedTextBox()
@@ -4565,6 +4769,7 @@ task.spawn(function()
                     input_milliseconds=inputMs,action=table.clone(actual),model_milliseconds=modelMs,
                     planning_milliseconds=planningMs,model_ran=modelRan,entity_count=entityCount,
                     proposed_action=proposed,goal_safety=safety.last,goal_safety_milliseconds=safetyMs}
+                physics.decision.contact=contact.last;physics.decision.ignore_teammates=ignoreTeammates
                 timing:record({time=now,model_ran=modelRan,entities=entityCount,pose_ms=poseMs,observe_ms=observeMs,
                     model_ms=modelMs,planning_ms=planningMs,safety_ms=safetyMs,decision_ms=inferenceMs,input_ms=inputMs,schedule_late_ms=late*1000})
                 previous=actual;rate=timing.rate

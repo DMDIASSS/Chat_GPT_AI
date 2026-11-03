@@ -4,7 +4,7 @@
   "model": "Chronos V2.1",
   "model_revision": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
   "targeted_tests": {
-    "passed": 198,
+    "passed": 209,
     "failed": 0,
     "subtests_passed": 47
   },
@@ -44,20 +44,20 @@
   },
   "artifacts": {
     "TurboBall_Chronos.lua": {
-      "bytes": 20601317,
-      "sha256": "37e077750d5889cf4fa981c1293c8eb485a891b47b0a92ebbbeea075d3f1538b"
+      "bytes": 20613471,
+      "sha256": "34e02a922ca0c4e71de3fe779c6fadd506cf024797ea057a2b6da304b45e5739"
     },
     "TurboBall_Chronos_Fast.lua": {
-      "bytes": 215793,
-      "sha256": "495d11fe1abb9f77306ec8616b58a1ba5e3524c881e9a7e8622c5cf1f52d7e9f"
+      "bytes": 227947,
+      "sha256": "355249091d733ae6077999ca8a42cb74bbbfcf81fccff82b68b898e9fe422f04"
     },
     "ChronosV2_1_FP32.bin": {
       "bytes": 15285480,
       "sha256": "eacc0beca7ffb06dc4ab745535cec26c4ebcb24d645d6fd10f5ca2700116384c"
     },
     "TurboBall_Nexto.lua": {
-      "bytes": 2591546,
-      "sha256": "8a951a688b1115f4fd951e08382268bc4501701b822026de112b10c18857ea5d"
+      "bytes": 2603657,
+      "sha256": "6a403973a0eb0db9aa952124a6175608b1577673a4d91ef701711b855373a75c"
     }
   },
   "scope": [
@@ -75,13 +75,21 @@
     "Raw binary artifact preserves every source float32 parameter",
     "Small loader opens its panel before downloading pinned model data",
     "Download timeout, HTTP errors, truncation, cancellation and late-reply handling",
-    "Startup batching under a synthetic 10 FPS scheduler"
+    "Startup batching under a synthetic 10 FPS scheduler",
+    "Sphere/OBB contact distances, car preset offsets and scaled ball radii",
+    "Moving/falling ground contacts with different gravity and velocity",
+    "Light-mode gravity fitting, including low-gravity samples",
+    "Ground corrections while actor inference is suspended, with F8 cancellation",
+    "Full jump hold without unrequested repeated rising edges",
+    "Tactical teammate filtering retains opponents and physical obstacles; UI toggle conflicts resolved",
+    "Analytic flat-floor optimization retains the saved geometry/ball trajectory references"
   ],
   "live_roblox_test": false,
   "all_linked_bots_compared": false,
   "command": "LUAU_BIN=... CHRONOS_ASSETS=... python -m pytest botrblx/tests -q",
-  "adapter_version": "6.10",
-  "previous_release": "2dd06519ec2cafab436d4a0fb22ae2cc60057330",
+  "adapter_version": "6.11",
+  "previous_release": "ca7aa4e97a2167e2a9fc2f315d36f0f757b00e5c",
   "startup_comparison": "chronos-startup-v6.10.json",
-  "model_data_revision": "aa6141f163cc3a059509019c178bbd527238356d"
+  "model_data_revision": "aa6141f163cc3a059509019c178bbd527238356d",
+  "contact_comparison": "chronos-contact-v6.11.json"
 }

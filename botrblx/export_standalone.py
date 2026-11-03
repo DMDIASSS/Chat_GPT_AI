@@ -210,6 +210,7 @@ def render_standalone(tensors,cases,model_sha,app_dir=APP_DIR,profile=None,model
     latency=(app_dir/"templates/local_latency.lua").read_text(encoding="utf-8")
     graphics=(app_dir/"templates/local_graphics.lua").read_text(encoding="utf-8")
     startup=(app_dir/"templates/local_startup.lua").read_text(encoding="utf-8")
+    contact=(app_dir/"templates/local_contact.lua").read_text(encoding="utf-8")
     if profile is None:profile=load_arena_profile(app_dir/"arena_profile.json")
     client=(app_dir/"client271.lua").read_text(encoding="utf-8")
     pose=client.split("-- POSE_READER_BEGIN",1)[1].partition("\n")[2].split("-- POSE_READER_END",1)[0]
@@ -231,6 +232,7 @@ def render_standalone(tensors,cases,model_sha,app_dir=APP_DIR,profile=None,model
             .replace("-- LOCAL_LATENCY_HERE", "local Latency=(function()\n"+latency+"\nend)()")
             .replace("-- LOCAL_GRAPHICS_HERE", "local Graphics=(function()\n"+graphics+"\nend)()")
             .replace("-- LOCAL_STARTUP_HERE", "local Startup=(function()\n"+startup+"\nend)()")
+            .replace("-- LOCAL_CONTACT_HERE", "local Contact=(function()\n"+contact+"\nend)()")
             .replace("-- RUNTIME_SETTINGS_HERE",literal(runtime_options or {}))
             .replace("-- MODEL_SETTINGS_HERE","local MODEL_NAME="+literal(model_name)+"\nlocal physicsEnabled="+literal(physics_assist))
             .replace("-- ARENA_PROFILE_HERE",literal(profile))

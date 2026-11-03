@@ -16,6 +16,7 @@
 -- LOCAL_LATENCY_HERE
 -- LOCAL_GRAPHICS_HERE
 -- LOCAL_STARTUP_HERE
+-- LOCAL_CONTACT_HERE
 local RUNTIME=
 -- RUNTIME_SETTINGS_HERE
 local ADAPTER_VERSION=RUNTIME.version or '6.8'
@@ -26,6 +27,9 @@ local padReader=Pads.new(PROFILE)
 local carReader=Cars.new(PROFILE,Arena)
 local kickoff=Kickoff.new(PROFILE)
 local physics=Physics.new(PROFILE,arenaAdapter)
+local contact=Contact.new(PROFILE,arenaAdapter,physics)
+contact.enabled=RUNTIME.contact==true
+local ignoreTeammates=RUNTIME.ignore_teammates==true
 local intercept=Intercept.new(PROFILE,arenaAdapter,physics)
 local calibration=Calibration.new(PROFILE)
 intercept.calibration=calibration
@@ -38,7 +42,7 @@ local HZ=30 -- pose sampling; policy decisions target 15 Hz (tick skip 8 at 120 
 local player=game:GetService("Players").LocalPlayer
 local latency=Latency.new(player)
 latency.enabled=RUNTIME.latency==true
-local worker,graphics,lastAppliedAt,lastJumpPress
+local worker,graphics,lastAppliedAt,lastJumpPress,lastActorAction,lastActorAt
 local pg=assert(player:FindFirstChildOfClass("PlayerGui"),"Join first")
 local teamReader=Teams.new(player)
 carReader.teams=teamReader
@@ -51,7 +55,7 @@ local function connect(signal,callback)
     local connection=signal:Connect(callback);connections[#connections+1]=connection
 end
 local window=Window.new(gui,game:GetService('UserInputService'),connect,function()return not enabled end,
-    MODEL_NAME..' v'..ADAPTER_VERSION..' | F4 minimize',RUNTIME.cooperative and 410 or 372)
+    MODEL_NAME..' v'..ADAPTER_VERSION..' | F4 minimize',RUNTIME.contact and 448 or(RUNTIME.cooperative and 410 or 372))
 local panel=window.panel
 local main=Instance.new('Frame',window.body);main.Name='Main';main.Size=UDim2.fromScale(1,1);main.BackgroundTransparency=1
 local label=Instance.new("TextLabel",main)
@@ -90,6 +94,12 @@ graphicsButton.Text='Game optimization: ON';graphicsButton.Visible=RUNTIME.coope
 local latencyButton=Instance.new('TextButton',main)
 latencyButton.Position=UDim2.fromOffset(240,333);latencyButton.Size=UDim2.fromOffset(230,28)
 latencyButton.Text='Lag compensation: ON';latencyButton.Visible=RUNTIME.cooperative==true
+local contactButton=Instance.new('TextButton',main)
+contactButton.Position=UDim2.fromOffset(10,370);contactButton.Size=UDim2.fromOffset(220,28)
+contactButton.Text='Contact assist: ON';contactButton.Visible=RUNTIME.contact==true
+local ignoreButton=Instance.new('TextButton',main)
+ignoreButton.Position=UDim2.fromOffset(240,370);ignoreButton.Size=UDim2.fromOffset(230,28)
+ignoreButton.Text='Ignore teammates: ON';ignoreButton.Visible=RUNTIME.contact==true
 gui.Parent=pg
 local input=game:GetService("UserInputService")
 local world=game:GetService("Workspace")
@@ -108,6 +118,7 @@ local keyboardKey={W=true,S=true,A=true,D=true,Q=true,E=true,SHIFT=true}
 local order={"W","S","A","D","Q","E","SHIFT","LMB","RMB"}
 local previous=table.create(8,0)
 local jumpAt,usedFlip,lastGround=nil,false,true
+local jumpLatched=false
 local pendingJump=nil
 local focus=true
 local function event(key,down)
@@ -123,8 +134,10 @@ local function release()
         end
     end
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
+    jumpLatched=false
     if worker then worker:cancel()end
     lastAppliedAt=nil;lastJumpPress=nil
+    lastActorAction=nil;lastActorAt=nil;contact:reset()
     if Policy.reset then Policy.reset()end
     pendingJump=nil
     keyboard:release()
@@ -162,6 +175,8 @@ local function controls()
     safetyButton.Visible=not enabled and not testingKeyboard
     graphicsButton.Visible=RUNTIME.cooperative==true and not enabled and not testingKeyboard
     latencyButton.Visible=RUNTIME.cooperative==true and not enabled and not testingKeyboard
+    contactButton.Visible=RUNTIME.contact==true and not enabled and not testingKeyboard
+    ignoreButton.Visible=RUNTIME.contact==true and not enabled and not testingKeyboard
     window.mini.Visible=not enabled
     main.Visible=not calibrating
     if calView then calView.Visible=calibrating end
@@ -188,6 +203,7 @@ local function saveReport(filename,savedFrom)
     local report=physics:report()
     report.physics_assist_enabled=physicsEnabled;report.saved_from=savedFrom
     report.teammate_yield_enabled=intercept.supportEnabled;report.model_name=MODEL_NAME
+    report.ignore_teammates=ignoreTeammates;report.contact_assist=contact:report()
     report.performance=timing:report()
     report.performance.cooperative=worker and worker:report()or nil
     report.performance.latency=RUNTIME.cooperative and latency:report()or nil
@@ -248,6 +264,7 @@ end)
 supportButton.Activated:Connect(function()
     stop();intercept.supportEnabled=not intercept.supportEnabled
     supportButton.Text=intercept.supportEnabled and "Yield to teammate: ON"or "Yield to teammate: OFF"
+    if intercept.supportEnabled then ignoreTeammates=false;ignoreButton.Text='Ignore teammates: OFF'end
     label.Text=intercept.supportEnabled and "Ground assist may yield to a nearby, aligned teammate actively approaching the ball."
         or "Scripted teammate yielding disabled. F6 starts."
 end)
@@ -255,6 +272,18 @@ safetyButton.Activated:Connect(function()
     stop();safetyEnabled=not safetyEnabled
     safetyButton.Text=safetyEnabled and 'Goal safety: ON'or 'Goal safety: OFF'
     label.Text=safetyEnabled and 'Conservative ground goal guards enabled.'or 'Goal guards disabled. F6 starts.'
+end)
+contactButton.Activated:Connect(function()
+    if enabled or testingKeyboard then return end
+    contact.enabled=not contact.enabled;contact:reset()
+    contactButton.Text=contact.enabled and 'Contact assist: ON'or 'Contact assist: OFF'
+end)
+ignoreButton.Activated:Connect(function()
+    if enabled or testingKeyboard then return end
+    ignoreTeammates=not ignoreTeammates
+    ignoreButton.Text=ignoreTeammates and 'Ignore teammates: ON'or 'Ignore teammates: OFF'
+    if ignoreTeammates then intercept.supportEnabled=false;supportButton.Text='Yield to teammate: OFF'end
+    epoch+=1;release()
 end)
 graphicsButton.Activated:Connect(function()
     if graphics then
@@ -491,14 +520,16 @@ task.spawn(function()
         if worker then label.Text..='\nSmooth scheduling active | game optimization '..(graphics and graphics.enabled and 'ON'or 'OFF')end
         local lastTick,lastUi=os.clock(),-math.huge
         local lastFrame=os.clock()
+        local lastJobAt=-math.huge
         local function startJob(packet,hasFlip,now)
+            lastJobAt=now
             packet.has_jumped=jumpAt~=nil
             local controls=table.clone(previous)
             local metadata={at=now,epoch=epoch,team=packet.team,scene=packet.scene_token,ground=packet.ground_estimate}
             worker:start(function(checkpoint)
                 local projected=latency:project(packet,physics,worker.wall,checkpoint)
                 metadata.car=projected.car;metadata.ball=projected.ball;metadata.targetAt=now+latency.horizon
-                return Policy.observe(projected,controls,hasFlip)
+                return Policy.observe(Contact.policyPacket(projected,ignoreTeammates),controls,hasFlip)
             end,nil,metadata)
         end
         local busy=false
@@ -513,9 +544,9 @@ task.spawn(function()
                     or(activeWindow and not activeWindow()))then stop('LOCAL paused: focus/chat/F8. F6 restarts.')end
                 if not enabled or now<armAt then worker:cancel()
                 else
-                    if held.RMB and lastJumpPress and now-lastJumpPress>.12 then
+                    if held.RMB and lastJumpPress and now-lastJumpPress>.22 then
                         if not pcall(event,'RMB',false)then stop('LOCAL paused: jump release failed');return end
-                        held.RMB=nil;previous[6]=0
+                        held.RMB=nil;previous[6]=0;jumpLatched=true
                     end
                     if lastAppliedAt and now-lastAppliedAt>.25 and held.LMB then
                         if not pcall(event,'LMB',false)then stop('LOCAL paused: boost release failed');return end
@@ -550,6 +581,7 @@ task.spawn(function()
                 stage="observing ball physics"
                 local observeAt=os.clock()
                 physics:observe(packet,now,worker~=nil and not physicsEnabled and not calibrating)
+                if RUNTIME.contact then contact:observe(packet,previous,now)end
                 local observeMs=(os.clock()-observeAt)*1000
                 if calibrating then
                     local keys={}
@@ -582,10 +614,31 @@ task.spawn(function()
                 end
                 stage="kickoff"
                 local override,recovery=kickoff:step(packet,now,pg)
-                local decisionPeriod=override and 1/30 or period
+                local ground=packet.ground_estimate
+                if ground and(not lastGround or previous[6]==0)then jumpAt=nil;usedFlip=false end
+                lastGround=ground
+                local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<PROFILE.physics.DOUBLEJUMP_MAX_DELAY))
+                local learned
+                if worker and completed and latency:fresh(completed,packet,now,epoch)then
+                    local mask=Policy.mask(ground,packet.boost,hasFlip,packet.turtled)
+                    local index,value=nil,-math.huge
+                    for i,v in ipairs(completed.logits)do if mask[i]and v>value then index,value=i,v end end
+                    learned=Policy.action(assert(index),completed.context)
+                    lastActorAction=learned;lastActorAt=now
+                end
+                local contactAction,contactMode
+                local contactMs=0
+                if RUNTIME.contact and contact.enabled and not override and not held.RMB then
+                    stage='ground contact correction'
+                    local base=learned or(lastActorAt and now-lastActorAt<.35 and lastActorAction)or previous
+                    local contactAt=os.clock()
+                    contactAction,contactMode=contact:step(packet,base,now)
+                    contactMs=(os.clock()-contactAt)*1000
+                end
+                local decisionPeriod=(override or contactAction)and 1/30 or period
                 if previousPeriod~=decisionPeriod then decisionAt=nil;previousPeriod=decisionPeriod end
                 local due,nextDecision,late=Timing.due(now,decisionAt,decisionPeriod)
-                if worker and not override then
+                if worker and not override and not contactAction then
                     if completed then due=true;nextDecision=decisionAt
                     elseif worker.job then return end
                 end
@@ -593,14 +646,12 @@ task.spawn(function()
                 decisionAt=nextDecision
                 local decisionEpoch=epoch
                 local began=os.clock()
-                local ground=packet.ground_estimate
-                if ground and(not lastGround or previous[6]==0)then jumpAt=nil;usedFlip=false end
-                lastGround=ground
-                local hasFlip=ground or(not usedFlip and(not jumpAt or now-jumpAt<PROFILE.physics.DOUBLEJUMP_MAX_DELAY))
-                local action=override
-                if worker and action then worker:cancel();completed=nil end
-                local modelMs,planningMs,entityCount,safetyMs=0,0,0,0
-                local modelRan=false
+                local action=override or contactAction
+                if contactAction then recovery=contactMode end
+                if worker and action and not contactAction then worker:cancel();completed=nil;learned=nil end
+                local modelMs,planningMs,entityCount,safetyMs=0,contactMs,0,0
+                local modelRan=learned~=nil
+                if learned then modelMs=completed.cpu*1000;entityCount=completed.context.entity_count or 0 end
                 physics.plan=nil
                 if not action then
                     stage="recovery"
@@ -615,14 +666,11 @@ task.spawn(function()
                     if not action then
                         stage="model observation"
                         if worker then
-                            if completed and latency:fresh(completed,packet,now,epoch)then
+                            if learned then
                                 modelMs=completed.cpu*1000;modelRan=true
                                 entityCount=completed.context.entity_count or 0
                                 -- Remove actions that became unavailable while the model yielded.
-                                local mask=Policy.mask(ground,packet.boost,hasFlip,packet.turtled)
-                                local index,value=nil,-math.huge
-                                for i,v in ipairs(completed.logits)do if mask[i]and v>value then index,value=i,v end end
-                                action=Policy.action(assert(index),completed.context)
+                                action=learned
                             else
                                 if not worker.job then startJob(packet,hasFlip,now)end
                                 if now-lastUi>.25 then
@@ -635,7 +683,7 @@ task.spawn(function()
                             end
                         else
                             packet.has_jumped=jumpAt~=nil
-                            local query,entities=Policy.observe(packet,previous,hasFlip)
+                            local query,entities=Policy.observe(Contact.policyPacket(packet,ignoreTeammates),previous,hasFlip)
                             entityCount=entities.entity_count or #entities
                             stage="model inference"
                             local modelAt=os.clock()
@@ -652,9 +700,10 @@ task.spawn(function()
                         end
                     end
                 end
-                local proposed=table.clone(action)
+                if worker and contactAction and not worker.job and now-lastJobAt>=period then startJob(packet,hasFlip,now)end
+                local proposed=table.clone(learned or action)
                 safety.last=nil
-                if modelRan and safetyEnabled then
+                if(modelRan or contactAction)and safetyEnabled then
                     stage='ground goal safety'
                     local safetyAt=os.clock()
                     local guarded,mode=safety:step(packet,action,now)
@@ -663,7 +712,11 @@ task.spawn(function()
                 end
                 stage="mapping inputs"
                 local wanted,actual=Policy.keys(action,ground)
-                local inferenceMs=(os.clock()-began)*1000
+                -- A timeout may release a held jump, but must not manufacture
+                -- a second rising edge/flip from an actor still holding jump.
+                if action[6]==0 then jumpLatched=false
+                elseif jumpLatched then wanted.RMB=nil;actual[6]=0 end
+                local inferenceMs=(os.clock()-began)*1000+contactMs
                 assert(inferenceMs<200,"Local inference exceeded 200ms")
                 -- Recheck before pressing: executor calls and prediction can yield.
                 if epoch~=decisionEpoch or not enabled or not alive or not focus or input:GetFocusedTextBox()
@@ -701,6 +754,7 @@ task.spawn(function()
                     input_milliseconds=inputMs,action=table.clone(actual),model_milliseconds=modelMs,
                     planning_milliseconds=planningMs,model_ran=modelRan,entity_count=entityCount,
                     proposed_action=proposed,goal_safety=safety.last,goal_safety_milliseconds=safetyMs}
+                physics.decision.contact=contact.last;physics.decision.ignore_teammates=ignoreTeammates
                 timing:record({time=now,model_ran=modelRan,entities=entityCount,pose_ms=poseMs,observe_ms=observeMs,
                     model_ms=modelMs,planning_ms=planningMs,safety_ms=safetyMs,decision_ms=inferenceMs,input_ms=inputMs,schedule_late_ms=late*1000})
                 previous=actual;rate=timing.rate

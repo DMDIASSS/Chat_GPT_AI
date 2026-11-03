@@ -6,7 +6,11 @@ masks. It runs locally with this adapter. It won 30 of 32 bounded RocketSim 1v1
 first-goal episodes against original Nexto; this is not an all-bot ranking or a
 live Roblox result. See [Chronos setup, loader and verification](CHRONOS_README.md).
 
-Chronos **local v6.10** adds a small online loader, visible startup stages,
+Chronos **local v6.11** adds ground-contact corrections using the saved game's
+car boxes and observed ball physics, lightweight live gravity fitting, and a
+fixed jump-hold safeguard. **Contact assist** and **Ignore teammates** start ON.
+Teammates stay in physical obstacle checks; tactical possession yielding stays
+OFF. Pause with F8 to change these options. It retains a small online loader, visible startup stages,
 bounded download waits and faster model preparation. Use the Fast loader linked
 in the Chronos guide. It retains frame-budgeted inference, native vector math with
 exact-zero activation skipping, bounded latency compensation, and a reversible

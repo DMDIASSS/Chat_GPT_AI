@@ -189,7 +189,7 @@ function game:HttpGet(url)
 end
 '''
         self.client_case('''
-assert(downloads==1 and result.version=='local-6.10')
+assert(downloads==1 and result.version=='local-6.11')
 move(.05);inputKey('F6')
 for i=1,30 do move(1/30)end
 assert(#emissions>0,'Fast loader never reached Ready')
@@ -239,7 +239,7 @@ print('SLICED_PARITY_OK',#cases,'mean_cpu_ms',total/#cases,'peak_slice_ms',peak,
 
     def test_graphics_default_toggle_and_close_restore(self):
         self.client_case('''
-assert(result.version=='local-6.10')
+assert(result.version=='local-6.11')
 assert(not lighting.GlobalShadows,'Light graphics did not start enabled')
 for i=1,10 do move(1/120)end
 click('Game optimization: ON');assert(lighting.GlobalShadows)
@@ -252,6 +252,48 @@ assert(lighting.GlobalShadows,'Close did not restore graphics')
 local lighting=object('Lighting','Lighting');lighting.Parent=workspace;lighting.GlobalShadows=true
 services.Lighting=lighting
 ''')
+
+    def test_ignore_teammates_default_toggle_keeps_opponents_in_actual_actor_input(self):
+        needle='if arenaAdapter then packet.hitbox_probe=arenaAdapter.hitboxProbe end'
+        inject=needle+'''
+local ally=table.clone(cp);ally.position={2000,2000,17};ally.team=TEAM
+local enemy=table.clone(cp);enemy.position={-2000,2000,17};enemy.team=1-TEAM
+packet.other_cars={ally,enemy}
+'''
+        source=self.source.replace(needle,inject)
+        hook='''
+local originalObserve=Policy.observe
+Policy.observe=function(p,...)
+ local allies,enemies=0,0
+ for _,car in ipairs(p.other_cars)do if car.team==p.team then allies+=1 else enemies+=1 end end
+ assert(enemies==1 and allies==(expectIgnore and 0 or 1),'Wrong tactical teammate filter')
+ observedViews+=1
+ return originalObserve(p,...)
+end
+'''
+        source=source.replace('local Keyboard=(function()',hook+'\nlocal Keyboard=(function()',1)
+        self.client_case('''
+move(.05);inputKey('F6');for i=1,35 do move(1/30)end
+assert(observedViews>0,'No actor observations inspected')
+inputKey('F8');click('Save physics report')
+assert(saved.ignore_teammates and not saved.teammate_yield_enabled and saved.contact_assist.enabled)
+click('Ignore teammates: ON');expectIgnore=false
+local before=observedViews
+inputKey('F6');for i=1,30 do move(1/30)end
+assert(observedViews>before,'Actor did not restart after switching teammate mode')
+inputKey('F8');click('Ignore teammates: OFF');expectIgnore=true
+click('Yield to teammate: OFF')
+click('Save physics report')
+assert(not saved.ignore_teammates and saved.teammate_yield_enabled,'Conflicting teammate modes stayed on')
+click('Ignore teammates: OFF');click('Contact assist: ON');click('Save physics report')
+assert(saved.ignore_teammates and not saved.teammate_yield_enabled and not saved.contact_assist.enabled)
+click('Close')
+''','',extra='''
+local expectIgnore=true
+local observedViews=0
+local saved
+writefile=function(_,body)saved=encoded[body]end
+''',source=source)
 
     def test_f8_cancels_a_yielded_job_and_restart_uses_new_work(self):
         needle='''local predict,backend=Policy.new(tensors,{yieldWork=RUNTIME.cooperative and loadingYield or nil,
@@ -288,6 +330,86 @@ assert(jobsFinished==count,'Closed work resumed')
 local slowRuntime=false
 local jobsStarted,jobsFinished=0,0
 task.wait=function(dt)move(dt or 1/120)end
+''',source=self.source.replace(needle,wrapped))
+
+    def test_contact_corrections_apply_while_the_actor_is_suspended(self):
+        source=self.source
+        needle='local packet={car=cp,ball=bp,boost=b,team=TEAM,ground_estimate=grounded,valid=true,sample_dt=dt}'
+        source=source.replace(needle,needle+'''
+packet.ground_estimate=true
+cp.position={0,-600,17};cp.velocity={0,1800,0};cp.forward={0,1,0};cp.up={0,0,1};cp.angular_velocity={0,0,0}
+bp.position={260,0,93.15};bp.velocity={-150,0,0};bp.angular_velocity={0,0,0}
+''')
+        needle='''local predict,backend=Policy.new(tensors,{yieldWork=RUNTIME.cooperative and loadingYield or nil,
+            progress=RUNTIME.cooperative and loadingProgress or nil})'''
+        source=source.replace(needle,'''local rawPredict,backend=Policy.new(tensors,{yieldWork=loadingYield})
+local function predict(q,c,checkpoint)
+ if slowActor then
+  jobsStarted+=1
+  for i=1,300 do now+=.0004;checkpoint()end
+ end
+ local index,logits=rawPredict(q,c,checkpoint)
+ if slowActor then jobsFinished+=1 end
+ return index,logits
+end''')
+        self.client_case('''
+slowActor=true
+move(.05);inputKey('F6')
+for i=1,120 do move(1/120);if jobsStarted>0 then break end end
+for i=1,30 do move(1/120)end
+assert(jobsStarted>0 and jobsFinished==0,'Expected a suspended background actor')
+inputKey('F8');click('Save physics report')
+assert(saved.performance.samples>0,'Contact inputs waited for the actor')
+local saw=false
+for _,sample in ipairs(saved.trace)do
+ if sample.decision and sample.decision.mode=='ground contact correction'then saw=true end
+end
+assert(saw,'Contact correction was not applied between actor results')
+local before=#emissions
+for i=1,50 do move(1/120)end
+assert(#emissions==before and jobsFinished==0,'Paused contact/actor work emitted inputs')
+click('Close')
+''','',extra='''
+local slowActor=false
+local jobsStarted,jobsFinished=0,0
+local saved
+writefile=function(_,body)saved=encoded[body]end
+task.wait=function(dt)move(dt or 1/120)end
+''',source=source)
+
+    def test_jump_can_reach_full_hold_without_retriggering_an_unrequested_flip(self):
+        needle='''local predict,backend=Policy.new(tensors,{yieldWork=RUNTIME.cooperative and loadingYield or nil,
+            progress=RUNTIME.cooperative and loadingProgress or nil})'''
+        wrapped='''local rawPredict,backend=Policy.new(tensors,{yieldWork=loadingYield})
+local function predict(q,c,checkpoint)
+ if forceControls then
+  local chosen
+  for i,a in ipairs(Policy.actions())do
+   if a[6]==(forceJump and 1 or 0)and a[3]==0 and a[4]==0 and a[5]==0 and a[7]==0 then chosen=i;break end
+  end
+  local logits=table.create(90,-100);logits[assert(chosen)]=100
+  return chosen,logits
+ end
+ return rawPredict(q,c,checkpoint)
+end'''
+        self.client_case('''
+forceControls=true;forceJump=true
+move(.05);inputKey('F6');for i=1,60 do move(1/60)end
+local down,up={},{}
+for _,event in ipairs(emissions)do
+ if event[2]=='RMB'then table.insert(event[1]=='down'and down or up,event[3])end
+end
+assert(#down==1 and #up==1,'Held jump manufactured repeated rising edges')
+assert(up[1]-down[1]>=.19 and up[1]-down[1]<.27,'Jump was released before the 200ms hold')
+forceJump=false;for i=1,12 do move(1/60)end
+forceJump=true;for i=1,16 do move(1/60)end
+local count=0;for _,event in ipairs(emissions)do if event[1]=='down'and event[2]=='RMB'then count+=1 end end
+assert(count==2,'A real release/new jump was blocked')
+inputKey('F8');click('Close')
+''','',extra='''
+local forceControls,forceJump=false,false
+mouse2press=function()emissions[#emissions+1]={'down','RMB',now}end
+mouse2release=function()emissions[#emissions+1]={'up','RMB',now}end
 ''',source=self.source.replace(needle,wrapped))
 
 

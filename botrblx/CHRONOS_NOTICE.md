@@ -42,3 +42,7 @@ Local v6.10 adds bounded startup scheduling and progress/error reporting. The
 Fast loader fetches the identical public FP32 values as raw data from the
 immutable revision in `chronos_runtime.json`; inference remains local. The
 standalone artifact continues to embed those values for offline operation.
+
+Local v6.11 adds a bounded ground sphere/OBB contact controller, lightweight live
+gravity fitting, independent teammate observation mode and jump-hold latching.
+The public Chronos weights and numerical reference outputs are unchanged.

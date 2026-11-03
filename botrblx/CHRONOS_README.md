@@ -1,9 +1,47 @@
 # TurboBall Chronos V2.1
 
 `downloads/TurboBall_Chronos.lua` contains the actual public Chronos V2.1 shared
-head and actor. It runs locally in Luau with the botrblx v6.10 window,
+head and actor. It runs locally in Luau with the botrblx v6.11 window,
 keyboard controls, telemetry, measured goal calibration and bounded recovery.
 There is no Python server to keep running and no model download during play.
+
+## v6.11: contact corrections and independent play
+
+**Contact assist: ON** adds a short ground-contact correction between actor
+decisions. It checks a sphere against the selected car's oriented collision box,
+including the box's forward/up offsets. It predicts up to 0.45 seconds using the
+observed ball radius, current velocity and gravity, and stable observed car
+acceleration. It corrects near misses, cuts boost when the contact line is wrong,
+and can brake for an imminent overshoot or car obstruction. The actor continues
+computing in the background. This does not require the heavier far-ground
+**Physics assist**, which still starts OFF.
+
+Corrections leave jumps, aerials, walls, goal interiors, existing overlaps and
+contested ball touches to the actor. Known preset dimensions use offsets from
+the saved game; unverified geometry is explicitly reported as an estimate.
+Hidden debug hitbox parts can have stale world transforms, so their positions
+are not treated as reliable collision offsets. This is a bounded controller,
+not a new model trained for every physics mode.
+
+Light mode now keeps the small, isolated-flight gravity fit active while
+skipping expensive forecast-error validation. It requires several consistent
+samples and rejects nearby cars/contacts. The jump safeguard allows the saved
+game's full 200 ms jump hold, then latches a timeout release until the actor
+requests a real release; it cannot turn one continued hold into repeated flips.
+Interior flat-floor queries use the same analytic surface with a faster path.
+
+**Ignore teammates: ON** is the default requested behavior. Teammates are omitted
+from the actor's tactical observation, and possession yielding stays OFF. Actual
+players remain in telemetry, gravity isolation and contact obstacle checks;
+opponent observations are retained. Pause with **F8** to turn this off. Enabling
+**Yield to teammate** disables **Ignore teammates**, and vice versa.
+
+The [synthetic contact comparison](reports/chronos-contact-v6.11.json) records
+the simplified steering test and cloud Luau timings. Its baseline is a dummy
+that drives straight, not Chronos. It does not measure live Roblox hit rate,
+competitive wins, aerial accuracy or FPS. The neural weights remain unchanged.
+For an actual miss, press **F9**, pause, then **Save physics report**; the trace
+records the chosen contact target, collider, gravity and proposed/applied action.
 
 ## v6.10: startup fix
 
@@ -53,9 +91,10 @@ processing/input delay and uses high ping/jitter to tighten prediction/freshness
 limits. It does not reduce the network ping itself. Unknown ping remains unknown.
 
 F8/focus loss/Close cancels suspended work before it can apply inputs. Jump
-pulses are bounded, and stale held boost is released. Normal driving skips
-expensive passive flight fitting; explicit calibration and physics assist retain
-it. The panel shows estimated FPS, ping, work-slice time and decision age.
+pulses are bounded, and stale held boost is released. Normal driving retains
+lightweight gravity fitting; full forecast-error validation runs during explicit
+calibration or physics assist. The panel shows estimated FPS, ping, work-slice
+time and decision age.
 
 See [the same-process performance comparison](reports/chronos-performance-v6.9.json).
 Those are cloud Luau CPU measurements, not FPS measurements on the user's
