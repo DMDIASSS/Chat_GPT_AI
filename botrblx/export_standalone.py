@@ -178,7 +178,21 @@ def load_arena_profile(path):
 
 def standalone_source(model,model_sha,app_dir=APP_DIR,profile=None,model_name="Update271",physics_assist=True):
     tensors,cases=prepare_model(model)
-    policy=(app_dir/"templates/local_policy.lua").read_text(encoding="utf-8")
+    return render_standalone(tensors,cases,model_sha,app_dir,profile,model_name,physics_assist)
+
+
+def render_standalone(tensors,cases,model_sha,app_dir=APP_DIR,profile=None,model_name="Update271",
+                      physics_assist=True,policy_file="local_policy.lua",policy_replacements=None):
+    """Share telemetry, input ownership and UI across explicitly supported actors."""
+    policy=(app_dir/"templates"/policy_file).read_text(encoding="utf-8")
+    if "-- COMMON_ADAPTER_HERE" in policy:
+        common=(app_dir/"templates/local_policy.lua").read_text(encoding="utf-8")
+        # Reuse the tested float32 decoder, action order and Roblox key mapping.
+        decoder=common[common.index("function Policy.decode"):common.index("local function dense")]
+        inputs=common[common.index("function Policy.actions()"):common.rindex("return Policy")]
+        policy=policy.replace("-- COMMON_ADAPTER_HERE","local Policy={}\n"+decoder+inputs)
+    for marker,value in (policy_replacements or {}).items():
+        policy=policy.replace(marker,value)
     keyboard=(app_dir/"templates/local_keyboard.lua").read_text(encoding="utf-8")
     arena=(app_dir/"templates/local_arena.lua").read_text(encoding="utf-8")
     pads=(app_dir/"templates/local_pads.lua").read_text(encoding="utf-8")

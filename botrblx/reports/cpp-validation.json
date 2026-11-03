@@ -1,0 +1,12 @@
+{
+  "cpp_reference_cases": 8,
+  "observations_per_case": 225,
+  "action_masks_per_case": 90,
+  "mapped_actions_per_case": 90,
+  "worst_prefix_error": 2.9770574949683493e-08,
+  "result": "PASS",
+  "harness": "tests/chronos_reference.cpp",
+  "harness_sha256": "2273322b31783328d1188fc3aa1a0ade3193613cec55aae8cd1f90aa6d090463",
+  "source_revision": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
+  "comparison": "self/global prefix and per-team multisets of shuffled padded rows; all masks and 90 reflected action vectors"
+}

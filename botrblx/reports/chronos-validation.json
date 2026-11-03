@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-03",
+  "base_revision": "37ff8491df5d3075e4b6213812efd4cc788d30e7",
+  "model": "Chronos V2.1",
+  "model_revision": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
+  "targeted_tests": {
+    "passed": 28,
+    "failed": 0
+  },
+  "pytorch_luau_reference_states": 8,
+  "cpp_observation_and_action_reference": {
+    "cpp_reference_cases": 8,
+    "observations_per_case": 225,
+    "action_masks_per_case": 90,
+    "mapped_actions_per_case": 90,
+    "worst_prefix_error": 2.9770574949683493e-08,
+    "result": "PASS",
+    "harness": "tests/chronos_reference.cpp",
+    "harness_sha256": "2273322b31783328d1188fc3aa1a0ade3193613cec55aae8cd1f90aa6d090463",
+    "source_revision": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
+    "comparison": "self/global prefix and per-team multisets of shuffled padded rows; all masks and 90 reflected action vectors"
+  },
+  "luau_cli_timing_ms": {
+    "final_run_mean": 79.9724398749504,
+    "final_run_peak": 190.7179699999233,
+    "isolated_run_mean": 49.56579262501748,
+    "isolated_run_peak": 53.43036200008555
+  },
+  "artifacts": {
+    "TurboBall_Chronos.lua": {
+      "bytes": 20572481,
+      "sha256": "7df3cf4c3471b2396a60db7851ca5e001b2af958d0e14625ed407328e2a8554a"
+    },
+    "TurboBall_Nexto.lua": {
+      "bytes": 2567504,
+      "sha256": "67e8610da082c15757aa839008e0fc9ea6cc2be0d8939cf30fd5eb257f2c39ee"
+    }
+  },
+  "scope": [
+    "PyTorch/Luau full float32 numeric parity",
+    "225-value observations, reflection, padding and action masks",
+    "F8, focus loss, input release and close lifecycle under Roblox mocks",
+    "Shared Nexto artifact and cadence regression",
+    "Pad cooldowns survive rescan",
+    "Arena, timing and keyboard regression tests"
+  ],
+  "live_roblox_test": false,
+  "all_linked_bots_compared": false,
+  "command": "LUAU_BIN=... CHRONOS_ASSETS=... python -m pytest botrblx/tests/test_chronos.py botrblx/tests/test_arena.py botrblx/tests/test_timing.py botrblx/tests/test_local_keyboard.py botrblx/tests/test_standalone.py::StandaloneTests::test_ready_nexto_runtime_keeps_cadence_and_active_trace_after_pause -q -s"
+}

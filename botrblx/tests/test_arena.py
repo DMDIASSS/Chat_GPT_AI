@@ -169,8 +169,13 @@ assert(selected[2].is_big==true and selected[2].active==false)
 for _,ring in ipairs(big)do ring.Color={R=1,G=.83,B=.19}end
 selected=pads:read(scene,{170,120,17},.3)
 assert(selected[2].active==true)
-small[1].Color={R=.8,G=.1,B=.1} -- unverified tint must not become a fake pad state
+for _,ring in ipairs(big)do ring.Color={R=.5,G=.55,B=.63}end
 selected=pads:read(scene,{170,120,17},.6)
+assert(selected[2].cooldown_remaining==10)
+selected=pads:read(scene,{170,120,17},2.6)
+assert(math.abs(selected[2].cooldown_remaining-8)<1e-6,'A pad rescan discarded its observed cooldown')
+small[1].Color={R=.8,G=.1,B=.1} -- unverified tint must not become a fake pad state
+selected=pads:read(scene,{170,120,17},2.9)
 assert(pads.known==1 and #selected==1)
 ''',mock=True)
 

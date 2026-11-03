@@ -638,12 +638,18 @@ function Pads:index(scene,now)
     -- under the scene. The caller scopes discovery to the local car's view.
     local folder=scene:FindFirstChild("BoostPads",true)
     if folder==self.folder and now-self.lastIndex<2 then return end
+    local previous={}
+    if folder==self.folder then
+        for _,entry in ipairs(self.entries)do previous[entry.halo]=entry end
+    end
     self.folder=folder;self.lastIndex=now;self.entries={};self.known=0
     if not folder then self.total=0;return end
     local rings={}
     for _,part in ipairs(folder:GetDescendants())do
         if part:IsA("BasePart")then
-            if part.Name=="PadHalo"then self.entries[#self.entries+1]={halo=part,rings={}}
+            if part.Name=="PadHalo"then
+                local entry=previous[part]or{halo=part}
+                entry.rings={};self.entries[#self.entries+1]=entry
             elseif part.Name=="PadRing"then rings[#rings+1]=part end
         end
     end
@@ -672,6 +678,7 @@ function Pads:read(scene,carPosition,now)
     if now-self.lastRead>=.2 then
         self.lastRead=now;self.known=0
         for _,entry in ipairs(self.entries)do
+            local wasActive=entry.active
             entry.active=nil
             if entry.big~=nil then
                 local yellow,valid=0,true
@@ -685,7 +692,11 @@ function Pads:read(scene,carPosition,now)
                         valid=false;break
                     end
                 end
-                if valid then entry.active=yellow==#entry.rings;self.known=self.known+1 end
+                if valid then
+                    entry.active=yellow==#entry.rings;self.known=self.known+1
+                    if entry.active then entry.emptyAt=nil
+                    elseif wasActive==true then entry.emptyAt=now end
+                else entry.emptyAt=nil end
             end
         end
     end
@@ -694,6 +705,7 @@ function Pads:read(scene,carPosition,now)
         if entry.active~=nil and entry.position then
             local p=entry.position
             candidates[#candidates+1]={position=p,is_big=entry.big,active=entry.active,
+                cooldown_remaining=entry.emptyAt and math.max(.01,(entry.big and 10 or 4)-(now-entry.emptyAt))or nil,
                 distance=(p[1]-carPosition[1])^2+(p[2]-carPosition[2])^2}
         end
     end
@@ -2132,6 +2144,7 @@ local function release()
         end
     end
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
+    if Policy.reset then Policy.reset()end
     pendingJump=nil
     keyboard:release()
     arenaAdapter:resetRecovery()
@@ -2781,13 +2794,14 @@ task.spawn(function()
                     end
                     if not action then
                         stage="model observation"
+                        packet.has_jumped=jumpAt~=nil
                         local query,entities=Policy.observe(packet,previous,hasFlip)
-                        entityCount=#entities
+                        entityCount=entities.entity_count or #entities
                         stage="model inference"
                         local modelAt=os.clock()
                         local index=predict(query,entities)
                         modelMs=(os.clock()-modelAt)*1000;modelRan=true
-                        action=actions[index]
+                        action=Policy.action and Policy.action(index,entities)or actions[index]
                         if needsPolicy then
                             stage="ground interception"
                             local planningAt=os.clock()

@@ -106,6 +106,7 @@ local function release()
         end
     end
     previous=table.create(8,0);jumpAt=nil;usedFlip=false
+    if Policy.reset then Policy.reset()end
     pendingJump=nil
     keyboard:release()
     arenaAdapter:resetRecovery()
@@ -492,13 +493,14 @@ task.spawn(function()
                     end
                     if not action then
                         stage="model observation"
+                        packet.has_jumped=jumpAt~=nil
                         local query,entities=Policy.observe(packet,previous,hasFlip)
-                        entityCount=#entities
+                        entityCount=entities.entity_count or #entities
                         stage="model inference"
                         local modelAt=os.clock()
                         local index=predict(query,entities)
                         modelMs=(os.clock()-modelAt)*1000;modelRan=true
-                        action=actions[index]
+                        action=Policy.action and Policy.action(index,entities)or actions[index]
                         if needsPolicy then
                             stage="ground interception"
                             local planningAt=os.clock()

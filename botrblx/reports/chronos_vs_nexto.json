@@ -1,0 +1,277 @@
+{
+  "model": {
+    "name": "Chronos V2.1",
+    "agent_id": "KingJake/ChronosV2.1.1",
+    "repository": "KingJake3113/Chronos",
+    "revision": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
+    "files": {
+      "SHARED_HEAD.lt": "e0aac68af61c43c30b78a036466e9199fe10735e2006cbb5f080e81d6caf1640",
+      "POLICY.lt": "cb4e93c281cc89bf5635a6c1c20d7de55f70667b9f744faac4be014f2cc72360"
+    },
+    "observation_size": 225,
+    "actions": 90,
+    "tick_skip": 8,
+    "action_delay": 7,
+    "shared_layers": [
+      960,
+      960
+    ],
+    "policy_layers": [
+      960,
+      800,
+      640,
+      640,
+      90
+    ],
+    "activation": "ReLU",
+    "layer_norm_epsilon": 1e-05,
+    "reference_hashes": {
+      "src/RLBotMain.cpp": "2163f7f52729739e9eab6c26d27d2d0268a3ceb6b41250bcb3fa1e759a06937d",
+      "inc/RLGymCPP/ObsBuilders/AdvancedObsPadded.cpp": "2c488d4110a52c49e41f24c9a4f13249ac5af3c2d04b3e53c027f5b251ed28db",
+      "inc/RLGymCPP/ActionParsers/DefaultAction.cpp": "82ae30ca6523c43cc44df46aa7642ebecee141c56d198d9b92aa7cbc72e6b9fb"
+    }
+  },
+  "opponent": "original Nexto",
+  "seed": 9317701,
+  "pairs": 16,
+  "decisions_limit": 750,
+  "totals": {
+    "chronos": 30,
+    "nexto": 2,
+    "draw": 0
+  },
+  "games": [
+    {
+      "seed": 1806915954,
+      "chronos_orange": false,
+      "scenario": "kickoff",
+      "winner": "chronos",
+      "decisions": 159
+    },
+    {
+      "seed": 1806915954,
+      "chronos_orange": true,
+      "scenario": "kickoff",
+      "winner": "chronos",
+      "decisions": 191
+    },
+    {
+      "seed": 1350188851,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 363
+    },
+    {
+      "seed": 1350188851,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 114
+    },
+    {
+      "seed": 916506547,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 280
+    },
+    {
+      "seed": 916506547,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 123
+    },
+    {
+      "seed": 668839094,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 110
+    },
+    {
+      "seed": 668839094,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 113
+    },
+    {
+      "seed": 1465133374,
+      "chronos_orange": false,
+      "scenario": "kickoff",
+      "winner": "chronos",
+      "decisions": 158
+    },
+    {
+      "seed": 1465133374,
+      "chronos_orange": true,
+      "scenario": "kickoff",
+      "winner": "chronos",
+      "decisions": 159
+    },
+    {
+      "seed": 1671283200,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 91
+    },
+    {
+      "seed": 1671283200,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 134
+    },
+    {
+      "seed": 803958550,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "nexto",
+      "decisions": 289
+    },
+    {
+      "seed": 803958550,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 109
+    },
+    {
+      "seed": 670672520,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 99
+    },
+    {
+      "seed": 670672520,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 88
+    },
+    {
+      "seed": 2483477,
+      "chronos_orange": false,
+      "scenario": "kickoff",
+      "winner": "chronos",
+      "decisions": 110
+    },
+    {
+      "seed": 2483477,
+      "chronos_orange": true,
+      "scenario": "kickoff",
+      "winner": "chronos",
+      "decisions": 114
+    },
+    {
+      "seed": 809083020,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 247
+    },
+    {
+      "seed": 809083020,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 207
+    },
+    {
+      "seed": 477567162,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "nexto",
+      "decisions": 139
+    },
+    {
+      "seed": 477567162,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 99
+    },
+    {
+      "seed": 1064584956,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 206
+    },
+    {
+      "seed": 1064584956,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 97
+    },
+    {
+      "seed": 1377194463,
+      "chronos_orange": false,
+      "scenario": "kickoff",
+      "winner": "chronos",
+      "decisions": 242
+    },
+    {
+      "seed": 1377194463,
+      "chronos_orange": true,
+      "scenario": "kickoff",
+      "winner": "chronos",
+      "decisions": 113
+    },
+    {
+      "seed": 1833183510,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 102
+    },
+    {
+      "seed": 1833183510,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 193
+    },
+    {
+      "seed": 1747488047,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 155
+    },
+    {
+      "seed": 1747488047,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 201
+    },
+    {
+      "seed": 261033838,
+      "chronos_orange": false,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 190
+    },
+    {
+      "seed": 261033838,
+      "chronos_orange": true,
+      "scenario": "grounded",
+      "winner": "chronos",
+      "decisions": 96
+    }
+  ],
+  "seconds": 134.5933927200001,
+  "scope": "RocketSim 1v1, bounded first-goal episodes, actors only, both team assignments, 7-tick action delay",
+  "limitations": [
+    "No Roblox execution or match results",
+    "Does not compare the other linked bots",
+    "No scripted kickoff overrides; not full five-minute matches",
+    "Simulator truth is available, unlike estimated Roblox opponent boost/jump state"
+  ]
+}
