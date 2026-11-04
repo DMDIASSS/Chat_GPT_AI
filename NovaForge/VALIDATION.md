@@ -1,5 +1,7 @@
 # Validation evidence and limits
 
+**v1.0.1 update:** the user reported a Windows `fsync` failure when saving a PPO checkpoint. The checkpoint and actor-export paths now open completed temporary files with write access. Two regression cases reproduced the failure under Linux before the fix. The updated teacher-enabled suite passes 24 tests; the core ZIP passes 19 with 5 optional teacher cases skipped. See [HOTFIX_v1.0.1.md](HOTFIX_v1.0.1.md) for installation and remaining Windows verification. The table below records the original v1.0 build checks, which did not detect this platform-specific bug.
+
 This package was built and exercised in a **Linux cloud environment**. Windows 10, a GTX 1650 Ti Mobile and Rocket League itself were unavailable. The laptop preset is a conservative starting point, not a measured optimum for that machine.
 
 ## Completed checks

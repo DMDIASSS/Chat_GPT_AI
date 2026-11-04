@@ -23,6 +23,13 @@ class Actor(nn.Module):
         return self.network(obs)
 
 
+def _sync_serialized_file(path):
+    # Windows fsync needs a writable descriptor; r+b preserves the saved bytes.
+    with open(path,'r+b') as f:
+        f.flush()
+        os.fsync(f.fileno())
+
+
 def save_ppo(model,path,**meta):
     path=Path(path)
     path.parent.mkdir(parents=True,exist_ok=True)
@@ -30,8 +37,7 @@ def save_ppo(model,path,**meta):
     os.close(fd)
     try:
         model.save(temp)
-        with open(temp,'rb') as f:
-            os.fsync(f.fileno())
+        _sync_serialized_file(temp)
         os.replace(temp,path)
         write_model_meta(path,timesteps=int(model.num_timesteps),**meta)
     finally:
@@ -50,8 +56,7 @@ def export_actor(model,path,**meta):
     os.close(fd)
     try:
         torch.jit.save(traced,temp)
-        with open(temp,'rb') as f:
-            os.fsync(f.fileno())
+        _sync_serialized_file(temp)
         os.replace(temp,path)
         write_model_meta(path,timesteps=int(model.num_timesteps),**meta)
     finally:

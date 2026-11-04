@@ -1,4 +1,6 @@
-# NovaForge v1 — start here
+# NovaForge v1.0.1 — start here
+
+If you already installed v1.0 and `1_CHECK.bat` failed with `Bad file descriptor` while saving a model, follow [HOTFIX_v1.0.1.md](HOTFIX_v1.0.1.md). You can keep your environment and downloaded assets.
 
 A new **1v1** Rocket League research bot for Windows 10, i5-10300H, GTX 1650 Ti Mobile and 16 GB RAM. This release adds a separate training lab inside `Chat_GPT_AI\NovaForge`. Your existing Slater/GigaLearn/RLGym files and checkpoints are not inputs to this trainer and are not overwritten.
 

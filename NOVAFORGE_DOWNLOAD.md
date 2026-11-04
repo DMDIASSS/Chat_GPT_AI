@@ -1,8 +1,8 @@
-# NovaForge v1 download
+# NovaForge v1.0.1 download
 
-[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.0.zip)
+[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.0.1.zip)
 
-Extract into your existing Chat_GPT_AI folder. Open NovaForge/START_HERE.md and run the numbered launchers in order. Windows defaults: Python 3.11 x64, CPU, two workers. No competitive pretrained student is bundled.
+Existing install: extract into Chat_GPT_AI, replace NovaForge source files, then rerun 1_CHECK.bat and 2_SMOKE.bat. Keep the existing .venv and assets; no dependency reinstall is needed. Fresh install: start with NovaForge/START_HERE.md. Windows defaults: Python 3.11 x64, CPU, two workers. No competitive pretrained student is bundled.
 
 [Full guide](NovaForge/START_HERE.md) · [Plan](NovaForge/PLAN.md) · [Validation](NovaForge/VALIDATION.md) · [Bot research](NovaForge/BOT_RESEARCH.md)
 

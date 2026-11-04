@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import numpy as np
 import pytest
@@ -10,6 +11,37 @@ from nova.environment import ArenaEnv
 from nova.models import export_actor, FrozenActor, save_ppo, load_ppo
 from nova.scenarios import Curriculum
 from nova.training import new_model, validate_config
+
+
+@pytest.mark.parametrize('kind',['checkpoint','actor'])
+def test_serialized_models_fsync_with_write_access(cfg,tmp_path,monkeypatch,kind):
+    """Reproduce Windows' write-access requirement even when running on Linux."""
+    real_fsync=os.fsync
+    def require_write_access(fd):
+        # A zero-byte write changes no file bytes and rejects read-only descriptors.
+        os.write(fd,b'')
+        return real_fsync(fd)
+
+    torch.set_num_threads(1)
+    cfg['ppo'].update(n_steps=16,batch_size=16,n_epochs=1)
+    env=ArenaEnv(cfg,opponent='scripted')
+    try:
+        model=new_model(cfg,env)
+        monkeypatch.setattr(os,'fsync',require_write_access)
+        obs,_=env.reset(seed=99)
+        expected=int(model.predict(obs,deterministic=True)[0])
+        if kind=='checkpoint':
+            path=tmp_path/'full.zip'
+            save_ppo(model,path)
+            restored=load_ppo(path)
+            assert int(restored.predict(obs,deterministic=True)[0])==expected
+        else:
+            path=tmp_path/'actor.pt'
+            export_actor(model,path)
+            assert FrozenActor(path).action(obs)==expected
+        assert not list(tmp_path.glob('*.tmp'))
+    finally:
+        env.close()
 
 
 def test_full_checkpoint_and_frozen_export_parity(cfg,tmp_path):
