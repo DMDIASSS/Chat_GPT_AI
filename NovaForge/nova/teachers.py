@@ -13,6 +13,7 @@ from .core import ROOT, TICK_SKIP, ACTIONS, as_v1, observe, sha256, atomic_json
 from .models import FrozenActor
 
 ASSETS=ROOT/'assets'
+BOT_NAMES=('scripted','nexto','ripple','chronos','galactus')
 
 
 def _entries(group):
@@ -32,7 +33,7 @@ def fetch_teachers(groups):
     """Download immutable upstream files, verify bytes, and preserve notices."""
     import rlgym.rocket_league.sim as sim
     for group in groups:
-        if group not in ('nexto','ripple'):
+        if group not in BOT_NAMES or group=='scripted':
             raise ValueError(f'No verified headless adapter for {group}')
         target=ASSETS/group
         target.mkdir(parents=True,exist_ok=True)
@@ -57,7 +58,7 @@ def fetch_teachers(groups):
             meshes=Path(sim.__file__).parent/'collision_meshes'
             shutil.copytree(meshes,target/'collision_meshes',dirs_exist_ok=True)
         atomic_json(target/'installed.json',installed)
-        print(f'{group}: files verified. License/notices: {target}',flush=True)
+        print(f'{group}: files verified. Upstream documentation: {target}',flush=True)
 
 
 def verify_teacher(group):
@@ -185,6 +186,20 @@ class Ripple:
 def make_opponent(name,path=None):
     factories={'scripted':Scripted,'nexto':Nexto,'ripple':Ripple}
     if name=='snapshot': return Snapshot(path)
+    if name in ('chronos','galactus'):
+        from .giga_teachers import GigaTeacher
+        return GigaTeacher(name)
     if name not in factories:
         raise ValueError(f'Unsupported opponent: {name}')
     return factories[name]()
+
+
+def controls_for_ticks(policy,state):
+    if hasattr(policy,'controls_for_ticks'):
+        controls=policy.controls_for_ticks(state,TICK_SKIP)
+    else:
+        controls=np.repeat(policy.act(state)[None,:],TICK_SKIP,axis=0)
+    controls=np.asarray(controls,dtype=np.float32)
+    if controls.shape!=(TICK_SKIP,8) or not np.isfinite(controls).all() or np.max(np.abs(controls))>1.001:
+        raise ValueError('Opponent must return valid controls for each physics tick')
+    return controls

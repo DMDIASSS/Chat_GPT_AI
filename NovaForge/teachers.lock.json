@@ -70,5 +70,59 @@
     "target": "LICENSE",
     "url": "https://raw.githubusercontent.com/RLBot/RLBotPack/0033a98d4e060670f334f60f7f8dc5ee21ba93bb/RLBotPack/Necto/LICENSE",
     "sha256": "1349a4b6148492b44f629e64eed676612e234fe9a839e4f3b277c1482c8849f1"
+  },
+  {
+    "group": "chronos",
+    "repo": "KingJake3113/Chronos",
+    "commit": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
+    "path": "rlbot/POLICY.lt",
+    "target": "POLICY.lt",
+    "url": "https://raw.githubusercontent.com/KingJake3113/Chronos/4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa/rlbot/POLICY.lt",
+    "sha256": "cb4e93c281cc89bf5635a6c1c20d7de55f70667b9f744faac4be014f2cc72360"
+  },
+  {
+    "group": "chronos",
+    "repo": "KingJake3113/Chronos",
+    "commit": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
+    "path": "rlbot/SHARED_HEAD.lt",
+    "target": "SHARED_HEAD.lt",
+    "url": "https://raw.githubusercontent.com/KingJake3113/Chronos/4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa/rlbot/SHARED_HEAD.lt",
+    "sha256": "e0aac68af61c43c30b78a036466e9199fe10735e2006cbb5f080e81d6caf1640"
+  },
+  {
+    "group": "chronos",
+    "repo": "KingJake3113/Chronos",
+    "commit": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
+    "path": "README.md",
+    "target": "README.md",
+    "url": "https://raw.githubusercontent.com/KingJake3113/Chronos/4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa/README.md",
+    "sha256": "bb4c8ece5e698c483eb7283b260375a3e169b3d013973aef80efc7d9eb27a9a2"
+  },
+  {
+    "group": "galactus",
+    "repo": "SoldierDoge/GalactusV2",
+    "commit": "217324c2fc516048effe0407595fa61c2ebc6863",
+    "path": "rlbot/POLICY.lt",
+    "target": "POLICY.lt",
+    "url": "https://raw.githubusercontent.com/SoldierDoge/GalactusV2/217324c2fc516048effe0407595fa61c2ebc6863/rlbot/POLICY.lt",
+    "sha256": "f31e15e118f14713ffc5d4af84ab0d8018c04f1451805f50a2e2df9d396603ed"
+  },
+  {
+    "group": "galactus",
+    "repo": "SoldierDoge/GalactusV2",
+    "commit": "217324c2fc516048effe0407595fa61c2ebc6863",
+    "path": "rlbot/SHARED_HEAD.lt",
+    "target": "SHARED_HEAD.lt",
+    "url": "https://raw.githubusercontent.com/SoldierDoge/GalactusV2/217324c2fc516048effe0407595fa61c2ebc6863/rlbot/SHARED_HEAD.lt",
+    "sha256": "a38be9da0a57141d0bf8e38bd51944f77aa04912f7912e9c4bc49f93db7285a4"
+  },
+  {
+    "group": "galactus",
+    "repo": "SoldierDoge/GalactusV2",
+    "commit": "217324c2fc516048effe0407595fa61c2ebc6863",
+    "path": "README.md",
+    "target": "README.md",
+    "url": "https://raw.githubusercontent.com/SoldierDoge/GalactusV2/217324c2fc516048effe0407595fa61c2ebc6863/README.md",
+    "sha256": "c337f9125171fbfec383d4cb4a732900a88a361070a7bf0b021b2f31ae796c4b"
   }
 ]

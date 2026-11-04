@@ -1,13 +1,15 @@
 # What the public bots make available
 
+**v1.1 update:** Chronos and GalactusV2 now have CPU simulator ports using their actual native weights. The deployment details below explain their interfaces. C++ network and feature/mask comparisons pass; live trajectory/forecast parity remains unverified. See [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md).
+
 Sources were inspected through the user's [RLBot botpack](https://github.com/RLBot/botpack/tree/master/Botpack). This is an interoperability review, not a verified ranking of playing strength. A deployment model usually does not include training data, reward code or optimizer state.
 
 | Bot | Public material inspected | Use in NovaForge v1 |
 | --- | --- | --- |
 | Ripple v1.1 | Python observation/action code, ONNX policies, runtime, notices | Real simulator trainer and demonstration collector. Fixed deterministic RL policy, original six-slot queue, four-tick decisions. No adaptive runtime bandit/BCM blending. |
 | Nexto | Public neural policy and observation builder | Real eight-tick neural opponent/teacher. Stock scripted kickoff is not included, so label comparisons `Nexto neural` rather than exact stock Nexto. |
-| Chronos | C++ GigaLearn inference project, padded observations, action code, `.lt` weights | Source study and later offline RLBot opponent. A correct headless port remains future work. |
-| GalactusV2 | C++ GigaLearn inference project, 258-feature builder, 90 actions, `.lt` weights | Source study and later offline RLBot opponent. Its prediction samples, timers and action delay need their own parity tests. |
+| Chronos | C++ GigaLearn inference project, padded observations, action code, `.lt` weights | CPU simulator port; 225 features, native weights/masks, side mirroring and delayed controls. |
+| GalactusV2 | C++ GigaLearn inference project, 258-feature builder, 90 actions, `.lt` weights | CPU simulator port; native weights/masks, five prediction samples and delayed controls, with documented forecast/contact-normal limits. |
 | Pulsar | A public C++ training research repository was found | Algorithm study only. It is not listed in the inspected botpack snapshot; this repository's identity as the specific strong bot the user means, and a compatible deployment checkpoint, were not established. |
 
 ## Ripple: useful material available now
@@ -22,7 +24,7 @@ NovaForge downloads the exact observation/action code and policy. The adapter tr
 
 [GalactusV2's public README](https://github.com/SoldierDoge/GalactusV2/tree/217324c2fc516048effe0407595fa61c2ebc6863) specifies 258 observations, 90 discrete actions, tick skip eight and delay seven. The feature builder includes boost timers and ball-prediction samples. It supplies inference weights rather than resumable optimizer/training state. Loading these files into the new 100-feature/276-action student would be incompatible.
 
-The immediate way to test either bot is to export NovaForge into RLBot v5 and play offline matches. The next headless adapter should begin with recorded-state parity against the original C++ runtime, including ball prediction, queue phase, normalization and action masks.
+Both can now be selected in the headless league. Fourteen scenario cases per bot compare the port's features and masks with the original C++ code, and separate network comparisons load the same `.lt` files through the native C++ model class. Full-match live comparisons remain necessary before treating port scores as equivalent to stock bot strength.
 
 ## Pulsar: a research direction, not a bundled trainer
 

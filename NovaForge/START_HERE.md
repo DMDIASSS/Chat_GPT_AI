@@ -1,4 +1,6 @@
-# NovaForge v1.0.1 — start here
+# NovaForge v1.1 — start here
+
+**For mixed-opponent training:** finish installation and `1_CHECK.bat`, then follow [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md) using launchers 10–16. This update includes the Windows checkpoint save fix, real Chronos/GalactusV2 simulator ports and a mixture with Nexto, Ripple and past student policies. The original single-teacher workflow below remains available.
 
 If you already installed v1.0 and `1_CHECK.bat` failed with `Bad file descriptor` while saving a model, follow [HOTFIX_v1.0.1.md](HOTFIX_v1.0.1.md). You can keep your environment and downloaded assets.
 
@@ -10,7 +12,7 @@ It trains a new, compact policy. No competitive pretrained student is included. 
 
 - Real headless RocketSim physics through RLGym v2, with Stable-Baselines3 PPO.
 - Frozen current-policy and historical-policy opponents, sampled once per episode.
-- Optional **Ripple v1.1** and **Nexto neural policy** trainers, downloaded from pinned public commits and verified with SHA256.
+- Optional **Ripple v1.1**, **Nexto neural policy**, **Chronos port** and **GalactusV2 port** trainers, downloaded from pinned public commits and verified with SHA256.
 - Shooting, defending, dribbling, aerial, wall, recovery and kickoff starts. A small curriculum increases difficulty as practice succeeds and gives more attention to weaker scenarios.
 - Teacher imitation before PPO, with validation separated by complete episode IDs.
 - Replay parsing into starting positions; teachers can generate fresh, exact simulator action labels from those positions.
@@ -63,14 +65,14 @@ If reusing a manual smoke name, choose `smoke02` or another fresh name. If two w
 Double-click `3_FETCH_TRAINERS.bat`, or run:
 
 ```bat
-.venv\Scripts\python.exe run.py fetch-teachers --names nexto,ripple
-.venv\Scripts\python.exe run.py doctor --teachers nexto,ripple
+.venv\Scripts\python.exe run.py fetch-teachers --names nexto,ripple,chronos,galactus
+.venv\Scripts\python.exe run.py doctor --teachers nexto,ripple,chronos,galactus
 .venv\Scripts\python.exe -m pytest tests -q --teachers
 ```
 
-Expect `DOCTOR_PASS` and passing tests. Files go into `assets\nexto` and `assets\ripple`, together with their licenses. These upstream materials use **CC BY-NC-SA 4.0**; preserve their attribution and terms when sharing adapted material. See [THIRD_PARTY.md](THIRD_PARTY.md).
+Expect `DOCTOR_PASS` and passing tests. Files go into per-bot folders under `assets`, together with the available upstream documentation/notices. Nexto and Ripple use **CC BY-NC-SA 4.0**; preserve their attribution and terms when sharing adapted material. See [THIRD_PARTY.md](THIRD_PARTY.md) for all four bots' provenance.
 
-The Nexto adapter runs its neural policy at eight physics ticks; it omits the stock scripted kickoff. Ripple runs its RL v1.1 ONNX model at four ticks with the original six-slot queue and deterministic action selection. These are documented simulator variants, and their scores should be labeled that way. Chronos and Galactus are available for later real-game evaluation through RLBot, but this release does not pretend to have headless adapters for them.
+The Nexto adapter runs its neural policy at eight physics ticks; it omits the stock scripted kickoff. Ripple runs its RL v1.1 ONNX model at four ticks with the original six-slot queue and deterministic action selection. Chronos and GalactusV2 ports use their actual native weights, eight-tick decisions and seven-tick control scheduling. The ports' native feature/network comparisons and remaining forecast/contact-normal limits are described in [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md). Label simulator results with these variants.
 
 ## 4. Give the new policy a teacher starting point
 

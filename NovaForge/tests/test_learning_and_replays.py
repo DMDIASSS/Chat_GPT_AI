@@ -110,7 +110,7 @@ def test_no_silent_teacher_fallback_and_league_cold_start(cfg):
         env.reset(seed=8)
         assert env.opponent_label=='scripted:empty-snapshot-pool'
     finally: env.close()
-    cfg['league']['weights']={'chronos':1}
+    cfg['league']['weights']={'unverified_pulsar':1}
     with pytest.raises(ValueError,match='headless'): validate_config(cfg)
 
 

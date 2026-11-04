@@ -1,0 +1,16 @@
+{
+  "workers": 2,
+  "device": "cpu",
+  "threads": 1,
+  "seed": 5217,
+  "rewards": "shaped",
+  "env": {"episode_seconds": 25, "no_touch_seconds": 8, "replay_bank": null},
+  "ppo": {"learning_rate": 0.0003, "n_steps": 1024, "batch_size": 256,
+    "n_epochs": 4, "gamma": 0.995, "gae_lambda": 0.95, "clip_range": 0.2,
+    "ent_coef": 0.01, "net_arch": [256, 256]},
+  "league": {"snapshot_every": 32768, "history_size": 12,
+    "weights": {"scripted": 0.10, "latest": 0.20, "history": 0.20,
+      "nexto": 0.125, "ripple": 0.125, "chronos": 0.125, "galactus": 0.125}},
+  "curriculum": {"adaptive": true, "weights": {"kickoff": 0.3, "shot": 0.2,
+    "defense": 0.15, "dribble": 0.1, "aerial": 0.1, "recovery": 0.1, "wall": 0.05}}
+}

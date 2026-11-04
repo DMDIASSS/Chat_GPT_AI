@@ -1,5 +1,7 @@
 # Implemented work and next experiments
 
+**v1.1:** Chronos and GalactusV2 now have working CPU simulator ports and join Nexto/Ripple in the diverse league. Mixed teacher collection is implemented. Native C++ feature/mask/network comparisons and short real training checks pass. The remaining work for these ports is broader trajectory/live validation, forecast comparison and the unavailable world-contact-normal exception; see [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md). Pulsar stays out until a deployment identity/checkpoint is established.
+
 ## Included in this ZIP
 
 | Feature | Implementation | First test |
@@ -30,8 +32,8 @@ Keep evaluation seeds separate from collection/training seeds. Use a second new 
 ## Next additions, in order
 
 1. **Windows transfer fixes.** Use the user's live clips and errors to fix packet timing, coordinate conversion or launcher issues before increasing model complexity. Acceptance: the same known-state features and controls agree across simulator and live adapter, then several uninterrupted RLBot games.
-2. **Chronos headless adapter.** Match its C++ padded observation layout, masked action logits, queue timing and native weights. Acceptance: original-runtime and port logits/actions agree on recorded states from both sides, followed by headless-versus-live comparisons.
-3. **Galactus headless adapter.** Reproduce the five ball-prediction samples and boost/timing features, including tick-eight/delay-seven scheduling. Acceptance: parity fixtures cover collisions, airborne cars, demos and kickoff transitions.
+2. **Chronos port transfer validation.** The v1.1 implementation matches the native feature/mask fixtures and C++ network logits. Extend comparison to long trajectories, demos, collisions and live matches. Check sensitivity to player-slot randomization and the unavailable contact-normal exception.
+3. **Galactus port prediction validation.** The v1.1 implementation matches native features with identical prediction samples and C++ network logits, including tick-eight/delay-seven scheduling. Compare full cached RocketSim forecasts with the native internal tracker and live prediction packets over collisions and goal transitions.
 4. **Hard-example replay bank.** Store actual learner failures and sample a bounded portion of training resets from them, keeping a separate untouched evaluation bank. Acceptance: recovery on the targeted failure improves without degrading kickoff/full-game screening.
 5. **Skill-specific teachers and a goal-conditioned policy.** Condition on an explicit task and sample actual mechanics demonstrations. Acceptance: aerial/dribble/recovery proxies and held-out match outcomes both improve. A high-touch counter alone is insufficient.
 6. **Reachability-grid experiment inspired by the public Pulsar research.** Begin with reset-cell mastery using actual success, then evaluate a contrastive critic as a separate algorithm. Acceptance: equal-compute improvement on held-out starts and first-goal/full-match evaluation; no claim of reproducing Pulsar without matching its system.

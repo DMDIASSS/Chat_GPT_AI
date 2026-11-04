@@ -1,8 +1,10 @@
-# NovaForge v1.0.1
+# NovaForge v1.1
 
-An isolated, laptop-sized 1v1 Rocket League training lab: RLGym v2 + RocketSim, PPO, frozen self-play, Nexto/Ripple trainers, mechanics resets, replay starting positions, teacher imitation, evaluation, and RLBot v5 export.
+An isolated, laptop-sized 1v1 Rocket League training lab: RLGym v2 + RocketSim, PPO, frozen self-play, Nexto/Ripple trainers, Chronos/GalactusV2 simulator ports, mechanics resets, replay starting positions, teacher imitation, evaluation, and RLBot v5 export.
 
 **Begin with [START_HERE.md](START_HERE.md).** It contains the Windows installation, numbered launchers, exact training/resume/evaluation commands and replay workflow.
+
+For the requested mixed-opponent league, follow [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md): launchers **10–16** download/check all four bots, collect mixed demonstrations, pretrain and train `diverse01`. The original launchers remain available for simpler experiments.
 
 Updating after a Windows `Bad file descriptor` save error? See [the v1.0.1 update instructions](HOTFIX_v1.0.1.md). Extract over the existing NovaForge source and rerun `1_CHECK.bat`; no dependency reinstall is needed.
 

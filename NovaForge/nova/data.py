@@ -11,7 +11,7 @@ import torch
 from .core import ROOT, ACTIONS, CONTRACT, OBS_SIZE, atomic_json, nearest_action, sha256
 from .environment import ArenaEnv
 from .models import save_ppo
-from .teachers import make_opponent
+from .teachers import make_opponent, controls_for_ticks, BOT_NAMES
 from .training import load_config, new_model, prepare_config
 
 
@@ -34,33 +34,46 @@ def collect(args):
     cfg=prepare_config(load_config(args.config),replay_bank=args.replay_bank)
     torch.set_num_threads(cfg['threads'])
     env=ArenaEnv(cfg,opponent=args.opponent)
-    teacher=make_opponent(args.teacher)
+    names=[n.strip() for n in args.teacher.split(',')]
+    if not names or set(names)-set(BOT_NAMES): raise ValueError('Unknown demonstration teacher')
+    teachers={n:make_opponent(n) for n in names}
+    selector=np.random.default_rng(args.seed+100003)
+    teacher_name=names[int(selector.integers(len(names)))]
+    teacher=teachers[teacher_name]
     observations=[]
     actions=[]
     groups=[]
     errors=[]
     skipped=0
+    mixed_windows=0
+    kept_by_teacher={n:0 for n in names}
     episode=0
     obs,_=env.reset(seed=args.seed)
     teacher.reset(env.state,env.agent,np.random.default_rng(args.seed))
     try:
         for i in range(args.samples):
-            command=teacher.act(env.state)
+            commands=controls_for_ticks(teacher,env.state)
+            command=commands[0]
             index=nearest_action(command)
             error=float(np.max(np.abs(command-ACTIONS[index])))
             # Never silently relabel a different jump/boost/handbrake.
-            matches=error<=.3 and np.array_equal(command[5:],ACTIONS[index,5:])
+            constant=bool(np.all(commands==command))
+            matches=constant and error<=.3 and np.array_equal(command[5:],ACTIONS[index,5:])
             if matches:
                 observations.append(obs.copy())
                 actions.append(index)
                 groups.append(episode)
                 errors.append(error)
+                kept_by_teacher[teacher_name]+=1
             else:
                 skipped+=1
-            obs,_,terminal,truncated,_=env.step_controls(command)
+                mixed_windows+=not constant
+            obs,_,terminal,truncated,_=env.step_controls(commands)
             if terminal or truncated:
                 episode+=1
                 obs,_=env.reset()
+                teacher_name=names[int(selector.integers(len(names)))]
+                teacher=teachers[teacher_name]
                 teacher.reset(env.state,env.agent,np.random.default_rng(args.seed+episode))
             if (i+1)%1000==0:
                 print(f'Teacher decisions {i+1}/{args.samples}; kept {len(actions)}, episodes {episode}',flush=True)
@@ -72,7 +85,8 @@ def collect(args):
     save_npz(args.out,obs=np.asarray(observations,dtype=np.float32),actions=np.asarray(actions,dtype=np.int64),
              episode=np.asarray(groups,dtype=np.int64))
     summary=dict(kind='simulator_teacher_controls',contract=CONTRACT,teacher=args.teacher,
-        opponent=args.opponent,samples=len(actions),skipped_quantization=skipped,
+        opponent=args.opponent,samples=len(actions),skipped_quantization=skipped-mixed_windows,
+        skipped_mid_window_change=mixed_windows,kept_by_teacher=kept_by_teacher,
         completed_episodes=episode,groups=len(set(groups)),max_control_error=max(errors),
         dataset_sha256=sha256(args.out),replay_bank=cfg['env']['replay_bank'],seed=args.seed,
         note='Labels are controls actually applied by the teacher in RocketSim, not replay-inferred inputs.')

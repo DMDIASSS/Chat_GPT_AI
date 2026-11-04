@@ -12,6 +12,7 @@ from .core import ACTIONS, atomic_json, sha256
 from .environment import ArenaEnv
 from .models import FrozenActor, export_actor, load_ppo
 from .training import load_config, resolve_model
+from .teachers import BOT_NAMES
 
 
 class Student:
@@ -47,7 +48,7 @@ def evaluate(args):
     cfg['curriculum']['adaptive']=False
     opponents=[x.strip() for x in args.opponents.split(',')]
     scenarios=[x.strip() for x in args.scenarios.split(',')]
-    if set(opponents)-{'scripted','nexto','ripple'}: raise ValueError('Unsupported evaluation opponent')
+    if set(opponents)-set(BOT_NAMES): raise ValueError('Unsupported evaluation opponent')
     if set(scenarios)-set(cfg['curriculum']['weights']): raise ValueError('Unknown evaluation scenario')
     if Path(args.out).exists(): raise FileExistsError('Choose a fresh report filename')
     rows=[]

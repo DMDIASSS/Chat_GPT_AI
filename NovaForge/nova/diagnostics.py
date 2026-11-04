@@ -12,7 +12,7 @@ import torch
 from .core import ROOT, CONTRACT, ACTIONS, atomic_json, check_model
 from .environment import ArenaEnv
 from .models import FrozenActor, load_ppo
-from .training import load_config, resolve_model, train
+from .training import load_config, resolve_model, train, prepare_config
 
 
 def doctor(args):
@@ -46,7 +46,7 @@ def doctor(args):
 
 
 def smoke(args):
-    cfg=load_config()
+    cfg=prepare_config(load_config(getattr(args,'config',None)),getattr(args,'teachers',None))
     cfg['workers']=args.workers
     cfg['ppo'].update(n_steps=64,batch_size=64,n_epochs=2)
     cfg['env'].update(episode_seconds=2,no_touch_seconds=1)

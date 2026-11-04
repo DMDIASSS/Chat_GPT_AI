@@ -16,7 +16,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from .core import ROOT, CONTRACT, atomic_json, check_model, sha256
 from .environment import ArenaEnv
 from .models import export_actor, load_ppo, save_ppo
-from .teachers import verify_teacher
+from .teachers import verify_teacher, BOT_NAMES
 
 
 def recover_checkpoint(run_dir):
@@ -51,7 +51,7 @@ def validate_config(cfg):
         w=cfg[key]['weights']
         if not w or any(not np.isfinite(x) or x<0 for x in w.values()) or sum(w.values())<=0:
             raise ValueError(f'Invalid {key} weights')
-    if set(cfg['league']['weights'])-{'scripted','latest','history','nexto','ripple'}:
+    if set(cfg['league']['weights'])-(set(BOT_NAMES)|{'latest','history'}):
         raise ValueError('No headless adapter for one of the league opponents')
     if set(cfg['curriculum']['weights'])-{'kickoff','shot','defense','dribble','aerial','recovery','wall','replay'}:
         raise ValueError('Unsupported practice scenario')
@@ -65,8 +65,8 @@ def prepare_config(cfg,teachers=None,replay_bank=None):
     cfg=json.loads(json.dumps(cfg))
     if teachers:
         names=[s.strip() for s in teachers.split(',') if s.strip()]
-        if len(names)!=len(set(names)) or set(names)-{'nexto','ripple'}:
-            raise ValueError('teachers must be nexto, ripple, or nexto,ripple')
+        if len(names)!=len(set(names)) or set(names)-(set(BOT_NAMES)-{'scripted'}):
+            raise ValueError('Supported teachers: nexto,ripple,chronos,galactus')
         cfg['league']['weights']={'scripted':.2,'latest':.3,'history':.2,
                                   **{n:.3/len(names) for n in names}}
     if replay_bank:
@@ -79,7 +79,7 @@ def prepare_config(cfg,teachers=None,replay_bank=None):
         if expected and digest!=expected: raise ValueError('Replay reset bank changed since this run was configured')
         cfg['env'].update(replay_bank=str(bank),replay_bank_sha256=digest)
     for name,weight in cfg['league']['weights'].items():
-        if name in ('nexto','ripple') and weight>0: verify_teacher(name)
+        if name in BOT_NAMES and name!='scripted' and weight>0: verify_teacher(name)
     validate_config(cfg)
     return cfg
 

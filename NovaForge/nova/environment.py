@@ -10,7 +10,7 @@ from rlgym.rocket_league.sim import RocketSimEngine
 
 from .core import ACTIONS, OBS_SIZE, TICK_SKIP, observe, sha256
 from .scenarios import Curriculum, make_state, practice_success
-from .teachers import make_opponent
+from .teachers import make_opponent, controls_for_ticks
 
 
 class ArenaEnv(gym.Env):
@@ -123,13 +123,13 @@ class ArenaEnv(gym.Env):
 
     def step_controls(self,controls):
         controls=np.asarray(controls,dtype=np.float32)
-        if controls.shape!=(8,) or not np.isfinite(controls).all() or np.max(np.abs(controls))>1.001:
+        if controls.shape==(8,): controls=np.repeat(controls[None,:],TICK_SKIP,axis=0)
+        if controls.shape!=(TICK_SKIP,8) or not np.isfinite(controls).all() or np.max(np.abs(controls))>1.001:
             raise ValueError('Invalid learner controls')
         old=self.state
-        opponent_action=self.opponent.act(old)
-        self.state=self.engine.step({self.agent:np.repeat(controls[None,:],TICK_SKIP,axis=0),
-                                    self.other:np.repeat(opponent_action[None,:],TICK_SKIP,axis=0)},{})
-        self.previous=controls.copy()
+        opponent_actions=controls_for_ticks(self.opponent,old)
+        self.state=self.engine.step({self.agent:controls,self.other:opponent_actions},{})
+        self.previous=controls[-1].copy()
         self.steps+=1
         touches=sum(c.ball_touches for c in self.state.cars.values())
         self.since_touch=0 if touches else self.since_touch+TICK_SKIP
