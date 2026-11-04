@@ -95,6 +95,15 @@ def main():
         p=sub.add_parser(command)
         p.add_argument('--run',default='laptop01')
     sub.add_parser('wandb-check',help='Verify the SDK can reuse a saved local W&B login; never displays a key')
+    p=sub.add_parser('report',help='Export a metrics-only progress ZIP to share for review')
+    p.add_argument('--run',default='diverse01')
+    p=sub.add_parser('compare-progress',help='Compare initial and current checkpoints on fixed opponents; pause first')
+    p.add_argument('--run',default='diverse01')
+    p.add_argument('--opponents',default='nexto,ripple,chronos,galactus')
+    p.add_argument('--scenarios',default='kickoff')
+    p.add_argument('--pairs',type=positive_int,default=5)
+    p.add_argument('--seconds',type=positive_float,default=20)
+    p.add_argument('--seed',type=int,default=910001)
     args=parser.parse_args()
     if args.command in ('status','pause'):
         run=(ROOT/'runs'/args.run).resolve()
@@ -105,6 +114,9 @@ def main():
             print('Stop requested. The trainer saves its current policy and exits at the next environment step.')
         else:
             print((run/'status.json').read_text())
+    elif args.command in ('report','compare-progress'):
+        from nova.reporting import report_command, compare_command
+        (report_command if args.command=='report' else compare_command)(args)
     elif args.command=='wandb-check':
         from nova.tracking import check_login
         check_login()

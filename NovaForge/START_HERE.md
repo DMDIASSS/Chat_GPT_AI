@@ -1,4 +1,6 @@
-# NovaForge v1.2 — start here
+# NovaForge v1.3 — start here
+
+**Show progress:** run **19_EXPORT_PROGRESS_REPORT.bat**, then upload the printed ZIP from `reports` in the chat. For an earliest-versus-current checkpoint comparison, pause with **15** and run **20_COMPARE_PROGRESS.bat**; it exports a report afterward. See [PROGRESS_REPORTS.md](PROGRESS_REPORTS.md) for update instructions, reporting details and what SPS measures.
 
 **Run until paused with W&B:** after updating an existing install, use [WANDB_AND_CONTINUOUS.md](WANDB_AND_CONTINUOUS.md): launcher **17** checks the saved local login, **18** starts/resumes `diverse01`, **15** pauses, and **16** shows status. Fresh installs still need installation and teacher/BC setup first. Mixed launchers 13/14 now run continuously with online W&B; the original workflow below retains bounded CLI examples.
 
@@ -217,4 +219,4 @@ This download is much larger. The policy optimizer uses CUDA; simulator workers 
 
 ## Send feedback
 
-Send `reports\doctor.json`, the smoke report in `reports`, the evaluation JSON, the BC report, and the recent console error if anything failed. A short RLViser/RLBot clip plus the scenario/opponent is especially useful. Include whether it chases, stalls, misses kickoffs, wastes boost or fails recoveries. These observations decide the next change in [PLAN.md](PLAN.md).
+For training progress, use launcher **19** and upload its report ZIP; launcher **20** adds a checkpoint comparison while paused. See [PROGRESS_REPORTS.md](PROGRESS_REPORTS.md). For installation/runtime failures, send `reports\doctor.json`, the smoke/BC report if relevant, and the recent console error. A short RLViser/RLBot clip plus the scenario/opponent is especially useful. Include whether it chases, stalls, misses kickoffs, wastes boost or fails recoveries. These observations decide the next change in [PLAN.md](PLAN.md).

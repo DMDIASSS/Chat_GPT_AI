@@ -227,6 +227,14 @@ def learn_segments(model,callback,steps,continuous,stop_path):
     return 'stopped'
 
 
+def archive_progress_csv(run_dir):
+    path=Path(run_dir)/'logs'/'progress.csv'
+    if path.exists():
+        history=path.parent/'history'
+        history.mkdir(parents=True,exist_ok=True)
+        path.replace(history/f'progress_{time.time_ns()}.csv')
+
+
 def train(args):
     run_dir=(ROOT/'runs'/args.run).resolve()
     if run_dir.parent != (ROOT/'runs').resolve():
@@ -273,6 +281,7 @@ def train(args):
                 imported=new_model(cfg,vec)
                 imported.policy.load_state_dict(model.policy.state_dict())
                 model=imported
+            archive_progress_csv(run_dir)
             model.set_logger(configure(str(run_dir/'logs'),['stdout','csv']))
             if tracker.run is not None: model.logger.output_formats.append(WandBWriter(tracker))
             print('Training until pause/Ctrl+C.' if continuous else f'Training for {args.steps} additional decisions.',flush=True)

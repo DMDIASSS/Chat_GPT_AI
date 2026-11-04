@@ -1,5 +1,7 @@
 # Implemented work and next experiments
 
+**v1.3:** one-click progress report ZIP with offline charts, selected config, opponent/mechanics trends, PPO metrics and checkpoint hashes; earliest/current paired comparison helper; PPO CSV retention across resumes. Report sampling units distinguish learner decisions from raw physics and teacher work. Technical archives informed the interpretation and next experiments in [ARCHIVE_RESEARCH.md](ARCHIVE_RESEARCH.md). See [PROGRESS_REPORTS.md](PROGRESS_REPORTS.md) for the feedback workflow.
+
 **v1.2:** mixed-training launchers now support continuous training until pause and an optional W&B dashboard. The tracking integration reuses the SDK's local login, keeps the online run ID across resume, reports opponent/mechanics/PPO metrics, and exposes the dashboard link in local status. See [WANDB_AND_CONTINUOUS.md](WANDB_AND_CONTINUOUS.md).
 
 **v1.1:** Chronos and GalactusV2 now have working CPU simulator ports and join Nexto/Ripple in the diverse league. Mixed teacher collection is implemented. Native C++ feature/mask/network comparisons and short real training checks pass. The remaining work for these ports is broader trajectory/live validation, forecast comparison and the unavailable world-contact-normal exception; see [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md). Pulsar stays out until a deployment identity/checkpoint is established.
@@ -19,6 +21,7 @@
 | Deployment | TorchScript actor with hash/contract metadata and RLBot v5 launcher | Export/PPO action parity and live-state feature parity; live match still needs Windows testing |
 | Operational controls | File lock, full optimizer checkpoint, atomic latest pointer, pause/resume | Two-worker real PPO smoke with resume |
 | Continuous training and W&B | Repeat PPO segments without resetting the model; reuse online tracking ID and show status/link | Real SDK offline logging, multi-segment mixed run, pause and resume; online credentials checked on the user's PC |
+| Shareable progression evidence | Selected metrics/config ZIP, offline charts, matched teacher cells and earliest/current paired evaluation | Export allowlist/secret exclusion, disjoint windows, evaluation ownership and CSV retention tests; real report and checkpoint comparison |
 
 ## Suggested experiment order on this laptop
 

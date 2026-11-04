@@ -1,8 +1,10 @@
-# NovaForge v1.2
+# NovaForge v1.3
 
 An isolated, laptop-sized 1v1 Rocket League training lab: RLGym v2 + RocketSim, PPO, frozen self-play, Nexto/Ripple trainers, Chronos/GalactusV2 simulator ports, mechanics resets, replay starting positions, teacher imitation, evaluation, and RLBot v5 export.
 
 **Begin with [START_HERE.md](START_HERE.md).** It contains the Windows installation, numbered launchers, exact training/resume/evaluation commands and replay workflow.
+
+**New: [progress reports and checkpoint comparisons](PROGRESS_REPORTS.md).** Run **19** to export a small report ZIP to upload in the chat. For stronger evidence, pause with **15** and run **20** to compare the earliest and current saved checkpoints, then resume with **18**. See [technical archive findings and proposed experiments](ARCHIVE_RESEARCH.md).
 
 **New: [continuous training with W&B](WANDB_AND_CONTINUOUS.md).** Run **17** once to install/check the dashboard SDK and reuse your saved local login. Run **18** to start/resume the mixed league until paused. Existing environments, models and runs can be kept.
 

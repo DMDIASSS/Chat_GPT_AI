@@ -1,5 +1,7 @@
 # NovaForge v1.2 — train until paused, with W&B status
 
+These controls remain available in v1.3. To share progression evidence, use the new [report exporter and checkpoint comparison](PROGRESS_REPORTS.md), launchers **19** and **20**.
+
 The v1.1 launchers stopped after their configured decision budget. **The v1.2 mixed-training launchers run continuously until you pause or interrupt them.** The Windows checkpoint fix and all four public bot ports remain included.
 
 ## Update and start
