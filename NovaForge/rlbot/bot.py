@@ -14,10 +14,10 @@ from nova.models import FrozenActor
 
 
 class NovaForge(Hivemind):
-    def __init__(self):
-        super().__init__('DMDIASSS/NovaForge-v1')
+    def __init__(self,policy_path=None,agent_id='DMDIASSS/NovaForge-v1'):
+        super().__init__(agent_id)
         torch.set_num_threads(1)
-        self.actor=FrozenActor(Path(__file__).with_name('policy.pt'))
+        self.actor=FrozenActor(Path(policy_path) if policy_path is not None else Path(__file__).with_name('policy.pt'))
         self.previous=np.zeros(8,dtype=np.float32)
         self.clock=DecisionClock()
         self.previous_phase=None

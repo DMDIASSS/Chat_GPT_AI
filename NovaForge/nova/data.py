@@ -10,7 +10,7 @@ import torch
 
 from .core import ROOT, ACTIONS, CONTRACT, OBS_SIZE, atomic_json, nearest_action, sha256
 from .environment import ArenaEnv
-from .models import save_ppo
+from .models import save_ppo, FrozenActor
 from .teachers import make_opponent, controls_for_ticks, BOT_NAMES
 from .training import load_config, new_model, prepare_config
 
@@ -37,21 +37,63 @@ def collect(args):
     names=[n.strip() for n in args.teacher.split(',')]
     if not names or set(names)-set(BOT_NAMES): raise ValueError('Unknown demonstration teacher')
     teachers={n:make_opponent(n) for n in names}
+    # Teachers are inference-only. No teacher parameters join the student's optimizer.
+    for policy in teachers.values():
+        for value in vars(policy).values():
+            if isinstance(value,torch.nn.Module):
+                value.eval()
+                for parameter in value.parameters(): parameter.requires_grad_(False)
     selector=np.random.default_rng(args.seed+100003)
-    teacher_name=names[int(selector.integers(len(names)))]
+    order=list(selector.permutation(names))
+    balanced=getattr(args,'balanced_teachers',False)
+    teacher_name=str(order[0]) if balanced else names[int(selector.integers(len(names)))]
     teacher=teachers[teacher_name]
     observations=[]
     actions=[]
     groups=[]
     errors=[]
+    teacher_ids=[]
+    scenario_ids=[]
+    rewards=[]
+    returns=[]
+    return_complete=[]
+    episode_rewards=[]
+    episode_rows=[]
+    scenario_names=list(cfg['curriculum']['weights'])
     skipped=0
     mixed_windows=0
     kept_by_teacher={n:0 for n in names}
     episode=0
+    attempted=0
+    stopped=False
+    stop_path=getattr(args,'stop_path',None)
+    progress=getattr(args,'on_progress',None)
+    student=FrozenActor(args.student_model) if getattr(args,'student_model',None) else None
+    prefix_decisions=0
+    prefix_episodes=0
     obs,_=env.reset(seed=args.seed)
-    teacher.reset(env.state,env.agent,np.random.default_rng(args.seed))
+    def finish_returns(complete):
+        values=np.zeros(len(episode_rewards),dtype=np.float32);future=0.
+        for j in range(len(episode_rewards)-1,-1,-1):
+            future=episode_rewards[j]+cfg['ppo']['gamma']*future;values[j]=future
+        for row,step in episode_rows:
+            returns[row]=float(values[step]);return_complete[row]=bool(complete)
+        episode_rewards.clear();episode_rows.clear()
+    def start_teacher():
+        nonlocal obs,prefix_decisions,prefix_episodes,episode
+        if student is not None and selector.random()<.25:
+            prefix_episodes+=1
+            for _ in range(int(selector.integers(1,61))):
+                obs,_,terminal,truncated,_=env.step(student.action(obs))
+                prefix_decisions+=1
+                if terminal or truncated:
+                    episode+=1;obs,_=env.reset();break
+                if stop_path and Path(stop_path).exists(): break
+        teacher.reset(env.state,env.agent,np.random.default_rng(args.seed+episode))
     try:
+        start_teacher()
         for i in range(args.samples):
+            if stop_path and Path(stop_path).exists(): stopped=True;break
             commands=controls_for_ticks(teacher,env.state)
             command=commands[0]
             index=nearest_action(command)
@@ -59,39 +101,59 @@ def collect(args):
             # Never silently relabel a different jump/boost/handbrake.
             constant=bool(np.all(commands==command))
             matches=constant and error<=.3 and np.array_equal(command[5:],ACTIONS[index,5:])
+            decision_obs=obs.copy() if matches else None
+            obs,reward,terminal,truncated,_=env.step_controls(commands)
+            attempted+=1
             if matches:
-                observations.append(obs.copy())
+                observations.append(decision_obs)
                 actions.append(index)
                 groups.append(episode)
+                teacher_ids.append(names.index(teacher_name))
+                scenario_ids.append(scenario_names.index(env.scenario))
                 errors.append(error)
                 kept_by_teacher[teacher_name]+=1
+                rewards.append(float(reward));returns.append(0.);return_complete.append(False)
+                episode_rows.append((len(actions)-1,len(episode_rewards)))
             else:
                 skipped+=1
                 mixed_windows+=not constant
-            obs,_,terminal,truncated,_=env.step_controls(commands)
+            episode_rewards.append(float(reward))
             if terminal or truncated:
+                finish_returns(True)
                 episode+=1
                 obs,_=env.reset()
-                teacher_name=names[int(selector.integers(len(names)))]
+                teacher_name=str(order[episode%len(order)]) if balanced else names[int(selector.integers(len(names)))]
                 teacher=teachers[teacher_name]
-                teacher.reset(env.state,env.agent,np.random.default_rng(args.seed+episode))
+                start_teacher()
             if (i+1)%1000==0:
                 print(f'Teacher decisions {i+1}/{args.samples}; kept {len(actions)}, episodes {episode}',flush=True)
+                if progress: progress(attempted,len(actions))
     except KeyboardInterrupt:
+        stopped=True
         print('Stopped collection; saving the samples already collected.',flush=True)
     finally:
+        finish_returns(False)
         env.close()
-    if not actions: raise ValueError('No compatible teacher actions were collected')
+    if not actions:
+        if stopped: return dict(stopped=True,samples=0,attempted_decisions=attempted,prefix_decisions=prefix_decisions)
+        raise ValueError('No compatible teacher actions were collected')
     save_npz(args.out,obs=np.asarray(observations,dtype=np.float32),actions=np.asarray(actions,dtype=np.int64),
-             episode=np.asarray(groups,dtype=np.int64))
+             episode=np.asarray(groups,dtype=np.int64),teacher_id=np.asarray(teacher_ids,dtype=np.int16),
+             scenario_id=np.asarray(scenario_ids,dtype=np.int16),reward=np.asarray(rewards,dtype=np.float32),
+             return_to_go=np.asarray(returns,dtype=np.float32),return_complete=np.asarray(return_complete,dtype=bool))
     summary=dict(kind='simulator_teacher_controls',contract=CONTRACT,teacher=args.teacher,
         opponent=args.opponent,samples=len(actions),skipped_quantization=skipped-mixed_windows,
         skipped_mid_window_change=mixed_windows,kept_by_teacher=kept_by_teacher,
         completed_episodes=episode,groups=len(set(groups)),max_control_error=max(errors),
         dataset_sha256=sha256(args.out),replay_bank=cfg['env']['replay_bank'],seed=args.seed,
+        teacher_names=names,scenario_names=scenario_names,attempted_decisions=attempted,stopped=stopped,
+        prefix_decisions=prefix_decisions,prefix_episodes=prefix_episodes,
+        reward_signal='NovaForge shared simulator reward; not the original teachers training reward',
+        reward_mean=float(np.mean(rewards)),complete_return_fraction=float(np.mean(return_complete)),
         note='Labels are controls actually applied by the teacher in RocketSim, not replay-inferred inputs.')
     atomic_json(str(args.out)+'.json',summary)
     print(json.dumps(summary,indent=2))
+    return summary
 
 
 def split_by_episode(groups,seed=90210):

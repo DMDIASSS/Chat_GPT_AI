@@ -18,7 +18,7 @@ from .teachers import BOT_NAMES
 class Student:
     def __init__(self,path):
         self.path=resolve_model(path)
-        self.actor=FrozenActor(self.path) if self.path.suffix=='.pt' else None
+        self.actor=FrozenActor(self.path) if self.path.suffix in {'.pt','.lt'} else None
         self.model=None if self.actor else load_ppo(self.path)
 
     def action(self,obs):

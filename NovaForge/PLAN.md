@@ -1,5 +1,9 @@
 # Implemented work and next experiments
 
+**v1.4:** [LibTorch .lt + RLBot v5 export](V5_EXPORT.md), supported actor packaging, and the requested `chat_gpt_ai/novaforge` ZIP layout. Shared simulator returns mildly weight imitation labels; the original teachers’ reward functions are unavailable.
+
+**v1.4 copying:** continuous frozen-teacher copying with fresh demonstration rounds, fixed separate validation episodes, balanced teacher losses, previous-action dropout, and teacher takeovers from student-reached states. Best validation checkpoints serve watch/export, while latest optimizer checkpoints serve resume. Launchers **21–27** and [FROZEN_TEACHER_COPYING.md](FROZEN_TEACHER_COPYING.md) cover the workflow. Supervised agreement is evaluated separately from actual playing strength.
+
 **v1.3:** one-click progress report ZIP with offline charts, selected config, opponent/mechanics trends, PPO metrics and checkpoint hashes; earliest/current paired comparison helper; PPO CSV retention across resumes. Report sampling units distinguish learner decisions from raw physics and teacher work. Technical archives informed the interpretation and next experiments in [ARCHIVE_RESEARCH.md](ARCHIVE_RESEARCH.md). See [PROGRESS_REPORTS.md](PROGRESS_REPORTS.md) for the feedback workflow.
 
 **v1.2:** mixed-training launchers now support continuous training until pause and an optional W&B dashboard. The tracking integration reuses the SDK's local login, keeps the online run ID across resume, reports opponent/mechanics/PPO metrics, and exposes the dashboard link in local status. See [WANDB_AND_CONTINUOUS.md](WANDB_AND_CONTINUOUS.md).

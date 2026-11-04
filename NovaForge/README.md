@@ -1,8 +1,12 @@
-# NovaForge v1.3
+# NovaForge v1.4
 
 An isolated, laptop-sized 1v1 Rocket League training lab: RLGym v2 + RocketSim, PPO, frozen self-play, Nexto/Ripple trainers, Chronos/GalactusV2 simulator ports, mechanics resets, replay starting positions, teacher imitation, evaluation, and RLBot v5 export.
 
 **Begin with [START_HERE.md](START_HERE.md).** It contains the Windows installation, numbered launchers, exact training/resume/evaluation commands and replay workflow.
+
+**New: [copy frozen teachers](FROZEN_TEACHER_COPYING.md).** Launcher **21** continuously gathers demonstrations and fits a student to frozen Nexto/Ripple/Chronos/Galactus controls. **22** pauses, **23** shows status, **24** watches, **25** exports, **26** reports, and **27** evaluates. This mode uses supervised learning with mild shared-return weighting and no PPO updates.
+
+**[Export .lt + .bot.toml for RLBot v5](V5_EXPORT.md):** launcher **25** exports the copied student, **29** exports the old PPO student, and **28** packages a supported actor. The ZIP layout is `chat_gpt_ai/novaforge`; merge it at your project folder’s parent.
 
 **New: [progress reports and checkpoint comparisons](PROGRESS_REPORTS.md).** Run **19** to export a small report ZIP to upload in the chat. For stronger evidence, pause with **15** and run **20** to compare the earliest and current saved checkpoints, then resume with **18**. See [technical archive findings and proposed experiments](ARCHIVE_RESEARCH.md).
 
@@ -19,4 +23,4 @@ Designed for an i5-10300H, GTX 1650 Ti Mobile and 16 GB RAM. CPU/two-worker defa
 - [Validation and limits](VALIDATION.md)
 - [Licenses and attribution](THIRD_PARTY.md)
 
-The ZIP extracts to a single `NovaForge` folder inside an existing `Chat_GPT_AI`. The original project is not modified by the trainer.
+The ZIP contains `chat_gpt_ai/novaforge`. Extract into the parent of your existing project folder and merge. The original project is not modified by the trainer.

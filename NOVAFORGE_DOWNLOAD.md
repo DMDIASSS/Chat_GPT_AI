@@ -1,8 +1,12 @@
-# NovaForge v1.3 download
+# NovaForge v1.4 download
 
-[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.3.zip)
+[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.4.zip)
 
-Adds one-click progress reports, offline charts and an earliest/current checkpoint comparison. Preserves PPO CSV history across resume. Includes continuous W&B training, the Windows checkpoint-save fix, and mixed-bot training with Nexto, Ripple, Chronos and GalactusV2 ports plus self-play. Pause with launcher 15 before updating, extract into Chat_GPT_AI and replace NovaForge source files while keeping .venv/assets/data/models/runs. Run 1_CHECK.bat, then 19_EXPORT_PROGRESS_REPORT.bat and upload its small report ZIP in the chat. For a paired checkpoint evaluation, pause with 15 and run 20_COMPARE_PROGRESS.bat. Resume training with 18. Fresh installations start with 0_INSTALL.bat and the teacher/BC steps 10–12; W&B setup is 17. Windows defaults: Python 3.11 x64, CPU, two workers. No competitive pretrained student is bundled.
+Adds continuous frozen-teacher copying, mild shared-return weighting, and LibTorch .lt + RLBot v5 .bot.toml export with the required Python adapter. All four teachers remain frozen. The student learns their executed controls through supervised updates, with separate validation rollouts and best-checkpoint selection. Original teacher reward functions are not recoverable from their weights; the shared simulator return provides a bounded preference for better demonstrated outcomes.
+
+The ZIP contains chat_gpt_ai/novaforge. Extract into the parent of your existing project folder (for example E:\Downloads), merge/replace the source files, and retain .venv/assets/datasets/models/runs. Pause the old run with 15 first. Run 1_CHECK.bat, then 21_START_OR_RESUME_COPY.bat. Launcher 22 pauses copying, 23 shows status, 24 watches, 25 exports .lt + .bot.toml, 26 reports and 27 evaluates. Launcher 29 exports the old diverse01 bot; 28 packages a supported actor. Fresh installs start with 0_INSTALL.bat, download teachers with 3_FETCH_TRAINERS.bat and set up W&B with 17. No pretrained student or teacher weights are bundled.
+
+[Frozen teacher copying](NovaForge/FROZEN_TEACHER_COPYING.md) · [.lt and v5 export](NovaForge/V5_EXPORT.md) · [Actor packager](NovaForge/PT_TO_TOML.md)
 
 [Progress reports, comparisons and SPS](NovaForge/PROGRESS_REPORTS.md) · [Technical archive findings](NovaForge/ARCHIVE_RESEARCH.md)
 

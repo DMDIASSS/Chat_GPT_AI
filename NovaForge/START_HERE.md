@@ -1,4 +1,6 @@
-# NovaForge v1.3 — start here
+# NovaForge v1.4 — start here
+
+**For direct copying of frozen teachers:** follow [FROZEN_TEACHER_COPYING.md](FROZEN_TEACHER_COPYING.md). Launchers **21–27** provide continuous supervised copying, pause/resume, viewing, export and reports in `copy01`. The older PPO workflow remains available below.
 
 **Show progress:** run **19_EXPORT_PROGRESS_REPORT.bat**, then upload the printed ZIP from `reports` in the chat. For an earliest-versus-current checkpoint comparison, pause with **15** and run **20_COMPARE_PROGRESS.bat**; it exports a report afterward. See [PROGRESS_REPORTS.md](PROGRESS_REPORTS.md) for update instructions, reporting details and what SPS measures.
 
@@ -26,12 +28,12 @@ The bot research and unfinished work are in [BOT_RESEARCH.md](BOT_RESEARCH.md) a
 
 ## 1. Unzip and install
 
-Extract the supplied ZIP **into your existing `Chat_GPT_AI` folder**. The result should be:
+The supplied ZIP contains **`chat_gpt_ai/novaforge`**. Extract into the **parent** of your existing project folder (for example `E:\Downloads`) and merge. The result should be:
 
 ```text
-Chat_GPT_AI\
+chat_gpt_ai\
     your existing files...
-    NovaForge\
+    novaforge\
         0_INSTALL.bat
         START_HERE.md
         run.py

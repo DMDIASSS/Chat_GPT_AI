@@ -5,7 +5,7 @@ cd /d "%~dp0"
 if errorlevel 1 goto failed
 ".venv\Scripts\python.exe" run.py wandb-check
 if errorlevel 1 goto login_needed
-echo W_AND_B_READY - Run 18_START_OR_RESUME_WANDB.bat
+echo W_AND_B_READY - Copy frozen teachers with 21_START_OR_RESUME_COPY.bat or continue PPO with 18.
 pause
 exit /b 0
 :login_needed
