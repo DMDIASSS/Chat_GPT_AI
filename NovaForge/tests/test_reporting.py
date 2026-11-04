@@ -74,6 +74,14 @@ def test_report_links_reject_credential_urls():
     assert safe_url('https://wandb.ai/me/project/runs/abc#token')=='https://wandb.ai/me/project/runs/abc'
 
 
+def test_coreweave_forge_dashboard_link_is_retained_without_secrets():
+    url='https://forge.coreweave.com/wandb/me/project/runs/abc123'
+    assert safe_url(url+'?api_key=DO_NOT_EXPORT#private')==url
+    assert safe_url('https://token@forge.coreweave.com/wandb/me/project/runs/abc123') is None
+    assert safe_url('https://forge.coreweave.com.evil.example/wandb/me/project/runs/abc123') is None
+    assert safe_url('https://forge.coreweave.com/me/project/runs/abc123') is None
+
+
 def test_evaluations_match_this_runs_checkpoints_and_keep_paired_evidence(tmp_path):
     def trial(outcome):
         return dict(sample(0,outcome),raw_path='C:/private/DO_NOT_EXPORT',seed=910001)

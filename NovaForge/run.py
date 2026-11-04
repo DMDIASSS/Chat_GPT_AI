@@ -91,6 +91,8 @@ def main():
     p.add_argument('--seconds',type=positive_float,default=30)
     p.add_argument('--seed',type=int,default=5555)
     p.add_argument('--config',default=None)
+    p.add_argument('--viewer-mode',choices=['auto','existing','manual'],default='auto')
+    p.add_argument('--viewer-exe',default=None,help='Optional explicit viewer path; normal project paths are searched automatically')
     for command in ['status','pause']:
         p=sub.add_parser(command)
         p.add_argument('--run',default='laptop01')
@@ -105,7 +107,7 @@ def main():
     p.add_argument('--seconds',type=positive_float,default=20)
     p.add_argument('--seed',type=int,default=910001)
     p=sub.add_parser('copy-train',help='Copy frozen teachers with supervised learning and fresh demonstration rounds')
-    p.add_argument('--run',default='copy01')
+    p.add_argument('--run',default='copy02')
     p.add_argument('--config',default='configs/copy.json')
     p.add_argument('--teachers',default='nexto,ripple,chronos,galactus')
     p.add_argument('--resume',action='store_true')
@@ -117,10 +119,10 @@ def main():
     p.add_argument('--buffer-samples',type=positive_int,default=250000)
     p.add_argument('--epochs',type=positive_int,default=10,help='Epochs per fresh demonstration round')
     p.add_argument('--lr',type=positive_float,default=.0003)
-    p.add_argument('--seed',type=int,default=17017)
+    p.add_argument('--seed',type=int,default=29017)
     p.add_argument('--wandb',choices=['online','offline','off'],default=None)
     p=sub.add_parser('copy-report',help='Export imitation metrics and matching evaluations to a shareable ZIP')
-    p.add_argument('--run',default='copy01')
+    p.add_argument('--run',default='copy02')
     p=sub.add_parser('pt-to-toml',help='Package a NovaForge TorchScript .pt actor for RLBot v5')
     p.add_argument('model',nargs='?',help='Actor .pt path; omit to open the Windows file picker')
     p.add_argument('--name',default=None,help='Display name for the packaged bot')
@@ -129,6 +131,9 @@ def main():
     p=sub.add_parser('export-v5',help='Export a trained NovaForge bot as .lt + RLBot v5 .bot.toml + runtime')
     p.add_argument('--model',required=True,help='Run folder, NovaForge full .zip checkpoint, or supported actor')
     p.add_argument('--name',default=None)
+    p=sub.add_parser('viewer-setup',help='Find/install RLViser and apply the learner ballcam preset')
+    p.add_argument('--exe',default=None)
+    p.add_argument('--mode',choices=['auto','existing'],default='auto')
     args=parser.parse_args()
     if args.command in ('status','pause'):
         run=(ROOT/'runs'/args.run).resolve()
@@ -139,6 +144,9 @@ def main():
             print('Stop requested. The trainer saves its current policy and exits at the next environment step.')
         else:
             print((run/'status.json').read_text())
+    elif args.command=='viewer-setup':
+        from nova.viewer import setup_command
+        setup_command(args)
     elif args.command in ('pt-to-toml','export-v5'):
         from nova.packaging import package_actor,export_v5
         (package_actor if args.command=='pt-to-toml' else export_v5)(args)

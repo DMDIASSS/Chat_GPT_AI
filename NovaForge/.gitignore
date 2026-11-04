@@ -12,3 +12,10 @@ rlbot/policy.pt.json
 wandb/
 
 exports/
+
+rlviser.exe
+rilviser.exe
+settings.txt
+viewer/bin/
+viewer/backups/
+viewer/last_setup.json

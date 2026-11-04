@@ -1,10 +1,14 @@
-# NovaForge v1.4 download
+# NovaForge v1.5 download
 
-[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.4.zip)
+[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.5.zip)
 
-Adds continuous frozen-teacher copying, mild shared-return weighting, and LibTorch .lt + RLBot v5 .bot.toml export with the required Python adapter. All four teachers remain frozen. The student learns their executed controls through supervised updates, with separate validation rollouts and best-checkpoint selection. Original teacher reward functions are not recoverable from their weights; the shared simulator return provides a bounded preference for better demonstrated outcomes.
+Corrects a teacher-copying shortcut: transition windows are retained, previous-action inputs are disabled in the actor, and fresh copy02 training starts with first-contact demonstrations. Published models are selected using their own kickoff monitoring plus copying loss. All teachers stay frozen; shared simulator returns mildly weight supervised labels. The original teachers reward functions remain unknown.
 
-The ZIP contains chat_gpt_ai/novaforge. Extract into the parent of your existing project folder (for example E:\Downloads), merge/replace the source files, and retain .venv/assets/datasets/models/runs. Pause the old run with 15 first. Run 1_CHECK.bat, then 21_START_OR_RESUME_COPY.bat. Launcher 22 pauses copying, 23 shows status, 24 watches, 25 exports .lt + .bot.toml, 26 reports and 27 evaluates. Launcher 29 exports the old diverse01 bot; 28 packages a supported actor. Fresh installs start with 0_INSTALL.bat, download teachers with 3_FETCH_TRAINERS.bat and set up W&B with 17. No pretrained student or teacher weights are bundled.
+The ZIP contains chat_gpt_ai/novaforge. Extract into the parent of your existing project folder (for example E:\Downloads), merge source files, and keep .venv/assets/datasets/models/runs. Pause the old copying process first. Run 1_CHECK.bat and then 21_START_OR_RESUME_COPY.bat for the fresh copy02. Launcher 22 pauses, 23 shows status, 24 automatically opens the learner camera, 25 exports .lt + .bot.toml, 26 reports, 27 evaluates against the named bots and 30 screens mechanics. Launcher 29 exports diverse01. No trained student or teacher weights are bundled.
+
+Automatic viewing finds chat_gpt_ai\rlviser.exe. The requested 110 FOV / 270 distance / -4 pitch learner ballcam uses a checked camera build downloaded once; the original viewer is preserved. Launcher 31 optionally prepares it ahead of watching. The fresh student still needs training and gameplay validation.
+
+[Copying correction](NovaForge/COPY_CORRECTION_v1.5.md) · [Automatic RLViser camera](NovaForge/RLVISER_CAMERA.md)
 
 [Frozen teacher copying](NovaForge/FROZEN_TEACHER_COPYING.md) · [.lt and v5 export](NovaForge/V5_EXPORT.md) · [Actor packager](NovaForge/PT_TO_TOML.md)
 

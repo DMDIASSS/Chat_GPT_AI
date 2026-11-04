@@ -60,8 +60,19 @@ def collect(args):
     episode_rewards=[]
     episode_rows=[]
     scenario_names=list(cfg['curriculum']['weights'])
+    scenario_order=list(selector.permutation([k for k,v in cfg['curriculum']['weights'].items() if v>0]))
+    balanced_scenarios=getattr(args,'balanced_scenarios',False)
     skipped=0
     mixed_windows=0
+    kept_mixed_windows=0
+    skipped_startup_idle=0
+    quantization_skipped=0
+    label_mode=getattr(args,'label_mode','constant_executed')
+    if label_mode not in {'constant_executed','final_executed'}:raise ValueError('Unknown teacher label mode')
+    teacher_started=False
+    first_contact_episode=False
+    first_contact_segments=0
+    transitions=[]
     kept_by_teacher={n:0 for n in names}
     episode=0
     attempted=0
@@ -71,7 +82,10 @@ def collect(args):
     student=FrozenActor(args.student_model) if getattr(args,'student_model',None) else None
     prefix_decisions=0
     prefix_episodes=0
-    obs,_=env.reset(seed=args.seed)
+    def reset_demo(seed=None):
+        options={'scenario':str(scenario_order[episode%len(scenario_order)])} if balanced_scenarios else None
+        return env.reset(seed=seed,options=options)
+    obs,_=reset_demo(args.seed)
     def finish_returns(complete):
         values=np.zeros(len(episode_rewards),dtype=np.float32);future=0.
         for j in range(len(episode_rewards)-1,-1,-1):
@@ -80,14 +94,16 @@ def collect(args):
             returns[row]=float(values[step]);return_complete[row]=bool(complete)
         episode_rewards.clear();episode_rows.clear()
     def start_teacher():
-        nonlocal obs,prefix_decisions,prefix_episodes,episode
+        nonlocal obs,prefix_decisions,prefix_episodes,episode,teacher_started,first_contact_episode
+        teacher_started=False
+        first_contact_episode=env.scenario=='kickoff' and selector.random()<getattr(args,'first_contact_fraction',0.)
         if student is not None and selector.random()<.25:
             prefix_episodes+=1
             for _ in range(int(selector.integers(1,61))):
                 obs,_,terminal,truncated,_=env.step(student.action(obs))
                 prefix_decisions+=1
                 if terminal or truncated:
-                    episode+=1;obs,_=env.reset();break
+                    episode+=1;obs,_=reset_demo();break
                 if stop_path and Path(stop_path).exists(): break
         teacher.reset(env.state,env.agent,np.random.default_rng(args.seed+episode))
     try:
@@ -95,12 +111,15 @@ def collect(args):
         for i in range(args.samples):
             if stop_path and Path(stop_path).exists(): stopped=True;break
             commands=controls_for_ticks(teacher,env.state)
-            command=commands[0]
+            command=commands[-1] if label_mode=='final_executed' else commands[0]
             index=nearest_action(command)
             error=float(np.max(np.abs(command-ACTIONS[index])))
             # Never silently relabel a different jump/boost/handbrake.
-            constant=bool(np.all(commands==command))
-            matches=constant and error<=.3 and np.array_equal(command[5:],ACTIONS[index,5:])
+            constant=bool(np.all(commands==commands[0]))
+            if np.any(np.abs(command)>1e-6):teacher_started=True
+            startup_idle=label_mode=='final_executed' and not teacher_started
+            matches=(constant or label_mode=='final_executed') and not startup_idle and error<=.3 and np.array_equal(command[5:],ACTIONS[index,5:])
+            is_transition=bool(np.max(np.abs(obs[-8:]-command))>1e-6)
             decision_obs=obs.copy() if matches else None
             obs,reward,terminal,truncated,_=env.step_controls(commands)
             attempted+=1
@@ -113,15 +132,21 @@ def collect(args):
                 errors.append(error)
                 kept_by_teacher[teacher_name]+=1
                 rewards.append(float(reward));returns.append(0.);return_complete.append(False)
+                transitions.append(is_transition)
+                kept_mixed_windows+=not constant
                 episode_rows.append((len(actions)-1,len(episode_rewards)))
             else:
                 skipped+=1
-                mixed_windows+=not constant
+                mixed_windows+=not constant and label_mode=='constant_executed'
+                skipped_startup_idle+=startup_idle
+                quantization_skipped+=(constant or label_mode=='final_executed') and not startup_idle and (error>.3 or not np.array_equal(command[5:],ACTIONS[index,5:]))
             episode_rewards.append(float(reward))
-            if terminal or truncated:
+            contact_end=first_contact_episode and env.own_touches>0
+            if terminal or truncated or contact_end:
+                first_contact_segments+=contact_end and not (terminal or truncated)
                 finish_returns(True)
                 episode+=1
-                obs,_=env.reset()
+                obs,_=reset_demo()
                 teacher_name=str(order[episode%len(order)]) if balanced else names[int(selector.integers(len(names)))]
                 teacher=teachers[teacher_name]
                 start_teacher()
@@ -140,17 +165,23 @@ def collect(args):
     save_npz(args.out,obs=np.asarray(observations,dtype=np.float32),actions=np.asarray(actions,dtype=np.int64),
              episode=np.asarray(groups,dtype=np.int64),teacher_id=np.asarray(teacher_ids,dtype=np.int16),
              scenario_id=np.asarray(scenario_ids,dtype=np.int16),reward=np.asarray(rewards,dtype=np.float32),
-             return_to_go=np.asarray(returns,dtype=np.float32),return_complete=np.asarray(return_complete,dtype=bool))
+             return_to_go=np.asarray(returns,dtype=np.float32),return_complete=np.asarray(return_complete,dtype=bool),
+             transition=np.asarray(transitions,dtype=bool))
     summary=dict(kind='simulator_teacher_controls',contract=CONTRACT,teacher=args.teacher,
-        opponent=args.opponent,samples=len(actions),skipped_quantization=skipped-mixed_windows,
+        opponent=args.opponent,samples=len(actions),skipped_quantization=quantization_skipped,
         skipped_mid_window_change=mixed_windows,kept_by_teacher=kept_by_teacher,
-        completed_episodes=episode,groups=len(set(groups)),max_control_error=max(errors),
+        completed_episodes=episode-first_contact_segments,completed_segments=episode,
+        groups=len(set(groups)),max_control_error=max(errors),
         dataset_sha256=sha256(args.out),replay_bank=cfg['env']['replay_bank'],seed=args.seed,
         teacher_names=names,scenario_names=scenario_names,attempted_decisions=attempted,stopped=stopped,
         prefix_decisions=prefix_decisions,prefix_episodes=prefix_episodes,
         reward_signal='NovaForge shared simulator reward; not the original teachers training reward',
         reward_mean=float(np.mean(rewards)),complete_return_fraction=float(np.mean(return_complete)),
-        note='Labels are controls actually applied by the teacher in RocketSim, not replay-inferred inputs.')
+        label_mode=label_mode,accepted_mid_window_changes=kept_mixed_windows,
+        skipped_startup_idle=skipped_startup_idle,transition_fraction=float(np.mean(transitions)),
+        first_contact_segments=first_contact_segments,
+        note=('Final-executed mode retains control transitions and skips artificial idle queue warmup. A changing four-tick window uses its last executed control as an approximate constant student target; stable windows are exact.'
+              if label_mode=='final_executed' else 'Stable executed-control labels; changing windows excluded. Legacy datasets can contain an action-history shortcut.'))
     atomic_json(str(args.out)+'.json',summary)
     print(json.dumps(summary,indent=2))
     return summary

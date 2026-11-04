@@ -30,12 +30,12 @@ The generated bot uses the enclosing NovaForge `.venv` and adapter. Keep it at `
 From Command Prompt inside `novaforge`:
 
 ```bat
-.venv\Scripts\python.exe run.py export-v5 --model runs\copy01 --name "My Teacher Copy"
+.venv\Scripts\python.exe run.py export-v5 --model runs\copy02 --name "My Teacher Copy"
 .venv\Scripts\python.exe run.py export-v5 --model runs\diverse01 --name "My PPO Bot"
 .venv\Scripts\python.exe run.py export-v5 --model models\mixed_bc.zip --name "My BC Bot"
 ```
 
-Run folders resolve to their published checkpoint. For the copying mode this is the best validated student, while resume restores the most recent optimizer state.
+Run folders resolve to their published checkpoint. For the copying mode this is the published student selected using kickoff monitoring and copying loss, while resume restores the most recent optimizer state.
 
 ## Convert an exported actor
 

@@ -100,21 +100,34 @@ def export_rlbot(args):
 
 
 def watch(args):
+    from filelock import FileLock,Timeout
+    from .core import ROOT
+    lock=ROOT/'work/rlviser-watch.lock';lock.parent.mkdir(parents=True,exist_ok=True)
+    try:
+        with FileLock(str(lock),timeout=0):
+            _watch_run(args)
+    except Timeout:
+        raise RuntimeError('A NovaForge viewer session is already running. Stop it with Ctrl+C before opening another.') from None
+
+
+def _watch_run(args):
     from rlgym.rocket_league.rlviser import RLViserRenderer
+    from .viewer import prepare_viewer,learner_first_state
     torch.set_num_threads(1)
     student=Student(args.model)
     cfg=load_config(args.config)
     cfg['env']['episode_seconds']=args.seconds
     cfg['env']['no_touch_seconds']=args.seconds+1
+    prepare_viewer(explicit=getattr(args,'viewer_exe',None),mode=getattr(args,'viewer_mode','auto'))
     env=ArenaEnv(cfg,opponent=args.opponent,scenario=args.scenario)
     renderer=RLViserRenderer(tick_rate=30)
-    print('Start the standalone RLViser application to view the UDP stream. Ctrl+C stops the viewer.')
+    print('RLViser opens automatically on the first frame. Ctrl+C stops viewing.')
     try:
         obs,_=env.reset(seed=args.seed)
         while True:
             started=time.monotonic()
             obs,_,terminal,truncated,info=env.step(student.action(obs))
-            renderer.render(env.state,{})
+            renderer.render(learner_first_state(env.state,env.agent),{})
             if terminal or truncated:
                 print(json.dumps({k:info[k] for k in ['outcome','timeout','scenario','touches']}),flush=True)
                 obs,_=env.reset()
@@ -122,4 +135,5 @@ def watch(args):
     except KeyboardInterrupt:
         pass
     finally:
-        env.close()
+        try:renderer.close()
+        finally:env.close()

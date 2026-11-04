@@ -1,5 +1,7 @@
 # Implemented work and next experiments
 
+**v1.5:** correct transition labels and eliminate previous-action shortcuts; start fresh `copy02`; bootstrap first-touch approaches, then expand the curriculum; select published models using student kickoff monitoring plus copying loss. Auto-find/open RLViser with a checked Windows camera build, preserve Forge dashboard links, and add mechanics/coverage reporting. See [the correction](COPY_CORRECTION_v1.5.md) and [camera setup](RLVISER_CAMERA.md).
+
 **v1.4:** [LibTorch .lt + RLBot v5 export](V5_EXPORT.md), supported actor packaging, and the requested `chat_gpt_ai/novaforge` ZIP layout. Shared simulator returns mildly weight imitation labels; the original teachers’ reward functions are unavailable.
 
 **v1.4 copying:** continuous frozen-teacher copying with fresh demonstration rounds, fixed separate validation episodes, balanced teacher losses, previous-action dropout, and teacher takeovers from student-reached states. Best validation checkpoints serve watch/export, while latest optimizer checkpoints serve resume. Launchers **21–27** and [FROZEN_TEACHER_COPYING.md](FROZEN_TEACHER_COPYING.md) cover the workflow. Supervised agreement is evaluated separately from actual playing strength.

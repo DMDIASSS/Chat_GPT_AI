@@ -1,6 +1,8 @@
-# NovaForge v1.4 — start here
+# NovaForge v1.5 — start here
 
-**For direct copying of frozen teachers:** follow [FROZEN_TEACHER_COPYING.md](FROZEN_TEACHER_COPYING.md). Launchers **21–27** provide continuous supervised copying, pause/resume, viewing, export and reports in `copy01`. The older PPO workflow remains available below.
+**Existing copying users:** use [COPY_CORRECTION_v1.5.md](COPY_CORRECTION_v1.5.md). Launcher **21** now starts/resumes a fresh `copy02`, with corrected labels and gameplay monitoring. **24** auto-launches RLViser on the learner with the requested camera preset.
+
+**For direct copying of frozen teachers:** follow [FROZEN_TEACHER_COPYING.md](FROZEN_TEACHER_COPYING.md). Launchers **21–27** provide continuous supervised copying, pause/resume, viewing, export and reports in `copy02`. The older PPO workflow remains available below.
 
 **Show progress:** run **19_EXPORT_PROGRESS_REPORT.bat**, then upload the printed ZIP from `reports` in the chat. For an earliest-versus-current checkpoint comparison, pause with **15** and run **20_COMPARE_PROGRESS.bat**; it exports a report afterward. See [PROGRESS_REPORTS.md](PROGRESS_REPORTS.md) for update instructions, reporting details and what SPS measures.
 
@@ -172,13 +174,13 @@ The report separates first-goal outcomes from practice success: an elevated touc
 
 ## 8. Watch the policy
 
-Download the standalone [RLViser application](https://github.com/VirxEC/rlviser/releases), extract `rlviser.exe` into `NovaForge`, launch it, then run:
+The watch command now finds RLViser and opens it automatically. It checks `chat_gpt_ai\rlviser.exe` first and prepares a checked camera build for the 110/270/−4 learner ballcam preset. See [RLVISER_CAMERA.md](RLVISER_CAMERA.md). Run:
 
 ```bat
 .venv\Scripts\python.exe run.py watch --model runs\laptop01 --opponent ripple --scenario kickoff
 ```
 
-The command streams simulator states at 30 decisions per second to RLViser. Start the standalone viewer first. Training can run headless with the viewer closed.
+The command streams simulator states at 30 decisions per second to RLViser. Training can run headless with the viewer closed. Ctrl+C stops the watch session and closes its viewer connection.
 
 ## 9. Try the new bot in Rocket League with RLBot v5
 

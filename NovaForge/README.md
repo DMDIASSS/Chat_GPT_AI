@@ -1,6 +1,8 @@
-# NovaForge v1.4
+# NovaForge v1.5
 
 An isolated, laptop-sized 1v1 Rocket League training lab: RLGym v2 + RocketSim, PPO, frozen self-play, Nexto/Ripple trainers, Chronos/GalactusV2 simulator ports, mechanics resets, replay starting positions, teacher imitation, evaluation, and RLBot v5 export.
+
+**v1.5 corrects a copying shortcut.** Start a fresh `copy02` with **21**. Control transitions are retained, the actor cannot read previous controls, and deployment selection includes the student’s own kickoff monitoring. See [the correction](COPY_CORRECTION_v1.5.md). **24** now automatically finds `chat_gpt_ai\rlviser.exe` and prepares the requested camera preset; see [RLViser setup](RLVISER_CAMERA.md).
 
 **Begin with [START_HERE.md](START_HERE.md).** It contains the Windows installation, numbered launchers, exact training/resume/evaluation commands and replay workflow.
 

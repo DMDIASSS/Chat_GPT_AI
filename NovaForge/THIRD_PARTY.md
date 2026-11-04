@@ -24,3 +24,7 @@ NovaForge's original source code is licensed under the included MIT license. Thi
 - RLViser/rlviser-py: upstream license/notices apply.
 
 The Pulsar repository remains a linked research reference and is not an active trainer. No deployment identity or compatible checkpoint for the intended Pulsar bot has been established.
+
+## RLViser camera build
+
+The optional automatic viewer is built from MIT-licensed VirxEC/rlviser commit `a4e524085cdb1601cf9c0af2f815591fb696db54`. The included patch adds configurable horizontal FOV, boom distance/height/pitch, initial car-follow ballcam and no artificial shake. License: [viewer/RLVISER_LICENSE.txt](viewer/RLVISER_LICENSE.txt). The separately downloaded executable and its checked SHA256 are pinned in `viewer.lock.json`.

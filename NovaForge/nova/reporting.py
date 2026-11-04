@@ -47,8 +47,12 @@ def safe_url(value):
     try:
         url=urlsplit(value or '')
         if url.scheme!='https' or url.username or url.password: return None
-        if url.hostname not in {'wandb.ai','wandb.coreweave.com'}: return None
-        if not re.fullmatch(r'/[\w.-]+/[\w.-]+/runs/[\w-]+/?',url.path): return None
+        if url.hostname in {'wandb.ai','wandb.coreweave.com'}:
+            pattern=r'/[\w.-]+/[\w.-]+/runs/[\w-]+/?'
+        elif url.hostname=='forge.coreweave.com':
+            pattern=r'/wandb/[\w.-]+/[\w.-]+/runs/[\w-]+/?'
+        else: return None
+        if not re.fullmatch(pattern,url.path): return None
         return urlunsplit((url.scheme,url.netloc,url.path,'',''))
     except (ValueError,TypeError): return None
 

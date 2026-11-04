@@ -1,0 +1,19 @@
+{
+  "version": "novaforge-rlviser-v0.9.3-camera1",
+  "upstream_commit": "a4e524085cdb1601cf9c0af2f815591fb696db54",
+  "build_commit": "1b01fd6b626c8596bbad1f9daa5cce4074ef8506",
+  "license": "MIT",
+  "windows": {
+    "url": "https://github.com/DMDIASSS/Chat_GPT_AI/releases/download/novaforge-rlviser-v0.9.3-camera1/rlviser-novaforge-win64.exe",
+    "sha256": "05454deb1922654ce700cce3e9ee04dda82b95e52e76b4aa00928fbc157e21d9",
+    "bytes": 54104064
+  },
+  "camera": {
+    "horizontal_fov": 110,
+    "distance": 270,
+    "height": 100,
+    "pitch_offset": -4,
+    "ball_cam": true,
+    "artificial_shake": false
+  }
+}
