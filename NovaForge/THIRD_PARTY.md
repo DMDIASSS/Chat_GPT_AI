@@ -19,6 +19,7 @@ NovaForge's original source code is licensed under the included MIT license. Thi
 - PyTorch: BSD-style project license and its dependency notices.
 - ONNX Runtime: MIT.
 - NumPy: BSD-3-Clause.
+- The optional Weights & Biases Python SDK: MIT. Its license and dependency notices apply; authentication is handled by the SDK on the user's machine.
 - RLBot and rlgym-compat: their upstream package licenses/notices apply.
 - RLViser/rlviser-py: upstream license/notices apply.
 

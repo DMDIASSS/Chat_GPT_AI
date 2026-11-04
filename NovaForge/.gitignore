@@ -9,3 +9,4 @@ reports/
 work/
 rlbot/policy.pt
 rlbot/policy.pt.json
+wandb/

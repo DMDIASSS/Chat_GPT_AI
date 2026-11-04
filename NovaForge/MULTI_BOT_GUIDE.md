@@ -1,4 +1,6 @@
-# NovaForge v1.1 — mixed-bot training
+# NovaForge v1.2 — mixed-bot training
+
+**Continuous training and W&B:** see [WANDB_AND_CONTINUOUS.md](WANDB_AND_CONTINUOUS.md). After teacher/BC setup, run **17** once and use **18** for automatic start/resume until paused. Launchers 13/14 now request continuous online tracking. The CLI examples below remain finite unless `--forever` is added.
 
 This update includes the Windows save fix and adds **Chronos and GalactusV2 simulator ports** alongside **Nexto neural, Ripple v1.1, latest self-play and historical self-play**. Pulsar is omitted because the intended bot/checkpoint has not been identified.
 
@@ -6,7 +8,7 @@ The project remains 1v1: each arena has one opposing car. Two workers can run di
 
 ## Update an existing install
 
-Extract the new ZIP into `Chat_GPT_AI`, allowing replacement of the NovaForge source files. Keep `.venv`, `assets`, datasets, models and runs. They are excluded from the ZIP. No new dependencies are needed if v1.0 installation completed. Run `1_CHECK.bat` again; then follow the mixed-bot steps below.
+Extract the new ZIP into `Chat_GPT_AI`, allowing replacement of the NovaForge source files. Keep `.venv`, `assets`, datasets, models and runs. They are excluded from the ZIP. Core training keeps the existing dependencies; the optional W&B SDK is installed separately by launcher 17. Run `1_CHECK.bat` again; then follow the mixed-bot steps below.
 
 For a fresh install, first follow steps 1–2 in [START_HERE.md](START_HERE.md).
 
@@ -15,7 +17,7 @@ For a fresh install, first follow steps 1–2 in [START_HERE.md](START_HERE.md).
 1. **`10_MIXED_CHECK.bat`** downloads all four public bots, verifies hashes, runs the complete tests and teacher diagnostics, then runs a short real mixed-opponent PPO/save/resume smoke. Expected markers: `DOCTOR_PASS`, `SMOKE_PASS`, `MIXED_CHECK_PASS`.
 2. **`11_MIXED_COLLECT.bat`** collects 40,000 teacher decisions against Nexto. The controlling teacher rotates among all four bots at episode boundaries. The dataset report records kept samples per teacher.
 3. **`12_MIXED_PRETRAIN.bat`** trains the new student on that mixture, with episode-disjoint validation. It writes `models\mixed_bc.zip` and its BC report.
-4. **`13_MIXED_TRAIN.bat`** starts `diverse01` from that model for 100,000 PPO decisions using the diverse league below.
+4. Run **`17_WANDB_SETUP.bat`** once, then **`18_START_OR_RESUME_WANDB.bat`** to start `diverse01` from that model and continue until paused. Alternatively **`13_MIXED_TRAIN.bat`** starts a fresh continuous run with online W&B and 100,000-decision segments.
 5. Use **`14_MIXED_RESUME.bat`** to continue, **`15_MIXED_PAUSE.bat`** to request a saved stop, and **`16_MIXED_STATUS.bat`** for progress. These target `diverse01`; the original launchers 7–9 target `laptop01`.
 
 Names are deliberately fresh. To rerun collection, BC or a new configuration, use new filenames/run names through the CLI; existing outputs are not replaced automatically.

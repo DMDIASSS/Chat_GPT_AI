@@ -39,6 +39,10 @@ def main():
     p=sub.add_parser('train')
     p.add_argument('--run',default='laptop01')
     p.add_argument('--steps',type=positive_int,default=2_000_000,help='Additional decisions; rounded up to a PPO rollout')
+    p.add_argument('--forever',action='store_true',help='Continue segments until pause/Ctrl+C; --steps is the segment size')
+    p.add_argument('--wandb',choices=['online','offline','off'],default=None,help='W&B mode; defaults to saved mode or off')
+    p.add_argument('--wandb-project',default=None,help='W&B project (default: novaforge)')
+    p.add_argument('--wandb-entity',default=None,help='Optional W&B team/user; default is the saved login entity')
     p.add_argument('--resume',action='store_true')
     p.add_argument('--init',default=None,help='NovaForge BC model to initialize a new run')
     p.add_argument('--config',default=None)
@@ -90,6 +94,7 @@ def main():
     for command in ['status','pause']:
         p=sub.add_parser(command)
         p.add_argument('--run',default='laptop01')
+    sub.add_parser('wandb-check',help='Verify the SDK can reuse a saved local W&B login; never displays a key')
     args=parser.parse_args()
     if args.command in ('status','pause'):
         run=(ROOT/'runs'/args.run).resolve()
@@ -100,6 +105,9 @@ def main():
             print('Stop requested. The trainer saves its current policy and exits at the next environment step.')
         else:
             print((run/'status.json').read_text())
+    elif args.command=='wandb-check':
+        from nova.tracking import check_login
+        check_login()
     elif args.command=='fetch-teachers':
         from nova.teachers import fetch_teachers
         fetch_teachers([n.strip() for n in args.names.split(',')])

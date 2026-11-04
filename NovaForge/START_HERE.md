@@ -1,4 +1,6 @@
-# NovaForge v1.1 — start here
+# NovaForge v1.2 — start here
+
+**Run until paused with W&B:** after updating an existing install, use [WANDB_AND_CONTINUOUS.md](WANDB_AND_CONTINUOUS.md): launcher **17** checks the saved local login, **18** starts/resumes `diverse01`, **15** pauses, and **16** shows status. Fresh installs still need installation and teacher/BC setup first. Mixed launchers 13/14 now run continuously with online W&B; the original workflow below retains bounded CLI examples.
 
 **For mixed-opponent training:** finish installation and `1_CHECK.bat`, then follow [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md) using launchers 10–16. This update includes the Windows checkpoint save fix, real Chronos/GalactusV2 simulator ports and a mixture with Nexto, Ripple and past student policies. The original single-teacher workflow below remains available.
 

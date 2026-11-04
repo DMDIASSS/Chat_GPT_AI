@@ -1,0 +1,2 @@
+# Optional live dashboard SDK; installs into NovaForge's existing environment.
+wandb==0.31.0

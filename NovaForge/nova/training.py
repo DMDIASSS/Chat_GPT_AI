@@ -17,6 +17,7 @@ from .core import ROOT, CONTRACT, atomic_json, check_model, sha256
 from .environment import ArenaEnv
 from .models import export_actor, load_ppo, save_ppo
 from .teachers import verify_teacher, BOT_NAMES
+from .tracking import Tracker, WandBWriter, EpisodeWindow
 
 
 def recover_checkpoint(run_dir):
@@ -114,7 +115,7 @@ def resolve_model(path):
 
 
 class LeagueCallback(BaseCallback):
-    def __init__(self,run_dir,cfg):
+    def __init__(self,run_dir,cfg,tracker=None,continuous=False):
         super().__init__()
         self.run_dir=Path(run_dir)
         self.cfg=cfg
@@ -125,9 +126,16 @@ class LeagueCallback(BaseCallback):
         self.wins=0
         self.losses=0
         self.timeouts=0
+        self.tracker=tracker
+        self.continuous=continuous
+        self.window=EpisodeWindow()
+        self.session_started=False
 
     def _on_training_start(self):
-        self.start_step=self.num_timesteps
+        if not self.session_started:
+            self.start_step=self.num_timesteps
+            self.started=time.monotonic()
+            self.session_started=True
 
     def persist(self,force=False):
         step=int(self.model.num_timesteps)
@@ -168,10 +176,17 @@ class LeagueCallback(BaseCallback):
         self.status('saved')
 
     def status(self,state):
+        fps=(self.model.num_timesteps-self.start_step)/max(time.monotonic()-self.started,.01)
+        if self.tracker:
+            self.tracker.log(dict(self.window.metrics(),**{'trainer/fps':fps,
+                'trainer/session_episodes':self.episodes,'trainer/continuous':int(self.continuous)}),
+                self.model.num_timesteps)
+            self.tracker.save_status()
         atomic_json(self.run_dir/'status.json',dict(state=state,timesteps=int(self.model.num_timesteps),
-            fps_since_start=(self.model.num_timesteps-self.start_step)/max(time.monotonic()-self.started,.01),
+            fps_since_start=fps,continuous=self.continuous,updated_unix_time=time.time(),
             episodes_this_session=self.episodes,wins=self.wins,losses=self.losses,timeouts=self.timeouts,
-            latest='latest.json',session_seconds=time.monotonic()-self.started))
+            latest='latest.json',session_seconds=time.monotonic()-self.started,
+            wandb=self.tracker.status() if self.tracker else {'mode':'off'}))
 
     def _on_rollout_start(self):
         # SB3 has completed the preceding PPO update at this point.
@@ -187,6 +202,7 @@ class LeagueCallback(BaseCallback):
                 fields=('outcome','timeout','practice_success','touches','high_touch','wall_touch',
                         'dribble_seconds','seconds','reward_parts','episode','scenario','opponent','side')
                 record={k:info[k] for k in fields}
+                self.window.add(record)
                 record.update(timesteps=self.num_timesteps,unix_time=time.time())
                 with (self.run_dir/'episodes.jsonl').open('a',encoding='utf8') as f:
                     f.write(json.dumps(record,allow_nan=False)+'\n')
@@ -195,7 +211,20 @@ class LeagueCallback(BaseCallback):
 
     def _on_training_end(self):
         self.persist(force=True)
-        self.status('stopped' if (self.run_dir/'STOP').exists() else 'finished')
+        self.model.logger.dump(step=self.model.num_timesteps)
+        self.status('stopped' if (self.run_dir/'STOP').exists() else
+                    'training' if self.continuous else 'finished')
+
+
+def learn_segments(model,callback,steps,continuous,stop_path):
+    """Keep one model/vector environment alive across bounded PPO segments."""
+    if steps<=0: raise ValueError('Segment size must be positive')
+    while not Path(stop_path).exists():
+        model.learn(total_timesteps=steps,callback=callback,reset_num_timesteps=False,
+                    log_interval=1,progress_bar=False)
+        if Path(stop_path).exists(): return 'stopped'
+        if not continuous: return 'finished'
+    return 'stopped'
 
 
 def train(args):
@@ -218,17 +247,25 @@ def train(args):
             if args.device: cfg['device']=args.device
             cfg=prepare_config(cfg,args.teachers,args.replay_bank)
             source=resolve_model(args.init) if args.init else None
-            atomic_json(run_dir/'config.json',cfg)
-            import importlib.metadata as metadata
-            atomic_json(run_dir/'provenance.json',dict(contract=CONTRACT,platform=platform.platform(),
-                packages={p:metadata.version(p) for p in ['torch','numpy','stable-baselines3',
-                        'rlgym-rocket-league','rlgym-tools','RocketSim','onnxruntime']},
-                initialization=str(source) if source else 'random'))
-        (run_dir/'STOP').unlink(missing_ok=True)
-        torch.set_num_threads(cfg['threads'])
-        vec=make_vector(cfg,run_dir)
-        callback=LeagueCallback(run_dir,cfg)
+        continuous=getattr(args,'forever',False)
+        tracker=Tracker(run_dir,cfg,mode=getattr(args,'wandb',None),
+                        project=getattr(args,'wandb_project',None),
+                        entity=getattr(args,'wandb_entity',None),continuous=continuous)
+        vec=None
+        callback=None
+        result='error'
         try:
+            if not args.resume:
+                atomic_json(run_dir/'config.json',cfg)
+                import importlib.metadata as metadata
+                atomic_json(run_dir/'provenance.json',dict(contract=CONTRACT,platform=platform.platform(),
+                    packages={p:metadata.version(p) for p in ['torch','numpy','stable-baselines3',
+                            'rlgym-rocket-league','rlgym-tools','RocketSim','onnxruntime']},
+                    initialization=str(source) if source else 'random'))
+            (run_dir/'STOP').unlink(missing_ok=True)
+            torch.set_num_threads(cfg['threads'])
+            vec=make_vector(cfg,run_dir)
+            callback=LeagueCallback(run_dir,cfg,tracker=tracker,continuous=continuous)
             model=load_ppo(source,vec,cfg['device']) if source else new_model(cfg,vec)
             if source and not args.resume:
                 # Keep BC policy weights; initialize PPO with this run's settings.
@@ -237,13 +274,19 @@ def train(args):
                 imported.policy.load_state_dict(model.policy.state_dict())
                 model=imported
             model.set_logger(configure(str(run_dir/'logs'),['stdout','csv']))
+            if tracker.run is not None: model.logger.output_formats.append(WandBWriter(tracker))
+            print('Training until pause/Ctrl+C.' if continuous else f'Training for {args.steps} additional decisions.',flush=True)
             try:
-                model.learn(total_timesteps=args.steps,callback=callback,reset_num_timesteps=False,
-                            log_interval=1,progress_bar=False)
+                result=learn_segments(model,callback,args.steps,continuous,run_dir/'STOP')
             except KeyboardInterrupt:
                 callback.persist(force=True)
                 callback.status('interrupted; saved')
+                result='interrupted; saved'
                 print('Interrupted. Last policy and optimizer saved; resume the same run.')
         finally:
-            vec.close()
+            try:
+                if vec is not None: vec.close()
+            finally:
+                tracker.finish(result)
+                if callback is not None and hasattr(callback,'model'): callback.status(result)
     print(f'Checkpoint pointer: {run_dir/"latest.json"}')

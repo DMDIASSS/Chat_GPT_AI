@@ -1,5 +1,7 @@
 # Implemented work and next experiments
 
+**v1.2:** mixed-training launchers now support continuous training until pause and an optional W&B dashboard. The tracking integration reuses the SDK's local login, keeps the online run ID across resume, reports opponent/mechanics/PPO metrics, and exposes the dashboard link in local status. See [WANDB_AND_CONTINUOUS.md](WANDB_AND_CONTINUOUS.md).
+
 **v1.1:** Chronos and GalactusV2 now have working CPU simulator ports and join Nexto/Ripple in the diverse league. Mixed teacher collection is implemented. Native C++ feature/mask/network comparisons and short real training checks pass. The remaining work for these ports is broader trajectory/live validation, forecast comparison and the unavailable world-contact-normal exception; see [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md). Pulsar stays out until a deployment identity/checkpoint is established.
 
 ## Included in this ZIP
@@ -16,6 +18,7 @@
 | Experiment evidence | Config/provenance, component rewards, PPO CSV and seeded paired screening | Short evaluation report, timeout accounting |
 | Deployment | TorchScript actor with hash/contract metadata and RLBot v5 launcher | Export/PPO action parity and live-state feature parity; live match still needs Windows testing |
 | Operational controls | File lock, full optimizer checkpoint, atomic latest pointer, pause/resume | Two-worker real PPO smoke with resume |
+| Continuous training and W&B | Repeat PPO segments without resetting the model; reuse online tracking ID and show status/link | Real SDK offline logging, multi-segment mixed run, pause and resume; online credentials checked on the user's PC |
 
 ## Suggested experiment order on this laptop
 
