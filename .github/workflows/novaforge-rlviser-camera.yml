@@ -15,6 +15,7 @@ jobs:
     env:
       CARGO_PROFILE_RELEASE_LTO: 'false'
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -26,9 +27,11 @@ jobs:
           git -C upstream fetch --depth 1 origin a4e524085cdb1601cf9c0af2f815591fb696db54
           git -C upstream checkout --detach FETCH_HEAD
           python NovaForge/viewer/patch_rlviser.py upstream
+          rustfmt --edition 2024 upstream/src/camera.rs upstream/src/udp.rs upstream/src/settings/options.rs upstream/src/settings/gui.rs
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: 'upstream -> target'
+          cache-on-failure: 'true'
       - name: Build standalone Windows viewer
         shell: pwsh
         run: cargo build --manifest-path upstream/Cargo.toml --release --locked --no-default-features --features threaded

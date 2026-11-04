@@ -60,7 +60,7 @@ fn update_camera_lens(options: Res<crate::settings::options::Options>, mut camer
         camera_transform.look_at(ball_pos, Vec3::Y);
         camera_transform.rotation *= Quat::from_rotation_x(options.camera_pitch.clamp(-45., 10.).to_radians());'''
     text=replace(text,old,new)
-    text=replace(text,'car_look * 280. + Vec3::Y * 110.','car_look * options.camera_distance.clamp(50., 1000.) + Vec3::Y * options.camera_height.clamp(20., 500.).')
+    text=replace(text,'car_look * 280. + Vec3::Y * 110.','car_look * options.camera_distance.clamp(50., 1000.) + Vec3::Y * options.camera_height.clamp(20., 500.)')
     text=replace(text,'Quat::from_rotation_x(-PI / 30.)','Quat::from_rotation_x(options.camera_pitch.clamp(-45., 10.).to_radians())')
     path.write_text(text)
     path=root/'src/settings/gui.rs';text=path.read_text()
