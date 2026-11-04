@@ -4,6 +4,8 @@ Run **24_WATCH_COPY.bat** after pausing copying with **22**. RLViser is found an
 
 The search starts at **`chat_gpt_ai\rlviser.exe`**, then checks common names in the project and viewer folders. The earlier `rilviser.exe` spelling is accepted too. An explicit `--viewer-exe` path is available for unusual locations.
 
+The camera build requires **rlviser-py 0.6.14**. Setup checks/updates that sender before importing its native extension. If you saw an enormous memory-allocation error with v1.5, follow [the protocol hotfix](VIEWER_HOTFIX_v1.5.1.md).
+
 ## Camera preset
 
 - Horizontal FOV **110°**, adapted to the window aspect ratio.

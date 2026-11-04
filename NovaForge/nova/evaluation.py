@@ -111,7 +111,6 @@ def watch(args):
 
 
 def _watch_run(args):
-    from rlgym.rocket_league.rlviser import RLViserRenderer
     from .viewer import prepare_viewer,learner_first_state
     torch.set_num_threads(1)
     student=Student(args.model)
@@ -119,6 +118,8 @@ def _watch_run(args):
     cfg['env']['episode_seconds']=args.seconds
     cfg['env']['no_touch_seconds']=args.seconds+1
     prepare_viewer(explicit=getattr(args,'viewer_exe',None),mode=getattr(args,'viewer_mode','auto'))
+    # Load the native extension only after checking/upgrading its protocol version.
+    from rlgym.rocket_league.rlviser import RLViserRenderer
     env=ArenaEnv(cfg,opponent=args.opponent,scenario=args.scenario)
     renderer=RLViserRenderer(tick_rate=30)
     print('RLViser opens automatically on the first frame. Ctrl+C stops viewing.')

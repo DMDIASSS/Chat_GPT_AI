@@ -1,4 +1,6 @@
-# NovaForge v1.5
+# NovaForge v1.5.1
+
+**Viewer crash fix:** the camera build requires the FlatBuffers sender `rlviser-py==0.6.14`. Setup/watch now upgrades the sender before loading its native DLL and refuses incompatible loaded versions. See [VIEWER_HOTFIX_v1.5.1.md](VIEWER_HOTFIX_v1.5.1.md). Continue your existing `copy02` with launcher 21.
 
 An isolated, laptop-sized 1v1 Rocket League training lab: RLGym v2 + RocketSim, PPO, frozen self-play, Nexto/Ripple trainers, Chronos/GalactusV2 simulator ports, mechanics resets, replay starting positions, teacher imitation, evaluation, and RLBot v5 export.
 

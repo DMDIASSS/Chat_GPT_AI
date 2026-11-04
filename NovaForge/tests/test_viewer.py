@@ -38,6 +38,7 @@ def test_existing_viewer_is_copied_without_moving_original_and_camera_follows_ca
 
 
 def test_checked_camera_download_is_installed_and_cached(tmp_path,monkeypatch):
+    monkeypatch.setattr(viewer,'ensure_camera_sender',lambda:None)
     root=tmp_path/'novaforge';root.mkdir()
     (root/'rlviser.exe').write_bytes(b'MZold')
     binary=b'MZcamera-custom';digest=hashlib.sha256(binary).hexdigest()
@@ -55,6 +56,27 @@ def test_checked_camera_download_is_installed_and_cached(tmp_path,monkeypatch):
     viewer.prepare_viewer(root,platform_name='win32')
     assert calls==[url]
     assert json.loads((root/'viewer/last_setup.json').read_text())['requested_camera']['shake'] is False
+
+
+def test_camera_sender_upgrades_legacy_before_native_import(monkeypatch):
+    version=['0.6.13'];calls=[]
+    monkeypatch.setattr(viewer.importlib.metadata,'version',lambda name:version[0])
+    monkeypatch.delitem(viewer.sys.modules,'rlviser_py',raising=False)
+    def install(command,check):calls.append(command);version[0]='0.6.14'
+    monkeypatch.setattr(viewer.subprocess,'run',install)
+    viewer.ensure_camera_sender()
+    assert calls[0][0]==viewer.sys.executable and calls[0][-1]=='rlviser-py==0.6.14'
+    viewer.ensure_camera_sender();assert len(calls)==1
+
+
+def test_camera_sender_refuses_loaded_incompatible_extension(monkeypatch):
+    monkeypatch.setattr(viewer.importlib.metadata,'version',lambda name:'0.6.13')
+    monkeypatch.setitem(viewer.sys.modules,'rlviser_py',object())
+    monkeypatch.setattr(viewer.subprocess,'run',lambda *a,**k:pytest.fail('Must not replace a loaded native DLL'))
+    with pytest.raises(RuntimeError,match='already loaded'):viewer.ensure_camera_sender()
+    monkeypatch.setattr(viewer.importlib.metadata,'version',lambda name:'0.6.14')
+    monkeypatch.setitem(viewer.sys.modules,'rlviser_py',Namespace(__version__='0.6.13'))
+    with pytest.raises(RuntimeError,match='already loaded'):viewer.ensure_camera_sender()
 
 
 @pytest.mark.parametrize('wrong_digest,binary',[(True,b'MZcorrect-format'),(False,b'not-an-executable')])

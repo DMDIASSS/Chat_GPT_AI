@@ -4,17 +4,41 @@ from __future__ import annotations
 import copy
 from datetime import datetime,timezone
 import hashlib
+import importlib.metadata
 import json
 import os
 from pathlib import Path
 import shutil
 import sys
+import subprocess
 import tempfile
 import urllib.request
 
 from .core import ROOT,atomic_json,sha256
 
 CAMERA=dict(fov=110.,distance=270.,height=100.,pitch=-4.,ball_cam=True,shake=False)
+CAMERA_SENDER_VERSION='0.6.14'
+
+
+def ensure_camera_sender():
+    """The camera viewer uses FlatBuffers; 0.6.13 uses the incompatible legacy wire format."""
+    try:version=importlib.metadata.version('rlviser-py')
+    except importlib.metadata.PackageNotFoundError:version=None
+    loaded=sys.modules.get('rlviser_py')
+    loaded_version=getattr(loaded,'__version__',None)
+    if loaded_version is not None and loaded_version!=CAMERA_SENDER_VERSION:
+        raise RuntimeError('The incompatible RLViser sender is already loaded. Close this console, run 31_SETUP_RLVISER.bat, then start viewing again.')
+    if version==CAMERA_SENDER_VERSION:return
+    command=[sys.executable,'-m','pip','install','--disable-pip-version-check','--only-binary=:all:',
+        '--no-deps','--index-url','https://pypi.org/simple','rlviser-py=='+CAMERA_SENDER_VERSION]
+    if 'rlviser_py' in sys.modules:
+        raise RuntimeError('The incompatible RLViser sender is already loaded. Close this console, run 31_SETUP_RLVISER.bat, then start viewing again.')
+    print(f'Updating the viewer sender from {version or "missing"} to {CAMERA_SENDER_VERSION} to match the camera protocol.',flush=True)
+    try:subprocess.run(command,check=True)
+    except (OSError,subprocess.CalledProcessError):
+        raise RuntimeError('Viewer sender update failed. Run .venv\\Scripts\\python.exe -m pip install --only-binary=:all: rlviser-py==0.6.14, then retry. Viewing has not started.') from None
+    if importlib.metadata.version('rlviser-py')!=CAMERA_SENDER_VERSION:
+        raise RuntimeError('Viewer sender version is still incompatible; restart after installing rlviser-py==0.6.14.')
 
 
 def find_viewer(root=ROOT,explicit=None):
@@ -112,6 +136,7 @@ def prepare_viewer(root=ROOT,explicit=None,mode='auto',platform_name=None):
             selected=found
     if selected is None:selected=found
     if selected is None:raise FileNotFoundError('RLViser was not found. Put rilviser.exe or rlviser.exe in chat_gpt_ai, or run viewer-setup online.')
+    if full_camera:ensure_camera_sender()
     if selected.resolve()!=canonical.resolve():
         if canonical.exists() and sha256(canonical)!=sha256(selected):
             backup=root/'viewer/backups'/f'rlviser-{sha256(canonical)[:12]}.exe'

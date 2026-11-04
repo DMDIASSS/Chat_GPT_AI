@@ -1,6 +1,10 @@
-# NovaForge v1.5 download
+# NovaForge v1.5.1 download
 
-[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.5.zip)
+[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.5.1.zip)
+
+Fixes the oversized RLViser allocation crash by matching the camera viewer with rlviser-py 0.6.14. Setup/watch checks and upgrades the sender before its native DLL is loaded. Existing copy02 training can be resumed. Close all viewer windows, merge this update, run 31_SETUP_RLVISER.bat, then 24_WATCH_COPY.bat.
+
+[Viewer protocol hotfix](NovaForge/VIEWER_HOTFIX_v1.5.1.md)
 
 Corrects a teacher-copying shortcut: transition windows are retained, previous-action inputs are disabled in the actor, and fresh copy02 training starts with first-contact demonstrations. Published models are selected using their own kickoff monitoring plus copying loss. All teachers stay frozen; shared simulator returns mildly weight supervised labels. The original teachers reward functions remain unknown.
 
