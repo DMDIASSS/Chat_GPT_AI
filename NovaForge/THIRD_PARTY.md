@@ -1,0 +1,23 @@
+# Licenses and provenance
+
+NovaForge's original source code is licensed under the included MIT license. Third-party libraries and downloaded bot materials retain their own terms. The downloadable core ZIP excludes teacher models, upstream source caches, collision meshes, datasets, trained weights and virtual environments.
+
+## Teacher materials downloaded on request
+
+- **Ripple**, by **Rolv**: [Rolv-Arild/Ripple-RLBot](https://github.com/Rolv-Arild/Ripple-RLBot), pinned to `7ca4273a891ab1d04d001b48cb86f1bc8914aa85`. Its code/models use **CC BY-NC-SA 4.0**. The installer preserves `LICENSE` and `NOTICE`. Ripple's upstream `obs.py`, `act.py` and model are downloaded unchanged. NovaForge's adapter is separate. Collision meshes are copied locally from the installed RLGym package for the upstream observation module's expected asset path.
+- **Nexto/Necto**, by **Rolv and the Necto contributors**: [RLBot/RLBotPack](https://github.com/RLBot/RLBotPack/tree/0033a98d4e060670f334f60f7f8dc5ee21ba93bb/RLBotPack/Necto), pinned to `0033a98d4e060670f334f60f7f8dc5ee21ba93bb`. Necto/Nexto materials use **CC BY-NC-SA 4.0**. The installer preserves `LICENSE` and the original observation source. It creates an import-only adaptation pointing to RLGym-tools' V1 types; the source records the modification. The stock scripted kickoff is omitted from the adapter.
+
+`teachers.lock.json` lists immutable source URLs and hashes. Fetching verifies the upstream bytes; loading verifies the installed files against the lock. Keep their source, attribution and applicable terms with any adapted materials you share. Generated demonstration datasets and teacher-derived student checkpoints may also be subject to upstream terms; they are not relicensed by the MIT source-code license.
+
+## Training dependencies
+
+- RLGym v2 and RLGym-tools: Apache-2.0. The student's advanced action table is provided by RLGym-tools, with bins selected to match the 276 Ripple controls.
+- RocketSim: MIT. Bundled collision assets supplied through dependencies retain their own provenance.
+- Stable-Baselines3: MIT.
+- PyTorch: BSD-style project license and its dependency notices.
+- ONNX Runtime: MIT.
+- NumPy: BSD-3-Clause.
+- RLBot and rlgym-compat: their upstream package licenses/notices apply.
+- RLViser/rlviser-py: upstream license/notices apply.
+
+Chronos, Galactus and the Pulsar repository are linked research references. No models or source from those projects are incorporated into this package.

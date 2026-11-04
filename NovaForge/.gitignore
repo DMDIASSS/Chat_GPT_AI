@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+assets/
+runs/
+models/
+datasets/
+reports/
+work/
+rlbot/policy.pt
+rlbot/policy.pt.json

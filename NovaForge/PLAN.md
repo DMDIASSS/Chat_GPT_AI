@@ -1,0 +1,41 @@
+# Implemented work and next experiments
+
+## Included in this ZIP
+
+| Feature | Implementation | First test |
+| --- | --- | --- |
+| New student | 100 team-relative features, 276 discrete controls, separate 256×256 policy/value MLPs | Core smoke and simulator/live observation parity tests |
+| Self-play league | Frozen latest policy plus a 12-member active history, sampled once per episode | Smoke exercises a saved snapshot as a real opponent |
+| New strong trainer | Ripple v1.1 ONNX adapter with original action queue | Teacher doctor and delayed-control tests |
+| Old reference trainer | Nexto neural policy, held at eight ticks | Both-side actual model tests |
+| Mechanics practice | Seven reset types, varied difficulty and per-worker success estimates | Both-side simulator resets and metrics tests |
+| Teacher imitation | Actual executed controls; incompatible labels filtered; episode-disjoint validation | Collection → BC → PPO initialization integration check |
+| Replay training starts | RLGym-tools parser → filtered serialized 1v1 states → new teacher rollouts | Serialized reset bank exercised in RocketSim; raw file parse still needs a user fixture |
+| Experiment evidence | Config/provenance, component rewards, PPO CSV and seeded paired screening | Short evaluation report, timeout accounting |
+| Deployment | TorchScript actor with hash/contract metadata and RLBot v5 launcher | Export/PPO action parity and live-state feature parity; live match still needs Windows testing |
+| Operational controls | File lock, full optimizer checkpoint, atomic latest pointer, pause/resume | Two-worker real PPO smoke with resume |
+
+## Suggested experiment order on this laptop
+
+1. Run install, tests, smoke and teacher checks.
+2. Collect 20k Ripple decisions against Nexto; pretrain five epochs.
+3. Train `laptop01` for 100k decisions and screen it against its BC initialization.
+4. Extend a successful run by 2M decisions. Preserve reports even if it gets worse.
+5. Compare a scratch run and a BC run at the same budget; then compare plain self-play and trainer mixing.
+6. Add a few verified 1v1 replay files. Compare teacher demonstrations from replay starts with the normal reset distribution.
+7. Export promising checkpoints and play multiple full offline RLBot matches on alternating team colors against the named bots.
+
+Keep evaluation seeds separate from collection/training seeds. Use a second new evaluation seed set before concluding that a change helped. First-goal simulator scores are preliminary. A mechanics proxy, BC accuracy or shaped reward can increase while playing strength falls.
+
+## Next additions, in order
+
+1. **Windows transfer fixes.** Use the user's live clips and errors to fix packet timing, coordinate conversion or launcher issues before increasing model complexity. Acceptance: the same known-state features and controls agree across simulator and live adapter, then several uninterrupted RLBot games.
+2. **Chronos headless adapter.** Match its C++ padded observation layout, masked action logits, queue timing and native weights. Acceptance: original-runtime and port logits/actions agree on recorded states from both sides, followed by headless-versus-live comparisons.
+3. **Galactus headless adapter.** Reproduce the five ball-prediction samples and boost/timing features, including tick-eight/delay-seven scheduling. Acceptance: parity fixtures cover collisions, airborne cars, demos and kickoff transitions.
+4. **Hard-example replay bank.** Store actual learner failures and sample a bounded portion of training resets from them, keeping a separate untouched evaluation bank. Acceptance: recovery on the targeted failure improves without degrading kickoff/full-game screening.
+5. **Skill-specific teachers and a goal-conditioned policy.** Condition on an explicit task and sample actual mechanics demonstrations. Acceptance: aerial/dribble/recovery proxies and held-out match outcomes both improve. A high-touch counter alone is insufficient.
+6. **Reachability-grid experiment inspired by the public Pulsar research.** Begin with reset-cell mastery using actual success, then evaluate a contrastive critic as a separate algorithm. Acceptance: equal-compute improvement on held-out starts and first-goal/full-match evaluation; no claim of reproducing Pulsar without matching its system.
+7. **2v2 / entity attention.** Change the feature contract, add teammate roles and random player ordering, introduce team rewards, and retrain. Acceptance: rotation/pass/defense metrics plus 2v2 match evaluation. The v1 weights would not be compatible.
+8. **Native GigaLearn rollout path.** Port only after the Python loop is stable. Acceptance: trace parity first; then measured end-to-end decisions/sec and match strength per training budget.
+
+After your first test, the most useful evidence is the smoke/doctor JSON, BC loss/accuracy, PPO throughput, evaluation outcomes with timeouts, and a clip of a repeated failure.

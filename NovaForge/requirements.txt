@@ -1,0 +1,19 @@
+# Windows: Python 3.11 x64. Install the desired torch CPU/CUDA wheel first (see setup).
+torch==2.9.1
+numpy==1.26.4
+RocketSim==2.2.1
+rlgym[rl-sim]==2.0.1
+rlgym-tools==2.6.5
+stable-baselines3==2.9.2
+gymnasium==1.4.0
+onnxruntime==1.23.2
+rlgym-compat==2.3.6
+rlbot==2.0.0b56
+rlviser-py==0.6.13
+filelock>=3.20,<4
+pytest==8.4.2
+# Replay parsing is an implemented path, so install its otherwise undeclared extras.
+pandas==2.2.3
+pyarrow==19.0.1
+numba==0.61.2
+scipy==1.15.3

@@ -1,0 +1,14 @@
+#:schema https://rlbot.org/schemas/agent.json
+[settings]
+name = "NovaForge v1"
+agent_id = "DMDIASSS/NovaForge-v1"
+run_command = '..\.venv\Scripts\python.exe bot.py'
+run_command_linux = '../.venv/bin/python bot.py'
+hivemind = true
+
+[details]
+developer = "DMDIASSS"
+description = "Experimental 1v1 policy trained with RocketSim, frozen self-play, teacher imitation and mechanics practice. Export a policy before running."
+source_link = "https://github.com/DMDIASSS/Chat_GPT_AI"
+language = "python"
+tags = ["1v1"]
