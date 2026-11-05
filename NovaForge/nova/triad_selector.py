@@ -26,6 +26,8 @@ from .training import load_config
 NAMES=('chronos','galactus','ripple')
 CONTRACT=dict(name='triad-selector-v1',observation=234,actions=list(NAMES),decision_ticks=8,hold_decisions=8)
 RUNS=ROOT.parent/'triadbot/runs'
+TRAINING_SETTINGS=dict(learning_rate=1e-4,n_steps=512,batch_size=256,n_epochs=4,
+    gae_lambda=.97,clip_range=.1,ent_coef=.003,target_kl=.02)
 
 
 class Context:
@@ -112,11 +114,13 @@ class Runner:
         self.gate=Gate(path,body)
         from .chronos_fusion import TeacherFusion
         self.teacher=TeacherFusion()
+        self.counts=np.zeros(3,dtype=np.int64)
     def bind(self,env):
         self.env=env;self.gate.reset()
         self.teacher.reset(env.arena.state,env.arena.agent,np.random.default_rng(271))
     def world_controls(self,obs):
         env=self.env;choice=self.gate.choose(obs[:225])
+        self.counts[choice]+=1
         return self.teacher.proposals(env.arena.state,env.previous,obs[:225],env.mirror)[choice]
 
 
@@ -138,20 +142,25 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
     with FileLock(str(run/'train.lock'),timeout=0):
         cfg=load_config(run/'config.json' if (run/'config.json').exists() else ROOT/'configs/chronos.json')
         cfg['env'].setdefault('learner_hitbox','breakout');cfg['league']['weights']={n:.25 for n in ('chronos','galactus','ripple','nexto')}
+        cfg.update(workers=1,threads=1,device='cpu')
+        from .research import session
+        start=check_model(run/'full.zip',CONTRACT)['timesteps'] if (run/'full.zip').exists() else 0
+        experiment=session(run,cfg,start)
         atomic_json(run/'config.json',cfg);env=SelectorEnv(cfg);tracker=Tracker(run,cfg,mode=wandb,continuous=forever)
         model=None;state='error';before=None;window=EpisodeWindow()
         try:
             if (run/'full.zip').exists():
                 check_model(run/'full.zip',CONTRACT);model=PPO.load(run/'full.zip',env=env,device='cpu')
             else:
-                model=PPO(SelectorPolicy,env,device='cpu',learning_rate=1e-4,n_steps=512,batch_size=256,n_epochs=4,
-                    gamma=cfg['ppo']['gamma'],gae_lambda=.97,clip_range=.1,ent_coef=.003,target_kl=.02,seed=271,verbose=1,
+                model=PPO(SelectorPolicy,env,device='cpu',**TRAINING_SETTINGS,
+                    gamma=cfg['ppo']['gamma'],seed=cfg.get('selector_seed',271),verbose=1,
                     policy_kwargs=dict(net_arch=dict(pi=[128,128],vf=[128,128])))
                 with torch.no_grad():
                     model.policy.action_net.weight.zero_();model.policy.action_net.bias.copy_(torch.tensor([1.,0.,0.]))
                 save_actor(model,run/'initial.pt',cfg['env']['learner_hitbox'])
                 shutil.copy2(run/'initial.pt',run/'champion.pt');shutil.copy2(run/'initial.pt.json',run/'champion.pt.json')
-            model.set_logger(configure(str(run/'logs'),['stdout','csv']))
+            model.set_random_seed(experiment['seed'])
+            model.set_logger(configure(str(run/'logs'/experiment['session_id']),['stdout','csv']))
             if tracker.run is not None:model.logger.output_formats.append(WandBWriter(tracker))
             if getattr(model,'selector_halt',None):
                 print('SELECTOR_HALTED:',model.selector_halt,'Export the retained champion.');state='stopped';return
@@ -211,15 +220,18 @@ def check_progress(run,cfg,model,checks):
             model.selector_halt='Substantial selector W/D/L regression';(run/'STOP').touch()
         checks.update(step=int(model.num_timesteps),checks=checks.get('checks',0)+1,regressions=bad,
             decision=decision,statistics=stats,candidate=match_summary(rows),champion=match_summary(old))
+        atomic_json(run/'research/guard_checks'/f'{int(model.num_timesteps):012d}.json',checks)
         atomic_json(run/'guard.json',checks)
     except EvaluationStopped:pass
 
 
-def evaluate(run_name='selector01',pairs=2,seconds=60):
+def evaluate(run_name='selector01',pairs=2,seconds=60,split='development'):
     from .chronos_league import match_suite,match_summary
     from .chronos_guard import paired_statistics,EvaluationStopped
     from filelock import Timeout
-    if pairs<=0 or not np.isfinite(seconds) or seconds<=0:raise ValueError('Positive pairs and seconds are required')
+    from .research import SEED_BANKS,evaluation_record
+    if split not in SEED_BANKS:raise ValueError('Unknown evaluation split')
+    if not isinstance(pairs,int) or not 1<=pairs<=256 or not np.isfinite(seconds) or seconds<=0:raise ValueError('Use 1..256 pairs and positive seconds')
     torch.set_num_threads(1)
     print(f'SELECTOR_EVALUATION_START: Torch threads={torch.get_num_threads()}, games={4*pairs*2*2}, duration={seconds:g}s simulated/game',flush=True)
     run=(RUNS/run_name).resolve()
@@ -236,13 +248,18 @@ def evaluate(run_name='selector01',pairs=2,seconds=60):
             baseline=Runner(run/'initial.pt',body)
             (run/'EVAL_STOP').unlink(missing_ok=True)
             try:
-                rows,old=match_suite(cfg,candidate,baseline,pairs,seconds,29100001,run/'EVAL_STOP')
+                rows,old=match_suite(cfg,candidate,baseline,pairs,seconds,SEED_BANKS[split],run/'EVAL_STOP')
             except (EvaluationStopped,KeyboardInterrupt):
                 print('EVALUATION_CANCELLED: weights unchanged; no new complete result written. Any existing wdl.json is from an earlier evaluation.',flush=True)
                 return
             report=dict(kind='triad_selector_timed_matches',candidate_sha256=latest['sha256'],
                 candidate_timesteps=latest['timesteps'],baseline_sha256=initial['sha256'],
                 candidate=match_summary(rows),initial=match_summary(old),statistics=paired_statistics(rows,old),trials=rows,baseline_trials=old)
+            report['split']=split
+            report['expert_decisions']={label:dict(zip(NAMES,map(int,policy.counts)))
+                for label,policy in (('candidate',candidate),('initial',baseline)) if hasattr(policy,'counts')}
+            archived=evaluation_record(run,cfg,report,split,SEED_BANKS[split],pairs,seconds)
+            print('EVALUATION_ARCHIVE_READY:',archived,flush=True)
             atomic_json(run/'wdl.json',report)
             print(json.dumps({k:v for k,v in report.items() if k not in ('trials','baseline_trials')},indent=2),flush=True)
             print('SELECTOR_WDL_READY:',run/'wdl.json',flush=True)

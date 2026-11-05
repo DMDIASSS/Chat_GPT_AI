@@ -1,4 +1,6 @@
-# NovaForge v1.8.1
+# NovaForge v1.9.0
+
+**Research stages 1–2:** [versioned objectives, isolated experiments and evaluation archives](RESEARCH_v1.9.md). No new reward winner is claimed.
 
 **Evaluation fix:** [thread limit, immediate launcher output and per-game progress](EVALUATION_HOTFIX_v1.8.1.md).
 

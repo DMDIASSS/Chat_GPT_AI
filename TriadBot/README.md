@@ -1,8 +1,10 @@
-# TriadBot v1.1.1
+# TriadBot v1.2.0
 
-**Launcher 7 fix:** update sibling NovaForge to v1.8.1 as well. Evaluation now limits Torch to one thread and prints loading phases, every game, running progress and the final wdl.json path. Its default is 32 games. Ctrl+C cancels without editing weights.
+**Research tools:** update sibling NovaForge to v1.9.0. Launchers 10/11/12 save a checkpoint backup, evaluate on a separate validation seed bank, and create a shareable research report. Evaluations retain the exact tested actors and full optimizer checkpoint; repeated use of a seed bank is recorded. See novaforge/RESEARCH_v1.9.md.
 
-Update the sibling NovaForge to v1.8.1 first. Your working v1.0 export can remain installed while you prepare a new one; each export has a distinct agent ID. This is a 1v1 experiment with exact pinned Chronos, GalactusV2 and Ripple v1.1 models.
+**Launcher 7 fix:** included in NovaForge v1.9.0. Evaluation now limits Torch to one thread and prints loading phases, every game, running progress and the final wdl.json path. Its default is 32 games. Ctrl+C cancels without editing weights.
+
+Update the sibling NovaForge to v1.9.0 first. Your working v1.0 export can remain installed while you prepare a new one; each export has a distinct agent ID. This is a 1v1 experiment with exact pinned Chronos, GalactusV2 and Ripple v1.1 models.
 
 A fixed car uses Breakout by default. Random exports also include an Octane variant. It cannot switch its hitbox when a different expert is chosen.
 
@@ -18,6 +20,9 @@ A fixed car uses Breakout by default. Random exports also include an Octane vari
 | 7 | Compare latest selector vs initialization with W/D/L; pause first |
 | 8 | Pause selector training |
 | 9 | Show selector status |
+| 10 | Save a complete checkpoint backup; pause first |
+| 11 | Validation W/D/L on a separate seed bank: 64 games total; pause first |
+| 12 | Shareable research report ZIP without weights/logs; pause first |
 
 The learned selector chooses a frozen expert and holds it for about half a second. Initially it chooses Chronos; no trained winning selector is bundled. Training updates only the selector, not the experts. Automatic W/D/L checks and fresh confirmation protect its deployment champion and stop substantial regression. Until promotion, launcher 6 exports initial Chronos-only routing. Watch 5 to see actual training progress.
 

@@ -39,10 +39,15 @@ class ChronosSnapshot(GigaTeacher):
 
 class ChronosArena(ArenaEnv):
     """Goal reward plus discount-consistent potential shaping; no flat touch farming."""
+    def __init__(self,*args,**kwargs):
+        from .objectives import objective
+        self.objective=objective(args[0] if args else kwargs['config'])
+        super().__init__(*args,**kwargs)
+
     def potential(self,state):
         direction=1 if self.team==0 else -1
         distance=min(float(np.linalg.norm(state.ball.position-state.cars[self.agent].physics.position)),12000.)
-        return .35*direction*float(state.ball.position[1])/5120-.1*distance/6000
+        return self.objective['field']*direction*float(state.ball.position[1])/5120-self.objective['distance']*distance/6000
 
     def _reward(self,old,new,outcome,terminated):
         if self.cfg.get('chronos',{}).get('reward_profile')=='potential_goal_v2':
@@ -108,7 +113,7 @@ class ChronosEnv(gym.Env):
             if terminated or truncated:break
         self.held=planned.copy()
         if self.arena.cfg.get('chronos',{}).get('reward_profile')=='potential_goal_v2':
-            parts={'goal':10.*info.get('outcome',0)}
+            parts={'goal':self.arena.objective['goal']*info.get('outcome',0)}
             if self.arena.cfg['rewards']!='sparse':
                 parts['potential']=(self.arena.cfg['ppo']['gamma']*(0. if terminated else self.arena.potential(self.arena.state))
                                     -initial_potential)

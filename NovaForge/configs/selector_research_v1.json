@@ -1,0 +1,18 @@
+{
+  "schema": "novaforge-selector-research-plan-v1",
+  "status": "protocol only; no strength improvement established",
+  "hypothesis": "Removing car-ball distance shaping may reduce chasing without improving scoring; test rather than assume.",
+  "source": "The same paused selector checkpoint, backed up before forks",
+  "variants": {"control": "current", "no_distance": "field_only", "sparse": "goals_only"},
+  "pilot_new_decisions_per_variant": 32768,
+  "training_seeds": [271, 811, 1601],
+  "evaluation": {
+    "pilot": {"split": "development", "pairs": 2, "seconds": 60},
+    "confirmation": {"split": "validation", "pairs": 8, "seconds": 60},
+    "final": {"split": "test", "pairs": 8, "seconds": 60},
+    "metric": "Paired signed W/D/L across Chronos, GalactusV2, Nexto and Ripple v1.1, both colors",
+    "secondary": ["goals_for", "goals_against", "per_opponent_outcomes", "expert_decisions"]
+  },
+  "decision": "Advance only if promising on development; validate with fresh seeds and independent training seeds. Final test only after selection is fixed. No automatic main-bot replacement.",
+  "limits": ["Development seeds have already been inspected.", "Native demolition respawns can add unseeded randomness.", "A fork retains the source critic and optimizer; its value function needs adaptation.", "A short pilot rejects obvious failures but cannot establish long-run strength."]
+}

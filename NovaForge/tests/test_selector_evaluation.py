@@ -14,7 +14,7 @@ def make_run(tmp_path,monkeypatch):
  from nova.core import ROOT
  run=tmp_path/'selector01';run.mkdir()
  cfg=load_config(ROOT/'configs/chronos.json');atomic_json(run/'config.json',cfg)
- for name,step in [('latest.pt',32768),('initial.pt',0)]:
+ for name,step in [('latest.pt',32768),('initial.pt',0),('champion.pt',0)]:
   p=run/name;p.write_bytes(name.encode());write_model_meta(p,contract=CONTRACT,timesteps=step,hitbox='breakout')
  monkeypatch.setattr(selector,'RUNS',tmp_path)
  def runner(*args):
