@@ -6,15 +6,28 @@ root=Path(__file__).resolve().parents[1]/'novaforge'
 if not root.exists():root=Path(__file__).resolve().parents[1]/'NovaForge'
 sys.path.insert(0,str(root))
 if __name__=='__main__':
-    parser=argparse.ArgumentParser(description='TriadBot three frozen experts')
-    parser.add_argument('command',choices=['check','watch','export','league','selector-train','selector-pause','selector-status','selector-evaluate','selector-diagnose','research-backup','research-fork','research-report'])
+    parser=argparse.ArgumentParser(description='TriadBot frozen experts, Fusion selection and isolated four-way training')
+    parser.add_argument('command',choices=['check','watch','export','league','selector-train','selector-pause','selector-status','selector-evaluate','selector-diagnose','research-backup','research-fork','research-report','fusion-select','fusion-refine-prepare','fusion-refine-train','fusion-refine-pause','selector-four-create'])
     parser.add_argument('--selector',default=None);parser.add_argument('--run',default='selector01');parser.add_argument('--source',default='selector01')
     parser.add_argument('--objective',choices=['current','field_only','goals_only'],default='current');parser.add_argument('--seed',type=int,default=271)
     parser.add_argument('--split',choices=['development','validation','test'],default='development')
     parser.add_argument('--skip-body-check',action='store_true')
+    parser.add_argument('--fusion-run',default='all');parser.add_argument('--refinement',default='fusion_refine01');parser.add_argument('--direct',action='store_true')
+    parser.add_argument('--max-candidates',type=int,default=12);parser.add_argument('--confirmation-pairs',type=int,default=2);parser.add_argument('--confirmation-seconds',type=float,default=60)
     parser.add_argument('--steps',type=int,default=32768);parser.add_argument('--once',action='store_true');parser.add_argument('--wandb',choices=['online','offline','off'],default='online');parser.add_argument('--pairs',type=int,default=2);parser.add_argument('--seconds',type=float,default=60);args=parser.parse_args()
     from nova import triad
-    if args.command.startswith('research-'):
+    if args.command in ('fusion-select','fusion-refine-prepare','fusion-refine-train','fusion-refine-pause','selector-four-create'):
+        from nova import fusion_selection as fusion
+        if args.command=='fusion-select':fusion.select_best(args.fusion_run,args.pairs,args.seconds,args.confirmation_pairs,args.confirmation_seconds,args.max_candidates)
+        elif args.command=='fusion-refine-prepare':fusion.prepare_refinement(args.refinement)
+        elif args.command=='fusion-refine-train':fusion.train_refinement(args.refinement,args.wandb)
+        elif args.command=='fusion-refine-pause':
+            from nova.core import ROOT
+            run=(ROOT/'runs'/args.refinement).resolve()
+            if run.parent!=(ROOT/'runs').resolve() or not (run/'config.json').exists():raise ValueError('No valid refinement run')
+            (run/'STOP').touch();print('Fusion refinement stop requested')
+        else:fusion.create_four(args.run,args.refinement,args.direct)
+    elif args.command.startswith('research-'):
         from nova import research
         if args.command=='research-backup':research.backup(args.run)
         elif args.command=='research-report':research.report(args.run)

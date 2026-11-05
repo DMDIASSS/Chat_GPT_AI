@@ -162,7 +162,8 @@ class ChronosCallback(BaseCallback):
         if replace and step==0:raise ValueError('Never replace the permanent initialization')
         suffix='_guard_'+uuid.uuid4().hex[:6] if replace else ''
         actor=self.run/'snapshots'/f'step_{step:012d}{suffix}.lt'
-        if replace or not complete_generation(full):save_ppo(self.model,full,contract=CHRONOS_CONTRACT,initialization='pretrained_chronos_anchored_ppo')
+        if replace or not complete_generation(full):save_ppo(self.model,full,contract=CHRONOS_CONTRACT,
+            initialization='selected_fusion_anchored_ppo' if self.cfg.get('fusion_refinement') else 'pretrained_chronos_anchored_ppo')
         check_model(full,CHRONOS_CONTRACT)
         if not complete_generation(actor):export_chronos_actor(self.model,actor)
         check_model(actor,CHRONOS_CONTRACT)
@@ -270,7 +271,7 @@ def train_chronos(args):
             callback.persist(force=True,replace=migrated and model.num_timesteps>0)
             from .chronos_guard import ensure_champion,check_progress,EvaluationStopped
             ensure_champion(run)
-            print('Chronos weights loaded directly. Eight-tick masked PPO; frozen opponents and snapshot self-play.',flush=True)
+            print(('Selected Fusion weights loaded.' if cfg.get('fusion_refinement') else 'Chronos weights loaded directly.')+' Eight-tick masked PPO; frozen opponents and snapshot self-play.',flush=True)
             try:
                 if source and not (run/'guard_state.json').exists() and model.num_timesteps>0:
                     callback.status('evaluating')

@@ -34,8 +34,10 @@ def ensure_champion(run):
         select_checkpoint(run);return
     initial=run/'checkpoints/step_000000000000.zip'
     meta=check_model(initial,CHRONOS_CONTRACT)
+    cfg=json.loads((run/'config.json').read_text()) if (run/'config.json').exists() else {}
+    origin='Selected trained Fusion initialization' if cfg.get('fusion_refinement') else 'Unchanged Chronos initialization'
     atomic_json(run/'champion.json',dict(path=str(initial.relative_to(run)),timesteps=0,
-        sha256=meta['sha256'],reason='Unchanged Chronos initialization; no unverified promotion'))
+        sha256=meta['sha256'],reason=origin+'; no unverified promotion'))
 
 
 def paired_statistics(rows,baseline):

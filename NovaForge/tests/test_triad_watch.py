@@ -43,7 +43,7 @@ def test_selector_watch_resolves_relative_model_before_changing_directory(tmp_pa
     from nova.core import write_model_meta
     from nova.triad_selector import CONTRACT
     path=entry/'runs/selector01/latest.pt';path.parent.mkdir(parents=True);path.write_bytes(b'fixture')
-    write_model_meta(path,contract=CONTRACT,timesteps=512)
+    write_model_meta(path,contract=CONTRACT,timesteps=512,hitbox='breakout')
     seen=[]
     def clock(selector_path,body):
         seen.append((selector_path,Path.cwd()))

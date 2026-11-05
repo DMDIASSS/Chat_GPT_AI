@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from filelock import FileLock,Timeout
 from .core import atomic_json,check_model,sha256
-from .triad_selector import Runner,Gate,NAMES,CONTRACT
+from .triad_selector import Runner,Gate,NAMES,selector_meta,teacher_pool
 from .chronos_league import play_match,match_summary
 from .chronos_guard import paired_statistics,EvaluationStopped
 from .research import run_path,provenance,stamp,LIMITS
@@ -20,16 +20,17 @@ REFERENCE_BODIES=dict(chronos='breakout',galactus='octane',ripple='octane')
 SEED=331000001
 
 
-def probabilities(logits):
+def probabilities(logits,n=3):
     x=np.asarray(logits,dtype=np.float64)
-    if x.shape!=(3,) or not np.isfinite(x).all():raise ValueError('Invalid diagnostic selector logits')
+    if x.shape!=(n,) or not np.isfinite(x).all():raise ValueError('Invalid diagnostic selector logits')
     p=np.exp(x-x.max());return p/p.sum()
 
 
 class ChoiceStats:
-    def __init__(self):
-        self.count=0;self.total=np.zeros(3);self.square=np.zeros(3)
-        self.low=np.ones(3);self.high=np.zeros(3);self.greedy=np.zeros(3,dtype=int)
+    def __init__(self,names=NAMES):
+        self.names=tuple(names);n=len(names)
+        self.count=0;self.total=np.zeros(n);self.square=np.zeros(n)
+        self.low=np.ones(n);self.high=np.zeros(n);self.greedy=np.zeros(n,dtype=int)
         self.entropy=0.;self.margins=[];self.margin_total=0.;self.kl=0.
     def add(self,p,reference):
         self.count+=1;self.total+=p;self.square+=p*p;self.low=np.minimum(self.low,p);self.high=np.maximum(self.high,p)
@@ -41,28 +42,29 @@ class ChoiceStats:
     def summary(self):
         if not self.count:return dict(free_choices=0)
         mean=self.total/self.count;std=np.sqrt(np.maximum(self.square/self.count-mean*mean,0))
-        return dict(free_choices=self.count,probability_mean=dict(zip(NAMES,map(float,mean))),
-            probability_std=dict(zip(NAMES,map(float,std))),probability_min=dict(zip(NAMES,map(float,self.low))),
-            probability_max=dict(zip(NAMES,map(float,self.high))),greedy_choices=dict(zip(NAMES,map(int,self.greedy))),
+        return dict(free_choices=self.count,probability_mean=dict(zip(self.names,map(float,mean))),
+            probability_std=dict(zip(self.names,map(float,std))),probability_min=dict(zip(self.names,map(float,self.low))),
+            probability_max=dict(zip(self.names,map(float,self.high))),greedy_choices=dict(zip(self.names,map(int,self.greedy))),
             mean_entropy_nats=self.entropy/self.count,mean_top_two_margin=self.margin_total/self.count,
             top_two_margin_percentiles_first_4096=dict(zip(('p10','p50','p90'),map(float,np.percentile(self.margins,[10,50,90])))),
             mean_kl_to_initial=self.kl/self.count)
 
 
 class Audit:
-    def __init__(self,reference):
-        self.reference=reference;self.latest=ChoiceStats();self.initial=ChoiceStats();self.by_opponent={}
+    def __init__(self,reference,names=NAMES):
+        self.names=tuple(names);self.n=len(names)
+        self.reference=reference;self.latest=ChoiceStats(names);self.initial=ChoiceStats(names);self.by_opponent={}
         self.forced_decisions=0
     def observe(self,gate,features,opponent):
         if gate.context.remaining:
             self.forced_decisions+=1;return
         obs=gate.context.observation(features)
-        if not np.all(obs[-3:]==1):raise ValueError('A free choice must allow all three experts')
+        if not np.all(obs[-self.n:]==1):raise ValueError('A free choice must allow every expert')
         x=torch.from_numpy(obs)[None,:]
         with torch.inference_mode():
-            p=probabilities(gate.network(x)[0].numpy());q=probabilities(self.reference(x)[0].numpy())
+            p=probabilities(gate.network(x)[0].numpy(),self.n);q=probabilities(self.reference(x)[0].numpy(),self.n)
         self.latest.add(p,q);self.initial.add(q,q)
-        if opponent not in self.by_opponent:self.by_opponent[opponent]=ChoiceStats()
+        if opponent not in self.by_opponent:self.by_opponent[opponent]=ChoiceStats(self.names)
         self.by_opponent[opponent].add(p,q)
     def summary(self):
         return dict(latest=self.latest.summary(),initial_on_same_latest_visited_contexts=self.initial.summary(),
@@ -72,14 +74,14 @@ class Audit:
 
 class DiagnosticRunner(Runner):
     def __init__(self,path,body,initial):
-        super().__init__(path,body);self.audit=Audit(Gate(initial,body).network)
+        super().__init__(path,body);self.audit=Audit(Gate(initial,body).network,self.gate.names)
     def world_controls(self,obs):
         self.audit.observe(self.gate,obs[:225],self.env.arena.opponent_label)
         return super().world_controls(obs)
 
 
 class FixedExpert:
-    def __init__(self,teacher,name):self.teacher=teacher;self.index=NAMES.index(name)
+    def __init__(self,teacher,name):self.teacher=teacher;self.index=tuple(getattr(teacher,'names',NAMES)).index(name)
     def bind(self,env):
         self.env=env;self.teacher.reset(env.arena.state,env.arena.agent,np.random.default_rng(271))
     def world_controls(self,obs):
@@ -87,9 +89,9 @@ class FixedExpert:
         return self.teacher.proposals(env.arena.state,env.previous,obs[:225],env.mirror)[self.index]
 
 
-def conditions(body,body_check=True):
+def conditions(body,body_check=True,names=NAMES):
     cells=[dict(label='selector_latest',body=body,expert=None)]
-    cells += [dict(label='fixed_'+n,body=body,expert=n) for n in NAMES]
+    cells += [dict(label='fixed_'+n,body=body,expert=n) for n in names]
     if body_check:
         cells += [dict(label=n+'_reference_body',body=REFERENCE_BODIES[n],expert=n)
                   for n in NAMES if body!=REFERENCE_BODIES[n]]
@@ -121,7 +123,7 @@ def benchmark(cfg,cells,policies,pairs,seconds,stop_path):
 
 def protected_hashes(run):
     names=['config.json','experiment.json','guard.json','status.json','STOP']
-    names += [n+s for n in ('full.zip','latest.pt','initial.pt','champion.pt') for s in ('','.json')]
+    names += [n+s for n in ('full.zip','latest.pt','initial.pt','champion.pt','frozen_fusion.pt') for s in ('','.json')]
     return {n:sha256(run/n) if (run/n).is_file() else None for n in names}
 
 
@@ -136,13 +138,13 @@ def diagnose(run_name='selector01',pairs=1,seconds=30,body_check=True):
             before=protected_hashes(run);started=time.monotonic()
             try:
                 cfg=load_config(run/'config.json');body=cfg['env'].get('learner_hitbox','breakout')
-                latest=check_model(run/'latest.pt',CONTRACT);initial=check_model(run/'initial.pt',CONTRACT)
+                latest=selector_meta(run/'latest.pt');initial=selector_meta(run/'initial.pt')
                 print(f'Checkpoint: {latest["timesteps"]} decisions; {latest["sha256"]}',flush=True)
                 print('LOADING 1/2: latest selector, initial probability reference and three experts',flush=True)
                 candidate=DiagnosticRunner(run/'latest.pt',body,run/'initial.pt')
                 print('LOADING 2/2: shared fixed-expert benchmark controllers',flush=True)
-                from .chronos_fusion import TeacherFusion
-                teacher=TeacherFusion();cells=conditions(body,body_check);policies={'selector_latest':candidate}
+                gate=getattr(candidate,'gate',None);names=getattr(gate,'names',NAMES)
+                teacher=teacher_pool(getattr(gate,'fusion_path',None));cells=conditions(body,body_check,names);policies={'selector_latest':candidate}
                 policies.update({c['label']:FixedExpert(teacher,c['expert']) for c in cells if c['expert'] is not None})
                 stop=run/'DIAGNOSTIC_STOP';stop.unlink(missing_ok=True)
                 rows=benchmark(cfg,cells,policies,pairs,seconds,stop)
@@ -154,7 +156,7 @@ def diagnose(run_name='selector01',pairs=1,seconds=30,body_check=True):
                     for c in cells if c['body']!=body}
                 report=dict(kind='selector_diagnostics_v1',candidate_sha256=latest['sha256'],candidate_timesteps=latest['timesteps'],
                     initial_sha256=initial['sha256'],conditions=cells,opponents=list(OPPONENTS),pairs=pairs,seconds=seconds,seed_start=SEED,
-                    free_choice_probabilities=candidate.audit.summary(),latest_expert_decisions=dict(zip(NAMES,map(int,candidate.counts))),
+                    free_choice_probabilities=candidate.audit.summary(),latest_expert_decisions=dict(zip(names,map(int,candidate.counts))),
                     summaries=summaries,paired_vs_fixed_chronos_same_body=same_body,reference_body_effects=body_effects,
                     trials=rows,provenance=provenance(cfg),wall_seconds=time.monotonic()-started,
                     limitations=LIMITS+' Exploratory short matches from kickoffs; not a promotion test. All expert conditions use the common 8-tick/7+1-delay adapter and Ripple held-queue approximation. Body comparisons intentionally change physics and do not validate native timing or full transfer fidelity.')

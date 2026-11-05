@@ -52,6 +52,11 @@ jobs:
         run: python tests/check_research.py
       - name: Actual read-only selector probabilities and fixed-expert diagnostics
         run: python tests/check_selector_diagnostics.py
+      - name: Selected Fusion refinement and four-expert selector integration
+        run: |
+          python tests/check_four_experts.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector_four/latest.pt
       - name: Isolated RLBot v4 export and official class importer
         run: |
           python -m pip install --target .v4sdk rlbot==1.68.0 "setuptools<81"

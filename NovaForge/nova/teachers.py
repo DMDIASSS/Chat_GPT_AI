@@ -13,7 +13,7 @@ from .core import ROOT, TICK_SKIP, ACTIONS, as_v1, observe, sha256, atomic_json
 from .models import FrozenActor
 
 ASSETS=ROOT/'assets'
-BUILTIN_BOTS=('scripted','scorer')
+BUILTIN_BOTS=('scripted','scorer','demochaser')
 FROZEN_BOTS=('nexto','ripple','chronos','galactus')
 BOT_NAMES=BUILTIN_BOTS+FROZEN_BOTS
 
@@ -110,6 +110,20 @@ class Scripted:
             car.on_ground and distance<320 and state.ball.position[2]>160 and self.counter%8<3,
             abs(angle)<.2 and distance>700 and car.boost_amount>0,
             abs(angle)>1.5],dtype=np.float32)
+        return self.previous.copy()
+
+
+class DemoChaser(Scripted):
+    """Original scripted stress opponent; not a port of the Adversity bot."""
+    def act(self,state):
+        own=state.cars[self.agent]
+        enemies=[c for c in state.cars.values() if c.team_num!=own.team_num]
+        target=min(enemies,key=lambda c:np.linalg.norm(c.physics.position-own.physics.position))
+        delta=target.physics.position+.2*target.physics.linear_velocity-own.physics.position
+        angle=np.arctan2(np.dot(delta,own.physics.right),np.dot(delta,own.physics.forward))
+        distance=float(np.linalg.norm(delta));steer=float(np.clip(angle*3,-1,1))
+        self.previous=np.array([1,steer,0,steer,0,False,
+            abs(angle)<.35 and distance>400 and own.boost_amount>0,abs(angle)>1.3],dtype=np.float32)
         return self.previous.copy()
 
 
@@ -222,7 +236,7 @@ class Ripple:
 
 
 def make_opponent(name,path=None):
-    factories={'scripted':Scripted,'scorer':Scorer,'nexto':Nexto,'ripple':Ripple}
+    factories={'scripted':Scripted,'scorer':Scorer,'demochaser':DemoChaser,'nexto':Nexto,'ripple':Ripple}
     if name=='snapshot': return Snapshot(path)
     if name=='chronos_snapshot':
         from .chronos import ChronosSnapshot

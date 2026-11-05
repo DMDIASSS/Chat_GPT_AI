@@ -70,7 +70,8 @@ class EpisodeWindow:
         keys={k for r in rows for k in r['reward_parts']}
         for key in keys:
             result[f'rewards/{key}_mean']=sum(r['reward_parts'].get(key,0.) for r in rows)/len(rows)
-        counts={name:sum(r.get('selector_counts',{}).get(name,0) for r in rows) for name in ('chronos','galactus','ripple')}
+        names=('chronos','galactus','ripple')+(('fusion',) if any('fusion' in r.get('selector_counts',{}) for r in rows) else ())
+        counts={name:sum(r.get('selector_counts',{}).get(name,0) for r in rows) for name in names}
         total=sum(counts.values())
         if total:
             result.update({f'selector/{name}_fraction':value/total for name,value in counts.items()})

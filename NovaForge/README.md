@@ -1,4 +1,8 @@
-# NovaForge v1.9.1
+# NovaForge v1.10.0
+
+**Selected/refined Fusion as fourth expert:** [new isolated workflow and launchers 14–24](FOUR_EXPERTS_v1.10.md). [Candidate/2v2 roadmap](EXPERT_AND_TEAM_PLAN_v1.10.md).
+
+**Telemetry correction:** [actual learned-selector probabilities](SELECTOR_TELEMETRY_v1.10.md). Existing three-way checkpoints remain compatible.
 
 **Selector diagnostics and Triad watch fix:** [launcher 13, probability audit and fixed-expert/body checks](DIAGNOSTICS_v1.9.1.md).
 

@@ -75,18 +75,23 @@ def session(run,cfg,step):
 
 def bundle(run,parent):
     """Called under the run lock. Commit a complete verified backup atomically."""
-    from .triad_selector import CONTRACT
+    from .triad_selector import selector_meta,fusion_asset
     run=Path(run);parent=Path(parent);parent.mkdir(parents=True,exist_ok=True)
     stage=parent/('.incomplete_'+stamp());stage.mkdir()
     try:
         files=[]
         for name in ('full.zip','latest.pt','initial.pt','champion.pt'):
             if name=='full.zip' and not (run/name).exists():continue
-            check_model(run/name,CONTRACT)
+            meta=selector_meta(run/name)
+            files.extend((name,name+'.json'))
+        meta=selector_meta(run/'latest.pt')
+        if 'fusion_teacher' in meta:
+            actor=fusion_asset(run,meta['fusion_teacher']);name=actor.relative_to(run.resolve()).as_posix()
             files.extend((name,name+'.json'))
         files+=['config.json']
-        files += [n for n in ('experiment.json','guard.json','status.json','fork.json') if (run/n).exists()]
-        for name in files:shutil.copy2(run/name,stage/name)
+        files += [n for n in ('experiment.json','guard.json','status.json','fork.json','fusion_selection.json','fusion_refinement.json') if (run/n).exists()]
+        for name in files:
+            (stage/name).parent.mkdir(parents=True,exist_ok=True);shutil.copy2(run/name,stage/name)
         record=dict(schema='novaforge-checkpoint-bundle-v1',files={n:sha256(stage/n) for n in files})
         atomic_json(stage/'bundle.json',record)
         destination=parent/stamp();stage.rename(destination)
@@ -106,7 +111,7 @@ def backup(name='selector01'):
 
 def fork(source,name,objective_name='current',seed=271):
     """Clone a saved optimizer and latest actor into an isolated ablation run."""
-    from .triad_selector import CONTRACT
+    from .triad_selector import selector_meta,fusion_asset
     src=run_path(source);dst=run_path(name)
     if objective_name not in REGISTRY:raise ValueError('Unknown registered objective')
     if not 0<=seed<2**32:raise ValueError('Seed must be in 0..4294967295')
@@ -114,7 +119,7 @@ def fork(source,name,objective_name='current',seed=271):
     if not src.is_dir():raise FileNotFoundError('Source selector run is missing')
     with FileLock(str(src/'train.lock'),timeout=0):
         if dst.exists():raise ValueError('Destination run already exists')
-        full=check_model(src/'full.zip',CONTRACT);actor=check_model(src/'latest.pt',CONTRACT)
+        full=selector_meta(src/'full.zip');actor=selector_meta(src/'latest.pt')
         if full['timesteps']!=actor['timesteps']:raise ValueError('Full checkpoint and latest actor are from different steps')
         cfg=json.loads((src/'config.json').read_text());cfg['objective']=dict(REGISTRY[objective_name]);cfg['selector_seed']=int(seed)
         cfg['env'].setdefault('learner_hitbox','breakout')
@@ -127,6 +132,12 @@ def fork(source,name,objective_name='current',seed=271):
                 for suffix in ('','.json'):shutil.copy2(src/(n+suffix),stage/(n+suffix))
             for n in ('initial.pt','champion.pt'):
                 for suffix in ('','.json'):shutil.copy2(src/('latest.pt'+suffix),stage/(n+suffix))
+            if 'fusion_teacher' in actor:
+                frozen=fusion_asset(src,actor['fusion_teacher']);name=frozen.relative_to(src).as_posix()
+                (stage/name).parent.mkdir(parents=True,exist_ok=True)
+                shutil.copy2(frozen,stage/name);shutil.copy2(str(frozen)+'.json',str(stage/name)+'.json')
+                for extra in ('fusion_selection.json','fusion_refinement.json'):
+                    if (src/extra).exists():shutil.copy2(src/extra,stage/extra)
             atomic_json(stage/'config.json',cfg)
             atomic_json(stage/'guard.json',dict(step=full['timesteps'],checks=0,regressions=0,decision='retain'))
             atomic_json(stage/'fork.json',dict(source_run=src.name,source_actor_sha256=actor['sha256'],
@@ -141,9 +152,9 @@ def fork(source,name,objective_name='current',seed=271):
 
 def evaluation_record(run,cfg,report,split,seed,pairs,seconds):
     """Keep tested weights and complete results; wdl.json stays a convenience copy."""
-    from .triad_selector import CONTRACT
+    from .triad_selector import selector_meta
     run=Path(run);info=provenance(cfg)
-    latest=check_model(run/'latest.pt',CONTRACT);initial=check_model(run/'initial.pt',CONTRACT)
+    latest=selector_meta(run/'latest.pt');initial=selector_meta(run/'initial.pt')
     if (report['candidate_sha256']!=latest['sha256'] or report['baseline_sha256']!=initial['sha256'] or
         report['candidate_timesteps']!=latest['timesteps']):raise ValueError('Report does not identify the saved tested checkpoints')
     out=bundle(run,run/'evaluations')
@@ -165,7 +176,7 @@ def report(name='selector01'):
     run=run_path(name);out=run.parent.parent/'reports'/f'{name}_research_{stamp()}.zip';out.parent.mkdir(parents=True,exist_ok=True)
     with FileLock(str(run/'train.lock'),timeout=0):
         with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
-            for n in ('guard.json','wdl.json'):
+            for n in ('guard.json','wdl.json','fusion_selection.json','fusion_refinement.json','frozen_fusion.pt.json'):
                 if (run/n).exists():z.write(run/n,n)
             if (run/'status.json').exists():
                 d=json.loads((run/'status.json').read_text());z.writestr('status.json',json.dumps({k:d[k] for k in ('state','timesteps','halt_reason','metrics','guard') if k in d},indent=2))

@@ -1,0 +1,76 @@
+{
+  "schema": "novaforge-bot-candidate-audit-v1",
+  "inspected_client_date": "2026-11-06",
+  "purpose": "Candidate/source audit, not an installed opponent registry or strength ranking",
+  "selection_policy": "Start with four validated experts, assess a fifth by conditional gameplay improvement and latency. Use a larger verified opponent pool; do not assume top individual WDL gives the best ensemble.",
+  "candidates": [
+    {
+      "name": "Rain",
+      "repository": "https://github.com/Reiud-Ad/RainStream.git",
+      "commit": "6a9cbb0473526ec2338cbf8c13fc384dd5abbb76",
+      "source": "https://github.com/Reiud-Ad/RainStream/tree/6a9cbb0473526ec2338cbf8c13fc384dd5abbb76",
+      "observations": "Author documents 231 observations, tick skip 6, delay 5, separate checkpoints for 1v1/2v2/3v3. Common 8-tick Chronos execution is not native Rain timing.",
+      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "license_review": "Review model/source terms before redistribution; public files alone are not a new model-license grant"
+    },
+    {
+      "name": "Megabyte / Kilobyte",
+      "repository": "https://github.com/SubparN0va/ByteBotpack.git",
+      "commit": "c13cf55f3a6e302e05c3b2099fe2b2681165fed8",
+      "source": "https://github.com/SubparN0va/ByteBotpack/tree/c13cf55f3a6e302e05c3b2099fe2b2681165fed8",
+      "observations": "Author documents Megabyte full-strength and Kilobyte difficulty profiles, 1v1/2v2/3v3 and shared RLBot LibTorch runtime.",
+      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "license_review": "Review model/source terms before redistribution; public files alone are not a new model-license grant"
+    },
+    {
+      "name": "Dice",
+      "repository": "https://github.com/V1XT1/Dice-BotPackV5.git",
+      "commit": "a3b9bd6b57c50ef0a50493a0e390eae6142bfa40",
+      "source": "https://github.com/V1XT1/Dice-BotPackV5/tree/a3b9bd6b57c50ef0a50493a0e390eae6142bfa40",
+      "observations": "GGLBot C++ submission with POLICY.lt and SHARED_HEAD.lt. Needs its own observation/action/timing port and parity tests.",
+      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "license_review": "Review model/source terms before redistribution; public files alone are not a new model-license grant"
+    },
+    {
+      "name": "Kira",
+      "repository": "https://github.com/stepkrav06/Kira.git",
+      "commit": "ba73b0557c4fa47b0408d09a5dd6b55059c59f58",
+      "source": "https://github.com/stepkrav06/Kira/tree/ba73b0557c4fa47b0408d09a5dd6b55059c59f58",
+      "observations": "GGLBot C++ submission with POLICY.lt and SHARED_HEAD.lt. Needs its own observation/action/timing port and parity tests.",
+      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "license_review": "Review model/source terms before redistribution; public files alone are not a new model-license grant"
+    },
+    {
+      "name": "Ducky",
+      "repository": "https://github.com/bccessnadev/RLBot-Ducky.git",
+      "commit": "b785bb6088927f8117c45924d372bba57eb0ed70",
+      "source": "https://github.com/bccessnadev/RLBot-Ducky/tree/b785bb6088927f8117c45924d372bba57eb0ed70",
+      "observations": "RocketForge C++ inference submission, POLICY.lt and team batching. Full training/physics adapter compatibility is not established.",
+      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "license_review": "Review model/source terms before redistribution; public files alone are not a new model-license grant"
+    },
+    {
+      "name": "Wisp v2",
+      "repository": "https://github.com/NicEastvillage/RLBot-Wisp-v2-py.git",
+      "commit": "58d4ab18fd0c92529b5ae6582ecf1713a6b1887a",
+      "source": "https://github.com/NicEastvillage/RLBot-Wisp-v2-py/tree/58d4ab18fd0c92529b5ae6582ecf1713a6b1887a",
+      "observations": "Author documents 1v1/2v2/3v3. Python observation/action code and backend/rocketsim_adapter.py are present. Requires validated integration.",
+      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "license_review": "Author states MIT with a Rocket League terms-of-service exception; retain original notices."
+    },
+    {
+      "name": "Willo 24k",
+      "repository": "https://github.com/NicEastvillage/RLBot-Willo-24k.git",
+      "commit": "342c8976d1e7768a7c3778bcbc84e5344edcd858",
+      "source": "https://github.com/NicEastvillage/RLBot-Willo-24k/tree/342c8976d1e7768a7c3778bcbc84e5344edcd858",
+      "observations": "Author describes a 24k-parameter bot primarily for 3v3. Python observation/action code and backend/rocketsim_adapter.py are present. Not ranked as a 1v1 substitute.",
+      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "license_review": "Author states MIT with a Rocket League terms-of-service exception; retain original notices."
+    }
+  ],
+  "adversity": {
+    "status": "Not identified by this name in the linked botpack listing during this audit",
+    "implemented_alternative": "Original scripted demochaser stress opponent, not a port of Adversity; 5% in new four-expert/refinement configs"
+  },
+  "team_status": "Current adapters/export guards are 1v1. Hivemind process batching is not learned team coordination. 2v2 requires explicit teammate/opponent observation parity and a separate coordinator experiment."
+}

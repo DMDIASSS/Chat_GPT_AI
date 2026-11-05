@@ -1,4 +1,6 @@
-# TriadBot v1.2.1
+# TriadBot v1.3.0
+
+**New in v1.3.0:** install sibling NovaForge v1.10.0. Launchers 14–24 select a tested Fusion, refine a copy for a bounded budget, then create/train/watch/diagnose/export a separate four-expert selector04. Original selector01 remains available. See novaforge/FOUR_EXPERTS_v1.10.md. Learned watch logs now show actual actor probabilities. This release remains 1v1.
 
 **New in v1.2.1:** launcher 13 runs read-only selector diagnostics and writes its own report ZIP. Update sibling NovaForge to v1.9.1 too. Watch 1/5 now run from the prepared viewer directory, fixing the second-project RLViser launch path.
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 
 
-def write_launchers(stage,python,agent_id,body='breakout',learned=False):
+def write_launchers(stage,python,agent_id,body='breakout',learned=False,fusion=False):
     stage=Path(stage)
     variants=[('',body)] if learned else [('',body),('.octane','octane')]
     for suffix,hitbox in variants:
@@ -19,12 +19,12 @@ def write_launchers(stage,python,agent_id,body='breakout',learned=False):
             # Local exports work immediately; portable variants use their own venv.
             win='"'+('.venv\\Scripts\\python.exe' if portable else str(python))+'" run_triad.py --body '+hitbox
             linux='"'+('.venv/bin/python' if portable else str(python))+'" run_triad.py --body '+hitbox
-            text='[settings]\nname = '+json.dumps('TriadBot '+('learned selector' if learned else 'random experts')+' '+hitbox+(' portable' if portable else ''))+'\n'
+            text='[settings]\nname = '+json.dumps('TriadBot '+('four-expert Fusion selector' if fusion else ('learned selector' if learned else 'random experts'))+' '+hitbox+(' portable' if portable else ''))+'\n'
             text+='agent_id = '+json.dumps(agent_id+suffix+('.portable' if portable else ''))+'\n'
             text+='run_command = '+json.dumps(win)+'\nrun_command_linux = '+json.dumps(linux)+'\n'
             text+='loadout_file = '+json.dumps(loadout)+'\nhivemind = true\n\n[details]\n'
             text+='developer = "NovaForge user; original models credited under assets"\n'
-            text+='description = "Chronos + GalactusV2 + Ripple v1.1. Fixed body; three frozen experts."\nlanguage = "python"\ntags = ["1v1"]\n'
+            text+='description = '+json.dumps('Chronos + GalactusV2 + Ripple v1.1'+(' + frozen local Fusion.' if fusion else '.')+' Fixed body; '+('four' if fusion else 'three')+' frozen experts.')+'\nlanguage = "python"\ntags = ["1v1"]\n'
             (stage/name).write_text(text)
 
 
@@ -41,7 +41,7 @@ def main(agent_id,body='breakout'):
         selector=ROOT/'selector.pt' if (ROOT/'selector.pt').exists() else None
         if args.diagnose:
             clock=TriadClock(selector_path=selector,body=args.body)
-            log.info('TRIAD_DIAGNOSE_PASS: Chronos / GalactusV2 / Ripple v1.1 loaded; selector=%s',bool(clock.gate));return
+            log.info('TRIAD_DIAGNOSE_PASS: experts=%s; selector=%s',clock.names,bool(clock.gate));return
         run_live(agent_id,selector,args.body)
     except BaseException:
         log.exception('TRIAD_START_FAILED');raise

@@ -1,18 +1,17 @@
-# Selector diagnostics and watch fix: NovaForge v1.9.1 / TriadBot v1.2.1
+# NovaForge v1.10 / TriadBot v1.3: selected/refined Fusion as a fourth expert
 
-[Download the combined source update ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-Triad-diagnostics-v1.9.1.zip)
+[Download the full combined source ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-Triad-four-experts-v1.10.0.zip)
 
-Adds 13_DIAGNOSE_SELECTOR.bat: free-choice selector probabilities, fixed Chronos/GalactusV2/Ripple comparisons through the common adapter, and optional reference-body checks. The default Breakout run has 48 short games (30 simulated seconds each), then prints DIAGNOSTIC_REPORT_READY with a shareable ZIP. The diagnostic does not train, change checkpoint files or promote a champion. Launcher 12 also includes the most recent diagnostic.
+Adds an isolated workflow: compare available saved Fusion students with fresh confirmation, refine a copy toward 131072 new decisions with self-play and a regression guard, then freeze the retained champion for a separate four-choice selector04. Original selector01/fusion01 runs are preserved. Corrects learned watch/runtime probability logs; those previously showed the unused random scheduler's probabilities.
 
-Fixes Triad watch launchers 1 and 5: RLViser was prepared in novaforge while the native sender looked in the current triadbot folder. The watch wrapper now resolves selector paths before running from novaforge, restores the original directory on exit/error, and explains busy viewer sessions. Watch launchers print immediately and run unbuffered. Native graphical viewer behavior still needs testing on your PC.
+Pause old training, wait for saving, and stop watch consoles. Copy chat_gpt_ai/novaforge and chat_gpt_ai/triadbot from the ZIP into the existing Chat_GPT_AI, replacing program files. Keep .venv/assets/runs/exports. No dependency reinstall or model reset.
 
-Pause with 8 and wait for saving. Copy the ZIP's chat_gpt_ai/novaforge and chat_gpt_ai/triadbot into your existing Chat_GPT_AI, replacing program files. Keep .venv/assets/runs/exports. Close old watch consoles with Ctrl+C and close RLViser. No dependency reinstall or training reset is needed. Run 13 and send its ZIP; retry 1 for random Triad or 5 for the learned selector.
+In triadbot: 14 compares saved Fusion candidates; 15 prepares isolated refinement; 16 runs/resumes bounded refinement; 17 creates the four-expert run; 18 trains it. 19 pauses, 20 watches latest, 21 diagnoses, 22 exports champion, 23 reports, and 24 pauses refinement. The initial four-way champion routes to Chronos until a student earns promotion.
 
-[Detailed diagnostic/watch instructions](NovaForge/DIAGNOSTICS_v1.9.1.md) · [Research plan](NovaForge/RESEARCH_v1.9.md) · [Validation](NovaForge/VALIDATION.md)
+[Full workflow and limitations](NovaForge/FOUR_EXPERTS_v1.10.md) · [Candidate audit and 2v2 roadmap](NovaForge/EXPERT_AND_TEAM_PLAN_v1.10.md) · [Corrected learned telemetry](NovaForge/SELECTOR_TELEMETRY_v1.10.md) · [Validation](NovaForge/VALIDATION.md)
 
-Individual source packages:
+The working runtime remains 1v1. Extra bot sources are audited, not silently installed as unverified headless policies. The new original scripted demochaser is a small stress opponent, not a port of Adversity. These changes do not prove a stronger bot.
 
-- [NovaForge v1.9.1](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.9.1.zip)
-- [TriadBot v1.2.1](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/TriadBot-v1.2.1.zip)
+Individual source ZIPs: [NovaForge v1.10.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.10.0.zip) and [TriadBot v1.3.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/TriadBot-v1.3.0.zip).
 
-Source only: no models, private reports or user run data. Published on codex/novaforge-v1; main remains unchanged. The measurements are exploratory and do not establish an improved bot or native timing parity.
+Source only: no weights or private reports. Personal model exports bundle locally downloaded/frozen teachers with matching metadata and notices. Published on codex/novaforge-v1; main is unchanged.
