@@ -1,21 +1,18 @@
-# NovaForge v1.8.0 and TriadBot v1.1 downloads
+# Evaluation hotfix: NovaForge v1.8.1 / TriadBot v1.1.1
 
-[Download NovaForge v1.8.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.8.0.zip)
+[Download the combined evaluation-fix ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-Triad-eval-fix-v1.8.1.zip)
 
-[Download TriadBot v1.1.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/TriadBot-v1.1.0.zip)
+Fixes blank/slow manual selector evaluation: the missing one-thread Torch setting is applied before model loading, launcher 7 prints immediately and runs unbuffered, and every game has visible start/score output plus running progress about every five wall-clock seconds during play. Training-lock errors explain how to pause. Cancellation preserves weights and earlier complete results; completed reports identify the tested checkpoint.
 
-Extract into the parent of chat_gpt_ai, copying contents over the existing novaforge and triadbot folders and replacing source files. Keep environments, assets and runs. Stop running training/viewers before updating. Existing Chronos weights and numbered launchers are preserved.
+Close the old evaluation console with Ctrl+C. Pause selector training with 8 and wait for it to finish saving. Inside the ZIP's chat_gpt_ai folder, copy novaforge and triadbot into the existing Chat_GPT_AI folder and replace program files. Keep .venv/assets/runs. Run 7_EVALUATE_SELECTOR.bat again. Its default is 32 games; allow all games to finish. Output: triadbot/runs/selector01/wdl.json. No reset, retraining or dependency reinstall is needed.
 
-TriadBot's reported v5 startup issue was a missing INSTALL step, confirmed by the user. New local exports need no second installation: their primary TOML uses the existing Python environment. Portable exports still use INSTALL.bat and bot.portable.bot.toml. Startup.log and DIAGNOSE.bat provide startup diagnostics. Generated exports specify fixed Breakout/Octane loadouts.
+[Detailed hotfix and short pipeline check](NovaForge/EVALUATION_HOTFIX_v1.8.1.md) · [Triad selector/body guide](NovaForge/TRIAD_SELECTOR_v1.1.md) · [Validation](NovaForge/VALIDATION.md)
 
-[Triad selector, hitboxes and export instructions](NovaForge/TRIAD_SELECTOR_v1.1.md) · [TriadBot launchers](TriadBot/README.md)
+Individual source packages are also available:
 
-The new Opti-inspired 1v1 PPO selector chooses among frozen Chronos, GalactusV2 and Ripple v1.1, committing for eight decisions (~0.53 seconds). It trains only the selector and preserves each expert's native control values. No Opti code or pretrained selector is bundled. Ripple queue/common timing remains an adaptation limit.
+- [NovaForge v1.8.1](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.8.1.zip)
+- [TriadBot v1.1.1](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/TriadBot-v1.1.1.zip)
 
-Triad launchers: 0 check; 1 random watch; 2 random export; 3 random W/D/L; 4 selector training/resume; 5 latest selector watch; 6 champion selector export; 7 selector W/D/L; 8 pause selector; 9 status. The initial champion routes to Chronos until a candidate passes automatic comparisons and fresh confirmation. Substantial regression stops training. These safeguards do not guarantee stronger play.
+[Main training and model exports](NovaForge/FINISH_AND_FUSION.md) · [Triad launchers](TriadBot/README.md) · [Attribution](NovaForge/THIRD_PARTY.md)
 
-Chronos uses Breakout in its pinned loadout. New runs use Breakout; older saved runs without an explicit body preserve Octane. Frozen Chronos opponents use Breakout, and GalactusV2/Ripple opponents use Octane. A live car cannot change its hitbox whenever the chosen controller changes.
-
-[Main training, self-play and both model export formats](NovaForge/FINISH_AND_FUSION.md) · [Validation](NovaForge/VALIDATION.md) · [Attribution](NovaForge/THIRD_PARTY.md)
-
-Source ZIPs contain no weights. Local exports bundle downloaded models and notices; no new license rights over those originals are implied. Native GigaLearn speed and improved live-match strength are not claimed. Published on codex/novaforge-v1; main remains unchanged.
+Source packages contain no model weights or user run data. Published on codex/novaforge-v1; main remains unchanged. The update changes evaluation execution/progress, not learned weights or match rules.

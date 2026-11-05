@@ -109,8 +109,9 @@ class SelectorEnv(Env):
 
 class Runner:
     def __init__(self,path,body):
+        self.gate=Gate(path,body)
         from .chronos_fusion import TeacherFusion
-        self.teacher=TeacherFusion();self.gate=Gate(path,body)
+        self.teacher=TeacherFusion()
     def bind(self,env):
         self.env=env;self.gate.reset()
         self.teacher.reset(env.arena.state,env.arena.agent,np.random.default_rng(271))
@@ -216,11 +217,34 @@ def check_progress(run,cfg,model,checks):
 
 def evaluate(run_name='selector01',pairs=2,seconds=60):
     from .chronos_league import match_suite,match_summary
-    from .chronos_guard import paired_statistics
+    from .chronos_guard import paired_statistics,EvaluationStopped
+    from filelock import Timeout
+    if pairs<=0 or not np.isfinite(seconds) or seconds<=0:raise ValueError('Positive pairs and seconds are required')
+    torch.set_num_threads(1)
+    print(f'SELECTOR_EVALUATION_START: Torch threads={torch.get_num_threads()}, games={4*pairs*2*2}, duration={seconds:g}s simulated/game',flush=True)
     run=(RUNS/run_name).resolve()
     if run.parent!=RUNS.resolve():raise ValueError('Invalid run name')
-    with FileLock(str(run/'train.lock'),timeout=0):
-        cfg=load_config(run/'config.json');body=cfg['env']['learner_hitbox']
-        rows,old=match_suite(cfg,Runner(run/'latest.pt',body),Runner(run/'initial.pt',body),pairs,seconds,29100001,run/'EVAL_STOP')
-        report=dict(candidate=match_summary(rows),initial=match_summary(old),statistics=paired_statistics(rows,old),trials=rows,baseline_trials=old)
-        atomic_json(run/'wdl.json',report);print(json.dumps({k:v for k,v in report.items() if k not in ('trials','baseline_trials')},indent=2))
+    if not (run/'config.json').exists():raise FileNotFoundError('No selector run. Start launcher 4 and save a checkpoint first.')
+    try:
+        with FileLock(str(run/'train.lock'),timeout=0):
+            cfg=load_config(run/'config.json');body=cfg['env']['learner_hitbox']
+            latest=check_model(run/'latest.pt',CONTRACT);initial=check_model(run/'initial.pt',CONTRACT)
+            print(f'Latest selector: {latest["timesteps"]} decisions, SHA256 {latest["sha256"]}',flush=True)
+            print('LOADING 1/2: latest selector and Chronos / GalactusV2 / Ripple v1.1',flush=True)
+            candidate=Runner(run/'latest.pt',body)
+            print('LOADING 2/2: initialization and frozen experts',flush=True)
+            baseline=Runner(run/'initial.pt',body)
+            (run/'EVAL_STOP').unlink(missing_ok=True)
+            try:
+                rows,old=match_suite(cfg,candidate,baseline,pairs,seconds,29100001,run/'EVAL_STOP')
+            except (EvaluationStopped,KeyboardInterrupt):
+                print('EVALUATION_CANCELLED: weights unchanged; no new complete result written. Any existing wdl.json is from an earlier evaluation.',flush=True)
+                return
+            report=dict(kind='triad_selector_timed_matches',candidate_sha256=latest['sha256'],
+                candidate_timesteps=latest['timesteps'],baseline_sha256=initial['sha256'],
+                candidate=match_summary(rows),initial=match_summary(old),statistics=paired_statistics(rows,old),trials=rows,baseline_trials=old)
+            atomic_json(run/'wdl.json',report)
+            print(json.dumps({k:v for k,v in report.items() if k not in ('trials','baseline_trials')},indent=2),flush=True)
+            print('SELECTOR_WDL_READY:',run/'wdl.json',flush=True)
+    except Timeout as error:
+        raise RuntimeError('Selector training is still using this run. Pause with launcher 8, wait for training to exit, then run 7.') from error

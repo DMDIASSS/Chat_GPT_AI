@@ -1,6 +1,8 @@
-# TriadBot v1.1
+# TriadBot v1.1.1
 
-Update the sibling NovaForge to v1.8.0 first. Your working v1.0 export can remain installed while you prepare a new one; each export has a distinct agent ID. This is a 1v1 experiment with exact pinned Chronos, GalactusV2 and Ripple v1.1 models.
+**Launcher 7 fix:** update sibling NovaForge to v1.8.1 as well. Evaluation now limits Torch to one thread and prints loading phases, every game, running progress and the final wdl.json path. Its default is 32 games. Ctrl+C cancels without editing weights.
+
+Update the sibling NovaForge to v1.8.1 first. Your working v1.0 export can remain installed while you prepare a new one; each export has a distinct agent ID. This is a 1v1 experiment with exact pinned Chronos, GalactusV2 and Ripple v1.1 models.
 
 A fixed car uses Breakout by default. Random exports also include an Octane variant. It cannot switch its hitbox when a different expert is chosen.
 

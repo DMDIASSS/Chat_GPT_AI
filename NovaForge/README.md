@@ -1,4 +1,6 @@
-# NovaForge v1.8.0
+# NovaForge v1.8.1
+
+**Evaluation fix:** [thread limit, immediate launcher output and per-game progress](EVALUATION_HOTFIX_v1.8.1.md).
 
 **TriadBot v1.1:** [learned options selector, exact model pins, fixed body settings and immediate local v5 exports](TRIAD_SELECTOR_v1.1.md). Existing Chronos runs and launchers remain available.
 

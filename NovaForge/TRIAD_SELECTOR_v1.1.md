@@ -1,3 +1,5 @@
+**Evaluation fix:** [v1.8.1 thread limit and visible game progress](EVALUATION_HOTFIX_v1.8.1.md).
+
 # TriadBot v1.1: an options selector, body settings and simpler v5 exports
 
 The missing INSTALL step explained the reported v1.0 startup failure; the user confirmed TriadBot works after installation. New **local** exports use the exporting Python environment immediately, so adding bot.bot.toml no longer requires creating another venv. On another PC, run INSTALL.bat and use bot.portable.bot.toml. Startup information/errors go to startup.log; DIAGNOSE.bat verifies the models without a game.
