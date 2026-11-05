@@ -1,10 +1,16 @@
 @echo off
+setlocal
 cd /d "%~dp0"
-"..\novaforge\.venv\Scripts\python.exe" run.py watch --selector runs/selector01/latest.pt
+echo TRIAD WATCH - latest learned selector.
+echo RLViser is found in Chat_GPT_AI or NovaForge and opens on the first frame.
+echo Stop other watch consoles with Ctrl+C first.
+set OMP_NUM_THREADS=1
+set MKL_NUM_THREADS=1
+"..\novaforge\.venv\Scripts\python.exe" -u run.py watch --selector runs/selector01/latest.pt
 if errorlevel 1 goto failed
 pause
 exit /b 0
 :failed
-echo SELECTOR_COMMAND_FAILED - keep this output.
+echo TRIAD_WATCH_FAILED - keep the error above. Close other viewer sessions and retry.
 pause
 exit /b 1

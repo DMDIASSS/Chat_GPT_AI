@@ -1,6 +1,8 @@
-# TriadBot v1.2.0
+# TriadBot v1.2.1
 
-**Research tools:** update sibling NovaForge to v1.9.0. Launchers 10/11/12 save a checkpoint backup, evaluate on a separate validation seed bank, and create a shareable research report. Evaluations retain the exact tested actors and full optimizer checkpoint; repeated use of a seed bank is recorded. See novaforge/RESEARCH_v1.9.md.
+**New in v1.2.1:** launcher 13 runs read-only selector diagnostics and writes its own report ZIP. Update sibling NovaForge to v1.9.1 too. Watch 1/5 now run from the prepared viewer directory, fixing the second-project RLViser launch path.
+
+**Research tools:** update sibling NovaForge to v1.9.1. Launchers 10/11/12 save a checkpoint backup, evaluate on a separate validation seed bank, and create a shareable research report. Evaluations retain the exact tested actors and full optimizer checkpoint; repeated use of a seed bank is recorded. See novaforge/RESEARCH_v1.9.md.
 
 **Launcher 7 fix:** included in NovaForge v1.9.0. Evaluation now limits Torch to one thread and prints loading phases, every game, running progress and the final wdl.json path. Its default is 32 games. Ctrl+C cancels without editing weights.
 
@@ -23,6 +25,7 @@ A fixed car uses Breakout by default. Random exports also include an Octane vari
 | 10 | Save a complete checkpoint backup; pause first |
 | 11 | Validation W/D/L on a separate seed bank: 64 games total; pause first |
 | 12 | Shareable research report ZIP without weights/logs; pause first |
+| 13 | Free-choice probabilities and fixed-expert/body diagnostics; pause first |
 
 The learned selector chooses a frozen expert and holds it for about half a second. Initially it chooses Chronos; no trained winning selector is bundled. Training updates only the selector, not the experts. Automatic W/D/L checks and fresh confirmation protect its deployment champion and stop substantial regression. Until promotion, launcher 6 exports initial Chronos-only routing. Watch 5 to see actual training progress.
 

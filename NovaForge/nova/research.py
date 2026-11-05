@@ -174,6 +174,11 @@ def report(name='selector01'):
                 d=json.loads(p.read_text());d.pop('files',None)
                 z.writestr('evaluations/'+p.parent.name+'/evaluation.json',json.dumps(d,indent=2))
                 z.write(p.parent/'wdl.json','evaluations/'+p.parent.name+'/wdl.json')
+            pointer=run/'diagnostics/latest.json'
+            if pointer.exists():
+                target=(run/json.loads(pointer.read_text())['path']/'diagnostic.json').resolve()
+                if not target.is_relative_to((run/'diagnostics').resolve()):raise ValueError('Diagnostic report path escapes its run')
+                z.write(target,'latest_diagnostic.json')
             z.writestr('limits.txt',LIMITS)
     print('RESEARCH_REPORT_READY:',out,flush=True)
     return out

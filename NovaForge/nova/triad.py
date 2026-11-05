@@ -135,11 +135,27 @@ def check():
 
 
 def watch(selector_path=None):
+    from contextlib import chdir
+    from filelock import Timeout
+    if selector_path is not None:
+        from .triad_selector import resolve
+        selector_path=resolve(selector_path).resolve()
+    try:
+        # rlviser-py spawns ./rlviser.exe and reads settings.txt from cwd.
+        # The second project's launchers start in the sibling triadbot folder.
+        with chdir(ROOT):_watch_in_project(selector_path)
+    except Timeout as error:
+        raise RuntimeError('A NovaForge/Triad viewer session is already running. Stop its watch console with Ctrl+C, close RLViser, then retry.') from error
+
+
+def _watch_in_project(selector_path=None):
     from filelock import FileLock
     from .viewer import prepare_viewer,learner_first_state
     from .training import load_config
     from .environment import ArenaEnv
     from .teachers import fetch_teachers
+    print('TRIAD_WATCH_START:', 'latest learned selector' if selector_path else 'random expert selection',flush=True)
+    print('Viewer working directory:',ROOT,flush=True)
     fetch_teachers(['chronos','galactus','ripple']);torch.set_num_threads(1)
     lock=ROOT/'work/rlviser-watch.lock';lock.parent.mkdir(parents=True,exist_ok=True)
     with FileLock(str(lock),timeout=0):
@@ -150,6 +166,7 @@ def watch(selector_path=None):
         if selector_path is not None:policy.clock=TriadClock(selector_path=selector_path,body=cfg['env'].get('learner_hitbox','breakout'))
         try:
             env.reset(seed=271);policy.reset(env.state,env.agent,np.random.default_rng(271))
+            print('RLViser opens on the first frame. Follow car 1 is Triad; opponent is Chronos. Ctrl+C stops viewing.',flush=True)
             while True:
                 start=time.monotonic();_,_,term,trunc,_=env.step_controls(policy.controls_for_ticks(env.state))
                 renderer.render(learner_first_state(env.state,env.agent),{})

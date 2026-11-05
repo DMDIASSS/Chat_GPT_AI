@@ -1,4 +1,6 @@
-# NovaForge v1.9.0
+# NovaForge v1.9.1
+
+**Selector diagnostics and Triad watch fix:** [launcher 13, probability audit and fixed-expert/body checks](DIAGNOSTICS_v1.9.1.md).
 
 **Research stages 1–2:** [versioned objectives, isolated experiments and evaluation archives](RESEARCH_v1.9.md). No new reward winner is claimed.
 
