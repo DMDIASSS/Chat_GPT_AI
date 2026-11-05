@@ -49,18 +49,18 @@ def model_meta(path):
     return Path(str(path) + '.json')
 
 
-def check_model(path):
+def check_model(path,contract=CONTRACT):
     path = Path(path).resolve()
     meta = json.loads(model_meta(path).read_text(encoding='utf8'))
-    if meta.get('contract') != CONTRACT:
+    if meta.get('contract') != contract:
         raise ValueError(f'Incompatible model contract: {path}')
     if meta.get('sha256') != sha256(path):
         raise ValueError(f'Model hash mismatch: {path}')
     return meta
 
 
-def write_model_meta(path, **details):
-    atomic_json(model_meta(path), dict(contract=CONTRACT, sha256=sha256(path), **details))
+def write_model_meta(path, contract=CONTRACT, **details):
+    atomic_json(model_meta(path), dict(contract=contract, sha256=sha256(path), **details))
 
 
 def nearest_action(controls):

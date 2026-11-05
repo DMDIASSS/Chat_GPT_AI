@@ -1,0 +1,14 @@
+{
+  "workers": 2, "device": "auto", "threads": 1, "seed": 631031,
+  "rewards": "shaped",
+  "env": {"episode_seconds": 30, "no_touch_seconds": 12, "replay_bank": null},
+  "ppo": {"learning_rate": 0.00001, "n_steps": 512, "batch_size": 256,
+    "n_epochs": 2, "gamma": 0.990025, "gae_lambda": 0.95, "clip_range": 0.1,
+    "ent_coef": 0.001, "target_kl": 0.02},
+  "chronos": {"reward_profile": "potential_goal_v1", "actor_lr": 0.00001, "critic_lr": 0.0003, "anchor_coef": 0.1,
+    "critic_warmup_updates": 2, "checkpoints_keep": 3},
+  "league": {"snapshot_every": 32768, "history_size": 6,
+    "weights": {"chronos": 0.2, "galactus": 0.15, "ripple": 0.1, "nexto": 0.1, "latest": 0.25, "history": 0.2}},
+  "curriculum": {"adaptive": false, "weights": {"kickoff": 0.3, "shot": 0.2,
+    "defense": 0.2, "dribble": 0.1, "recovery": 0.1, "aerial": 0.05, "wall": 0.05}}
+}

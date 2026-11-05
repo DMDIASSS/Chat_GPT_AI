@@ -99,7 +99,6 @@ def build_features(state,agent,previous,rng,kind,predictions=None,opponent_slot=
 
 
 def _load_sequence(path,widths,input_size,activation,output=None):
-    archive=torch.jit.load(str(path),map_location='cpu')
     layers=[]
     size=input_size
     for width in widths:
@@ -107,7 +106,9 @@ def _load_sequence(path,widths,input_size,activation,output=None):
         size=width
     if output is not None: layers.append(nn.Linear(size,output))
     seq=nn.Sequential(*layers)
-    seq.load_state_dict(dict(archive.named_parameters()),strict=True)
+    if path is not None:
+        archive=torch.jit.load(str(path),map_location='cpu')
+        seq.load_state_dict(dict(archive.named_parameters()),strict=True)
     seq.requires_grad_(False)
     return seq.eval()
 
@@ -120,8 +121,8 @@ class GigaNetwork(nn.Module):
         elif kind=='galactus':
             first=258;shared=[1024,1024];policy=[1024]*4;act=nn.LeakyReLU
         else: raise ValueError(kind)
-        self.head=_load_sequence(path/'SHARED_HEAD.lt',shared,first,act)
-        self.policy=_load_sequence(path/'POLICY.lt',policy,shared[-1],act,90)
+        self.head=_load_sequence(path/'SHARED_HEAD.lt' if path is not None else None,shared,first,act)
+        self.policy=_load_sequence(path/'POLICY.lt' if path is not None else None,policy,shared[-1],act,90)
     def forward(self,x):
         return self.policy(self.head(x))
 

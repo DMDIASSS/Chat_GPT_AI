@@ -1,0 +1,2099 @@
+[
+  {
+    "repo": "Rolv-Arild/Necto",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 48015,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "6a16073cfd779bb791c8f857f7b912d0bba4112e84fae1dcce350e4fc7b06903"
+  },
+  {
+    "repo": "Rolv-Arild/replay-pretraining",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 232,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "d5f20c517f0aaaa95edcb33eba112f67e4a4f4e1c399189a81c55d3ceea1c5d3"
+  },
+  {
+    "repo": "Rolv-Arild/rocket-learn",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 4768,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "cb93ac7660b2779362babe1993e1035aaee4be5318fbca38b03bc4bc4c497218"
+  },
+  {
+    "repo": "Rolv-Arild/python-ballchasing",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 138,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a96395b9adeace73b28492a53a50c814b703967b9e41127dd0a5aebc89c343ce"
+  },
+  {
+    "repo": "Rolv-Arild/EARL-pytorch",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 237,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "1c8fdf92a597db879d7ab7377bcb8279b9fc79baa8c13c33702a3c0004289505"
+  },
+  {
+    "repo": "Rolv-Arild/Pearl",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 34141,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "33201f1979d2ee2f271de66ad4db070d59982948fb8334c58063df8497b05749"
+  },
+  {
+    "repo": "Rolv-Arild/metacognition-benchmark",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 158,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "44078b5dc34bb70ea14cd75c7465f3b269e2b405835ea4e3a034680a372abba5"
+  },
+  {
+    "repo": "Rolv-Arild/WILE-E",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 155,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "d8651f7d2536b9737667d443cac7e50fef6f10fe07d62738561fedabec5189f7"
+  },
+  {
+    "repo": "Rolv-Arild/rl-high-level-dataset",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 67,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "350ee909c49b3722e928ad339a75d33bf703641668734adf0469c4f5968caaaf"
+  },
+  {
+    "repo": "Rolv-Arild/replicar",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 5660,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "4d17408f3ada48d6cadb09188a801f9f11732d7b4fd5078767789477de1f3b9c"
+  },
+  {
+    "repo": "Rolv-Arild/nb-internet-curator",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 256,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "d2925a9fcf197ca8546b3db57f0fb413db58474f1f32dec3087fdc05148c77d9"
+  },
+  {
+    "repo": "Rolv-Arild/PathFinder",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 676,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/distil-whisper",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 2660,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "7992c9d03093b1dfb052f7a7392757f66d7ee904bb44ee106f49c00a5f7abdec"
+  },
+  {
+    "repo": "Rolv-Arild/Ripple-RLBot",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 49125,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "e105292f5b8c89db0679468975a44d762c6b33dbd1e61e640a28f52539b3af51"
+  },
+  {
+    "repo": "Rolv-Arild/RLBotPack",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 256552,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "2487d0ec9eb7ac0db257bcd109f808e97f076ebf0c5a3de204b5e29032b1a262"
+  },
+  {
+    "repo": "Rolv-Arild/rust-carball",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 175,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "75733019af092f6ad67cb04fe295c734471a6b72ce1d65d3cf4e22eeda30f87e"
+  },
+  {
+    "repo": "Rolv-Arild/Geiger-Marsden",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 2,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/LeJOS-EV3-Pong",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 7,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/Algdat",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 14,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/Prosjekt-Matte2",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 49,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/core",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 8406,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "9f975a39bf480372a805b14b69c3d285f83f85ca58092b0921874f00b68d96d0"
+  },
+  {
+    "repo": "Rolv-Arild/RLGymStream",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 917,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "bd01f611771ec69733d3ac1cc196a3bc7c1b7d780cd3f748867332c8e266ec17"
+  },
+  {
+    "repo": "Rolv-Arild/datatrove",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 34154,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a6c722e2e1c36665ed3a2ab4206473855b2428eda146c99ad6a7ef45aa602366"
+  },
+  {
+    "repo": "Rolv-Arild/Snek-Old",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 17,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/wiki",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 6481,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8c1732fd1e0256c49f6a4df0a624e4c55169b25a9220bac141841de5d7c18311"
+  },
+  {
+    "repo": "Rolv-Arild/SU2",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 5065,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "b7c56f42df39656b8fac7d085e5e8c68fb4b345b7139ad0ee785767f3d357d68"
+  },
+  {
+    "repo": "Rolv-Arild/RLBotGUI",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 66327,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8c9e5d883d1217e75e354dd5052d6043bebce5acc69c8bfe2089de05193bceb4"
+  },
+  {
+    "repo": "Rolv-Arild/GroundEffect",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 22,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a5cbc807046f046edaedd37a77e8974a5a4bb56446961e527400cf87f17801d3"
+  },
+  {
+    "repo": "Rolv-Arild/gui",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 15343,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3b6c1716749d42590d0a0bc82bd0a4a19deedc9a9ff387bb12a20f4961b6f3a3"
+  },
+  {
+    "repo": "Rolv-Arild/Maskinlaering2",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 22,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/Snek",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 56900,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/rust-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 483,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8df155bc1fdabcc8c7195bf58374dd1b4a4a1752d3e66362f0295ae8cfb100a0"
+  },
+  {
+    "repo": "Rolv-Arild/Oving3",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 7,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/RLGymExampleBot",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 12,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "e740824218025bc7c3f4c1380dbf76c769c14d7a0fb098ea9be9281e45f71690"
+  },
+  {
+    "repo": "Rolv-Arild/rlgym",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 1269,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "9d8efb475e205321aa53ce70372eb92a9ba9ed49144ee14d763954efc4ab33d6"
+  },
+  {
+    "repo": "Rolv-Arild/Botcoin",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 67,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/rlgym-compat",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 121,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "b8ab9560e9c373541b461286bc33000679100a56d21f8d3a4df43eb8c5ee5e5b"
+  },
+  {
+    "repo": "Rolv-Arild/MatteProsjekt",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 80,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "Rolv-Arild/rlgym.github.io",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 6380,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "dadeab07c325d6e213006b1618e5ff0c329e8285b03e1b6177ef432571f576f0"
+  },
+  {
+    "repo": "Rolv-Arild/awesome-deep-rl",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 110,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ecd8605efcb8a7a3796da8fc07021f28b8f238ff7d996ab0ec627cf6b677677d"
+  },
+  {
+    "repo": "Rolv-Arild/Quiz",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 4269,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "RLBot/RLBot",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 77533,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "df2511f4a19aa5e76143a593bfd215f378fc99c4b12378301c7cd87d235ffda1"
+  },
+  {
+    "repo": "RLBot/RLBotPythonExample",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 488,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "69b2a56dabe33453348816e038d4888cca2e7ff6627567d020fe5cd017c61f9c"
+  },
+  {
+    "repo": "RLBot/RLBotPack",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 257857,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "2487d0ec9eb7ac0db257bcd109f808e97f076ebf0c5a3de204b5e29032b1a262"
+  },
+  {
+    "repo": "RLBot/RLBotCSharpExample",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 180,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8947bed03fa71fd5d480ff3acdd8128a3a14cc363e670091945fd45ebc3eaa44"
+  },
+  {
+    "repo": "RLBot/RLBotGUI",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 65837,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8c9e5d883d1217e75e354dd5052d6043bebce5acc69c8bfe2089de05193bceb4"
+  },
+  {
+    "repo": "RLBot/RLBotJavaExample",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 1259,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "fc7ac24541ee005e9a7868b259926653bbe13fa6aff446762c75c7e5e93f0068"
+  },
+  {
+    "repo": "RLBot/rlbot-rust",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 319,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ec75e6df1c236145904e9d3b8ae7d6eb72761482ea3fa461d0699888559c59c9"
+  },
+  {
+    "repo": "RLBot/core",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 8583,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "53a02f24d16c0eb56b1be282ab8e6574b5ca97b16833d2d9c8fe52f59bd15605"
+  },
+  {
+    "repo": "RLBot/RLBotScratchInterface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 4591,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "977ed221950b81cd076ef4f595e6d9f9fc131fe5334fcda26237c6a51ad1049b"
+  },
+  {
+    "repo": "RLBot/EasyRLBotExample",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 31,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "38fa327ac3a4464307baef23216e6eef933026de5bff2429a84eca0c5d593237"
+  },
+  {
+    "repo": "RLBot/EasyRLBot",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 7426,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "e4906dbe4b7978366e3cb626bebfdb479748ab269eec313dab9a2dc5d10b8272"
+  },
+  {
+    "repo": "RLBot/RLBotTraining",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 460,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "162c71b6098720b522d186300f5063e87edda73654f95c4ef18d14a8d1b56e48"
+  },
+  {
+    "repo": "RLBot/gui",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 36575,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "29a4e66da234bca628080fdb68304334c8a774cf49690a0b8563e9e0af1958f2"
+  },
+  {
+    "repo": "RLBot/python-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 3730,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "7d14f908ef01325281948d0ec20aa6ca820f1689a84f670f87984313484b0b53"
+  },
+  {
+    "repo": "RLBot/python-example",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 96,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3c3f3251e85c7409d8cd96a4d68eb8da0c86b3593efae9280a0132482fe71dd5"
+  },
+  {
+    "repo": "RLBot/rlbot.github.io",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 7263,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "RLBot/RLBotTwitchBroker",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 17716,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "2d27371bc1ab292c336de0601ee96a9699f7311117bf1bda45fb74d0fe5b98b4"
+  },
+  {
+    "repo": "RLBot/botpack",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 8841,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "c9be1207b08a980c56fb0d03384e215e86191bcd0117e9d75f11f71663071420"
+  },
+  {
+    "repo": "RLBot/gui-installer",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 67489,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a22d9f80b4bdbe1b8a5f2753bb7933c77a6c2f3d5454c44aea41b1a9fca0a55f"
+  },
+  {
+    "repo": "RLBot/flatbuffers-python",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 865,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "e7651c03e2f838320eb26136a9b80cf219317a9a931a1c9c0b981e8c9f403104"
+  },
+  {
+    "repo": "RLBot/RLBotControllerOverlay",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 2232,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "RLBot/flatbuffers-schema",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 19872,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "3106eb33e4bcbe3485eb8f052dc74af1ea1ab455d58b61e41c31054a91e2a607"
+  },
+  {
+    "repo": "RLBot/flatpak",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 8097,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "de281d2ac7cd7216eaa5506a179c7ce1dc1e389f0de06a50ca2fb12ea3ee81d2"
+  },
+  {
+    "repo": "RLBot/RLBotJavascriptExample",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 2,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "c776c33e5e36fdb805c4b36966e628fd783cf6cceb26ca85e3cf20ac8227e09f"
+  },
+  {
+    "repo": "RLBot/cpp-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 259,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "9a748b197606407de95d73ccd5c9cf5ad8cb45911f25b5a50e7b170323bcf939"
+  },
+  {
+    "repo": "RLBot/csharp-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 327,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ecd40594d85f4bd9891ef7ebd9a3bd05d4733f6179cbd4a45bf6f718ef62d422"
+  },
+  {
+    "repo": "RLBot/launcher",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 2014,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "923f897fc3b3ebf7f6b8a439772fc471d0be9425630ef05091657256c270b0d1"
+  },
+  {
+    "repo": "RLBot/discord-bot",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 107,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "06c67c628ada52bec92a8852ad1e6ded38ab9f010b7f0a6ecea6c230b697eae0"
+  },
+  {
+    "repo": "RLBot/wiki",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 8662,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "07320847b2644c67f120ee9c46116a8b174badf721bb119d2ee1ec9c5e862f0a"
+  },
+  {
+    "repo": "RLBot/rust-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 643,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8df155bc1fdabcc8c7195bf58374dd1b4a4a1752d3e66362f0295ae8cfb100a0"
+  },
+  {
+    "repo": "RLBot/csharp-example",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 9,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "18c8521934d3479e766362d60cac1839f78482b83d6bf785ba7f3396a397a346"
+  },
+  {
+    "repo": "RLBot/scratch-blocks",
+    "branch": "rlbot",
+    "archived": false,
+    "size_kib": 82201,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "d1ada16481760b78aa9a522dc0a182deda38e559d7b8efccd96e8f261bce4c98"
+  },
+  {
+    "repo": "RLBot/java-manager",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 2528,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "RLBot/TrackAndField",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 69,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a326a629f79d55697dc8ab21a3ab25914a31d3868374f325afc01563f7eda10a"
+  },
+  {
+    "repo": "RLBot/java-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 209,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "e64e97f1ef9476479f8ee303bbf6cb8c59bcfe11d15d941991237e8f55098d73"
+  },
+  {
+    "repo": "RLBot/go-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 3889,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "da6cbcc50aeb8a912fdad4b5955803ebdace9db4de452a07540902bebb28839b"
+  },
+  {
+    "repo": "RLBot/csharp-manager",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 58,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "7cb101224864447454d74372153851154e02dd64f00349787b657f8897bb2368"
+  },
+  {
+    "repo": "RLBot/scratch-gui",
+    "branch": "rlbot",
+    "archived": false,
+    "size_kib": 303071,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "dc7fd51a03f451a1d4180252186b5e689041ba0c8faa7d8e0a868657bcb6138b"
+  },
+  {
+    "repo": "RLBot/javascript-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 133,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "639afd5c8adcbbab387e147caab583e4ecf5890955c03c87d9af2929970a8de2"
+  },
+  {
+    "repo": "RLBot/RLBotCastingNotes",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 697,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "aeebc9c26f77fb314a4a3d1b381dea788f2ae430101e4b99b4f71adaecccf7b5"
+  },
+  {
+    "repo": "RLBot/art",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 259141,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3fb392ae8be09aa114886226ac97b295eb45c03a9b67a99a8f73cce24d9ba08a"
+  },
+  {
+    "repo": "RLBot/scratch-vm",
+    "branch": "rlbot",
+    "archived": false,
+    "size_kib": 117535,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3c2f6e81c365f3f680631b50ae8c8f3e9944bac92e8d0e4de94af5ac8398704f"
+  },
+  {
+    "repo": "RLBot/RLBotPythonHivemindExample",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 5,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a993d3b4b4fc0fb7bed461505e88b5a93871f097e31c70d58a978a7f6d0a1ed6"
+  },
+  {
+    "repo": "RLBot/AutoLeaguePlay",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 17044,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "32306447bd0bd37e5f090b7a913915fec57ab8f1d4671a51107686a995911ecd"
+  },
+  {
+    "repo": "SubparN0va/GGLBot",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 698,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "b844a6bac51f51900b47732f945361c52b0d3877a041f83e00ac2dad0bdafa09"
+  },
+  {
+    "repo": "SubparN0va/ByteBotpack",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 48320,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "86e88d49be47b45118052552f7fb05496df8d0ddd6c21a0e91d93174c3b0d452"
+  },
+  {
+    "repo": "SubparN0va/botpack",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 8837,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "c9be1207b08a980c56fb0d03384e215e86191bcd0117e9d75f11f71663071420"
+  },
+  {
+    "repo": "VirxEC/rlviser",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 22808,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "26218d050b0a36cbf4b2f6684cf1b9118dd720613d7b24eec7bee6caa9a71da5"
+  },
+  {
+    "repo": "VirxEC/rocketsim-rs",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 450,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "679da9a5aef1472008631b12b8b07bbabb051c685e99aaf2e3c721b37cb56e06"
+  },
+  {
+    "repo": "VirxEC/rl_ball_sym",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 8923,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "c477dc8cdcfb47ba47af72d5d07f108563cfcc022cb1bd106bf2319ab047a2ab"
+  },
+  {
+    "repo": "VirxEC/VirxERLU",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 457,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "18779fb15a07c146192617e62b1bf5f1d4ee7e26e86bb45def6dd329608d0b39"
+  },
+  {
+    "repo": "VirxEC/dubins_paths",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 266,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "94d60bc396b893c656907a004e98e212b3ccabdf7f5ea1b16b5c76679cbdfddb"
+  },
+  {
+    "repo": "VirxEC/VirxEB",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 1208,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ab93695054d86600ecc31b0ad121e8fd7f8163382a640d4a88894c3d389e75b3"
+  },
+  {
+    "repo": "VirxEC/rlbot_gui_rust",
+    "branch": "master",
+    "archived": true,
+    "size_kib": 50973,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "cd730a1ae74b98db91b77842f8f54f5329dbd7c5c6c9c7be5dea8eca85462486"
+  },
+  {
+    "repo": "VirxEC/rlviser-py",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 129,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "78e98d69e311b3953dd3edb9d3735122d9862e4515df9074a9e1197608277ee1"
+  },
+  {
+    "repo": "VirxEC/rlgymppo_rs",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 2392,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "1657f0b25a8ec542bb0a6b8798b4ceb616f43bccee4b9a6b6db1341b8eb0e50b"
+  },
+  {
+    "repo": "VirxEC/combo_vec",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 111,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "77b04c717608c63ec7d4f92238f494dc942c7e4748222a40344a56988c6b0a7c"
+  },
+  {
+    "repo": "VirxEC/RLBotSim",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 2076,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "662405a12c5b8e47373bbe7af55faf8e0c5bedd5d24e46da330d5edfcc0a4bd0"
+  },
+  {
+    "repo": "VirxEC/rocketsim-oxide",
+    "branch": "master",
+    "archived": true,
+    "size_kib": 803,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "35926c13e98ab16ac5f73f054e2785c7bae4c915bfb3d69c2e97a411b05c6e73"
+  },
+  {
+    "repo": "VirxEC/rlbot425",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 34,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/rl_ball_sym_pybinds",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 422,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "255ce55d031a7898bcd9f5bb644385bc1a1309e72107ca1c74c1b4f4d5e4da4b"
+  },
+  {
+    "repo": "VirxEC/rl_ball_sym_dll",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 34,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/VirxEPH",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 74,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "39e539c8f843285c0fd9e742f4db6abf11fb0a7c91e3848e3b8efea6c4b625a2"
+  },
+  {
+    "repo": "VirxEC/rocketsim-utils",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 547,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "74c857157daac27eb5eb313a679fb8d73d09f5abff0f5a883c99e556aaee6983"
+  },
+  {
+    "repo": "VirxEC/rlgym_rs",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 58,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "3fc20363b0986fba52fd72cfdd6957e72960fe36a9a2dae0cb0aaeb8125fe0ce"
+  },
+  {
+    "repo": "VirxEC/NectoFamily",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 2549,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "f6fa32d8fd53381559753855da4eaa14096636ee154b58dbadad1c01eaef5b30"
+  },
+  {
+    "repo": "VirxEC/rocketsim-py",
+    "branch": "master",
+    "archived": true,
+    "size_kib": 120,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "9cf104e39dd5d7126310d82e2d2cb6fffbafba5b07ad307ebe7cb340291ecaa1"
+  },
+  {
+    "repo": "VirxEC/rlutilities-py",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 8215,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "5b4e0513cbc84cfdfdf132637f966fc4e371b5174175fb47a882c9d314c826c6"
+  },
+  {
+    "repo": "VirxEC/RocketSim",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 116951,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "51008c5e75394aa4d99dd4b51fa163c504749a3f3e3a3c28bd0915c97ab5dd30"
+  },
+  {
+    "repo": "VirxEC/rlviser-rocketsim",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 40,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "b91ef80443c013b74c6ec53620e84f17a635142108f92c4e57b0cb64c5cf6fab"
+  },
+  {
+    "repo": "VirxEC/cse-2600-fproj",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 74038,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/rlbot_smh",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 55,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "cc35c3a6ad1b51c9e0b58d59b4b5964d3fb6bc43a13776f1de7259f88995ab2b"
+  },
+  {
+    "repo": "VirxEC/VirxERLU-RLib",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 518,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "4e674bb79b913d1a7f0e65ba0843759fc1fdb6492c755640263aee55acec9d1d"
+  },
+  {
+    "repo": "VirxEC/RLBotPack",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 256521,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "2487d0ec9eb7ac0db257bcd109f808e97f076ebf0c5a3de204b5e29032b1a262"
+  },
+  {
+    "repo": "VirxEC/rl_arena_collision_dumper",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 36,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "fc5de5619e70a8d0ca71bebd616367727867394006743a20eec6b4dd33d789c2"
+  },
+  {
+    "repo": "VirxEC/Elementv5",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 1650,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "7b1c9abf783f1a0e8bfc4c6838f00a4af75c12193447a781c278b6600770079e"
+  },
+  {
+    "repo": "VirxEC/SuperchargedBots",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 30,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "018c7348b449ce29fd9a3570513724ac6a0af4a34a51a9b959c0aa64241d4195"
+  },
+  {
+    "repo": "VirxEC/virxec.github.io",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 3640,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8e1479eec9c0e312ad03eac76456950106e0249f35b81ec64f9e4fdfe5995e0d"
+  },
+  {
+    "repo": "VirxEC/configparser-rs",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 433,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "5078691e823b1e96410b4c68cac213292a7932c30956806afb31073b90fe958d"
+  },
+  {
+    "repo": "VirxEC/replay-to-rocketsim",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 104,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a554f6eeadf8873833ed4ea69a5eb4f7573948e4adbacc76689c4c6b16ea4cb1"
+  },
+  {
+    "repo": "VirxEC/KickoffOnly",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 35,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "6b26dbaa8f9edeb8fb9e0dc8c0da7a75e4c0cd2a381b84ee245abf9b851b68e4"
+  },
+  {
+    "repo": "VirxEC/rlbot-rocketsim",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 174,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "35a9f96863b10dad0ef4a0196c1f3630a1374f36f04198bf8feb95fb0c3d072a"
+  },
+  {
+    "repo": "VirxEC/python-no-run",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 2,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "166e930211b029630661c468711a44e039db08a0913a151bd673affa5a8969a9"
+  },
+  {
+    "repo": "VirxEC/RLBot-Beast",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 406,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "cb3d400be3d8c54e07cd88dbbb5768f942fab2d25cf04049e79c8e426adb88b2"
+  },
+  {
+    "repo": "VirxEC/directory_tree_generator",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 7,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a7105dad4b289e2e430864289b91334a6698b8d6b509806efeb69b229d3c0adc"
+  },
+  {
+    "repo": "VirxEC/necto_rocketsim",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 657,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "16d1d9453fbce1864e69bcd85dddbae919d45f2cff5791f502617147cf29c284"
+  },
+  {
+    "repo": "VirxEC/rust-ico",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 38,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3dc04db78b7f87848167f97038e1c2860f4690346779a2d9dd3b54711fef2a58"
+  },
+  {
+    "repo": "VirxEC/tokio",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 10994,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "5659d5297f252ea4444b2be765ef82a13775bcd0e5714e89092c7424dbefd2af"
+  },
+  {
+    "repo": "VirxEC/RLGymPPO_CPP",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 1065,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "42b8793034217d7c1b3a7281755f1d4721557b27fb6ba725757383819e2cf871"
+  },
+  {
+    "repo": "VirxEC/bob-diff",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 53,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "5f64bf713601782af53944ed3f6751516090f54b29551d1ef804e30a26a68bde"
+  },
+  {
+    "repo": "VirxEC/boxcars-py",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 16173,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "2087ec13bab124c0e7b5240e6fd1cae964166cd5950f770099afe9f8376a9536"
+  },
+  {
+    "repo": "VirxEC/ProjectTerminal",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 11,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ae2cc8065f933cf451a651d9d403a77a699d07c9da9476c156f393ac3efe4c63"
+  },
+  {
+    "repo": "VirxEC/GoslingUtils",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 80,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/binary_greedy_mesher_demo",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 219,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ac91b48bdcc4aa639fec24285e7490402ec36075b3a6a24dc5159e066ed27375"
+  },
+  {
+    "repo": "VirxEC/get-size",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 44,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "07a8b8e577c40f5c8300c529ec71623ef2b10f3de582401014ce09957bc996c8"
+  },
+  {
+    "repo": "VirxEC/bevy_atmosphere",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 48611,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "512df5f27167ab844f6db2e538e2f3e0adc247562fcb5ae34c1935a4c963555d"
+  },
+  {
+    "repo": "VirxEC/DownToEarth",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 95,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/rocket-learn",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 354,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "493e0364f8017034ced3828abded98e8923734aa8fe3e4188f0c6da1c8085fe5"
+  },
+  {
+    "repo": "VirxEC/Html-Css-Js-Template",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 4,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/VirxEC",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 4,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "53910689d56af34064fc952b56917b54b4326a22012af7879b43a58e60740e18"
+  },
+  {
+    "repo": "VirxEC/bob-example",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 641,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ed00df114d50ce1eccac0cb6873320e7eed31f37a0aa7df707561463b34fbfb4"
+  },
+  {
+    "repo": "VirxEC/bevy_spectator",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 46,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "f97fae1880b3c64ec6f382dac71572af7038e008b537eaa1135171faeb573569"
+  },
+  {
+    "repo": "VirxEC/include-flate",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 1094,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "80e26505ef51b21b8a3a657c186cb8fe820bdd1e39911ad852bb9f28f0c28d8c"
+  },
+  {
+    "repo": "VirxEC/rlgym-ppo",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 120,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "69f12fc0813483750b391fd3720bcaee7aa9a6df96b63dba75a5a4662880568a"
+  },
+  {
+    "repo": "VirxEC/pytorch-archive",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 27,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "14e37b2a4f6397f87f82af0f12cbd658a130f4eb0919afb720d389fabe255c17"
+  },
+  {
+    "repo": "VirxEC/code_3000",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 279,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3cb4699a95472c15df0c06539126d231675ee6b7e6a21217c6253ac72e139e04"
+  },
+  {
+    "repo": "VirxEC/RLBotChoreography",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 55374,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "12f3267aa38c00a59a0b1a0b8c13423cf0c11d89c8f84dd9821178304abc0d5b"
+  },
+  {
+    "repo": "VirxEC/flatbuffers-schema",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 19853,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3106eb33e4bcbe3485eb8f052dc74af1ea1ab455d58b61e41c31054a91e2a607"
+  },
+  {
+    "repo": "VirxEC/rhost-server-rlbot",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 5588,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "bfaee89699b8d2009133df6b5b12b3a09d0dc7781226ae82150396947b52cbc3"
+  },
+  {
+    "repo": "VirxEC/zero-g-script",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 38,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/VirxERLU-CLib",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 11,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "6370fe2a530e5950cfbbde7af3ea70f15c486ddda7086ca646e5531950347d75"
+  },
+  {
+    "repo": "VirxEC/RLUtilities",
+    "branch": "develop",
+    "archived": false,
+    "size_kib": 123879,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "27dccb8315565e36127f50d58ae5d5ffaf054da2a6bb1c0671c89d5c46798bfb"
+  },
+  {
+    "repo": "VirxEC/go-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 3856,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "da6cbcc50aeb8a912fdad4b5955803ebdace9db4de452a07540902bebb28839b"
+  },
+  {
+    "repo": "VirxEC/STAT_4185_Assignment_1",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 5,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "4e9a111123b7673349336c76b207b7513e7edcd0ed4581d2da3e2a21c6a3cca6"
+  },
+  {
+    "repo": "VirxEC/GGLBot",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 634,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "b844a6bac51f51900b47732f945361c52b0d3877a041f83e00ac2dad0bdafa09"
+  },
+  {
+    "repo": "VirxEC/CSWeek",
+    "branch": "master",
+    "archived": true,
+    "size_kib": 346,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "67893630df58a54840ee169f8873fde9416252c96b67bdf79e0c55c741d6344d"
+  },
+  {
+    "repo": "VirxEC/RLBotCastingNotes",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 667,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/stat-final-data",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 12,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "73602f7881cb8b09eb2682ed2c0ee00d3884dd23e7f81d6a267152fce97ac88f"
+  },
+  {
+    "repo": "VirxEC/RLBotGUI",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 60742,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8c9e5d883d1217e75e354dd5052d6043bebce5acc69c8bfe2089de05193bceb4"
+  },
+  {
+    "repo": "VirxEC/rust-field-offset",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 32,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "7affe2265eb804c7f6ce1d9a95b499f4c88d8b902865d7b1f0122ec6163f07b8"
+  },
+  {
+    "repo": "VirxEC/MPFramework",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 44,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3f1fac0bc6ca88d54b35312a0d6c164f7f88a5ccbc7bd0936239cad5d1980824"
+  },
+  {
+    "repo": "VirxEC/kickoff_boi",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 54,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "b655875f40c1f2e88f12b35d0ffdf29dcbc5f9507e03a691e3f80bea6002d93e"
+  },
+  {
+    "repo": "VirxEC/tauri",
+    "branch": "dev",
+    "archived": false,
+    "size_kib": 66681,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "40db127359d24aa1b0baa1ef61117a097c623afc863760a562473685c75be24f"
+  },
+  {
+    "repo": "VirxEC/rocket-league-gym",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 1203,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "f5df9f59047d097cf09bee4b54a859a5bbd5bba5ffd339ca2b7a00201f884199"
+  },
+  {
+    "repo": "VirxEC/rlutilities-rs",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 8260,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "feb2279170dbd29a13a1526d68b77b4d65c51d45345ddd1f4de713220e0de85a"
+  },
+  {
+    "repo": "VirxEC/bevy_framepace",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 383,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "fbc90c7aedce7ca381c5b75a5e959e2c1f0b54f83bd44c8c02fbf04747fbe281"
+  },
+  {
+    "repo": "VirxEC/ImpactServer",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 5489,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "729634111e34709ea3bacce002fa061a523f7a731b0931e18ba227486dc7148b"
+  },
+  {
+    "repo": "VirxEC/rlbot_gui_rs",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 5175,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "55435dd2cd0e3547bf9f3fcaf1024278502d04e4365dd0005b5616ee20954f43"
+  },
+  {
+    "repo": "VirxEC/rlbot-gui",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 32182,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3b6c1716749d42590d0a0bc82bd0a4a19deedc9a9ff387bb12a20f4961b6f3a3"
+  },
+  {
+    "repo": "VirxEC/glam-rs",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 1975,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "7d1a4fa0f07b3f91c03ef6dd0ec14f6488b3b532c147d57641350c42be1fab74"
+  },
+  {
+    "repo": "VirxEC/rlbot.github.io",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 3889,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/rocket-league-gym-sim",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 120,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "3360c6aa524123301b3c081ec2124e19cedddc1dbdd48f0a36167f4de9e8b534"
+  },
+  {
+    "repo": "VirxEC/turn-time-est",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 483,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ef289093d023daab20394d14817c3994dd2ecc896b1123d06fcb357c2d414b55"
+  },
+  {
+    "repo": "VirxEC/RLBotCPP",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 108,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "9a748b197606407de95d73ccd5c9cf5ad8cb45911f25b5a50e7b170323bcf939"
+  },
+  {
+    "repo": "VirxEC/kuchiki",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 11122,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "2600915662f99776522619e7bfa26bcad2f1300cbfd0cce479d7d523590471ec"
+  },
+  {
+    "repo": "VirxEC/python-manager",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 900,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "771f6ab9b8e9bcd85ea62ecb6bf2cbae9142dd5fdbd2b640c0a6c000ae7a9703"
+  },
+  {
+    "repo": "VirxEC/rust-interface",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 452,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8df155bc1fdabcc8c7195bf58374dd1b4a4a1752d3e66362f0295ae8cfb100a0"
+  },
+  {
+    "repo": "VirxEC/zed",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 390546,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "0a1b8417d31d53dfd6b4f1c5cc1a1a6f7ae6d3ac044bdb1938bd49cbd09d8198"
+  },
+  {
+    "repo": "VirxEC/tmcp",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 46,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ec19f984600009600e4d9fbb8a64534ec15631f612e250fa0a3051ff8130e63f"
+  },
+  {
+    "repo": "VirxEC/Anarchy",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 63282,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "d5454c81333b64d4da8016d3fb6abc13021936a9952c1febdd125c35acf1fc45"
+  },
+  {
+    "repo": "VirxEC/bob-base-images",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 15,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "2f0d87417611a2619e2807d2916a7b1940a0b041f1459bb26c238c09c15a468b"
+  },
+  {
+    "repo": "VirxEC/autocxx",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 4108,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "85d3c09d964f2b049030bc348c15871b6bb37e86b734bbadb2d6d087287ab599"
+  },
+  {
+    "repo": "VirxEC/CPQuery",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 27,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/rlgym-compat",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 109,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "b8ab9560e9c373541b461286bc33000679100a56d21f8d3a4df43eb8c5ee5e5b"
+  },
+  {
+    "repo": "VirxEC/rust-embed",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 1271,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "d078d6c22330f396d5a855846f880db5fa0330df006af2c8c3a37bac306d9d01"
+  },
+  {
+    "repo": "VirxEC/rlbot_gui_rust_apt",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 407869,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "VirxEC/boxcars",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 71490,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "14c27b498e1da84f38040606afb2970d8c7c805e365c0a923faddc83ac2817b1"
+  },
+  {
+    "repo": "VirxEC/bob",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 118,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a37acc28f44a6b3de26ce0c80c7fcc8b5c67922a1369cb973d3fa8e329bce5ae"
+  },
+  {
+    "repo": "VirxEC/RLBot",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 108625,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "df2511f4a19aa5e76143a593bfd215f378fc99c4b12378301c7cd87d235ffda1"
+  },
+  {
+    "repo": "VirxEC/guilauncher",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 82389,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ff98ebab2953cfb50ead5668db4fe0fa199e01c2ff0f4d5bf4891291633c9857"
+  },
+  {
+    "repo": "VirxEC/cubecl",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 5315,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "eb18a1e46f98df0059f3353f370d1587065de6f51af62d519e9e600c688f37bc"
+  },
+  {
+    "repo": "ZealanL/RocketSim",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 468737,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "acdfb3ebdf33ccdfe2f46a7b0f9a4da2ebd514b10323acead5f6d9f90e4aa476"
+  },
+  {
+    "repo": "ZealanL/RLGym-PPO-Guide",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 139,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a79cfb56c701e1407fd59813e10a8806640f51f7b485969691134604eff06856"
+  },
+  {
+    "repo": "ZealanL/GigaLearnCPP-Leak",
+    "branch": "main",
+    "archived": true,
+    "size_kib": 1723,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "f8dff803481dfbc102e36592ea56ee85e971be816d7a51841b92c4a9bc82e624"
+  },
+  {
+    "repo": "ZealanL/RLGymPPO_CPP",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 1051,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "42b8793034217d7c1b3a7281755f1d4721557b27fb6ba725757383819e2cf871"
+  },
+  {
+    "repo": "ZealanL/RLArenaCollisionDumper",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 54,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "d94449abcafc9e8ab12ff2674675a903f833c3231b401fab968f9ef49baf7820"
+  },
+  {
+    "repo": "ZealanL/RocketSimVis",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 807,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "9b634d1f6dbae0e5b7ee7edcf599da4c52d58ca6aa3844b8f2f884932fd9a4d1"
+  },
+  {
+    "repo": "ZealanL/RLGym-PPO-RLBot-Example",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 11,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "0e66b658565c9019de6cef496743acb37aef1885b975e27f039c927d74e6ab88"
+  },
+  {
+    "repo": "ZealanL/WhosBottingPlugin",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 758,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "fdd8d4c03ead87a8cd4de65b4c413a7cc888055cbe27965bbdba9b3f3b518a93"
+  },
+  {
+    "repo": "ZealanL/RLBotPack",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 316347,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "2487d0ec9eb7ac0db257bcd109f808e97f076ebf0c5a3de204b5e29032b1a262"
+  },
+  {
+    "repo": "ZealanL/PolicyPlasticity",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 4,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "cffdb5546757f4f115f56bd5f777621bf164db69a3e4303541d8e9c7efc02dda"
+  },
+  {
+    "repo": "ZealanL/IDA_PythonScripts",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 14,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "7770a79f556eb95dbf2ba4544583d497e8dffe58b3dd4a1e2a33e33563940ed1"
+  },
+  {
+    "repo": "ZealanL/RLGymSim_CPP",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 35,
+    "readme_status": "downloaded",
+    "review_depth": "source archive and selected critical files",
+    "readme_sha256": "827b31d6ec25187350d40953d824c0773bb8bbf0fb964d24de6c0d1391bf7c53"
+  },
+  {
+    "repo": "ZealanL/rlgym-ppo",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 156,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "69f12fc0813483750b391fd3720bcaee7aa9a6df96b63dba75a5a4662880568a"
+  },
+  {
+    "repo": "ZealanL/NoteVis",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 991,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8b847a83e114fab6313c6e05c6c8a19eafaf0aeda2822eca4bf9f6fdd79584b8"
+  },
+  {
+    "repo": "ZealanL/ztour",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 561,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "d6c15d2a17d63283545fb35dd4cf2b4e3608d97e5280822e007bc746cd336bd6"
+  },
+  {
+    "repo": "ZealanL/PartyGamesPlugin",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 690,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "ZealanL/RLCarInputSolver",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 33,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "1eaf5cd0ab1a68d5c6d48ad830aa780b60e54026541b3c05cbfb2f4da6c2761f"
+  },
+  {
+    "repo": "ZealanL/ZCAC",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 17021,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "72c99a5c4da3a58c9b89b9b01373095e3736ecbb5f4137d7141e476a94ba74e6"
+  },
+  {
+    "repo": "ZealanL/GridentifyEngine",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 15,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "f0cd3717e30f47fb4c70a5cde340db453631fc5da6eb0d4fcd95973a56202734"
+  },
+  {
+    "repo": "ZealanL/rust-carball",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 127,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "75733019af092f6ad67cb04fe295c734471a6b72ce1d65d3cf4e22eeda30f87e"
+  },
+  {
+    "repo": "ZealanL/BakkesRocketSimPlayer",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 1252,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "e5cdef2497b10d2c443002128a8370d5c9168d4b6a9e87c40645c73acb7bfbfc"
+  },
+  {
+    "repo": "ZealanL/ZNet",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 11,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "51d1a3eb149252a982f00c821e439d6ecd84dcd172a6920ba21d876dc517233f"
+  },
+  {
+    "repo": "ZealanL/RocketSimDocs",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 3307,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ed2f3e110d14beab488e7c84cffa2927bb7ae048284e663b02d448e1ff2cfedd"
+  },
+  {
+    "repo": "ZealanL/cubefight",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 48,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "6f2c93442419a972b02b8e75794e83b0de51b771113f1bc0b7be9d052b549343"
+  },
+  {
+    "repo": "ZealanL/emarPlatform_Operator",
+    "branch": "master",
+    "archived": true,
+    "size_kib": 5767,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "151e09cacc1dad0367e0cf8ca9a675c620ce36175ddef199f0add465ddd29269"
+  },
+  {
+    "repo": "ZealanL/RLGymExampleBot",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 12,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "e740824218025bc7c3f4c1380dbf76c769c14d7a0fb098ea9be9281e45f71690"
+  },
+  {
+    "repo": "ZealanL/CubingNav",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 104,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "ZealanL/ZUI",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 543,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "5af8c6c17c67b4bae9ed3e680c60f9bbed21ca9c19ce8b41bb97c2d62bc14e08"
+  },
+  {
+    "repo": "ZealanL/rocket-league-gym",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 6532,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "aab6edb10dba69b28239157b248e368201c5bb4baf64d7675229ec33df980444"
+  },
+  {
+    "repo": "ZealanL/Chainfall",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 34,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "d9826fbc1271fcd63e93f5d082d1f0d6ec1211a434e29065e60760595e712d3b"
+  },
+  {
+    "repo": "ZealanL/RLUtilities",
+    "branch": "develop",
+    "archived": false,
+    "size_kib": 123831,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "d6531a563e3bdd5849b84f128cb8032b2a3e4696d71aff6b6a5eecf9ccf41aa8"
+  },
+  {
+    "repo": "ZealanL/chrono_task_public",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 43,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "1bfafa225d067e7f75690dd686d53fb66d8b8d7bbe5bca16e6d32d93cfb8a64b"
+  },
+  {
+    "repo": "ZealanL/BoardMouse",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 244,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "c9a3609dd1ff6bc3a5e2044b0371ddbfbbe42382d39e83887326513fc8073bdf"
+  },
+  {
+    "repo": "ZealanL/KBMOverlay",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 561,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a2725683b8c766dd0d33595d8ceeb58db98146badfb344ae65f28f41a30bb5b5"
+  },
+  {
+    "repo": "ZealanL/Stockfish",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 18359,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "ae3ef5c2282400d643c6e923d0b8b8d8fe35cf98762701f0379c79bde16c3a26"
+  },
+  {
+    "repo": "ZealanL/MathEngine",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 46,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "8a893503c2eaaca79a939f7f44a898613e85581e6720f9d531e0b01f5b0c688d"
+  },
+  {
+    "repo": "ZealanL/Connect4Solved",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 44,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "221339481614940319b0e19a9bdfb69021e31a16f52ace81e9fe5a30b3e37fa5"
+  },
+  {
+    "repo": "ZealanL/RLReorientTesting",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 49,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "b99685632c6b1901afb6f4992272895fde3be8f979af9a4aca335353f2efdba1"
+  },
+  {
+    "repo": "ZealanL/chrono_task",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 1645,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "ZealanL/BoardCrab",
+    "branch": "main",
+    "archived": false,
+    "size_kib": 270,
+    "readme_status": "no_root_readme",
+    "review_depth": "catalog only; no root README located",
+    "readme_sha256": null
+  },
+  {
+    "repo": "ZealanL/NeonWave",
+    "branch": "master",
+    "archived": false,
+    "size_kib": 1044,
+    "readme_status": "downloaded",
+    "review_depth": "catalog and root README",
+    "readme_sha256": "a53e41a9beb6f76f0b930df8624154d7196197a43ad05621b3973f42241066a6"
+  }
+]

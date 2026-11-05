@@ -8,8 +8,10 @@ SCENARIOS = ('kickoff','shot','defense','dribble','aerial','recovery','wall')
 
 
 def set_pose(car, position, yaw, velocity=(0,0,0), pitch=0., roll=0., boost=60.):
-    car.physics.position = np.asarray(position, dtype=np.float32)
-    car.physics.linear_velocity = np.asarray(velocity, dtype=np.float32)
+    # Team rotation mutates these arrays. Never alias KickoffMutator's shared
+    # float32 spawn templates (np.asarray alone returns a view of them).
+    car.physics.position = np.array(position, dtype=np.float32, copy=True)
+    car.physics.linear_velocity = np.array(velocity, dtype=np.float32, copy=True)
     car.physics.angular_velocity = np.zeros(3, dtype=np.float32)
     car.physics.euler_angles = np.asarray([pitch,yaw,roll], dtype=np.float32)
     car.on_ground = position[2] < 30 and abs(roll) < .1 and abs(pitch) < .1

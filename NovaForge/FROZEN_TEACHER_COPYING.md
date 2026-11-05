@@ -1,5 +1,8 @@
 # Frozen-teacher copying — v1.5
 
+**Current direction:** [Chronos-initialized PPO](CHRONOS_TRAINING.md) uses launchers 35–42. copy02 remains separate. v1.6 also fixes a kickoff-template mutation; rerun paired screens with the corrected code before using old kickoff results.
+
+
 **v1.5.2:** Existing copy02 users should run launcher **32** once, then **21**. The published student is preserved; collection now includes general scenarios and early teacher takeovers. Read [the learning update](LEARNING_UPDATE_v1.5.2.md) before interpreting old and new evaluations.
 
 

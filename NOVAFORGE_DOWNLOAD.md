@@ -1,35 +1,19 @@
-# NovaForge v1.5.4 download
+# NovaForge v1.6.0 download
 
-[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.5.4.zip)
+[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.6.0.zip)
 
-Adds direct comparison of the best held-out training candidate against the published policy. The latest user reports trained to 1.05M decisions but watch/evaluation still used a 250k published checkpoint. Merge this ZIP, run 1_CHECK.bat, pause with 22, then run 33_COMPARE_COPY_CANDIDATE.bat and send the automatically generated report ZIP. Launcher 34 watches the candidate, while 24 keeps watching the published policy. No reset or automatic promotion.
+Starts the actual Chronos policy as a new reward-driven PPO learner. Four frozen opponents, snapshot self-play, frozen initialization KL, critic warmup, full optimizer resume, W&B, initial/current comparisons and v5/native-component exports are included. Existing copy02 stays in its own run folder.
 
-[Candidate review and report diagnosis](NovaForge/CANDIDATE_REVIEW_v1.5.4.md)
+Pause old training, merge chat_gpt_ai/novaforge at the project folder's parent, and run 1_CHECK.bat. Launcher 35 starts/resumes chronos01 until paused; 36 pauses, 37 shows status, 38 watches, 39 compares with initialization and creates a report, 40 exports .lt/.bot.toml, 41 reports and 42 watches initialization. Fresh installations first use 0_INSTALL.bat. After 32,768 learner decisions, pause, run 39 and send the report before a long run.
 
-Fixes the two Windows viewer-check failures: test watches use an isolated lock; the native UDP protocol diagnostic is opt-in, with exclusive wildcard socket preflight on Windows. Merge this ZIP, run 1_CHECK.bat, then run 32 once if copy02 has not yet been upgraded, and resume with 21. Your saved student is preserved.
+[Step-by-step Chronos training](NovaForge/CHRONOS_TRAINING.md) · [Upstream review](NovaForge/UPSTREAM_REVIEW.md) · [Detailed plan](NovaForge/PLAN.md) · [Validation](NovaForge/VALIDATION.md)
 
-[Windows check hotfix](NovaForge/CHECK_HOTFIX_v1.5.3.md)
+The upstream review inventories 233 public repositories across the five supplied accounts, retrieves 203 root READMEs and examines selected training/deployment source from 19 pinned archives. Native GigaLearn/Rust rollout integration, replay reconstruction and additional Byte-family adapters remain separate work, with explicit compatibility gates.
 
-Corrects stalled teacher copying: retained nonkickoff practice, earlier teacher takeovers after student attempts, fewer fitting passes and a ground scoring opponent. Existing copy02 users: pause with 22, merge this ZIP, run 1_CHECK.bat, run 32_UPGRADE_COPY_LEARNING.bat once, then resume with 21. The published student is preserved. Run 27, 30 and 26 after two or three completed new rounds. No improved playing strength or native-backend speed is claimed yet.
+Fixes an orange-team reset modifying shared kickoff spawn arrays. Historical kickoff comparisons from affected versions were not reliably paired; new comparisons assert identical starting observations. Also retains the checked RLViser sender/camera build and safe Windows viewer diagnostics.
 
-[Learning update and report diagnosis](NovaForge/LEARNING_UPDATE_v1.5.2.md)
+The ZIP contains chat_gpt_ai/novaforge. Keep existing .venv/assets/datasets/models/runs. No model weights are bundled; launchers download pinned, hash-verified originals. This package does not grant new rights over them. No playing-strength gain over original Chronos, Windows game-transfer result or native GigaLearn throughput is claimed.
 
-The RLViser sender protocol fix from v1.5.1 remains included. 
+[Original installation and replay workflow](NovaForge/START_HERE.md) · [Old copying workflow](NovaForge/FROZEN_TEACHER_COPYING.md) · [Viewer setup](NovaForge/RLVISER_CAMERA.md) · [Attribution](NovaForge/THIRD_PARTY.md)
 
-[Viewer protocol hotfix](NovaForge/VIEWER_HOTFIX_v1.5.1.md)
-
-Corrects a teacher-copying shortcut: transition windows are retained, previous-action inputs are disabled in the actor, and fresh copy02 training starts with first-contact demonstrations. Published models are selected using their own kickoff monitoring plus copying loss. All teachers stay frozen; shared simulator returns mildly weight supervised labels. The original teachers reward functions remain unknown.
-
-The ZIP contains chat_gpt_ai/novaforge. Extract into the parent of your existing project folder (for example E:\Downloads), merge source files, and keep .venv/assets/datasets/models/runs. Pause the old copying process first. Run 1_CHECK.bat and then 21_START_OR_RESUME_COPY.bat for copy02. Launcher 22 pauses, 23 shows status, 24 automatically opens the learner camera, 25 exports .lt + .bot.toml, 26 reports, 27 evaluates against the named bots and 30 screens mechanics. Launcher 29 exports diverse01. No trained student or teacher weights are bundled.
-
-Automatic viewing finds chat_gpt_ai\rlviser.exe. The requested 110 FOV / 270 distance / -4 pitch learner ballcam uses a checked camera build downloaded once; the original viewer is preserved. Launcher 31 optionally prepares it ahead of watching. The fresh student still needs training and gameplay validation.
-
-[Copying correction](NovaForge/COPY_CORRECTION_v1.5.md) · [Automatic RLViser camera](NovaForge/RLVISER_CAMERA.md)
-
-[Frozen teacher copying](NovaForge/FROZEN_TEACHER_COPYING.md) · [.lt and v5 export](NovaForge/V5_EXPORT.md) · [Actor packager](NovaForge/PT_TO_TOML.md)
-
-[Progress reports, comparisons and SPS](NovaForge/PROGRESS_REPORTS.md) · [Technical archive findings](NovaForge/ARCHIVE_RESEARCH.md)
-
-[W&B and continuous training](NovaForge/WANDB_AND_CONTINUOUS.md) · [Mixed-bot guide](NovaForge/MULTI_BOT_GUIDE.md) · [Full guide](NovaForge/START_HERE.md) · [Plan](NovaForge/PLAN.md) · [Validation](NovaForge/VALIDATION.md) · [Bot research](NovaForge/BOT_RESEARCH.md)
-
-This branch adds an isolated new project; the existing main branch and original training files are unchanged.
+The source is published on codex/novaforge-v1. The existing main branch and original project files are unchanged.

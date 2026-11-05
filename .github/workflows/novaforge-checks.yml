@@ -34,6 +34,11 @@ jobs:
           python -m pip install --only-binary=:all: --no-deps -r requirements-viewer.txt
       - name: Core training checks (no live viewer ports)
         run: python -m pytest tests -q
+      - name: Actual Chronos initialization and trajectory parity
+        run: |
+          python run.py fetch-teachers --names chronos
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest tests/test_chronos.py -q --chronos
       - name: Native UDP framing on Windows
         run: python -m pytest tests/test_viewer_protocol.py -q --viewer-udp
       - name: Occupied UDP ports skip without a native crash

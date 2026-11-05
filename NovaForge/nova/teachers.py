@@ -224,6 +224,9 @@ class Ripple:
 def make_opponent(name,path=None):
     factories={'scripted':Scripted,'scorer':Scorer,'nexto':Nexto,'ripple':Ripple}
     if name=='snapshot': return Snapshot(path)
+    if name=='chronos_snapshot':
+        from .chronos import ChronosSnapshot
+        return ChronosSnapshot(path)
     if name in ('chronos','galactus'):
         from .giga_teachers import GigaTeacher
         return GigaTeacher(name)

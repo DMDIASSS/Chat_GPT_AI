@@ -28,3 +28,9 @@ The Pulsar repository remains a linked research reference and is not an active t
 ## RLViser camera build
 
 The optional automatic viewer is built from MIT-licensed VirxEC/rlviser commit `a4e524085cdb1601cf9c0af2f815591fb696db54`. The included patch adds configurable horizontal FOV, boom distance/height/pitch, initial car-follow ballcam and no artificial shake. License: [viewer/RLVISER_LICENSE.txt](viewer/RLVISER_LICENSE.txt). The separately downloaded executable and its checked SHA256 are pinned in `viewer.lock.json`.
+
+## Chronos fine tuning in v1.6
+
+The new student loads the pinned Chronos deployment weights directly on the user's machine; no model weights are bundled in the source ZIP. The separate components retain their original architecture. The public source has no explicit root model license; this project does not grant new rights over those weights. Source credit and the exact commit are retained in exported packages.
+
+The PPO rollout/checkpoint machinery uses Stable-Baselines3 2.9.2 (MIT, DLR-RM/stable-baselines3). The custom clipped PPO update follows its public algorithm with a separate critic, critic warmup and a frozen-reference KL term. Research repositories and their reported license metadata are listed in UPSTREAM_REVIEW.md and upstream_pins.json; reviewing them does not vendor their code or imply their licenses agree.

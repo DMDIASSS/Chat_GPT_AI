@@ -1,5 +1,8 @@
 # Candidate review v1.5.4
 
+**Correction in v1.6:** a shared kickoff-template mutation made old orange resets non-repeatable. Historical kickoff comparisons were not reliably paired. See [the reset fix and Chronos branch](CHRONOS_TRAINING.md).
+
+
 ## What the latest reports establish
 
 The three November 5 reports describe the same training state and published model. Collection reached 1,050,000 attempted teacher decisions. Revision 2 is active: the current buffer contains 246,874 accepted labels, every configured scenario, all four frozen teachers and 584 teacher takeovers from student attempts. About 63.5% of those active labels are kickoffs. All active opponents are scorer: the run is still in the beginner opponent stage, even though it now practices other scenarios too.

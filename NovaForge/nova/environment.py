@@ -16,7 +16,7 @@ from .teachers import make_opponent, controls_for_ticks
 class ArenaEnv(gym.Env):
     metadata={'render_modes':[]}
 
-    def __init__(self,config,league_manifest=None,opponent=None,snapshot=None,scenario=None,side=None):
+    def __init__(self,config,league_manifest=None,opponent=None,snapshot=None,scenario=None,side=None,snapshot_kind='snapshot'):
         super().__init__()
         self.cfg=config
         self.engine=RocketSimEngine(rlbot_delay=True)
@@ -25,6 +25,7 @@ class ArenaEnv(gym.Env):
         self.league_manifest=Path(league_manifest) if league_manifest else None
         self.forced_opponent=opponent
         self.forced_snapshot=snapshot
+        self.snapshot_kind=snapshot_kind
         self.forced_scenario=scenario
         self.forced_side=side
         self.curriculum=Curriculum(config['curriculum']['weights'],config['curriculum']['adaptive'])
@@ -59,7 +60,7 @@ class ArenaEnv(gym.Env):
                 chosen=entries[-1] if name=='latest' else entries[int(self.np_random.integers(len(entries)))]
                 path=self.league_manifest.parent/chosen['path']
                 label=f'{name}:{chosen["step"]}'
-                name='snapshot'
+                name=self.snapshot_kind
             else:
                 name='scripted'
                 label='scripted:empty-snapshot-pool'
@@ -67,7 +68,7 @@ class ArenaEnv(gym.Env):
         if key not in self.cache:
             self.cache[key]=make_opponent(name,path)
             # Keep at most four snapshot actors in each worker's RAM.
-            snapshots=[k for k in self.cache if k[0]=='snapshot']
+            snapshots=[k for k in self.cache if k[0] in ('snapshot','chronos_snapshot')]
             for old in snapshots[:-4]: self.cache.pop(old)
         self.opponent=self.cache[key]
         self.opponent_label=label

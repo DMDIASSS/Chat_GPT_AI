@@ -1,0 +1,102 @@
+[
+  {
+    "repo": "ZealanL/GigaLearnCPP-Leak",
+    "commit": "86e11c3881a21225a43c36b14af40f0b3c87e7dd",
+    "license": null
+  },
+  {
+    "repo": "ZealanL/RLGymPPO_CPP",
+    "commit": "ee4cc56fc8e43758cc898fdba92a9173a94e52f2",
+    "license": null
+  },
+  {
+    "repo": "ZealanL/PolicyPlasticity",
+    "commit": "53570dc342b053cef25ccc7397d101535050ad1d",
+    "license": null
+  },
+  {
+    "repo": "Rolv-Arild/rocket-learn",
+    "commit": "976e255c82fb53c92ddf0975c8e9ab81f6cf333a",
+    "license": null
+  },
+  {
+    "repo": "Rolv-Arild/Necto",
+    "commit": "2e6ed7d6ed2b352e8ff529d4a12a0c9c70c28cca",
+    "license": "NOASSERTION"
+  },
+  {
+    "repo": "Rolv-Arild/Pearl",
+    "commit": "c8dd5c9261374c39ccf96aa9d083cdd79bc51fad",
+    "license": "NOASSERTION"
+  },
+  {
+    "repo": "Rolv-Arild/replicar",
+    "commit": "b184d67590382df26eaff6964a1b9e39854b0d25",
+    "license": "MIT"
+  },
+  {
+    "repo": "Rolv-Arild/replay-pretraining",
+    "commit": "8c15e847dc9ecf37ef8ad38d6c615b080772c959",
+    "license": "GPL-3.0"
+  },
+  {
+    "repo": "VirxEC/rlgymppo_rs",
+    "commit": "86bd82280ff2d04d04677eb383525d1ef08feae8",
+    "license": "GPL-2.0"
+  },
+  {
+    "repo": "VirxEC/rlgym_rs",
+    "commit": "1b7d8941e5a4085e5be2bee60c697ce586c17197",
+    "license": null
+  },
+  {
+    "repo": "VirxEC/rlviser-py",
+    "commit": "dc1b7aad5b48bc075ba0817a30cb0da25689ad4d",
+    "license": "MIT"
+  },
+  {
+    "repo": "SubparN0va/GGLBot",
+    "commit": "d5d21daa7653f842699b590d6bf85597c617e4d8",
+    "license": null
+  },
+  {
+    "repo": "SubparN0va/ByteBotpack",
+    "commit": "90cc53d45d43c20e428f7bdc486c3c81d09681e6",
+    "license": "MIT"
+  },
+  {
+    "repo": "KingJake3113/Chronos",
+    "commit": "4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa",
+    "license": null
+  },
+  {
+    "repo": "RLBot/python-interface",
+    "commit": "8a0850f20ff647d933566fb31cf060d87ab5ec35",
+    "license": "MIT"
+  },
+  {
+    "repo": "RLBot/core",
+    "commit": "11d5d863ec2f8b2647741cff22a2c59c6b6ad08e",
+    "license": "MIT"
+  },
+  {
+    "repo": "RLBot/botpack",
+    "commit": "d3a76268273d79bfc98b6d718515da82127a0120",
+    "license": "NOASSERTION"
+  },
+  {
+    "repo": "RLBot/flatbuffers-schema",
+    "commit": "e27de77b4ae2cd9fef5bfea53994be7e24454b47",
+    "license": null
+  },
+  {
+    "repo": "ZealanL/RocketSim",
+    "commit": "c2baacb8f4b441dd8505e63c2aeb5a1679b60b02",
+    "license": "MIT"
+  },
+  {
+    "repo": "ZealanL/RLGymSim_CPP",
+    "commit": "28694c6ecf8480a9ce72db5c350833724ded89a6",
+    "license": null
+  }
+]

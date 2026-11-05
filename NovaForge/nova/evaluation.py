@@ -64,9 +64,13 @@ def evaluate(args):
                 for side in (0,1):
                     env=ArenaEnv(cfg,opponent=opponent,scenario=scenario,side=side)
                     try:
+                        initial_observation=None
                         for label,policy,destination in [('candidate',student,rows),('baseline',baseline,baseline_rows)]:
                             if policy is None: continue
                             obs,_=env.reset(seed=seed)
+                            if initial_observation is None:initial_observation=obs.copy()
+                            elif not np.array_equal(initial_observation,obs):
+                                raise RuntimeError('Paired evaluation reset produced different starting observations')
                             while True:
                                 obs,_,terminal,truncated,info=env.step(policy.action(obs))
                                 if terminal or truncated: break
@@ -80,6 +84,7 @@ def evaluate(args):
                              for s in scenarios}
     report=dict(kind='first_goal_trials',candidate=str(student.path),candidate_sha256=sha256(student.path),
         seconds_per_trial=args.seconds,seed_start=args.seed,paired_team_sides=True,
+        paired_initial_observations_verified=True,
         summary=summarize(rows),breakdown=breakdown,trials=rows,
         note='Simulator screening only. Timeouts are censored trials. Goals without student contact can result from the reset trajectory or opponent own goals. Even contact-backed goals do not establish mechanical causation. No automatic promotion.')
     if baseline:

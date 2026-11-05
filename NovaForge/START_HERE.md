@@ -1,4 +1,11 @@
-# NovaForge v1.5 — start here
+# NovaForge v1.6 — start here
+
+**v1.6.0:** For the requested Chronos base, use launchers **35–42** and [CHRONOS_TRAINING.md](CHRONOS_TRAINING.md). This is a new pretrained-policy PPO run, separate from copy02. The kickoff reset fix also applies to the old environment.
+
+
+## Earlier workflows and general installation
+
+Use the Chronos guide above for the current experiment. The following sections retain the older copying, scratch PPO and replay workflows.
 
 **v1.5.2:** Existing copy02 users should run launcher **32** once, then **21**. The published student is preserved; collection now includes general scenarios and early teacher takeovers. Read [the learning update](LEARNING_UPDATE_v1.5.2.md) before interpreting old and new evaluations.
 

@@ -73,3 +73,20 @@ def test_action_buttons_and_finite_table():
     assert ACTIONS.shape==(276,8)
     assert len(np.unique(ACTIONS,axis=0))==276
     assert set(np.unique(ACTIONS[:,5:]))<={0,1}
+
+
+def test_repeated_team_resets_do_not_mutate_shared_kickoff_templates(cfg):
+    from rlgym.rocket_league.state_mutators import KickoffMutator
+    blue=KickoffMutator.SPAWN_BLUE_POS.copy();orange=KickoffMutator.SPAWN_ORANGE_POS.copy()
+    for side in (1,0,1,1,0):
+        env=ArenaEnv(cfg,opponent='scripted',scenario='kickoff',side=side)
+        try:
+            states=[]
+            for _ in range(3):
+                obs,_=env.reset(seed=233);states.append(obs.copy())
+                position=env.state.cars[env.agent].physics.position
+                assert position[1]>0 if side==1 else position[1]<0
+                np.testing.assert_array_equal(KickoffMutator.SPAWN_BLUE_POS,blue)
+                np.testing.assert_array_equal(KickoffMutator.SPAWN_ORANGE_POS,orange)
+            for obs in states[1:]:np.testing.assert_array_equal(obs,states[0])
+        finally:env.close()

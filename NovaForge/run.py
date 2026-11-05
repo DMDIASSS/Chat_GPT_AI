@@ -143,6 +143,30 @@ def main():
     p=sub.add_parser('viewer-setup',help='Find/install RLViser and apply the learner ballcam preset')
     p.add_argument('--exe',default=None)
     p.add_argument('--mode',choices=['auto','existing'],default='auto')
+    p=sub.add_parser('chronos-train',help='Fine-tune actual Chronos weights with anchored PPO and snapshot self-play')
+    p.add_argument('--run',default='chronos01')
+    p.add_argument('--config',default='configs/chronos.json')
+    p.add_argument('--resume',action='store_true')
+    p.add_argument('--steps',type=positive_int,default=32768)
+    p.add_argument('--forever',action='store_true')
+    p.add_argument('--device',choices=['cpu','cuda','auto'],default=None)
+    p.add_argument('--wandb',choices=['online','offline','off'],default=None)
+    p=sub.add_parser('chronos-watch')
+    p.add_argument('--run',default='chronos01')
+    p.add_argument('--initial',action='store_true')
+    p.add_argument('--opponent',choices=['scorer','chronos','galactus','nexto','ripple'],default='chronos')
+    p.add_argument('--scenario',choices=['kickoff','shot','defense','dribble','aerial','recovery','wall'],default='kickoff')
+    p.add_argument('--viewer-mode',choices=['auto','existing','manual'],default='auto')
+    p=sub.add_parser('chronos-evaluate')
+    p.add_argument('--run',default='chronos01')
+    p.add_argument('--opponents',default='scorer,chronos,galactus,nexto,ripple')
+    p.add_argument('--scenarios',default='kickoff,shot,defense')
+    p.add_argument('--pairs',type=positive_int,default=5)
+    p.add_argument('--seconds',type=positive_float,default=20)
+    p.add_argument('--seed',type=int,default=1700001)
+    p=sub.add_parser('chronos-export')
+    p.add_argument('--run',default='chronos01');p.add_argument('--initial',action='store_true')
+    p=sub.add_parser('chronos-report');p.add_argument('--run',default='chronos01')
     args=parser.parse_args()
     if args.command in ('status','pause'):
         run=(ROOT/'runs'/args.run).resolve()
@@ -153,6 +177,13 @@ def main():
             print('Stop requested. The trainer saves its current policy and exits at the next environment step.')
         else:
             print((run/'status.json').read_text())
+    elif args.command=='chronos-train':
+        from nova.chronos_training import train_chronos
+        train_chronos(args)
+    elif args.command in ('chronos-watch','chronos-evaluate','chronos-export','chronos-report'):
+        from nova.chronos_tools import watch_chronos,evaluate_chronos,export_chronos,report_chronos
+        {'chronos-watch':watch_chronos,'chronos-evaluate':evaluate_chronos,
+         'chronos-export':export_chronos,'chronos-report':report_chronos}[args.command](args)
     elif args.command=='viewer-setup':
         from nova.viewer import setup_command
         setup_command(args)

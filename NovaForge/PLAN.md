@@ -1,70 +1,26 @@
-# Implemented work and next experiments
+# Chronos training plan
 
-**Current v1.5.4:** [direct candidate review](CANDIDATE_REVIEW_v1.5.4.md) compares the new trained candidate against the older published policy before another learning change. Reports now retain checkpoint roles and future rejected-candidate probes.
+## Implemented in v1.6.0
 
-**v1.5.2:** [varied correction collection](LEARNING_UPDATE_v1.5.2.md), preserved copy02 upgrade, reduced fitting reuse, ground scorer and contact-aware goal reporting. Kickoff overrides remain disabled.
+The [Chronos branch](CHRONOS_TRAINING.md) initializes the real deployed actor and shared head, trains a separate critic, and fine-tunes through masked PPO with a frozen initialization KL penalty. Opponents are frozen Chronos/Galactus/Ripple/Nexto and saved learner versions. Full optimizer checkpoints, bounded storage, W&B, initial/current watching, paired screening, reports and native-component/v5 export are implemented.
 
-## Next work after the current correction
+The [upstream review](UPSTREAM_REVIEW.md) records the five-account inventory, pinned source inspection and compatibility decisions. The shared kickoff-template mutation is fixed. Historical affected kickoff comparisons are not valid policy rankings.
 
-1. **Verify the correction on copy02.** Collect 100–150k additional decisions after launcher 32. Compare the exact preserved published checkpoint with the new candidate using the same opponents, both teams and new seed sets. Track contact fraction, scored goals with contact, defense stops, recovery success, held-out loss and time. Reject an apparent aerial gain made of zero-touch goals. Keep 271 unchanged as the requested reference once its files are identified.
-2. **Break down teacher usefulness.** At equal decisions and wall time, compare one-teacher starts against the four-teacher mixture. Report transitions and each scenario, not only global action agreement. Check teacher takeovers from actual failed student states visually. A mixture can contain incompatible choices; more teachers is not automatically better.
-3. **Improve selection evidence.** Expand the training monitor beyond ten kickoff trials to fixed shooting, defense and recovery cases, while retaining the old probe series. Store its protocol/version and checkpoint hash. Use separate untouched seeds for strength claims. Do not silently reinterpret historical scores.
-4. **Native throughput integration.** Recover the source behind NATIVE_5_TRAIN.bat, preserve existing runs, verify feature/control-delay/reward traces, then add batched frozen-teacher inference and parallel arenas. Report physics ticks, learner decisions, teacher inferences, gradient updates and end-to-end time separately. Compare learning gained per minute before preferring the native backend.
-5. **Reward-driven refinement inspired by cycle9.** Branch the best verified copying policy into PPO with low actor learning rate and a frozen initialization anchor; retain supervised refreshes. Start with goal, contact, movement-toward-ball and conceded-goal components, audit reward contributions for farming, and compare with pure copying at equal wall time. Existing PPO mode is not yet this combined trainer. Require actual scoring/defending gains before promotion.
-6. **Optional assisted kickoff comparisons.** Keep training overrides off for both teams. If an export/comparison assist is added, expose it explicitly and run assisted and unassisted benchmarks as separate variants. Never use assisted behavior to claim the network learned kickoff.
+## Next gates, in order
 
-## Prior implementation history
+1. **Establish the starting behavior.** Run checks, start chronos01 and watch the permanent initialization with 42. Export it separately for offline v5 comparison. Acceptance: competent neural control on both teams, correct camera/controls, no scripted kickoff overriding either model.
+2. **Short reward-driven pilot.** Run 32,768 learner decisions, pause and compare with 39. Inspect goals/concedes, contacts, timeout fractions, per-opponent coverage, goal/potential reward contributions, critic fit and anchor KL. Acceptance: training and frozen self-play work without unexplained loss of starting behavior. Reward or KL alone does not establish strength.
+3. **Validate outside the development screen.** Repeat with fresh seeds and longer trials, then full offline 1v1 games on both teams against original Chronos and other bots. Keep all checkpoint hashes and the permanent initialization. Acceptance: repeatable gameplay improvement with uncertainty and no automatic promotion from a small screen.
+4. **Tune one learning factor at a time.** Compare actor rates/anchor strength and sparse-goal vs potential shaping at equal wall time. Adjust critic warmup only with value/error evidence. Keep teacher inputs, masks and timing fixed. Acceptance: stronger held-out play rather than larger reward or faster physics alone.
+5. **Native multi-game integration.** Select one maintained backend after checking availability and licensing. First load the exact two Chronos components and match observations, masks, delayed action traces, rewards and episode boundaries. Then compare learner decisions/sec, collection/update time, RAM/VRAM and playing strength per hour. Python remains the working reference until parity passes; GigaLearn's raw SPS is not claimed here.
+6. **Failure/replay reset bank.** Reconstruct supplied 1v1 replays with an explicit replicar adapter or retain serialized learner failures. Track source provenance and uncertain inferred controls; keep a separate evaluation bank. Acceptance: targeted recovery improves without degrading kickoff and full matches. No automatic raw replay integration is included yet.
+7. **Additional opponents.** Byte/Kilobyte/Megabyte require their own ByteObs/ByteAction adapter, timing and model checks. Add only after native feature/logit/control parity. Pulsar remains unidentified and is not a fabricated pool member.
+8. **Expand game modes only after 1v1 transfer.** 2v2/3v3 need different entity handling, teammate rewards and testing. Do not silently reuse the 1v1 deployment contract.
 
-**v1.5:** correct transition labels and eliminate previous-action shortcuts; start fresh `copy02`; bootstrap first-touch approaches, then expand the curriculum; select published models using student kickoff monitoring plus copying loss. Auto-find/open RLViser with a checked Windows camera build, preserve Forge dashboard links, and add mechanics/coverage reporting. See [the correction](COPY_CORRECTION_v1.5.md) and [camera setup](RLVISER_CAMERA.md).
+## Evidence to send after the pilot
 
-**v1.4:** [LibTorch .lt + RLBot v5 export](V5_EXPORT.md), supported actor packaging, and the requested `chat_gpt_ai/novaforge` ZIP layout. Shared simulator returns mildly weight imitation labels; the original teachers’ reward functions are unavailable.
+Pause with 36, run 39, and upload the generated chronos01 report ZIP. Include a short description of initial vs current play; launcher 41 can export metrics without rerunning evaluations. Real v5 errors and gameplay clips help distinguish transfer bugs from learning problems.
 
-**v1.4 copying:** continuous frozen-teacher copying with fresh demonstration rounds, fixed separate validation episodes, balanced teacher losses, previous-action dropout, and teacher takeovers from student-reached states. Best validation checkpoints serve watch/export, while latest optimizer checkpoints serve resume. Launchers **21–27** and [FROZEN_TEACHER_COPYING.md](FROZEN_TEACHER_COPYING.md) cover the workflow. Supervised agreement is evaluated separately from actual playing strength.
+## Earlier work
 
-**v1.3:** one-click progress report ZIP with offline charts, selected config, opponent/mechanics trends, PPO metrics and checkpoint hashes; earliest/current paired comparison helper; PPO CSV retention across resumes. Report sampling units distinguish learner decisions from raw physics and teacher work. Technical archives informed the interpretation and next experiments in [ARCHIVE_RESEARCH.md](ARCHIVE_RESEARCH.md). See [PROGRESS_REPORTS.md](PROGRESS_REPORTS.md) for the feedback workflow.
-
-**v1.2:** mixed-training launchers now support continuous training until pause and an optional W&B dashboard. The tracking integration reuses the SDK's local login, keeps the online run ID across resume, reports opponent/mechanics/PPO metrics, and exposes the dashboard link in local status. See [WANDB_AND_CONTINUOUS.md](WANDB_AND_CONTINUOUS.md).
-
-**v1.1:** Chronos and GalactusV2 now have working CPU simulator ports and join Nexto/Ripple in the diverse league. Mixed teacher collection is implemented. Native C++ feature/mask/network comparisons and short real training checks pass. The remaining work for these ports is broader trajectory/live validation, forecast comparison and the unavailable world-contact-normal exception; see [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md). Pulsar stays out until a deployment identity/checkpoint is established.
-
-## Included in this ZIP
-
-| Feature | Implementation | First test |
-| --- | --- | --- |
-| New student | 100 team-relative features, 276 discrete controls, separate 256×256 policy/value MLPs | Core smoke and simulator/live observation parity tests |
-| Self-play league | Frozen latest policy plus a 12-member active history, sampled once per episode | Smoke exercises a saved snapshot as a real opponent |
-| New strong trainer | Ripple v1.1 ONNX adapter with original action queue | Teacher doctor and delayed-control tests |
-| Old reference trainer | Nexto neural policy, held at eight ticks | Both-side actual model tests |
-| Mechanics practice | Seven reset types, varied difficulty and per-worker success estimates | Both-side simulator resets and metrics tests |
-| Teacher imitation | Actual executed controls; incompatible labels filtered; episode-disjoint validation | Collection → BC → PPO initialization integration check |
-| Replay training starts | RLGym-tools parser → filtered serialized 1v1 states → new teacher rollouts | Serialized reset bank exercised in RocketSim; raw file parse still needs a user fixture |
-| Experiment evidence | Config/provenance, component rewards, PPO CSV and seeded paired screening | Short evaluation report, timeout accounting |
-| Deployment | TorchScript actor with hash/contract metadata and RLBot v5 launcher | Export/PPO action parity and live-state feature parity; live match still needs Windows testing |
-| Operational controls | File lock, full optimizer checkpoint, atomic latest pointer, pause/resume | Two-worker real PPO smoke with resume |
-| Continuous training and W&B | Repeat PPO segments without resetting the model; reuse online tracking ID and show status/link | Real SDK offline logging, multi-segment mixed run, pause and resume; online credentials checked on the user's PC |
-| Shareable progression evidence | Selected metrics/config ZIP, offline charts, matched teacher cells and earliest/current paired evaluation | Export allowlist/secret exclusion, disjoint windows, evaluation ownership and CSV retention tests; real report and checkpoint comparison |
-
-## Suggested experiment order on this laptop
-
-1. Run install, tests, smoke and teacher checks.
-2. Collect 20k Ripple decisions against Nexto; pretrain five epochs.
-3. Train `laptop01` for 100k decisions and screen it against its BC initialization.
-4. Extend a successful run by 2M decisions. Preserve reports even if it gets worse.
-5. Compare a scratch run and a BC run at the same budget; then compare plain self-play and trainer mixing.
-6. Add a few verified 1v1 replay files. Compare teacher demonstrations from replay starts with the normal reset distribution.
-7. Export promising checkpoints and play multiple full offline RLBot matches on alternating team colors against the named bots.
-
-Keep evaluation seeds separate from collection/training seeds. Use a second new evaluation seed set before concluding that a change helped. First-goal simulator scores are preliminary. A mechanics proxy, BC accuracy or shaped reward can increase while playing strength falls.
-
-## Next additions, in order
-
-1. **Windows transfer fixes.** Use the user's live clips and errors to fix packet timing, coordinate conversion or launcher issues before increasing model complexity. Acceptance: the same known-state features and controls agree across simulator and live adapter, then several uninterrupted RLBot games.
-2. **Chronos port transfer validation.** The v1.1 implementation matches the native feature/mask fixtures and C++ network logits. Extend comparison to long trajectories, demos, collisions and live matches. Check sensitivity to player-slot randomization and the unavailable contact-normal exception.
-3. **Galactus port prediction validation.** The v1.1 implementation matches native features with identical prediction samples and C++ network logits, including tick-eight/delay-seven scheduling. Compare full cached RocketSim forecasts with the native internal tracker and live prediction packets over collisions and goal transitions.
-4. **Hard-example replay bank.** Store actual learner failures and sample a bounded portion of training resets from them, keeping a separate untouched evaluation bank. Acceptance: recovery on the targeted failure improves without degrading kickoff/full-game screening.
-5. **Skill-specific teachers and a goal-conditioned policy.** Condition on an explicit task and sample actual mechanics demonstrations. Acceptance: aerial/dribble/recovery proxies and held-out match outcomes both improve. A high-touch counter alone is insufficient.
-6. **Reachability-grid experiment inspired by the public Pulsar research.** Begin with reset-cell mastery using actual success, then evaluate a contrastive critic as a separate algorithm. Acceptance: equal-compute improvement on held-out starts and first-goal/full-match evaluation; no claim of reproducing Pulsar without matching its system.
-7. **2v2 / entity attention.** Change the feature contract, add teammate roles and random player ordering, introduce team rewards, and retrain. Acceptance: rotation/pass/defense metrics plus 2v2 match evaluation. The v1 weights would not be compatible.
-8. **Native GigaLearn rollout path.** Port only after the Python loop is stable. Acceptance: trace parity first; then measured end-to-end decisions/sec and match strength per training budget.
-
-After your first test, the most useful evidence is the smoke/doctor JSON, BC loss/accuracy, PPO throughput, evaluation outcomes with timeouts, and a clip of a repeated failure.
+The old scratch and teacher-copying experiments remain in the source and their own run folders. Their instructions are in [START_HERE.md](START_HERE.md), [FROZEN_TEACHER_COPYING.md](FROZEN_TEACHER_COPYING.md), [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md) and [ARCHIVE_RESEARCH.md](ARCHIVE_RESEARCH.md). They do not initialize chronos01.

@@ -1,36 +1,39 @@
-# NovaForge v1.5.4
+# NovaForge v1.6.0
 
-**Candidate comparison:** pause with **22**, then run **33_COMPARE_COPY_CANDIDATE.bat** to compare the best held-out candidate against the published policy. **34** watches the candidate; **24** watches the published policy. See [checkpoint roles and the latest report diagnosis](CANDIDATE_REVIEW_v1.5.4.md).
+Continue training the actual Chronos policy with reward-driven PPO, four frozen opponents and snapshot self-play. The new **chronos01** run is separate from earlier copying experiments.
 
-**Windows check fix:** watch tests use an isolated temporary lock; the native UDP protocol check is opt-in and checks exclusive Windows port ownership. Normal **1_CHECK.bat** no longer competes with a live viewer session. See [the check hotfix](CHECK_HOTFIX_v1.5.3.md).
+## Start
 
-**Learning correction:** upgrade existing copy02 once with **32_UPGRADE_COPY_LEARNING.bat**, then resume with **21**. This keeps your published student, expands beginner practice beyond kickoffs, adds early teacher takeovers from student attempts, and reduces repeated fitting. **24** now watches against a ground scorer. See [the learning update](LEARNING_UPDATE_v1.5.2.md).
+Pause copy02 with 22 and wait for its console to exit. Merge this ZIP at your project folder's parent; it contains **chat_gpt_ai/novaforge/**. Keep .venv, assets and runs. Run **1_CHECK.bat**, then **35_START_OR_RESUME_CHRONOS.bat**. Fresh installations first need **0_INSTALL.bat**.
 
-**Viewer crash fix:** the camera build requires the FlatBuffers sender `rlviser-py==0.6.14`. Setup/watch now upgrades the sender before loading its native DLL and refuses incompatible loaded versions. See [VIEWER_HOTFIX_v1.5.1.md](VIEWER_HOTFIX_v1.5.1.md). Continue your existing `copy02` with launcher 21.
+| Launcher | Action |
+| --- | --- |
+| 35 | Start/resume Chronos PPO continuously with W&B |
+| 36 | Request a safe training pause |
+| 37 | Show training/dashboard status |
+| 38 | Watch the latest learner with automatic RLViser camera |
+| 39 | Compare current vs unchanged initialization; export a report |
+| 40 | Export .lt components and an RLBot v5 .bot.toml launcher |
+| 41 | Export a metrics report ZIP |
+| 42 | Watch the unchanged Chronos initialization |
 
-An isolated, laptop-sized 1v1 Rocket League training lab: RLGym v2 + RocketSim, PPO, frozen self-play, Nexto/Ripple trainers, Chronos/GalactusV2 simulator ports, mechanics resets, replay starting positions, teacher imitation, evaluation, and RLBot v5 export.
+After **32,768 learner decisions**, pause and run 39. Send the report before extending the run substantially. Initializing from Chronos avoids learning basic controls from scratch; improvement over Chronos still needs gameplay evidence.
 
-**v1.5 corrects a copying shortcut.** Start a fresh `copy02` with **21**. Control transitions are retained, the actor cannot read previous controls, and deployment selection includes the student’s own kickoff monitoring. See [the correction](COPY_CORRECTION_v1.5.md). **24** now automatically finds `chat_gpt_ai\rlviser.exe` and prepares the requested camera preset; see [RLViser setup](RLVISER_CAMERA.md).
+[Step-by-step Chronos guide](CHRONOS_TRAINING.md) · [Upstream review](UPSTREAM_REVIEW.md) · [Plan](PLAN.md) · [Validation](VALIDATION.md) · [Attribution](THIRD_PARTY.md)
 
-**Begin with [START_HERE.md](START_HERE.md).** It contains the Windows installation, numbered launchers, exact training/resume/evaluation commands and replay workflow.
+## What changed
 
-**New: [copy frozen teachers](FROZEN_TEACHER_COPYING.md).** Launcher **21** continuously gathers demonstrations and fits a student to frozen Nexto/Ripple/Chronos/Galactus controls. **22** pauses, **23** shows status, **24** watches, **25** exports, **26** reports, and **27** evaluates. This mode uses supervised learning with mild shared-return weighting and no PPO updates.
+- Actual 225-feature / 90-action Chronos shared head and policy weights, preserving its mirror convention, action mask and delayed controls.
+- Separate new critic, critic-only warmup, small actor learning rate and frozen initialization KL penalty.
+- Frozen original Chronos, GalactusV2, Ripple and Nexto opponents, plus latest/historical frozen learner snapshots.
+- Goal/concede reward and discount-consistent potential shaping; full optimizer resume, bounded checkpoint retention and W&B using the SDK's saved local login.
+- Permanent initialization for paired screening, initial/current viewing, metrics reports, combined actor.lt and separate SHARED_HEAD.lt / POLICY.lt exports.
+- Fixed shared kickoff spawn arrays being modified during orange-team resets. Historical kickoff comparisons from affected versions were not reliably paired and should not rank policies. New comparisons verify identical initial observations.
 
-**[Export .lt + .bot.toml for RLBot v5](V5_EXPORT.md):** launcher **25** exports the copied student, **29** exports the old PPO student, and **28** packages a supported actor. The ZIP layout is `chat_gpt_ai/novaforge`; merge it at your project folder’s parent.
+The review inventories 233 public repositories from the five supplied accounts, retrieves 203 root READMEs and examines selected training/deployment source in 19 pinned archives. It records compatibility limits and deferred integrations; no native GigaLearn throughput or strength gain is claimed.
 
-**New: [progress reports and checkpoint comparisons](PROGRESS_REPORTS.md).** Run **19** to export a small report ZIP to upload in the chat. For stronger evidence, pause with **15** and run **20** to compare the earliest and current saved checkpoints, then resume with **18**. See [technical archive findings and proposed experiments](ARCHIVE_RESEARCH.md).
+## Existing experiments
 
-**New: [continuous training with W&B](WANDB_AND_CONTINUOUS.md).** Run **17** once to install/check the dashboard SDK and reuse your saved local login. Run **18** to start/resume the mixed league until paused. Existing environments, models and runs can be kept.
+Old runs and launchers remain available: [copy02](FROZEN_TEACHER_COPYING.md), [candidate inspection](CANDIDATE_REVIEW_v1.5.4.md), [mixed PPO](MULTI_BOT_GUIDE.md), [reports](PROGRESS_REPORTS.md), [W&B](WANDB_AND_CONTINUOUS.md), [general installation and replay workflow](START_HERE.md), [viewer setup](RLVISER_CAMERA.md), and [earlier export formats](V5_EXPORT.md).
 
-For the requested mixed-opponent league, follow [MULTI_BOT_GUIDE.md](MULTI_BOT_GUIDE.md): launchers **10–16** download/check all four bots, collect mixed demonstrations, pretrain and train `diverse01`. The original launchers remain available for simpler experiments.
-
-Updating after a Windows `Bad file descriptor` save error? See [the v1.0.1 update instructions](HOTFIX_v1.0.1.md). Extract over the existing NovaForge source and rerun `1_CHECK.bat`; no dependency reinstall is needed.
-
-Designed for an i5-10300H, GTX 1650 Ti Mobile and 16 GB RAM. CPU/two-worker defaults. Experimental new student; no competitive pretrained student is bundled.
-
-- [Research on the named bots](BOT_RESEARCH.md)
-- [Implemented features and next experiments](PLAN.md)
-- [Validation and limits](VALIDATION.md)
-- [Licenses and attribution](THIRD_PARTY.md)
-
-The ZIP contains `chat_gpt_ai/novaforge`. Extract into the parent of your existing project folder and merge. The original project is not modified by the trainer.
+Designed for Windows 10, i5-10300H, GTX 1650 Ti Mobile and 16 GB RAM. Defaults use two simulator workers. Actual laptop CUDA speed and full offline RLBot matches need user testing. The source ZIP contains no model weights; launchers fetch pinned, hash-verified originals. It does not grant new rights over those originals.

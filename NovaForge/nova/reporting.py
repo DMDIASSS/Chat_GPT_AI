@@ -21,7 +21,8 @@ SCENARIOS={'kickoff','shot','defense','dribble','aerial','recovery','wall','repl
 REWARDS={'goal','potential','approach','touch','high_touch','ball_progress','boost_cost'}
 PPO_KEYS={'train/loss','train/value_loss','train/policy_gradient_loss','train/entropy_loss',
           'train/approx_kl','train/clip_fraction','train/learning_rate','train/explained_variance',
-          'train/n_updates','rollout/ep_rew_mean','rollout/ep_len_mean','time/fps'}
+          'train/n_updates','train/anchor_kl','train/critic_warmup','train/actor_lr','train/critic_lr',
+          'train/chronos_updates','rollout/ep_rew_mean','rollout/ep_len_mean','time/fps'}
 
 
 def number(value):
@@ -222,6 +223,7 @@ def evaluation_summaries(reports,latest_hash,known_hashes):
             return rows
         rows=clean_trials(data.get('trials',[]))
         result.append(dict(candidate_sha256=digest,matches_latest_checkpoint=digest==latest_hash,
+            paired_initial_observations_verified=bool(data.get('paired_initial_observations_verified',False)),
             baseline_sha256=data.get('baseline_sha256') if re.fullmatch(r'[0-9a-f]{64}',str(data.get('baseline_sha256',''))) else None,
             summary=numbers(data.get('summary',{}),{'trials','first_goal_wins','first_goal_losses','timeouts',
                 'first_goal_score_fraction','resolved_fraction','practice_success_fraction','touches_per_trial',
