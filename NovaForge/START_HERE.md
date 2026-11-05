@@ -1,3 +1,5 @@
+**v1.7 current workflow:** [Finish and train unattended](FINISH_AND_FUSION.md). Old launchers/runs remain available below.
+
 # NovaForge v1.6 — start here
 
 **v1.6.0:** For the requested Chronos base, use launchers **35–42** and [CHRONOS_TRAINING.md](CHRONOS_TRAINING.md). This is a new pretrained-policy PPO run, separate from copy02. The kickoff reset fix also applies to the old environment.

@@ -1,2 +1,2 @@
-"""NovaForge: a small, reproducible RocketSim 1v1 research bot."""
-__version__ = '1.6.0'
+"""NovaForge: Chronos transfer learning and frozen-opponent experiments."""
+__version__ = "1.7.0"

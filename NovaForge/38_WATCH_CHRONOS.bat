@@ -1,5 +1,5 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-".venv\Scripts\python.exe" run.py chronos-watch --run chronos01
+".venv\Scripts\python.exe" run.py chronos-watch --run chronos01 --latest
 pause

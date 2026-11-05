@@ -92,7 +92,10 @@ def test_critic_warmup_then_real_actor_update_and_checkpoint_roundtrip(tmp_path,
         monkeypatch.setattr(chronos_tools,'ROOT',tmp_path)
         chronos_tools.export_chronos(Namespace(run='export_test',initial=False))
         package=next(p for p in (tmp_path/'exports').iterdir() if p.is_dir())
-        assert {p.name for p in package.iterdir()}>={'actor.lt','SHARED_HEAD.lt','POLICY.lt','bot.bot.toml','bot.py'}
+        assert {p.name for p in package.iterdir()}>={'actor.lt','actor.pt','actor_weights.pt','SHARED_HEAD.lt','POLICY.lt','bot.bot.toml','bot.cfg','bot_v4.py','bot.py'}
+        assert (package/'actor.pt').read_bytes()==(package/'actor.lt').read_bytes()
+        restored=torch.load(package/'actor_weights.pt',weights_only=True)
+        assert set(restored)==set(model.policy.actor.state_dict())
         assert len({p.name.lower() for p in package.iterdir()})==len(list(package.iterdir()))
         assert tomllib.loads((package/'bot.bot.toml').read_text())['settings']['agent_id'].startswith('DMDIASSS/novachronos_')
     finally:env.close()
@@ -133,7 +136,7 @@ def test_eight_tick_potential_shaping_telescopes_and_does_not_pay_for_contact():
         state=copy.deepcopy(env.arena.state);other=copy.deepcopy(state)
         other.cars[env.arena.agent].ball_touches=100
         a=env.arena._reward(state,state,0,False);b=env.arena._reward(state,other,0,False)
-        assert a==b and set(env.arena.last_reward_parts)=={'goal','potential'}
+        assert a==b and set(env.reward_parts)=={'goal','potential'}
     finally:env.close()
 
 
@@ -191,6 +194,18 @@ def test_v5_packet_features_and_masks_match_simulator_and_keep_stable_ids(cfg,si
         np.testing.assert_allclose(actual,expected,rtol=0,atol=1e-6)
         assert live_mirror==mirror
         np.testing.assert_array_equal(native_action_mask(live.game_state.cars[agent]),native_action_mask(state.cars[env.agent]))
+        from types import SimpleNamespace as NS
+        from nova.chronos_v4 import PacketState
+        v4players=[NS(physics=players[i].physics,team=car.team_num,boost=car.boost_amount,
+            has_wheel_contact=car.on_ground,jumped=car.has_jumped,
+            double_jumped=car.has_flipped or car.has_double_jumped,is_demolished=car.is_demoed)
+            for i,car in enumerate(state.cars.values())]
+        v4=PacketState(BOOST_LOCATIONS).decode(NS(game_info=NS(frame_num=120,seconds_elapsed=1),
+            num_cars=2,game_cars=v4players,game_ball=packet.balls[0],game_boosts=packet.boost_pads),
+            NS(num_boosts=34,boost_pads=field.boost_pads))
+        v4features,v4mirror=build_features(v4,own_index,previous,np.random.default_rng(3),'chronos')
+        np.testing.assert_allclose(v4features,expected,rtol=0,atol=1e-6)
+        assert v4mirror==mirror
         original=live.game_state.cars[agent]
         later=GamePacket(players=players,balls=packet.balls,boost_pads=packet.boost_pads,
             match_info=MatchInfo(frame_num=121,seconds_elapsed=121/120,match_phase=MatchPhase.Active))

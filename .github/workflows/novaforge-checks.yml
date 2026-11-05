@@ -2,7 +2,7 @@ name: NovaForge Windows checks
 on:
   push:
     branches: [codex/novaforge-v1]
-    paths: ['NovaForge/**', '.github/workflows/novaforge-checks.yml']
+    paths: ['NovaForge/**', 'TriadBot/**', '.github/workflows/novaforge-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,9 +36,14 @@ jobs:
         run: python -m pytest tests -q
       - name: Actual Chronos initialization and trajectory parity
         run: |
-          python run.py fetch-teachers --names chronos
+          python run.py fetch-teachers --names chronos,ripple,galactus,nexto
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m pytest tests/test_chronos.py -q --chronos
+          python -m pytest tests/test_chronos.py tests/test_chronos_finish.py tests/test_triad.py -q --chronos --teachers
+      - name: Isolated RLBot v4 export and official class importer
+        run: |
+          python -m pip install --target .v4sdk rlbot==1.68.0 "setuptools<81"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_v4_sdk.py --sdk-dir .v4sdk
       - name: Native UDP framing on Windows
         run: python -m pytest tests/test_viewer_protocol.py -q --viewer-udp
       - name: Occupied UDP ports skip without a native crash

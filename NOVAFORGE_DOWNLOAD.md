@@ -1,19 +1,21 @@
-# NovaForge v1.6.0 download
+# NovaForge v1.7.0 and TriadBot downloads
 
-[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.6.0.zip)
+[Download NovaForge v1.7.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.7.0.zip)
 
-Starts the actual Chronos policy as a new reward-driven PPO learner. Four frozen opponents, snapshot self-play, frozen initialization KL, critic warmup, full optimizer resume, W&B, initial/current comparisons and v5/native-component exports are included. Existing copy02 stays in its own run folder.
+[Download TriadBot v1.0.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/TriadBot-v1.0.0.zip)
 
-Pause old training, merge chat_gpt_ai/novaforge at the project folder's parent, and run 1_CHECK.bat. Launcher 35 starts/resumes chronos01 until paused; 36 pauses, 37 shows status, 38 watches, 39 compares with initialization and creates a report, 40 exports .lt/.bot.toml, 41 reports and 42 watches initialization. Fresh installations first use 0_INSTALL.bat. After 32,768 learner decisions, pause, run 39 and send the report before a long run.
+Extract both into the parent of chat_gpt_ai. NovaForge contains chat_gpt_ai/novaforge; TriadBot contains chat_gpt_ai/triadbot. Preserve environments, assets and runs.
 
-[Step-by-step Chronos training](NovaForge/CHRONOS_TRAINING.md) · [Upstream review](NovaForge/UPSTREAM_REVIEW.md) · [Detailed plan](NovaForge/PLAN.md) · [Validation](NovaForge/VALIDATION.md)
+NovaForge: pause with 36, merge, run 1_CHECK, then 35 to upgrade/resume chronos01 with backed-up settings, eight-tick rewards, longer credit horizon, W&B, automatic timed W/D/L/confirmation and substantial-regression stops. 38 still watches latest; 51 watches the protected champion. 40 exports the champion as both .pt/.cfg and .lt/.toml; 41 reports; 50 compares latest with original Chronos. 43 starts the separate fusion01 probability-distillation/PPO experiment, with 44 pause, 46 W/D/L, 47 export and 48 report.
 
-The upstream review inventories 233 public repositories across the five supplied accounts, retrieves 203 root READMEs and examines selected training/deployment source from 19 pinned archives. Native GigaLearn/Rust rollout integration, replay reconstruction and additional Byte-family adapters remain separate work, with explicit compatibility gates.
+[Current instructions, safeguards, fusion pilot and exports](NovaForge/FINISH_AND_FUSION.md) · [Validation](NovaForge/VALIDATION.md)
 
-Fixes an orange-team reset modifying shared kickoff spawn arrays. Historical kickoff comparisons from affected versions were not reliably paired; new comparisons assert identical starting observations. Also retains the checked RLViser sender/camera build and safe Windows viewer diagnostics.
+TriadBot is a separate frozen three-model random router. Waiting experts gain probability; frequent/repeated choices lose probability. Run its 0 check, 1 watch, 2 portable v5 export or 3 W/D/L comparison. The generated personal export contains the three local models; the downloadable source ZIP does not.
 
-The ZIP contains chat_gpt_ai/novaforge. Keep existing .venv/assets/datasets/models/runs. No model weights are bundled; launchers download pinned, hash-verified originals. This package does not grant new rights over them. No playing-strength gain over original Chronos, Windows game-transfer result or native GigaLearn throughput is claimed.
+[TriadBot instructions](TriadBot/README.md)
 
-[Original installation and replay workflow](NovaForge/START_HERE.md) · [Old copying workflow](NovaForge/FROZEN_TEACHER_COPYING.md) · [Viewer setup](NovaForge/RLVISER_CAMERA.md) · [Attribution](NovaForge/THIRD_PARTY.md)
+The small fusion pilot did not establish an improvement: original Chronos 6 W / 2 D / 0 L, raw ensemble 4 / 1 / 3, short single-student distillation 4 / 3 / 1 across eight matched 30-second simulator games. Experiments do not replace the user's existing good Chronos run. No reward guarantees stronger play; the export champion is protected by separate comparisons. Windows live games and laptop CUDA performance still require user testing. Native GigaLearn throughput is not claimed.
 
-The source is published on codex/novaforge-v1. The existing main branch and original project files are unchanged.
+[Upstream review](NovaForge/UPSTREAM_REVIEW.md) · [Further plan](NovaForge/PLAN.md) · [Attribution](NovaForge/THIRD_PARTY.md)
+
+Published on codex/novaforge-v1; main and the original project files are unchanged.

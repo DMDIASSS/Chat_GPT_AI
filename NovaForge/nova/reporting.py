@@ -23,6 +23,7 @@ PPO_KEYS={'train/loss','train/value_loss','train/policy_gradient_loss','train/en
           'train/approx_kl','train/clip_fraction','train/learning_rate','train/explained_variance',
           'train/n_updates','train/anchor_kl','train/critic_warmup','train/actor_lr','train/critic_lr',
           'train/chronos_updates','rollout/ep_rew_mean','rollout/ep_len_mean','time/fps'}
+PPO_KEYS.update({'train/update_rejected','train/anchor_probe_kl'})
 
 
 def number(value):

@@ -1,0 +1,13 @@
+{
+  "contract": {
+    "name": "novaforge-v1-1v1",
+    "observation": 100,
+    "actions": 276,
+    "action_sha256": "ce3b7a7ad9886c7002632b5d85de62c05ae8bc2504888686e9425231452c8546",
+    "tick_skip": 4,
+    "simulator_action_delay_ticks": 1
+  },
+  "sha256": "5861bdf6f17136132af4d85919623d0bca8370bd2e069fe8888b6edd60075020",
+  "timesteps": 12000,
+  "source_sha256": "9694b68b292ddfc22eb57fef003f0d939695d893775adb1c34577cf37ea95e35"
+}

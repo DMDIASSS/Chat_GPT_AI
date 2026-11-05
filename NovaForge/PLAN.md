@@ -1,3 +1,5 @@
+**v1.7 delivered:** eight-tick reward accounting, extended credit horizon, backed-up upgrade, automatic W/D/L/confirmation, regression/invalid-update stops, protected champion exports in both formats, a separate multi-teacher distillation experiment, and [TriadBot](SECOND_PROJECT.md). See [current instructions and pilot evidence](FINISH_AND_FUSION.md). Remaining research is live transfer, longer independent comparisons and native throughput; rewards cannot guarantee improved play.
+
 # Chronos training plan
 
 ## Implemented in v1.6.0

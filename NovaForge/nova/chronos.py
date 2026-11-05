@@ -7,6 +7,7 @@ not extra inputs to the pretrained actor. No NovaForge-276 conversion is involve
 from __future__ import annotations
 
 import hashlib
+import copy
 from pathlib import Path
 
 import gymnasium as gym
@@ -44,12 +45,20 @@ class ChronosArena(ArenaEnv):
         return .35*direction*float(state.ball.position[1])/5120-.1*distance/6000
 
     def _reward(self,old,new,outcome,terminated):
+        if self.cfg.get('chronos',{}).get('reward_profile')=='potential_goal_v2':
+            self.last_reward_parts={}
+            return 0. # Account once at the eight-tick decision boundary below.
         gamma4=self.cfg['ppo']['gamma']**.5
         potential=gamma4*(0. if terminated else self.potential(new))-self.potential(old)
         self.last_reward_parts={'goal':10.*outcome}
         if self.cfg['rewards']!='sparse':self.last_reward_parts['potential']=potential
         for key,value in self.last_reward_parts.items():self.reward_parts[key]=self.reward_parts.get(key,0.)+value
         return float(sum(self.last_reward_parts.values()))
+
+    def _truncated(self):
+        # A PPO transition is eight ticks. Time-limit bootstrapping must never
+        # observe a half decision; goals still terminate immediately.
+        return self.steps%2==0 and super()._truncated()
 
 
 class ChronosEnv(gym.Env):
@@ -83,6 +92,7 @@ class ChronosEnv(gym.Env):
         if self.mirror:planned[[1,3,4]]*=-1
         commands=np.repeat(self.held[None,:],8,axis=0);commands[7]=planned
         self.previous=planned.copy()
+        initial_potential=self.arena.potential(self.arena.state)
         reward=0.
         for start in (0,4):
             _,part,terminated,truncated,info=self.arena.step_controls(commands[start:start+4])
@@ -92,6 +102,13 @@ class ChronosEnv(gym.Env):
                 self.reward_parts[key]=self.reward_parts.get(key,0.)+discount*value
             if terminated or truncated:break
         self.held=planned.copy()
+        if self.arena.cfg.get('chronos',{}).get('reward_profile')=='potential_goal_v2':
+            parts={'goal':10.*info.get('outcome',0)}
+            if self.arena.cfg['rewards']!='sparse':
+                parts['potential']=(self.arena.cfg['ppo']['gamma']*(0. if terminated else self.arena.potential(self.arena.state))
+                                    -initial_potential)
+            reward=float(sum(parts.values()))
+            for key,value in parts.items():self.reward_parts[key]=self.reward_parts.get(key,0.)+value
         self.decisions+=1
         self.reward_total+=reward
         if 'episode' in info:
@@ -160,6 +177,28 @@ class ChronosPPO(PPO):
         super().__init__(*args,**kwargs)
 
     def train(self):
+        policy_before=copy.deepcopy(self.policy.state_dict())
+        optimizer_before=copy.deepcopy(self.policy.optimizer.state_dict())
+        try:
+            self._train_chronos()
+            probe=torch.as_tensor(self.rollout_buffer.observations.reshape(-1,315)[:512],device=self.device)
+            with torch.no_grad():anchor_kl=float(self.policy.anchor_kl(probe))
+            if not np.isfinite(anchor_kl):raise FloatingPointError('Nonfinite anchor KL')
+            if anchor_kl>getattr(self,'anchor_kl_limit',float('inf')):
+                self.policy.load_state_dict(policy_before);self.policy.optimizer.load_state_dict(optimizer_before)
+                self.actor_lr=max(self.actor_lr*.5,1e-7);self.anchor_coef=min(self.anchor_coef*1.5,4.)
+                self.logger.record('train/update_rejected',1)
+                self.consecutive_rejections=getattr(self,'consecutive_rejections',0)+1
+                if self.consecutive_rejections>=3:self.training_halt_reason='Three consecutive updates exceeded the frozen-policy KL limit'
+            else:
+                self.consecutive_rejections=0
+                self.logger.record('train/update_rejected',0)
+            self.logger.record('train/anchor_probe_kl',anchor_kl)
+        except (FloatingPointError,ValueError,RuntimeError):
+            self.policy.load_state_dict(policy_before);self.policy.optimizer.load_state_dict(optimizer_before)
+            raise
+
+    def _train_chronos(self):
         policy=self.policy;policy.set_training_mode(True)
         policy.optimizer.param_groups[0]['lr']=self.actor_lr
         policy.optimizer.param_groups[1]['lr']=self.critic_lr
@@ -186,10 +225,10 @@ class ChronosPPO(PPO):
                     keep_going=False;break
                 loss=self.vf_coef*value_loss
                 if not warmup:loss=loss+actor_loss+self.ent_coef*entropy_loss+self.anchor_coef*anchor_loss
-                if not torch.isfinite(loss):raise ValueError('Nonfinite Chronos PPO loss')
+                if not torch.isfinite(loss):raise FloatingPointError('Nonfinite Chronos PPO loss')
                 policy.optimizer.zero_grad(set_to_none=True);loss.backward()
-                nn.utils.clip_grad_norm_(policy.value_net.parameters(),self.max_grad_norm)
-                if not warmup:nn.utils.clip_grad_norm_(policy.actor.parameters(),self.max_grad_norm)
+                nn.utils.clip_grad_norm_(policy.value_net.parameters(),self.max_grad_norm,error_if_nonfinite=True)
+                if not warmup:nn.utils.clip_grad_norm_(policy.actor.parameters(),self.max_grad_norm,error_if_nonfinite=True)
                 policy.optimizer.step()
                 for key,value in [('loss',loss.item()),('policy_gradient_loss',actor_loss.item()),('value_loss',value_loss.item()),
                     ('entropy_loss',entropy_loss.item()),('anchor_kl',anchor_loss.item()),('approx_kl',approx),

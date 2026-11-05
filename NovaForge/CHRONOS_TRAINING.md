@@ -1,3 +1,5 @@
+**v1.7 update:** Follow [FINISH_AND_FUSION.md](FINISH_AND_FUSION.md) for current reward settings, automatic stops, champion exports, fusion and v4/v5 packaging. Launcher 38 continues to watch latest; 51 watches the retained champion. The text below records the v1.6 workflow.
+
 # Chronos as the starting policy: NovaChronos
 
 This is a separate **chronos01** run initialized from the actual pinned Chronos policy and shared-head weights. It is reward-driven PPO, not the copy02 classifier. The original downloaded Chronos weights stay frozen and hash-verified; copy02 is preserved.

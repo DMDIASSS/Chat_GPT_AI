@@ -128,6 +128,10 @@ class ArenaEnv(gym.Env):
     def step(self,action):
         return self.step_controls(ACTIONS[int(action)])
 
+    def _truncated(self):
+        return (self.steps*TICK_SKIP>=self.cfg['env']['episode_seconds']*120 or
+                self.since_touch>=self.cfg['env']['no_touch_seconds']*120)
+
     def step_controls(self,controls):
         controls=np.asarray(controls,dtype=np.float32)
         if controls.shape==(8,): controls=np.repeat(controls[None,:],TICK_SKIP,axis=0)
@@ -150,8 +154,7 @@ class ArenaEnv(gym.Env):
             self.dribble_seconds+=TICK_SKIP/120
         terminated=bool(self.state.goal_scored)
         # Goal takes precedence over a simultaneous horizon/timeout.
-        truncated=not terminated and (self.steps*TICK_SKIP>=self.cfg['env']['episode_seconds']*120 or
-                    self.since_touch>=self.cfg['env']['no_touch_seconds']*120)
+        truncated=not terminated and self._truncated()
         outcome=(1 if self.state.scoring_team==self.team else -1) if terminated else 0
         reward=self._reward(old,self.state,outcome,terminated)
         self.reward_total+=reward

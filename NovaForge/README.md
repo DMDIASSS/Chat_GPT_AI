@@ -1,4 +1,6 @@
-# NovaForge v1.6.0
+# NovaForge v1.7.0
+
+**Current guide: [Finish, unattended safeguards, fusion and both exports](FINISH_AND_FUSION.md).** Launcher 35 upgrades/resumes chronos01 with backed-up settings, longer reward credit, automatic W/D/L checks, protected champion and regression stops. Launcher 38 still watches the latest learner; 51 watches the champion. Launcher 40 exports both .pt/.cfg and .lt/.toml. Launcher 43 starts the separate fusion01 experiment. [TriadBot](SECOND_PROJECT.md) is a separate random three-expert project.
 
 Continue training the actual Chronos policy with reward-driven PPO, four frozen opponents and snapshot self-play. The new **chronos01** run is separate from earlier copying experiments.
 
@@ -17,7 +19,7 @@ Pause copy02 with 22 and wait for its console to exit. Merge this ZIP at your pr
 | 41 | Export a metrics report ZIP |
 | 42 | Watch the unchanged Chronos initialization |
 
-After **32,768 learner decisions**, pause and run 39. Send the report before extending the run substantially. Initializing from Chronos avoids learning basic controls from scratch; improvement over Chronos still needs gameplay evidence.
+Unattended W/D/L checks run every 131,072 decisions. Use 41 to export a report when needed. Initializing from Chronos avoids learning basic controls from scratch; improvement over Chronos still needs gameplay evidence.
 
 [Step-by-step Chronos guide](CHRONOS_TRAINING.md) · [Upstream review](UPSTREAM_REVIEW.md) · [Plan](PLAN.md) · [Validation](VALIDATION.md) · [Attribution](THIRD_PARTY.md)
 

@@ -148,12 +148,14 @@ def main():
     p.add_argument('--config',default='configs/chronos.json')
     p.add_argument('--resume',action='store_true')
     p.add_argument('--steps',type=positive_int,default=32768)
+    p.add_argument('--clear-halt',action='store_true',help='Explicitly clear a reviewed automatic training halt')
     p.add_argument('--forever',action='store_true')
     p.add_argument('--device',choices=['cpu','cuda','auto'],default=None)
     p.add_argument('--wandb',choices=['online','offline','off'],default=None)
     p=sub.add_parser('chronos-watch')
     p.add_argument('--run',default='chronos01')
     p.add_argument('--initial',action='store_true')
+    p.add_argument('--latest',action='store_true',help='Watch the unselected learner instead of the retained champion')
     p.add_argument('--opponent',choices=['scorer','chronos','galactus','nexto','ripple'],default='chronos')
     p.add_argument('--scenario',choices=['kickoff','shot','defense','dribble','aerial','recovery','wall'],default='kickoff')
     p.add_argument('--viewer-mode',choices=['auto','existing','manual'],default='auto')
@@ -166,7 +168,15 @@ def main():
     p.add_argument('--seed',type=int,default=1700001)
     p=sub.add_parser('chronos-export')
     p.add_argument('--run',default='chronos01');p.add_argument('--initial',action='store_true')
+    p.add_argument('--latest',action='store_true',help='Export the unselected learner instead of the retained champion')
     p=sub.add_parser('chronos-report');p.add_argument('--run',default='chronos01')
+    p=sub.add_parser('chronos-combine',help='Experimental single Chronos network distilled from Chronos/Ripple/Galactus probabilities')
+    p.add_argument('--run',default='fusion01');p.add_argument('--samples',type=positive_int,default=32768)
+    p=sub.add_parser('chronos-league',help='Timed multi-goal W/D/L against frozen bots and original Chronos baseline')
+    p.add_argument('--run',default='chronos01');p.add_argument('--latest',action='store_true')
+    p.add_argument('--ensemble',action='store_true',help='Benchmark the experimental probability ensemble')
+    p.add_argument('--pairs',type=positive_int,default=2);p.add_argument('--seconds',type=positive_float,default=60)
+    p.add_argument('--seed',type=int,default=99271001)
     args=parser.parse_args()
     if args.command in ('status','pause'):
         run=(ROOT/'runs'/args.run).resolve()
@@ -180,6 +190,12 @@ def main():
     elif args.command=='chronos-train':
         from nova.chronos_training import train_chronos
         train_chronos(args)
+    elif args.command=='chronos-combine':
+        from nova.chronos_fusion import combine_command
+        combine_command(args)
+    elif args.command=='chronos-league':
+        from nova.chronos_league import league_command
+        league_command(args)
     elif args.command in ('chronos-watch','chronos-evaluate','chronos-export','chronos-report'):
         from nova.chronos_tools import watch_chronos,evaluate_chronos,export_chronos,report_chronos
         {'chronos-watch':watch_chronos,'chronos-evaluate':evaluate_chronos,

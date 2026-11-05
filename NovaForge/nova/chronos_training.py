@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import json
 import os
+import shutil
+import uuid
 from pathlib import Path
 import tempfile
 import time
@@ -123,7 +125,29 @@ def new_chronos_model(cfg,env,initialize=True):
         original=GigaNetwork(verify_teacher('chronos'),'chronos')
         model.policy.actor.load_state_dict(original.state_dict(),strict=True)
         model.policy.anchor.load_state_dict(original.state_dict(),strict=True)
+    model.anchor_kl_limit=settings.get('anchor_kl_limit',.1)
+    model.reward_revision=settings.get('reward_profile')
+    with torch.no_grad():
+        model.policy.value_net[-1].weight.zero_();model.policy.value_net[-1].bias.zero_()
     return model
+
+
+def finish_config(run,cfg,source):
+    """One-time, backed-up migration from the known v1.6 reward configuration."""
+    if cfg['chronos'].get('reward_profile')=='potential_goal_v2':return cfg
+    if cfg['chronos'].get('reward_profile')!='potential_goal_v1':raise ValueError('Unknown Chronos reward profile; migration refused')
+    folder=Path(run)/'upgrades/pre_v1_7_0';folder.mkdir(parents=True,exist_ok=True)
+    if not (folder/'config.json').exists():
+        shutil.copy2(Path(run)/'config.json',folder/'config.json')
+    if not complete_generation(folder/'full.zip'):
+        shutil.copy2(source,folder/'full.zip');shutil.copy2(str(source)+'.json',str(folder/'full.zip')+'.json')
+        check_model(folder/'full.zip',CHRONOS_CONTRACT)
+    updated=load_config(ROOT/'configs/chronos.json')
+    for key in ('seed','workers','threads','device'):updated[key]=cfg[key]
+    updated['trainer']='chronos_ppo_v1'
+    atomic_json(Path(run)/'config.json',updated)
+    print('UPGRADED: eight-tick reward, longer credit horizon, critic warmup and automatic champion checks. Previous config/model backed up.',flush=True)
+    return updated
 
 
 class ChronosCallback(BaseCallback):
@@ -131,18 +155,21 @@ class ChronosCallback(BaseCallback):
         super().__init__();self.run=Path(run);self.cfg=cfg;self.tracker=tracker;self.continuous=continuous
         self.started=time.monotonic();self.start_step=None;self.last_saved=-1;self.window=EpisodeWindow()
 
-    def persist(self,force=False):
+    def persist(self,force=False,replace=False):
         step=int(self.model.num_timesteps)
         if not force and self.last_saved>=0 and step-self.last_saved<self.cfg['league']['snapshot_every']:return
         full=self.run/'checkpoints'/f'step_{step:012d}.zip'
-        actor=self.run/'snapshots'/f'step_{step:012d}.lt'
-        if not complete_generation(full):save_ppo(self.model,full,contract=CHRONOS_CONTRACT,initialization='pretrained_chronos_anchored_ppo')
+        if replace and step==0:raise ValueError('Never replace the permanent initialization')
+        suffix='_guard_'+uuid.uuid4().hex[:6] if replace else ''
+        actor=self.run/'snapshots'/f'step_{step:012d}{suffix}.lt'
+        if replace or not complete_generation(full):save_ppo(self.model,full,contract=CHRONOS_CONTRACT,initialization='pretrained_chronos_anchored_ppo')
         check_model(full,CHRONOS_CONTRACT)
         if not complete_generation(actor):export_chronos_actor(self.model,actor)
         check_model(actor,CHRONOS_CONTRACT)
         atomic_json(self.run/'latest.json',dict(path=str(full.relative_to(self.run)),step=step,contract=CHRONOS_CONTRACT))
         manifest=self.run/'league.json'
         entries=json.loads(manifest.read_text())['snapshots'] if manifest.exists() else []
+        if replace:entries=[e for e in entries if e['step']!=step]
         if not any(e['step']==step for e in entries):entries.append(dict(path=str(actor.relative_to(self.run)),step=step))
         entries=entries[-self.cfg['league']['history_size']:]
         atomic_json(manifest,dict(contract=CHRONOS_CONTRACT,snapshots=entries))
@@ -167,10 +194,15 @@ class ChronosCallback(BaseCallback):
         atomic_json(self.run/'status.json',dict(trainer='chronos_ppo_v1',state=state,timesteps=step,
             decision_ticks=8,session_seconds=time.monotonic()-self.started,metrics=metrics,
             chronos_updates=self.model.chronos_updates,critic_warmup_updates=self.model.critic_warmup_updates,
-            continuous=self.continuous,wandb=self.tracker.status()))
+            continuous=self.continuous,wandb=self.tracker.status(),
+            halt_reason=getattr(self.model,'training_halt_reason',None),
+            champion=json.loads((self.run/'champion.json').read_text()) if (self.run/'champion.json').exists() else None,
+            guard=json.loads((self.run/'guard_state.json').read_text()) if (self.run/'guard_state.json').exists() else None))
 
     def _on_rollout_start(self):self.persist()
     def _on_step(self):
+        if getattr(self.model,'training_halt_reason',None):
+            (self.run/'STOP').touch();return False
         for info in self.locals.get('infos',[]):
             if 'outcome' in info:
                 self.window.add(info)
@@ -180,7 +212,9 @@ class ChronosCallback(BaseCallback):
                     f.write(json.dumps(dict(row,timesteps=int(self.model.num_timesteps)))+'\n')
         if self.n_calls%250==0:self.status('training')
         return not (self.run/'STOP').exists()
-    def _on_training_end(self):self.persist(force=True)
+    def _on_training_end(self):
+        self.persist(force=True)
+        self.model.logger.dump(step=self.model.num_timesteps)
 
 
 def train_chronos(args):
@@ -195,6 +229,7 @@ def train_chronos(args):
             provenance=json.loads((run/'provenance.json').read_text())
             if provenance['teacher_lock_sha256']!=sha256(ROOT/'teachers.lock.json'):
                 raise ValueError('Teacher lock changed since this Chronos run began')
+            cfg=finish_config(run,cfg,source)
         else:
             if (run/'config.json').exists():raise FileExistsError('Run exists; use --resume')
             cfg=prepare_config(load_config(args.config))
@@ -207,6 +242,22 @@ def train_chronos(args):
             tracker=Tracker(run,cfg,mode=args.wandb,continuous=args.forever)
             vec=make_chronos_vector(cfg,run)
             model=ChronosPPO.load(source,env=vec,device=cfg['device']) if source else new_chronos_model(cfg,vec)
+            if getattr(args,'clear_halt',False):
+                model.training_halt_reason=None;model.consecutive_rejections=0
+            migrated=False
+            if getattr(model,'reward_revision',None)!=cfg['chronos']['reward_profile']:
+                from .chronos_guard import reset_critic
+                reset_critic(model,cfg['chronos']['critic_warmup_updates'])
+                model.actor_lr=cfg['chronos']['actor_lr'];model.critic_lr=cfg['chronos']['critic_lr']
+                model.anchor_coef=cfg['chronos']['anchor_coef'];model.anchor_kl_limit=cfg['chronos']['anchor_kl_limit']
+                model.gamma=cfg['ppo']['gamma'];model.gae_lambda=cfg['ppo']['gae_lambda']
+                model.n_steps=cfg['ppo']['n_steps'];model.batch_size=cfg['ppo']['batch_size']
+                model.rollout_buffer=type(model.rollout_buffer)(model.n_steps,model.observation_space,model.action_space,
+                    device=model.device,gamma=model.gamma,gae_lambda=model.gae_lambda,n_envs=model.n_envs)
+                from stable_baselines3.common.utils import FloatSchedule
+                model.clip_range=FloatSchedule(cfg['ppo']['clip_range'])
+                model.ent_coef=cfg['ppo']['ent_coef'];model.target_kl=cfg['ppo']['target_kl']
+                model.reward_revision=cfg['chronos']['reward_profile'];migrated=True
             if not source:
                 atomic_json(run/'config.json',cfg)
                 atomic_json(run/'provenance.json',dict(contract=CHRONOS_CONTRACT,teacher_lock_sha256=sha256(ROOT/'teachers.lock.json'),
@@ -216,14 +267,30 @@ def train_chronos(args):
             if tracker.run is not None:model.logger.output_formats.append(WandBWriter(tracker))
             (run/'STOP').unlink(missing_ok=True)
             callback=ChronosCallback(run,cfg,tracker,args.forever);callback.init_callback(model)
-            callback.persist(force=True)
+            callback.persist(force=True,replace=migrated and model.num_timesteps>0)
+            from .chronos_guard import ensure_champion,check_progress,EvaluationStopped
+            ensure_champion(run)
             print('Chronos weights loaded directly. Eight-tick masked PPO; frozen opponents and snapshot self-play.',flush=True)
-            try:result=learn_segments(model,callback,args.steps,args.forever,run/'STOP')
-            except KeyboardInterrupt:result='stopped'
+            try:
+                if source and not (run/'guard_state.json').exists() and model.num_timesteps>0:
+                    callback.status('evaluating')
+                    if check_progress(run,cfg,model,tracker,force=True):callback.persist(force=True,replace=True)
+                while not (run/'STOP').exists():
+                    model.learn(total_timesteps=args.steps,callback=callback,reset_num_timesteps=False,log_interval=1,progress_bar=False)
+                    if (run/'STOP').exists():break
+                    callback.status('evaluating')
+                    if check_progress(run,cfg,model,tracker):callback.persist(force=True,replace=True)
+                    callback.status('training')
+                    if not args.forever:result='finished';break
+                else:result='stopped'
+                if (run/'STOP').exists():result='stopped'
+            except (KeyboardInterrupt,EvaluationStopped):result='stopped'
         finally:
             try:
                 if model is not None and callback is not None:
                     callback.persist(force=True);callback.status(result)
+                    if getattr(model,'training_halt_reason',None):
+                        print('AUTOMATIC_TRAINING_HALT:',model.training_halt_reason,'The retained champion remains exportable.',flush=True)
                     verify_teacher('chronos')
             finally:
                 if vec is not None:vec.close()
