@@ -1,5 +1,8 @@
 # Frozen-teacher copying — v1.5
 
+**v1.5.2:** Existing copy02 users should run launcher **32** once, then **21**. The published student is preserved; collection now includes general scenarios and early teacher takeovers. Read [the learning update](LEARNING_UPDATE_v1.5.2.md) before interpreting old and new evaluations.
+
+
 This version starts a **fresh student in `runs\copy02`** and trains it on frozen Nexto, Ripple, Chronos and Galactus simulator controls. It includes a correction for the previous-action shortcut found in v1.4. Read [COPY_CORRECTION_v1.5.md](COPY_CORRECTION_v1.5.md) for the evidence and changes.
 
 ## Update and start fresh

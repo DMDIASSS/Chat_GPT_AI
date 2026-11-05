@@ -22,13 +22,49 @@ from .core import ROOT,ACTIONS,CONTRACT,OBS_SIZE,atomic_json,check_model,sha256
 from .data import collect
 from .environment import ArenaEnv
 from .models import load_ppo,save_ppo,export_actor
-from .teachers import BOT_NAMES,verify_teacher
+from .teachers import BOT_NAMES,FROZEN_BOTS,verify_teacher
 from .tracking import Tracker
 from .training import load_config,new_model,resolve_model
 
 BASE_KEYS=('obs','actions','teacher_id','scenario_id')
 ARRAY_KEYS=BASE_KEYS+('reward','return_to_go','return_complete','transition')
 PROBE_SEEDS=(940111,940107,940103,940101,940105)
+
+
+def correction_options():
+    return dict(revision=2,bootstrap_kickoff_weight=.65,student_prefix_fraction=.5,
+                bootstrap_opponents='scorer',general_opponents='scorer,nexto,ripple,chronos,galactus')
+
+
+def collection_config(cfg,bootstrap):
+    focused=json.loads(json.dumps(cfg))
+    if bootstrap:
+        weights=focused['curriculum']['weights'];other=sum(v for k,v in weights.items() if k!='kickoff')
+        kickoff=cfg['copy'].get('bootstrap_kickoff_weight',1.)
+        focused['curriculum']['weights']={k:(kickoff if k=='kickoff' else (1-kickoff)*v/other if other else 0.) for k,v in weights.items()}
+    return focused
+
+
+def upgrade_copy(args):
+    """Preserve weights/history, restart collection from the published student, and archive old active data."""
+    run=(ROOT/'runs'/args.run).resolve()
+    if run.parent!=(ROOT/'runs').resolve():raise ValueError('Invalid run name')
+    with FileLock(str(run/'train.lock'),timeout=0):
+        cfg=json.loads((run/'config.json').read_text());state=json.loads((run/'copy_state.json').read_text())
+        if cfg['copy'].get('revision',1)>=2:
+            print('COPY_ALREADY_UPGRADED: resume with 21.');return
+        if not cfg['copy'].get('history_free'):raise ValueError('Upgrade copy02, not the legacy copy01 run')
+        selected=state.get('published',state['best']);check_model(run/selected['path'])
+        # A single immutable backup makes an interrupted upgrade repeatable.
+        backup=run/'copy_upgrade_v152_backup.json'
+        if not backup.exists():atomic_json(backup,dict(config=cfg,state=state))
+        state['archived_shards_v152']=state['shards'];state['shards']=[]
+        state['resume']=dict(selected);state['phase']='collection';state['epoch']=0
+        state['collection_stage']='correction_pending'
+        atomic_json(run/'copy_state.json',state)
+        cfg['copy'].update(correction_options(),epochs=2,lr=.0001)
+        atomic_json(run/'config.json',cfg)
+        print('COPY_UPGRADED: retained published student and validation; next resume collects varied corrections. No training files deleted.')
 
 
 def load_shard(path):
@@ -206,6 +242,7 @@ def student_probe(model,cfg,stop):
     n=len(rows)
     return dict(trials=n,contact_fraction=sum(r['touches']>0 for r in rows)/n,
         score_fraction=sum(r['outcome']==1 for r in rows)/n,
+        contact_score_fraction=sum(r['outcome']==1 and r['touches']>0 for r in rows)/n,
         concede_fraction=sum(r['outcome']==-1 for r in rows)/n,timeout_fraction=sum(r['timeout'] for r in rows)/n,
         touches_per_trial=sum(r['touches'] for r in rows)/n,active_control_fraction=active/max(steps,1),
         forward_throttle_fraction=float(forward)/max(steps,1),boost_fraction=float(boost)/max(steps,1))
@@ -218,7 +255,8 @@ def publish_by_probe(model,run,state,cfg,stop):
     selected=state.get('published',state['best']);measured=state.get('last_student_probe')
     selected_validation=state.get('published_validation') or state['best_validation']
     def rank(probe,validation):
-        return (probe['contact_fraction'],probe['score_fraction'],-probe['concede_fraction'],-validation['balanced_loss'])
+        # Historical probes without contact-backed goal counts receive no goal bonus.
+        return (probe['contact_fraction'],probe.get('contact_score_fraction',0.),-probe['concede_fraction'],-validation['balanced_loss'])
     best_rank=rank(measured,selected_validation) if measured else None
     seen=set()
     for record,validation in candidates:
@@ -259,13 +297,14 @@ def train_copy(args):
             cfg=load_config(args.config);cfg['workers']=1
             cfg['curriculum']['adaptive']=False
             names=[n.strip() for n in args.teachers.split(',')]
-            if not names or len(set(names))!=len(names) or set(names)-(set(BOT_NAMES)-{'scripted'}):
+            if not names or len(set(names))!=len(names) or set(names)-set(FROZEN_BOTS):
                 raise ValueError('Choose frozen nexto,ripple,chronos,galactus teachers without duplicates')
             if args.buffer_samples<args.samples: raise ValueError('buffer-samples must be at least samples per round')
             options=dict(teachers=names,samples=args.samples,validation_samples=args.validation_samples,
                 buffer_samples=args.buffer_samples,epochs=args.epochs,lr=args.lr,seed=args.seed,
                 previous_action_dropout=1.,reward_weighting=True,history_free=True,label_mode='final_executed',
                 first_contact_bootstrap=True,contact_threshold=.75)
+            options.update(correction_options())
             cfg['copy']=options
             state=dict(schema=1,teachers=names,teacher_lock_sha256=sha256(ROOT/'teachers.lock.json'),
                 round=0,epoch=0,phase='validation',validation_shards=[],validation_decisions=0,
@@ -330,27 +369,32 @@ def train_copy(args):
                 state['collection_stage']='first_contact' if bootstrap else ('validation' if validation else 'general')
                 collection_cfg=run/'config.json'
                 if bootstrap:
-                    focused=json.loads(json.dumps(cfg))
-                    focused['curriculum']['weights']={k:float(k=='kickoff') for k in cfg['curriculum']['weights']}
+                    focused=collection_config(cfg,True)
                     collection_cfg=run/'work'/f'first_contact_{uuid.uuid4().hex[:8]}.json'
                     atomic_json(collection_cfg,focused)
                 student=None
-                if not validation and not bootstrap and state['round']>0:
+                if not validation and state['collected_decisions']>0 and (not bootstrap or options.get('revision',1)>=2):
                     actor=run/'work'/f'prefix_{uuid.uuid4().hex[:8]}.pt'
                     best=load_ppo(run/state.get('published',state['best'])['path'])
                     export_actor(best,actor);student=str(actor)
                     del best
                 state['phase']='validation' if validation else 'collection';status('copying')
+                opponents='scripted' if validation else options.get('bootstrap_opponents','scorer') if bootstrap else options.get('general_opponents','scorer,nexto,ripple,chronos,galactus')
                 summary=collect(SimpleNamespace(config=str(collection_cfg),replay_bank=None,
-                    opponent='scripted',teacher=','.join(names),samples=remaining,out=str(path),seed=seed,
+                    opponent=opponents,teacher=','.join(names),samples=remaining,out=str(path),seed=seed,
                     balanced_teachers=True,stop_path=stop,on_progress=lambda n,k:status('copying',n,k),
                     student_model=student,label_mode=options['label_mode'],balanced_scenarios=validation,
-                    first_contact_fraction=1. if bootstrap else (0. if validation else .25)))
+                    student_prefix_fraction=options.get('student_prefix_fraction',.25),
+                    first_contact_fraction=.65 if bootstrap and options.get('revision',1)>=2 else (1. if bootstrap else (0. if validation else .25))))
                 if summary.get('stopped'): stop.touch()
                 if summary['samples']:
                     entry=dict(path=str(path.relative_to(run)),samples=summary['samples'],
                         attempted_decisions=summary['attempted_decisions'],sha256=summary['dataset_sha256'],
                         kept_by_teacher=summary['kept_by_teacher'],prefix_episodes=summary['prefix_episodes'],
+                        kept_by_opponent=summary['kept_by_opponent'],
+                        kept_by_scenario=summary['kept_by_scenario'],
+                        collection_seconds=summary['collection_seconds'],
+                        teacher_decisions_per_second=summary['teacher_decisions_per_second'],
                         reward_mean=summary['reward_mean'],complete_return_fraction=summary['complete_return_fraction'])
                     if validation:
                         state['validation_shards'].append(entry)
@@ -363,6 +407,10 @@ def train_copy(args):
                             state['shards'].pop(0)
                         state['phase']='fit';state['epoch']=0
                     atomic_json(state_path,state)
+                    if not validation:
+                        tracker.log({'copy/collection_decisions_per_second':summary['teacher_decisions_per_second'],
+                                     'copy/collection_seconds':summary['collection_seconds'],
+                                     'copy/teacher_takeover_episodes':summary['prefix_episodes']},state['collected_decisions'])
             ready=True
             while state['validation_decisions']<options['validation_samples'] and not stop.exists(): gather(True)
             validation_data=load_corpus(run,state['validation_shards']) if state['validation_shards'] else None
@@ -470,11 +518,17 @@ def report_copy(args):
         row=numbers(raw,{'round','epoch','collected_decisions','gradient_updates','train_loss',
             'teacher_reward_mean','complete_return_fraction'})
         row['validation']=clean_validation(raw.get('validation'));history.append(row)
+    active_collection={'by_teacher':defaultdict(int),'by_opponent':defaultdict(int),'by_scenario':defaultdict(int),'prefix_episodes':0}
+    for entry in state['shards']:
+        active_collection['prefix_episodes']+=int(entry.get('prefix_episodes',0))
+        for key,allowed in [('by_teacher',BOT_NAMES),('by_opponent',BOT_NAMES),('by_scenario',SCENARIOS)]:
+            for name,count in numbers(entry.get('kept_'+key,{}),allowed).items():active_collection[key][name]+=count
     report=dict(kind='frozen_teacher_copying',run=run.name,generated_utc=datetime.now(timezone.utc).isoformat(),
         teachers=[n for n in state['teachers'] if n in BOT_NAMES],
         teacher_lock_sha256=state['teacher_lock_sha256'],
         configuration=dict(copy=numbers(config['copy'],{'samples','validation_samples','buffer_samples',
-            'epochs','lr','seed','previous_action_dropout'}),reward_weighting=bool(config['copy'].get('reward_weighting',True)),
+            'epochs','lr','seed','previous_action_dropout','revision','bootstrap_kickoff_weight','student_prefix_fraction'}),reward_weighting=bool(config['copy'].get('reward_weighting',True)),
+            collection_opponents={k:[n for n in config['copy'].get(k,'scripted').split(',') if n in BOT_NAMES] for k in ('bootstrap_opponents','general_opponents')},
             history_free=bool(config['copy'].get('history_free')),label_mode=config['copy'].get('label_mode','constant_executed'),
             first_contact_bootstrap=bool(config['copy'].get('first_contact_bootstrap')),
             reset_weights=numbers(config['curriculum']['weights'],SCENARIOS)),
@@ -482,9 +536,11 @@ def report_copy(args):
         best_checkpoint={k:published[k] for k in ['sha256','timesteps']},
         validation_best_checkpoint={k:state['best'][k] for k in ['sha256','timesteps']},
         best_validation=clean_validation(state['best_validation']),history=history,
+        active_collection=active_collection,
         selected_validation=clean_validation(state.get('published_validation')),
         review_notes=validation_coverage_notes(state['best_validation'],config['curriculum']['weights']),
         student_probe=numbers(state.get('last_student_probe'),{'trials','contact_fraction','score_fraction',
+            'contact_score_fraction',
             'concede_fraction','timeout_fraction','touches_per_trial','active_control_fraction',
             'forward_throttle_fraction','boost_fraction'}),
         probe_matches_best=bool(state.get('last_student_probe',{}).get('checkpoint_sha256')==published['sha256']),

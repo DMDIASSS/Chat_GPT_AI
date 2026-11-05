@@ -52,7 +52,7 @@ def main():
     p.add_argument('--replay-bank',default=None)
     p=sub.add_parser('collect',help='Collect actual teacher controls in RocketSim')
     p.add_argument('--teacher',default='ripple',help='One bot or a comma-separated mixture of demonstration teachers')
-    p.add_argument('--opponent',choices=['scripted','nexto','ripple','chronos','galactus'],default='scripted')
+    p.add_argument('--opponent',default='scripted',help='One opponent or comma-separated episode mixture')
     p.add_argument('--samples',type=positive_int,default=20000)
     p.add_argument('--out',default='datasets/ripple20k.npz')
     p.add_argument('--seed',type=int,default=2217)
@@ -86,7 +86,7 @@ def main():
     p.add_argument('--model',required=True)
     p=sub.add_parser('watch',help='Stream the bot to the standalone RLViser application')
     p.add_argument('--model',required=True)
-    p.add_argument('--opponent',choices=['scripted','nexto','ripple','chronos','galactus'],default='scripted')
+    p.add_argument('--opponent',choices=['scripted','scorer','nexto','ripple','chronos','galactus'],default='scorer')
     p.add_argument('--scenario',choices=['kickoff','shot','defense','aerial','dribble','recovery','wall'],default='kickoff')
     p.add_argument('--seconds',type=positive_float,default=30)
     p.add_argument('--seed',type=int,default=5555)
@@ -117,11 +117,13 @@ def main():
     p.add_argument('--samples',type=positive_int,default=50000,help='Teacher decisions per fresh demonstration round')
     p.add_argument('--validation-samples',type=positive_int,default=10000)
     p.add_argument('--buffer-samples',type=positive_int,default=250000)
-    p.add_argument('--epochs',type=positive_int,default=10,help='Epochs per fresh demonstration round')
-    p.add_argument('--lr',type=positive_float,default=.0003)
+    p.add_argument('--epochs',type=positive_int,default=2,help='Epochs per fresh demonstration round')
+    p.add_argument('--lr',type=positive_float,default=.0001)
     p.add_argument('--seed',type=int,default=29017)
     p.add_argument('--wandb',choices=['online','offline','off'],default=None)
     p=sub.add_parser('copy-report',help='Export imitation metrics and matching evaluations to a shareable ZIP')
+    p.add_argument('--run',default='copy02')
+    p=sub.add_parser('copy-upgrade',help='Preserve copy02 weights and switch to varied correction collection')
     p.add_argument('--run',default='copy02')
     p=sub.add_parser('pt-to-toml',help='Package a NovaForge TorchScript .pt actor for RLBot v5')
     p.add_argument('model',nargs='?',help='Actor .pt path; omit to open the Windows file picker')
@@ -150,9 +152,9 @@ def main():
     elif args.command in ('pt-to-toml','export-v5'):
         from nova.packaging import package_actor,export_v5
         (package_actor if args.command=='pt-to-toml' else export_v5)(args)
-    elif args.command in ('copy-train','copy-report'):
-        from nova.imitation import train_copy, report_copy
-        (train_copy if args.command=='copy-train' else report_copy)(args)
+    elif args.command in ('copy-train','copy-report','copy-upgrade'):
+        from nova.imitation import train_copy, report_copy, upgrade_copy
+        {'copy-train':train_copy,'copy-report':report_copy,'copy-upgrade':upgrade_copy}[args.command](args)
     elif args.command in ('report','compare-progress'):
         from nova.reporting import report_command, compare_command
         (report_command if args.command=='report' else compare_command)(args)

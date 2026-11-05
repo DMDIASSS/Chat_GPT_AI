@@ -1,5 +1,8 @@
 # NovaForge v1.5 — start here
 
+**v1.5.2:** Existing copy02 users should run launcher **32** once, then **21**. The published student is preserved; collection now includes general scenarios and early teacher takeovers. Read [the learning update](LEARNING_UPDATE_v1.5.2.md) before interpreting old and new evaluations.
+
+
 **Existing copying users:** use [COPY_CORRECTION_v1.5.md](COPY_CORRECTION_v1.5.md). Launcher **21** now starts/resumes a fresh `copy02`, with corrected labels and gameplay monitoring. **24** auto-launches RLViser on the learner with the requested camera preset.
 
 **For direct copying of frozen teachers:** follow [FROZEN_TEACHER_COPYING.md](FROZEN_TEACHER_COPYING.md). Launchers **21–27** provide continuous supervised copying, pause/resume, viewing, export and reports in `copy02`. The older PPO workflow remains available below.

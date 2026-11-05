@@ -31,7 +31,10 @@ def summarize(rows):
     wins=sum(r['outcome']==1 for r in rows)
     losses=sum(r['outcome']==-1 for r in rows)
     timeouts=sum(r['timeout'] for r in rows)
+    contact_wins=sum(r['outcome']==1 and r['touches']>0 for r in rows)
     return dict(trials=n,first_goal_wins=wins,first_goal_losses=losses,timeouts=timeouts,
+        wins_with_student_contact=contact_wins,wins_without_student_contact=wins-contact_wins,
+        contact_score_fraction=contact_wins/max(n,1),
         first_goal_score_fraction=wins/max(n,1),resolved_fraction=(wins+losses)/max(n,1),
         practice_success_fraction=sum(r['practice_success'] for r in rows)/max(n,1),
         touches_per_trial=sum(r['touches'] for r in rows)/max(n,1))
@@ -77,7 +80,7 @@ def evaluate(args):
     report=dict(kind='first_goal_trials',candidate=str(student.path),candidate_sha256=sha256(student.path),
         seconds_per_trial=args.seconds,seed_start=args.seed,paired_team_sides=True,
         summary=summarize(rows),breakdown=breakdown,trials=rows,
-        note='Simulator screening only. Timeouts are censored trials, not draws or wins. No automatic promotion.')
+        note='Simulator screening only. Timeouts are censored trials. Goals without student contact can result from the reset trajectory or opponent own goals. Even contact-backed goals do not establish mechanical causation. No automatic promotion.')
     if baseline:
         delta=np.array([a['outcome']-b['outcome'] for a,b in zip(rows,baseline_rows)])
         report.update(baseline=str(baseline.path),baseline_sha256=sha256(baseline.path),

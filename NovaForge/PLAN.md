@@ -1,5 +1,18 @@
 # Implemented work and next experiments
 
+**Current v1.5.2:** [varied correction collection](LEARNING_UPDATE_v1.5.2.md), preserved copy02 upgrade, reduced fitting reuse, ground scorer and contact-aware goal reporting. Kickoff overrides remain disabled.
+
+## Next work after the current correction
+
+1. **Verify the correction on copy02.** Collect 100–150k additional decisions after launcher 32. Compare the exact preserved published checkpoint with the new candidate using the same opponents, both teams and new seed sets. Track contact fraction, scored goals with contact, defense stops, recovery success, held-out loss and time. Reject an apparent aerial gain made of zero-touch goals. Keep 271 unchanged as the requested reference once its files are identified.
+2. **Break down teacher usefulness.** At equal decisions and wall time, compare one-teacher starts against the four-teacher mixture. Report transitions and each scenario, not only global action agreement. Check teacher takeovers from actual failed student states visually. A mixture can contain incompatible choices; more teachers is not automatically better.
+3. **Improve selection evidence.** Expand the training monitor beyond ten kickoff trials to fixed shooting, defense and recovery cases, while retaining the old probe series. Store its protocol/version and checkpoint hash. Use separate untouched seeds for strength claims. Do not silently reinterpret historical scores.
+4. **Native throughput integration.** Recover the source behind NATIVE_5_TRAIN.bat, preserve existing runs, verify feature/control-delay/reward traces, then add batched frozen-teacher inference and parallel arenas. Report physics ticks, learner decisions, teacher inferences, gradient updates and end-to-end time separately. Compare learning gained per minute before preferring the native backend.
+5. **Reward-driven refinement inspired by cycle9.** Branch the best verified copying policy into PPO with low actor learning rate and a frozen initialization anchor; retain supervised refreshes. Start with goal, contact, movement-toward-ball and conceded-goal components, audit reward contributions for farming, and compare with pure copying at equal wall time. Existing PPO mode is not yet this combined trainer. Require actual scoring/defending gains before promotion.
+6. **Optional assisted kickoff comparisons.** Keep training overrides off for both teams. If an export/comparison assist is added, expose it explicitly and run assisted and unassisted benchmarks as separate variants. Never use assisted behavior to claim the network learned kickoff.
+
+## Prior implementation history
+
 **v1.5:** correct transition labels and eliminate previous-action shortcuts; start fresh `copy02`; bootstrap first-touch approaches, then expand the curriculum; select published models using student kickoff monitoring plus copying loss. Auto-find/open RLViser with a checked Windows camera build, preserve Forge dashboard links, and add mechanics/coverage reporting. See [the correction](COPY_CORRECTION_v1.5.md) and [camera setup](RLVISER_CAMERA.md).
 
 **v1.4:** [LibTorch .lt + RLBot v5 export](V5_EXPORT.md), supported actor packaging, and the requested `chat_gpt_ai/novaforge` ZIP layout. Shared simulator returns mildly weight imitation labels; the original teachers’ reward functions are unavailable.

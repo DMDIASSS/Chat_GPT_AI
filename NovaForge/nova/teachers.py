@@ -13,7 +13,9 @@ from .core import ROOT, TICK_SKIP, ACTIONS, as_v1, observe, sha256, atomic_json
 from .models import FrozenActor
 
 ASSETS=ROOT/'assets'
-BOT_NAMES=('scripted','nexto','ripple','chronos','galactus')
+BUILTIN_BOTS=('scripted','scorer')
+FROZEN_BOTS=('nexto','ripple','chronos','galactus')
+BOT_NAMES=BUILTIN_BOTS+FROZEN_BOTS
 
 
 def _entries(group):
@@ -33,7 +35,7 @@ def fetch_teachers(groups):
     """Download immutable upstream files, verify bytes, and preserve notices."""
     import rlgym.rocket_league.sim as sim
     for group in groups:
-        if group not in BOT_NAMES or group=='scripted':
+        if group not in FROZEN_BOTS:
             raise ValueError(f'No verified headless adapter for {group}')
         target=ASSETS/group
         target.mkdir(parents=True,exist_ok=True)
@@ -111,6 +113,42 @@ class Scripted:
         return self.previous.copy()
 
 
+class Scorer(Scripted):
+    """Ground scoring baseline: approach behind the ball, then drive it toward goal."""
+    def target(self,state):
+        car=state.cars[self.agent];ball=state.ball.position.copy()
+        direction=1 if car.team_num==0 else -1
+        goal=np.array([0.,direction*5500.,93.15],dtype=np.float32)
+        shot=goal[:2]-ball[:2];shot/=max(float(np.linalg.norm(shot)),1.)
+        relative=car.physics.position[:2]-ball[:2]
+        behind=float(relative@shot)
+        lateral=float(abs(relative[0]*shot[1]-relative[1]*shot[0]))
+        distance=float(np.linalg.norm(relative))
+        lined_up=behind<-50 and lateral<max(110.,.22*distance)
+        if lined_up:
+            target=ball.copy();target[:2]+=shot*350.
+        else:
+            target=ball.copy();target[:2]-=shot*min(650.,max(280.,distance*.45))
+            if behind>-80:
+                # Route around the ball instead of pushing it toward the own goal.
+                side=1. if relative[0]*shot[1]-relative[1]*shot[0]>=0 else -1.
+                target[:2]+=np.array([shot[1],-shot[0]])*side*350.
+        target[0]=np.clip(target[0],-3950,3950);target[1]=np.clip(target[1],-5000,5000)
+        return target,lined_up
+
+    def act(self,state):
+        car=state.cars[self.agent];target,lined_up=self.target(state)
+        delta=target-car.physics.position
+        angle=float(np.arctan2(np.dot(delta,car.physics.right),np.dot(delta,car.physics.forward)))
+        distance=float(np.linalg.norm(delta[:2]))
+        steer=float(np.clip(angle*3.,-1.,1.))
+        throttle=1. if abs(angle)<1.2 else .35
+        boost=car.on_ground and abs(angle)<.18 and distance>300 and car.boost_amount>0
+        jump=car.on_ground and lined_up and np.linalg.norm(state.ball.position-car.physics.position)<260 and 180<state.ball.position[2]<400
+        self.previous=np.array([throttle,steer,0,steer,0,jump,boost,abs(angle)>1.4],dtype=np.float32)
+        return self.previous.copy()
+
+
 class Snapshot:
     def __init__(self,path):
         self.actor=FrozenActor(path)
@@ -184,7 +222,7 @@ class Ripple:
 
 
 def make_opponent(name,path=None):
-    factories={'scripted':Scripted,'nexto':Nexto,'ripple':Ripple}
+    factories={'scripted':Scripted,'scorer':Scorer,'nexto':Nexto,'ripple':Ripple}
     if name=='snapshot': return Snapshot(path)
     if name in ('chronos','galactus'):
         from .giga_teachers import GigaTeacher

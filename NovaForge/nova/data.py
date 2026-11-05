@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 
 import numpy as np
@@ -31,9 +32,14 @@ def save_npz(path,**arrays):
 
 
 def collect(args):
+    started=time.monotonic()
     cfg=prepare_config(load_config(args.config),replay_bank=args.replay_bank)
     torch.set_num_threads(cfg['threads'])
-    env=ArenaEnv(cfg,opponent=args.opponent)
+    opponents=[n.strip() for n in args.opponent.split(',')]
+    if not opponents or len(set(opponents))!=len(opponents) or set(opponents)-set(BOT_NAMES):raise ValueError('Unknown/duplicate collection opponent')
+    if len(opponents)>1:
+        cfg['league']['weights']={n:1./len(opponents) for n in opponents}
+    env=ArenaEnv(cfg,opponent=opponents[0] if len(opponents)==1 else None)
     names=[n.strip() for n in args.teacher.split(',')]
     if not names or set(names)-set(BOT_NAMES): raise ValueError('Unknown demonstration teacher')
     teachers={n:make_opponent(n) for n in names}
@@ -74,12 +80,15 @@ def collect(args):
     first_contact_segments=0
     transitions=[]
     kept_by_teacher={n:0 for n in names}
+    kept_by_opponent={n:0 for n in opponents}
     episode=0
     attempted=0
     stopped=False
     stop_path=getattr(args,'stop_path',None)
     progress=getattr(args,'on_progress',None)
     student=FrozenActor(args.student_model) if getattr(args,'student_model',None) else None
+    prefix_fraction=float(getattr(args,'student_prefix_fraction',.25))
+    if not 0<=prefix_fraction<=1:raise ValueError('Student prefix fraction must be in [0,1]')
     prefix_decisions=0
     prefix_episodes=0
     def reset_demo(seed=None):
@@ -97,7 +106,7 @@ def collect(args):
         nonlocal obs,prefix_decisions,prefix_episodes,episode,teacher_started,first_contact_episode
         teacher_started=False
         first_contact_episode=env.scenario=='kickoff' and selector.random()<getattr(args,'first_contact_fraction',0.)
-        if student is not None and selector.random()<.25:
+        if student is not None and selector.random()<prefix_fraction:
             prefix_episodes+=1
             for _ in range(int(selector.integers(1,61))):
                 obs,_,terminal,truncated,_=env.step(student.action(obs))
@@ -105,6 +114,9 @@ def collect(args):
                 if terminal or truncated:
                     episode+=1;obs,_=reset_demo();break
                 if stop_path and Path(stop_path).exists(): break
+            # The teacher should recover and continue from this state, even when
+            # the student already touched the ball during its unlabelled prefix.
+            first_contact_episode=False
         teacher.reset(env.state,env.agent,np.random.default_rng(args.seed+episode))
     try:
         start_teacher()
@@ -131,6 +143,7 @@ def collect(args):
                 scenario_ids.append(scenario_names.index(env.scenario))
                 errors.append(error)
                 kept_by_teacher[teacher_name]+=1
+                kept_by_opponent[env.opponent_label]+=1
                 rewards.append(float(reward));returns.append(0.);return_complete.append(False)
                 transitions.append(is_transition)
                 kept_mixed_windows+=not constant
@@ -170,6 +183,8 @@ def collect(args):
     summary=dict(kind='simulator_teacher_controls',contract=CONTRACT,teacher=args.teacher,
         opponent=args.opponent,samples=len(actions),skipped_quantization=quantization_skipped,
         skipped_mid_window_change=mixed_windows,kept_by_teacher=kept_by_teacher,
+        kept_by_opponent=kept_by_opponent,
+        kept_by_scenario={name:scenario_ids.count(i) for i,name in enumerate(scenario_names)},
         completed_episodes=episode-first_contact_segments,completed_segments=episode,
         groups=len(set(groups)),max_control_error=max(errors),
         dataset_sha256=sha256(args.out),replay_bank=cfg['env']['replay_bank'],seed=args.seed,
@@ -180,8 +195,11 @@ def collect(args):
         label_mode=label_mode,accepted_mid_window_changes=kept_mixed_windows,
         skipped_startup_idle=skipped_startup_idle,transition_fraction=float(np.mean(transitions)),
         first_contact_segments=first_contact_segments,
+        student_prefix_fraction=prefix_fraction,
+        collection_seconds=time.monotonic()-started,
         note=('Final-executed mode retains control transitions and skips artificial idle queue warmup. A changing four-tick window uses its last executed control as an approximate constant student target; stable windows are exact.'
               if label_mode=='final_executed' else 'Stable executed-control labels; changing windows excluded. Legacy datasets can contain an action-history shortcut.'))
+    summary['teacher_decisions_per_second']=attempted/max(summary['collection_seconds'],1e-9)
     atomic_json(str(args.out)+'.json',summary)
     print(json.dumps(summary,indent=2))
     return summary

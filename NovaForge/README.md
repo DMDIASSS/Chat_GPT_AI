@@ -1,4 +1,6 @@
-# NovaForge v1.5.1
+# NovaForge v1.5.2
+
+**Learning correction:** upgrade existing copy02 once with **32_UPGRADE_COPY_LEARNING.bat**, then resume with **21**. This keeps your published student, expands beginner practice beyond kickoffs, adds early teacher takeovers from student attempts, and reduces repeated fitting. **24** now watches against a ground scorer. See [the learning update](LEARNING_UPDATE_v1.5.2.md).
 
 **Viewer crash fix:** the camera build requires the FlatBuffers sender `rlviser-py==0.6.14`. Setup/watch now upgrades the sender before loading its native DLL and refuses incompatible loaded versions. See [VIEWER_HOTFIX_v1.5.1.md](VIEWER_HOTFIX_v1.5.1.md). Continue your existing `copy02` with launcher 21.
 

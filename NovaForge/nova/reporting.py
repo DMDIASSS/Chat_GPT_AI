@@ -16,7 +16,7 @@ import uuid
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-BOTS={'scripted','nexto','ripple','chronos','galactus','latest','history'}
+BOTS={'scripted','scorer','nexto','ripple','chronos','galactus','latest','history'}
 SCENARIOS={'kickoff','shot','defense','dribble','aerial','recovery','wall','replay'}
 REWARDS={'goal','potential','approach','touch','high_touch','ball_progress','boost_cost'}
 PPO_KEYS={'train/loss','train/value_loss','train/policy_gradient_loss','train/entropy_loss',
@@ -224,7 +224,8 @@ def evaluation_summaries(reports,latest_hash,known_hashes):
         result.append(dict(candidate_sha256=digest,matches_latest_checkpoint=digest==latest_hash,
             baseline_sha256=data.get('baseline_sha256') if re.fullmatch(r'[0-9a-f]{64}',str(data.get('baseline_sha256',''))) else None,
             summary=numbers(data.get('summary',{}),{'trials','first_goal_wins','first_goal_losses','timeouts',
-                'first_goal_score_fraction','resolved_fraction','practice_success_fraction','touches_per_trial'}),
+                'first_goal_score_fraction','resolved_fraction','practice_success_fraction','touches_per_trial',
+                'wins_with_student_contact','wins_without_student_contact','contact_score_fraction'}),
             baseline_summary=numbers(data.get('baseline_summary',{}),{'trials','first_goal_wins','first_goal_losses','timeouts','first_goal_score_fraction'}),
             baseline_trials=clean_trials(data.get('baseline_trials',[])),
             comparison=numbers(data,{'paired_mean_outcome_delta','paired_delta_standard_error',
