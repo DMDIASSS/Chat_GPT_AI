@@ -203,3 +203,24 @@ def test_v5_packet_features_and_masks_match_simulator_and_keep_stable_ids(cfg,si
         live.indices={own_index};live.last_frame=None;live.clock=Clock();live.network=None;live.rng=None
         assert set(ChronosBot.get_outputs(live,later))=={own_index}
     finally:env.close()
+
+
+def test_selfplay_reloads_manifest_if_inactive_snapshot_is_pruned_during_load(cfg,tmp_path,monkeypatch):
+    from nova.core import atomic_json
+    import nova.environment as module
+    manifest=tmp_path/'league.json'
+    atomic_json(manifest,{'snapshots':[{'step':32,'path':'old.lt'}]})
+    opponent=object();calls=[]
+    def load(kind,path):
+        calls.append((kind,Path(path).name))
+        if Path(path).name=='old.lt':
+            atomic_json(manifest,{'snapshots':[{'step':64,'path':'new.lt'}]})
+            raise FileNotFoundError('Snapshot pruned after worker read the previous manifest')
+        return opponent
+    monkeypatch.setattr(module,'make_opponent',load)
+    env=ArenaEnv(cfg,league_manifest=manifest,opponent='latest',snapshot_kind='chronos_snapshot')
+    try:
+        env._choose_opponent()
+        assert calls==[('chronos_snapshot','old.lt'),('chronos_snapshot','new.lt')]
+        assert env.opponent is opponent and env.opponent_label=='latest:64'
+    finally:env.close()

@@ -42,7 +42,7 @@ class ArenaEnv(gym.Env):
         if self.curriculum.weights.get('replay',0)>0 and self.bank is None:
             raise ValueError('Replay resets have weight but no replay_bank is configured')
 
-    def _choose_opponent(self):
+    def _choose_opponent(self,_snapshot_retries=0):
         path=self.forced_snapshot
         if self.forced_opponent:
             name=self.forced_opponent
@@ -66,7 +66,13 @@ class ArenaEnv(gym.Env):
                 label='scripted:empty-snapshot-pool'
         key=(name,str(path))
         if key not in self.cache:
-            self.cache[key]=make_opponent(name,path)
+            try:self.cache[key]=make_opponent(name,path)
+            except FileNotFoundError:
+                # A worker may read the previous atomic manifest immediately
+                # before the learner switches it and prunes inactive actors.
+                if label.split(':')[0] in ('latest','history') and self.league_manifest and _snapshot_retries<3:
+                    return self._choose_opponent(_snapshot_retries+1)
+                raise
             # Keep at most four snapshot actors in each worker's RAM.
             snapshots=[k for k in self.cache if k[0] in ('snapshot','chronos_snapshot')]
             for old in snapshots[:-4]: self.cache.pop(old)
