@@ -7,7 +7,8 @@
   "env": {
     "episode_seconds": 60,
     "no_touch_seconds": 20,
-    "replay_bank": null
+    "replay_bank": null,
+    "learner_hitbox": "breakout"
   },
   "ppo": {
     "learning_rate": 5e-06,

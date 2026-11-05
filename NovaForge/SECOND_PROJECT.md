@@ -1,3 +1,5 @@
+**Current update:** [TriadBot v1.1 selector and hitbox guide](TRIAD_SELECTOR_v1.1.md). Local exports now run without INSTALL; portable exports still need installation.
+
 # TriadBot second project
 
 Download the separate TriadBot-v1.0.0.zip from the project's GitHub download page and merge its **chat_gpt_ai/triadbot** folder alongside **chat_gpt_ai/novaforge**. NovaForge v1.7.0 supplies its installed setup runtime.

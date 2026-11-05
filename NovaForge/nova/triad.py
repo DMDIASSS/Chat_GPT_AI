@@ -8,6 +8,7 @@ import tempfile
 import time
 import uuid
 import zipfile
+import sys
 import numpy as np
 import torch
 from .core import ROOT,sha256
@@ -27,9 +28,11 @@ class FairSelector:
         return scores/scores.sum()
     def choose(self):
         choice=int(self.rng.choice(3,p=self.probabilities()))
+        self.record(choice)
+        return choice
+    def record(self,choice):
         self.ages+=1;self.ages[choice]=0;self.counts[choice]+=1
         self.recent.append(choice);self.last=choice
-        return choice
     def status(self):
         return dict(last=NAMES[self.last] if self.last is not None else None,
             selections=dict(zip(NAMES,map(int,self.counts))),waiting_decisions=dict(zip(NAMES,map(int,self.ages))),
@@ -37,12 +40,17 @@ class FairSelector:
 
 
 class TriadClock:
-    def __init__(self,seed=271):
+    def __init__(self,seed=271,selector_path=None,body='breakout'):
         from .chronos_fusion import TeacherFusion
-        self.teacher=TeacherFusion();self.selector=FairSelector(seed);self.reset()
+        self.teacher=TeacherFusion();self.selector=FairSelector(seed);self.gate=None
+        if selector_path is not None:
+            from .triad_selector import Gate
+            self.gate=Gate(selector_path,body)
+        self.reset()
     def reset(self):
         self.previous=np.zeros(8,np.float32);self.held=np.zeros(8,np.float32)
         self.pending=None;self.next_decision=None;self.last_frame=None;self.initialized=False
+        if self.gate is not None:self.gate.reset()
     def controls(self,state,agent,rng):
         frame=int(state.tick_count)
         if self.last_frame is not None and frame<self.last_frame:self.reset()
@@ -53,10 +61,10 @@ class TriadClock:
             self.held=self.pending[1].copy();self.pending=None
         if self.next_decision is None or frame>=self.next_decision:
             obs,mirror=build_features(state,agent,self.previous,rng,'chronos')
-            experts=self.teacher.distributions(state,self.previous,obs,mirror)
-            selected=self.selector.choose();mask=native_action_mask(state.cars[agent])
-            command=TABLE[int(np.where(mask,experts[selected],-np.inf).argmax())].copy()
-            if mirror:command[[1,3,4]]*=-1
+            experts=self.teacher.proposals(state,self.previous,obs,mirror)
+            if self.gate is None:selected=self.selector.choose()
+            else:selected=self.gate.choose(obs);self.selector.record(selected)
+            command=experts[selected].copy()
             self.previous=command.copy();self.pending=(frame+7,command);self.next_decision=frame+8
         return self.held.copy()
 
@@ -76,15 +84,18 @@ class TriadPolicy:
         return result
 
 
-def run_live(agent_id):
+def create_live_bot(agent_id,selector_path=None,body='breakout'):
     from rlbot.managers.hivemind import Hivemind
     from rlbot.flat import ControllerState,MatchPhase
     from rlgym_compat import GameState
     class TriadBot(Hivemind):
         def __init__(self):
             super().__init__(agent_id);torch.set_num_threads(1)
-            self.clock=TriadClock();self.rng=np.random.default_rng(271);self.last_frame=None;self.last_log=-10000
-        def initialize(self):self.create_state()
+            self.clock=None;self.rng=np.random.default_rng(271);self.last_frame=None;self.last_log=-10000
+        def initialize(self):
+            self._logger.info('Loading pinned Chronos / GalactusV2 / Ripple v1.1 after connecting')
+            self.clock=TriadClock(selector_path=selector_path,body=body);self.create_state()
+            self._logger.info('TRIAD_READY: %s selector, %s body','learned' if self.clock.gate else 'fair random',body)
         def create_state(self):self.state=GameState.create_compat_game_state(self.field_info,self.match_config)
         def get_outputs(self,packet):
             if len(packet.players)!=2 or not packet.balls or len(self.indices)!=1:
@@ -100,7 +111,11 @@ def run_live(agent_id):
             if frame-self.last_log>=600:
                 self._logger.info('Triad selection: %s',json.dumps(self.clock.selector.status()));self.last_log=frame
             return {index:ControllerState(*[float(v) for v in controls[:5]],*[bool(v) for v in controls[5:]])}
-    TriadBot().run()
+    return TriadBot()
+
+
+def run_live(agent_id,selector_path=None,body='breakout'):
+    create_live_bot(agent_id,selector_path,body).run(wants_match_communications=False,wants_ball_predictions=False)
 
 
 def check():
@@ -119,7 +134,7 @@ def check():
     finally:env.close()
 
 
-def watch():
+def watch(selector_path=None):
     from filelock import FileLock
     from .viewer import prepare_viewer,learner_first_state
     from .training import load_config
@@ -132,6 +147,7 @@ def watch():
         from rlgym.rocket_league.rlviser import RLViserRenderer
         cfg=load_config(ROOT/'configs/chronos.json');env=ArenaEnv(cfg,opponent='chronos',scenario='kickoff')
         renderer=RLViserRenderer(tick_rate=30);policy=TriadPolicy();last_log=0.
+        if selector_path is not None:policy.clock=TriadClock(selector_path=selector_path,body=cfg['env'].get('learner_hitbox','breakout'))
         try:
             env.reset(seed=271);policy.reset(env.state,env.agent,np.random.default_rng(271))
             while True:
@@ -147,22 +163,31 @@ def watch():
             finally:env.close()
 
 
-def export():
+def export(selector_path=None,destination_parent=None):
     from .teachers import fetch_teachers,verify_teacher
     fetch_teachers(['chronos','galactus','ripple'])
-    parent=ROOT.parent/'triadbot/exports';parent.mkdir(parents=True,exist_ok=True)
+    parent=Path(destination_parent) if destination_parent is not None else ROOT.parent/'triadbot/exports'
+    parent.mkdir(parents=True,exist_ok=True)
     stem='TriadBot_'+uuid.uuid4().hex[:8];destination=parent/stem
+    body='breakout'
+    if selector_path is not None:
+        from .triad_selector import resolve,CONTRACT
+        from .core import check_model
+        selector_path=resolve(selector_path);body=check_model(selector_path,CONTRACT)['hitbox']
     with tempfile.TemporaryDirectory(dir=parent) as temp:
         stage=Path(temp)/stem;stage.mkdir()
         shutil.copytree(ROOT/'nova',stage/'nova',ignore=shutil.ignore_patterns('__pycache__'))
         for name in ('requirements.txt','teachers.lock.json','THIRD_PARTY.md'):shutil.copy2(ROOT/name,stage/name)
         for name in NAMES:shutil.copytree(verify_teacher(name),stage/'assets'/name)
+        if selector_path is not None:
+            shutil.copy2(selector_path,stage/'selector.pt');shutil.copy2(str(selector_path)+'.json',stage/'selector.pt.json')
         agent_id='DMDIASSS/'+stem
-        (stage/'run_triad.py').write_text('from nova.triad import run_live\nif __name__=="__main__":run_live('+repr(agent_id)+')\n')
-        win=json.dumps('".venv\\Scripts\\python.exe" run_triad.py');linux=json.dumps('".venv/bin/python" run_triad.py')
-        (stage/'bot.bot.toml').write_text('[settings]\nname = "TriadBot random experts"\nagent_id = '+json.dumps(agent_id)+'\nrun_command = '+win+'\nrun_command_linux = '+linux+'\nhivemind = true\n\n[details]\ndeveloper = "NovaForge user; models credited to original authors"\ndescription = "Three frozen models with age/repetition weighted selection. Experimental timing/action projections."\nlanguage = "python"\ntags = ["1v1"]\n')
-        (stage/'INSTALL.bat').write_text('@echo off\ncd /d "%~dp0"\npy -3.11 -m venv .venv\nif errorlevel 1 goto failed\n".venv\\Scripts\\python.exe" -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu\nif errorlevel 1 goto failed\n".venv\\Scripts\\python.exe" -m pip install -r requirements.txt\nif errorlevel 1 goto failed\necho TRIAD_INSTALLED - add bot.bot.toml in RLBot v5.\npause\nexit /b 0\n:failed\necho INSTALL_FAILED\npause\nexit /b 1\n')
-        (stage/'README.txt').write_text('Portable personal runtime export. Run INSTALL.bat with Python 3.11 x64, then import bot.bot.toml into RLBot v5 for offline 1v1. Three original networks remain separate; this is not one merged .pt/.lt.\nOne model controls each 8-tick decision. Waiting models gain probability; recent/frequent selections lose probability. Selection statistics print to the bot log. All models stay frozen.\nRipple 276->90 projection and its held-control queue approximation can lose skills. Switching experts can disrupt mechanics; no strength gain is claimed.\nOriginal teacher notices and hashes are preserved under assets and THIRD_PARTY.md. No new redistribution license is granted.\n')
+        (stage/'run_triad.py').write_text('from nova.triad_boot import main\nif __name__=="__main__":main('+repr(agent_id)+', '+repr(body)+')\n')
+        from .triad_boot import write_launchers
+        write_launchers(stage,sys.executable,agent_id,body,selector_path is not None)
+        (stage/'INSTALL.bat').write_text('@echo off\ncd /d "%~dp0"\npy -3.11 -m venv .venv\nif errorlevel 1 goto failed\n".venv\\Scripts\\python.exe" -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu\nif errorlevel 1 goto failed\n".venv\\Scripts\\python.exe" -m pip install -r requirements.txt\nif errorlevel 1 goto failed\necho TRIAD_INSTALLED - add bot.portable.bot.toml in RLBot v5.\npause\nexit /b 0\n:failed\necho INSTALL_FAILED\npause\nexit /b 1\n')
+        (stage/'README.txt').write_text('LOCAL: import bot.bot.toml immediately; it uses the exporting Python environment. No INSTALL step is required while that environment stays installed.\nPORTABLE: on another PC run INSTALL.bat, then import bot.portable.bot.toml. Startup diagnostics go to startup.log. DIAGNOSE.bat loads all models without Rocket League.\nDefault body is Breakout. A live car keeps one hitbox while controllers switch; Octane alternatives are generated only for random mode. The learned selector is trained for its fixed body.\nLearned mode selects among three frozen models and commits for 8 decisions (~0.53s). Random mode retains waiting/repetition probabilities. Three models remain separate.\nRipple 276->90 projection and held-control queue approximation can lose skills. No strength gain is claimed. Original notices/hashes are preserved; no new model-license grant is implied.\n')
+        (stage/'DIAGNOSE.bat').write_text('@echo off\ncd /d "%~dp0"\n"'+sys.executable+'" run_triad.py --diagnose\npause\n')
         files=sorted(p for p in stage.rglob('*') if p.is_file())
         (stage/'MANIFEST.sha256').write_text(''.join(sha256(p)+'  '+p.relative_to(stage).as_posix()+'\n' for p in files))
         archive=Path(temp)/(stem+'.zip')
@@ -171,6 +196,7 @@ def export():
                 if p.is_file():z.write(p,stem+'/'+p.relative_to(stage).as_posix())
         stage.replace(destination);archive.replace(parent/(stem+'.zip'))
     print('TRIAD_EXPORT_READY:',destination/'bot.bot.toml',flush=True)
+    return destination
 
 
 def league():
@@ -186,9 +212,9 @@ def league():
         def bind(self,env):
             self.env=env;self.selector=FairSelector(271)
             self.teacher.reset(env.arena.state,env.arena.agent,np.random.default_rng(271))
-        def action(self,obs):
-            env=self.env;choices=self.teacher.distributions(env.arena.state,env.previous,obs[:225],env.mirror)
-            return int(choices[self.selector.choose()].argmax())
+        def world_controls(self,obs):
+            env=self.env;choices=self.teacher.proposals(env.arena.state,env.previous,obs[:225],env.mirror)
+            return choices[self.selector.choose()]
     candidate=RandomExpert()
     class Original:
         def action(self,obs):

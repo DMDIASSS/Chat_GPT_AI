@@ -34,7 +34,8 @@ def play_match(cfg,policy,opponent,side,seed,seconds,stop_path):
             if hasattr(policy,'bind'):policy.bind(env)
             while True:
                 if Path(stop_path).exists():raise EvaluationStopped()
-                obs,_,terminal,truncated,info=env.step(policy.action(obs))
+                if hasattr(policy,'world_controls'):obs,_,terminal,truncated,info=env.step_world_controls(policy.world_controls(obs))
+                else:obs,_,terminal,truncated,info=env.step(policy.action(obs))
                 ticks+=8
                 if terminal or truncated:break
             contacts+=info['touches']
@@ -53,8 +54,8 @@ def match_suite(cfg,candidate,baseline,pairs,seconds,seed,stop_path):
     from .chronos_training import ChronosRunner
     from .chronos_guard import EvaluationStopped
     if Path(stop_path).exists():raise EvaluationStopped()
-    a=candidate if hasattr(candidate,'action') else ChronosRunner(candidate)
-    b=baseline if hasattr(baseline,'action') else ChronosRunner(baseline)
+    a=candidate if hasattr(candidate,'action') or hasattr(candidate,'world_controls') else ChronosRunner(candidate)
+    b=baseline if hasattr(baseline,'action') or hasattr(baseline,'world_controls') else ChronosRunner(baseline)
     rows=[];old=[]
     for cell,opponent in enumerate(('chronos','galactus','nexto','ripple')):
         for pair in range(pairs):

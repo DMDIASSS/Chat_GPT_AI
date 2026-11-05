@@ -1,4 +1,6 @@
-# NovaForge v1.7.0
+# NovaForge v1.8.0
+
+**TriadBot v1.1:** [learned options selector, exact model pins, fixed body settings and immediate local v5 exports](TRIAD_SELECTOR_v1.1.md). Existing Chronos runs and launchers remain available.
 
 **Current guide: [Finish, unattended safeguards, fusion and both exports](FINISH_AND_FUSION.md).** Launcher 35 upgrades/resumes chronos01 with backed-up settings, longer reward credit, automatic W/D/L checks, protected champion and regression stops. Launcher 38 still watches the latest learner; 51 watches the champion. Launcher 40 exports both .pt/.cfg and .lt/.toml. Launcher 43 starts the separate fusion01 experiment. [TriadBot](SECOND_PROJECT.md) is a separate random three-expert project.
 

@@ -1,21 +1,21 @@
-# NovaForge v1.7.0 and TriadBot downloads
+# NovaForge v1.8.0 and TriadBot v1.1 downloads
 
-[Download NovaForge v1.7.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.7.0.zip)
+[Download NovaForge v1.8.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.8.0.zip)
 
-[Download TriadBot v1.0.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/TriadBot-v1.0.0.zip)
+[Download TriadBot v1.1.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/TriadBot-v1.1.0.zip)
 
-Extract both into the parent of chat_gpt_ai. NovaForge contains chat_gpt_ai/novaforge; TriadBot contains chat_gpt_ai/triadbot. Preserve environments, assets and runs.
+Extract into the parent of chat_gpt_ai, copying contents over the existing novaforge and triadbot folders and replacing source files. Keep environments, assets and runs. Stop running training/viewers before updating. Existing Chronos weights and numbered launchers are preserved.
 
-NovaForge: pause with 36, merge, run 1_CHECK, then 35 to upgrade/resume chronos01 with backed-up settings, eight-tick rewards, longer credit horizon, W&B, automatic timed W/D/L/confirmation and substantial-regression stops. 38 still watches latest; 51 watches the protected champion. 40 exports the champion as both .pt/.cfg and .lt/.toml; 41 reports; 50 compares latest with original Chronos. 43 starts the separate fusion01 probability-distillation/PPO experiment, with 44 pause, 46 W/D/L, 47 export and 48 report.
+TriadBot's reported v5 startup issue was a missing INSTALL step, confirmed by the user. New local exports need no second installation: their primary TOML uses the existing Python environment. Portable exports still use INSTALL.bat and bot.portable.bot.toml. Startup.log and DIAGNOSE.bat provide startup diagnostics. Generated exports specify fixed Breakout/Octane loadouts.
 
-[Current instructions, safeguards, fusion pilot and exports](NovaForge/FINISH_AND_FUSION.md) · [Validation](NovaForge/VALIDATION.md)
+[Triad selector, hitboxes and export instructions](NovaForge/TRIAD_SELECTOR_v1.1.md) · [TriadBot launchers](TriadBot/README.md)
 
-TriadBot is a separate frozen three-model random router. Waiting experts gain probability; frequent/repeated choices lose probability. Run its 0 check, 1 watch, 2 portable v5 export or 3 W/D/L comparison. The generated personal export contains the three local models; the downloadable source ZIP does not.
+The new Opti-inspired 1v1 PPO selector chooses among frozen Chronos, GalactusV2 and Ripple v1.1, committing for eight decisions (~0.53 seconds). It trains only the selector and preserves each expert's native control values. No Opti code or pretrained selector is bundled. Ripple queue/common timing remains an adaptation limit.
 
-[TriadBot instructions](TriadBot/README.md)
+Triad launchers: 0 check; 1 random watch; 2 random export; 3 random W/D/L; 4 selector training/resume; 5 latest selector watch; 6 champion selector export; 7 selector W/D/L; 8 pause selector; 9 status. The initial champion routes to Chronos until a candidate passes automatic comparisons and fresh confirmation. Substantial regression stops training. These safeguards do not guarantee stronger play.
 
-The small fusion pilot did not establish an improvement: original Chronos 6 W / 2 D / 0 L, raw ensemble 4 / 1 / 3, short single-student distillation 4 / 3 / 1 across eight matched 30-second simulator games. Experiments do not replace the user's existing good Chronos run. No reward guarantees stronger play; the export champion is protected by separate comparisons. Windows live games and laptop CUDA performance still require user testing. Native GigaLearn throughput is not claimed.
+Chronos uses Breakout in its pinned loadout. New runs use Breakout; older saved runs without an explicit body preserve Octane. Frozen Chronos opponents use Breakout, and GalactusV2/Ripple opponents use Octane. A live car cannot change its hitbox whenever the chosen controller changes.
 
-[Upstream review](NovaForge/UPSTREAM_REVIEW.md) · [Further plan](NovaForge/PLAN.md) · [Attribution](NovaForge/THIRD_PARTY.md)
+[Main training, self-play and both model export formats](NovaForge/FINISH_AND_FUSION.md) · [Validation](NovaForge/VALIDATION.md) · [Attribution](NovaForge/THIRD_PARTY.md)
 
-Published on codex/novaforge-v1; main and the original project files are unchanged.
+Source ZIPs contain no weights. Local exports bundle downloaded models and notices; no new license rights over those originals are implied. Native GigaLearn speed and improved live-match strength are not claimed. Published on codex/novaforge-v1; main remains unchanged.

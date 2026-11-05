@@ -70,6 +70,7 @@ def clean_config(cfg):
     if isinstance(layers,list) and all(isinstance(n,int) and 0<n<100000 for n in layers):
         result['ppo']['net_arch']=layers[:10]
     result['env']=numbers(cfg.get('env',{}),{'episode_seconds','no_touch_seconds'})
+    if cfg.get('env',{}).get('learner_hitbox') in {'octane','breakout'}:result['env']['learner_hitbox']=cfg['env']['learner_hitbox']
     result['env']['uses_replay_bank']=bool(cfg.get('env',{}).get('replay_bank'))
     result['league']=numbers(cfg.get('league',{}),{'snapshot_every','history_size'})
     result['league']['weights']=numbers(cfg.get('league',{}).get('weights',{}),BOTS)

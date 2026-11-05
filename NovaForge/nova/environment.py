@@ -86,6 +86,14 @@ class ArenaEnv(gym.Env):
         side=self.forced_side if self.forced_side is not None else int(self.np_random.integers(2))
         desired=make_state(self.engine,self.np_random,self.scenario,side,
                            self.curriculum.difficulty(self.scenario),self.bank)
+        self._choose_opponent()
+        from rlgym.rocket_league.common_values import OCTANE,BREAKOUT
+        own_body=self.cfg['env'].get('learner_hitbox','octane')
+        if own_body not in ('octane','breakout'):raise ValueError('Unsupported learner hitbox')
+        opponent=self.opponent_label.split(':')[0]
+        other_body=BREAKOUT if opponent=='chronos' else (BREAKOUT if own_body=='breakout' and opponent in ('latest','history','chronos_snapshot') else OCTANE)
+        for car in desired.cars.values():
+            car.hitbox_type=(BREAKOUT if own_body=='breakout' else OCTANE) if car.team_num==side else other_body
         self.state=self.engine.set_state(desired,{})
         self.agent=next(k for k,c in self.state.cars.items() if c.team_num==side)
         self.other=next(k for k in self.state.cars if k!=self.agent)
@@ -99,7 +107,6 @@ class ArenaEnv(gym.Env):
         self.dribble_seconds=0.
         self.reward_total=0.
         self.reward_parts={}
-        self._choose_opponent()
         self.opponent.reset(self.state,self.other,self.np_random)
         return observe(self.state,self.agent,self.previous),{'scenario':self.scenario,'side':side}
 

@@ -106,6 +106,9 @@ def export_chronos(args):
     if run.parent!=(ROOT/'runs').resolve():raise ValueError('Invalid run name')
     source=select_checkpoint(run,initial=getattr(args,'initial',False),latest=getattr(args,'latest',False))
     meta=check_model(source,CHRONOS_CONTRACT)
+    saved_body=load_config(run/'config.json').get('env',{}).get('learner_hitbox','octane') if (run/'config.json').exists() else 'breakout'
+    body='breakout' if meta['timesteps']==0 else saved_body
+    car_id=22 if body=='breakout' else 23
     actor=load_network(source)
     stem='novachronos_'+meta['sha256'][:10]+'_'+uuid.uuid4().hex[:6]
     parent=ROOT/'exports';parent.mkdir(parents=True,exist_ok=True)
@@ -131,7 +134,7 @@ def export_chronos(args):
         shutil.copy2(Path(__file__).with_name('chronos_v4.py'),stage/'chronos_v4.py')
         (stage/'bot_v4.py').write_text('from pathlib import Path\nfrom chronos_v4 import make_agent\nfrom clock import ChronosClock\nfrom features import BOOSTS\nclass NovaChronos(make_agent(Path(__file__).with_name("actor.pt"),ChronosClock,BOOSTS)):\n    pass\n')
         (stage/'bot.cfg').write_text('[Locations]\npython_file = bot_v4.py\nlooks_config = looks.cfg\nname = NovaChronos '+str(meta['timesteps'])+'\nmaximum_tick_rate = 120\nrequirements_file = requirements-v4.txt\n\n[Details]\ndeveloper = NovaForge user; original model KingJake3113\ndescription = Chronos PPO export. Python 3.11 x64. Estimated v4 flip timing; v5 preferred.\nlanguage = python\n')
-        (stage/'looks.cfg').write_text('[Bot Loadout]\nteam_color_id = 27\ncustom_color_id = 0\ncar_id = 23\ndecal_id = 0\nwheels_id = 1565\nboost_id = 0\nantenna_id = 0\nhat_id = 0\npaint_finish_id = 197\npaint_finish_2_id = 197\n')
+        (stage/'looks.cfg').write_text('[Bot Loadout]\nteam_color_id = 27\ncustom_color_id = 0\ncar_id = '+str(car_id)+'\ndecal_id = 0\nwheels_id = 1565\nboost_id = 0\nantenna_id = 0\nhat_id = 0\npaint_finish_id = 197\npaint_finish_2_id = 197\n')
         (stage/'requirements-v4.txt').write_text('--extra-index-url https://download.pytorch.org/whl/cpu\ntorch==2.9.1+cpu\nnumpy==1.26.4\nrlbot==1.68.0\nsetuptools<81\n')
         from .reporting import clean_config,numbers
         saved_cfg=load_config(run/'config.json') if (run/'config.json').exists() else {}
@@ -151,6 +154,7 @@ agent_id = AGENT
 run_command = WIN
 run_command_linux = LINUX
 hivemind = true
+loadout_file = "loadout.toml"
 [details]
 developer = "NovaForge user; Chronos model credit: KingJake3113"
 description = "Chronos-initialized 1v1 PPO student. Requires enclosing NovaForge project."
@@ -161,6 +165,7 @@ tags = ["1v1"]
         for token,value in [('AGENT',agent_id),('WIN','"..\\..\\.venv\\Scripts\\python.exe" bot.py'),('LINUX','"../../.venv/bin/python" bot.py')]:
             toml=toml.replace('= '+token+'\n','= '+json.dumps(value)+'\n')
         (stage/'bot.bot.toml').write_text(toml)
+        (stage/'loadout.toml').write_text('[blue_loadout]\ncar_id = '+str(car_id)+'\n[orange_loadout]\ncar_id = '+str(car_id)+'\n')
         (stage/'bot.py').write_text('from pathlib import Path\nimport sys\nsys.path.insert(0,str(Path(__file__).resolve().parents[2]))\nfrom nova.chronos_live import ChronosBot\nif __name__=="__main__":\n    ChronosBot(Path(__file__).with_name("actor.lt"),'+repr(agent_id)+').run()\n')
         (stage/'README.txt').write_text('RLBot v5: keep this folder inside novaforge/exports and add bot.bot.toml to v5. It uses actor.lt.\nRLBot v4: add bot.cfg to the v4 GUI with Python 3.11 x64 and install requirements-v4.txt in its separate v4 environment. This export uses actor.pt and can be moved as a complete folder. Never install the v4 SDK into the training .venv.\nactor.pt and actor.lt are the same 225->90 TorchScript network. actor_weights.pt is a separate state_dict for custom code; training_config.json describes the training settings. Full PPO/optimizer resume uses the .zip under runs, not actor_weights.pt.\nSHARED_HEAD.lt and POLICY.lt preserve the native Chronos architecture. Native observation/action timing must match.\nThe port mask lacks the original contact-normal exception; v4 also estimates flip timing from less detailed packet fields. Live full-match checks are required.\nSource model: KingJake3113/Chronos commit 4f8fdd27e4802d977b33b9ade4759ff6aeaca5aa.\nNo explicit root model license was identified; no new license grant for the original weights is implied.\n')
         archive=Path(temporary)/(stem+'.zip')

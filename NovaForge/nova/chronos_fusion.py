@@ -63,12 +63,21 @@ class TeacherFusion:
         self.ripple.obs.prev_prev_actions[:1]=previous
         self.ripple.obs.pre_step(legacy,controlled_count=1,elapsed_ticks=8)
         ripple=self.ripple.session.run(['logits'],dict(zip(('main','others','ball','actions','boosts'),self.ripple.obs.current_obs)))[0][0]
+        chronos_command=TABLE[int(np.where(mask,chronos,-np.inf).argmax())].copy()
+        if mirror:chronos_command[[1,3,4]]*=-1
+        self.native_proposals=np.stack((chronos_command,
+            TABLE[int(np.where(mask,galactus,-np.inf).argmax())].copy(),
+            self.ripple_table[int(np.argmax(ripple))].copy())).astype(np.float32)
         p0=softmax(chronos,mask)
         p1=project_probabilities(softmax(galactus,native_action_mask(state.cars[self.agent])),TABLE,mirror,mask)
         p2=project_probabilities(softmax(ripple),self.ripple_table,mirror,mask)
         components=np.stack((p0,p1,p2)).astype(np.float32)
         if not np.isfinite(components).all():raise ValueError('Nonfinite teacher fusion')
         return components
+
+    def proposals(self,state,previous,chronos_features,mirror):
+        self.distributions(state,previous,chronos_features,mirror)
+        return self.native_proposals.copy()
 
 
 class FusionRunner:

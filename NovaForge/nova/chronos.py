@@ -90,6 +90,11 @@ class ChronosEnv(gym.Env):
             raise ValueError('Invalid/masked Chronos action')
         planned=TABLE[action].copy()
         if self.mirror:planned[[1,3,4]]*=-1
+        return self.step_world_controls(planned)
+
+    def step_world_controls(self,planned):
+        planned=np.asarray(planned,dtype=np.float32)
+        if planned.shape!=(8,) or not np.isfinite(planned).all() or abs(planned).max()>1.001:raise ValueError('Invalid expert controls')
         commands=np.repeat(self.held[None,:],8,axis=0);commands[7]=planned
         self.previous=planned.copy()
         initial_potential=self.arena.potential(self.arena.state)

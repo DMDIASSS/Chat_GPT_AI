@@ -1,17 +1,26 @@
-# TriadBot: three frozen experts
+# TriadBot v1.1
 
-This is a second project alongside NovaForge. It keeps original Chronos, Galactus and Ripple loaded, and selects **one teacher per eight-tick decision**. Each car receives one control vector at a time. All three models propose distributions; the chosen model supplies the action, with the common seven-tick planned delay.
+Update the sibling NovaForge to v1.8.0 first. Your working v1.0 export can remain installed while you prepare a new one; each export has a distinct agent ID. This is a 1v1 experiment with exact pinned Chronos, GalactusV2 and Ripple v1.1 models.
 
-Extract into the parent of chat_gpt_ai, merging chat_gpt_ai/triadbot. Update the sibling novaforge to v1.7.0 and keep its installed Python environment.
+A fixed car uses Breakout by default. Random exports also include an Octane variant. It cannot switch its hitbox when a different expert is chosen.
 
-1. Run **0_CHECK_TRIAD.bat** to fetch/verify the three teachers and exercise actual simulation controls.
-2. Run **1_WATCH_TRIAD.bat** to watch against Chronos with the automatic learner camera. Ctrl+C stops viewing.
-3. Run **2_EXPORT_TRIAD_V5.bat** to create a portable personal export under triadbot/exports.
-4. The exported folder contains all three models, matching source, notices, integrity hashes, INSTALL.bat and bot.bot.toml. Run its INSTALL.bat with Python 3.11 x64, then import bot.bot.toml into RLBot v5 for offline 1v1. The generated ZIP is next to that folder.
-5. **3_COMPARE_WDL.bat** compares the random router and original Chronos against all four frozen opponents using timed 60-second matches on both colors; results go to triadbot/reports.
+| Launcher | Action |
+| --- | --- |
+| 0 | Fetch/verify and check all three experts |
+| 1 | Watch fair weighted-random selection |
+| 2 | Export a random v5 bot |
+| 3 | Compare random routing vs original Chronos with W/D/L |
+| 4 | Train/resume the new PPO selector (selector01), until paused or stopped by a guard |
+| 5 | Watch the latest selector |
+| 6 | Export the retained selector champion |
+| 7 | Compare latest selector vs initialization with W/D/L; pause first |
+| 8 | Pause selector training |
+| 9 | Show selector status |
 
-Waiting teachers gain probability. Frequent recent teachers lose probability, and the teacher just used receives a repeat penalty. All probabilities remain positive. The recent window is 60 decisions; logs show selection counts, time waiting and next probabilities. Selection history persists across kickoff resets. There is no training or model-weight update in TriadBot.
+The learned selector chooses a frozen expert and holds it for about half a second. Initially it chooses Chronos; no trained winning selector is bundled. Training updates only the selector, not the experts. Automatic W/D/L checks and fresh confirmation protect its deployment champion and stop substantial regression. Until promotion, launcher 6 exports initial Chronos-only routing. Watch 5 to see actual training progress.
 
-This is a three-network runtime bundle, not a single merged .pt/.lt. Chronos/Galactus use a 90-action interface; Ripple's 276 actions are projected onto it and its longer queue is approximated using held controls. Switching can disrupt mechanics. This experimental controller is not claimed to outperform any teacher. Main-project fusion instead distills a separate single network for ordinary .pt/.cfg or .lt/.toml export.
+Exports appear under triadbot/exports. On this PC add **bot.bot.toml** directly: it uses the existing Python environment and needs no new INSTALL. On another PC run INSTALL.bat, then add **bot.portable.bot.toml**. DIAGNOSE.bat loads all models; startup.log records startup errors. Random variants have different IDs and explicit Breakout/Octane loadout files. Selector variants keep their training body.
 
-The downloadable source ZIP contains no teacher weights. Generated exports contain the user's locally downloaded originals and their notices; no new license grant for those originals is implied.
+Triad preserves native control vectors including Ripple's fine controls. Common execution delay and Ripple's held-control queue approximation remain transfer limitations. This is an independently implemented Opti-inspired hierarchy, not Opti's code or trained policy. See novaforge/TRIAD_SELECTOR_v1.1.md for source references, training details and limitations.
+
+Source ZIPs contain no weights. Exports bundle your locally downloaded models, notices and hashes; no new rights over the original weights are granted. Full offline game strength still needs measurement.

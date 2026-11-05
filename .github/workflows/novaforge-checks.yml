@@ -38,7 +38,14 @@ jobs:
         run: |
           python run.py fetch-teachers --names chronos,ripple,galactus,nexto
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m pytest tests/test_chronos.py tests/test_chronos_finish.py tests/test_triad.py -q --chronos --teachers
+          python -m pytest tests/test_chronos.py tests/test_chronos_finish.py tests/test_triad.py tests/test_triad_selector.py -q --chronos --teachers
+      - name: Triad actual export v5 handshake and controls (no new venv)
+        run: |
+          python tests/check_triad_v5.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -c "from nova.triad_selector import train; train('ci_selector',steps=32,forever=False,wandb='off')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector/latest.pt
       - name: Isolated RLBot v4 export and official class importer
         run: |
           python -m pip install --target .v4sdk rlbot==1.68.0 "setuptools<81"
