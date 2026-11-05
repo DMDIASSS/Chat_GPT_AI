@@ -16,8 +16,8 @@ from .teachers import BOT_NAMES
 
 
 class Student:
-    def __init__(self,path):
-        self.path=resolve_model(path)
+    def __init__(self,path,copy_checkpoint='published'):
+        self.path=resolve_model(path,copy_checkpoint)
         self.actor=FrozenActor(self.path) if self.path.suffix in {'.pt','.lt'} else None
         self.model=None if self.actor else load_ppo(self.path)
 
@@ -42,7 +42,8 @@ def summarize(rows):
 
 def evaluate(args):
     torch.set_num_threads(1)
-    student=Student(args.model)
+    student=Student(args.model,getattr(args,'copy_checkpoint','published'))
+    print(f'Evaluating checkpoint: {student.path} | SHA256 {sha256(student.path)}',flush=True)
     baseline=Student(args.baseline) if args.baseline else None
     cfg=load_config(args.config)
     cfg['env']['episode_seconds']=args.seconds
@@ -116,7 +117,8 @@ def watch(args):
 def _watch_run(args):
     from .viewer import prepare_viewer,learner_first_state
     torch.set_num_threads(1)
-    student=Student(args.model)
+    student=Student(args.model,getattr(args,'copy_checkpoint','published'))
+    print(f'Watching checkpoint: {student.path} | SHA256 {sha256(student.path)}',flush=True)
     cfg=load_config(args.config)
     cfg['env']['episode_seconds']=args.seconds
     cfg['env']['no_touch_seconds']=args.seconds+1

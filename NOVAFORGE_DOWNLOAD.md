@@ -1,6 +1,10 @@
-# NovaForge v1.5.3 download
+# NovaForge v1.5.4 download
 
-[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.5.3.zip)
+[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.5.4.zip)
+
+Adds direct comparison of the best held-out training candidate against the published policy. The latest user reports trained to 1.05M decisions but watch/evaluation still used a 250k published checkpoint. Merge this ZIP, run 1_CHECK.bat, pause with 22, then run 33_COMPARE_COPY_CANDIDATE.bat and send the automatically generated report ZIP. Launcher 34 watches the candidate, while 24 keeps watching the published policy. No reset or automatic promotion.
+
+[Candidate review and report diagnosis](NovaForge/CANDIDATE_REVIEW_v1.5.4.md)
 
 Fixes the two Windows viewer-check failures: test watches use an isolated lock; the native UDP protocol diagnostic is opt-in, with exclusive wildcard socket preflight on Windows. Merge this ZIP, run 1_CHECK.bat, then run 32 once if copy02 has not yet been upgraded, and resume with 21. Your saved student is preserved.
 

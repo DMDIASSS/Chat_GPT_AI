@@ -258,7 +258,7 @@ def publish_by_probe(model,run,state,cfg,stop):
         # Historical probes without contact-backed goal counts receive no goal bonus.
         return (probe['contact_fraction'],probe.get('contact_score_fraction',0.),-probe['concede_fraction'],-validation['balanced_loss'])
     best_rank=rank(measured,selected_validation) if measured else None
-    seen=set()
+    seen=set();candidate_checks=[]
     for record,validation in candidates:
         if stop.exists():return None
         if record['sha256'] in seen:continue
@@ -267,14 +267,42 @@ def publish_by_probe(model,run,state,cfg,stop):
         probe=student_probe(candidate,cfg,stop);del candidate
         if probe is None:return None
         probe['checkpoint_sha256']=record['sha256']
+        candidate_checks.append(dict(sha256=record['sha256'],timesteps=record['timesteps'],
+                                     validation_loss=validation['balanced_loss'],probe=dict(probe)))
         score=rank(probe,validation)
         if best_rank is None or score>best_rank:
             selected=record;selected_validation=validation;measured=probe;best_rank=score
     state['published']=dict(selected);state['published_validation']=selected_validation
     state['last_student_probe']=measured
+    state['last_candidate_probes']=candidate_checks
     atomic_json(run/'copy_state.json',state)
     atomic_json(run/'latest.json',dict(path=selected['path'],step=selected['timesteps'],contract=CONTRACT))
     return measured
+
+
+def compare_copy(args):
+    """Evaluate immutable candidate/published checkpoints without changing any training pointers."""
+    from .evaluation import evaluate
+    run=(ROOT/'runs'/args.run).resolve()
+    if run.parent!=(ROOT/'runs').resolve():raise ValueError('Invalid copy run name')
+    with FileLock(str(run/'train.lock'),timeout=0):
+        candidate=resolve_model(run,args.candidate);published=resolve_model(run)
+        print(f'COPY_CANDIDATE: {candidate.name} | {sha256(candidate)}',flush=True)
+        print(f'COPY_PUBLISHED: {published.name} | {sha256(published)}',flush=True)
+        if sha256(candidate)==sha256(published):
+            print('Candidate and published checkpoint are identical; no duplicate comparison needed.',flush=True)
+            report_copy(SimpleNamespace(run=args.run));return
+        stamp=datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')+'_'+uuid.uuid4().hex[:6]
+        (ROOT/'reports').mkdir(parents=True,exist_ok=True)
+        for label,opponents,scenarios,seed in [
+            ('kickoff','scripted,scorer,nexto,ripple,chronos,galactus','kickoff',950001),
+            ('mechanics','scorer','kickoff,shot,defense,dribble,aerial,recovery,wall',960001)]:
+            evaluate(SimpleNamespace(model=str(candidate),baseline=str(published),
+                config=str(run/'config.json'),opponents=opponents,scenarios=scenarios,
+                pairs=args.pairs,seconds=args.seconds,seed=seed,
+                out=str(ROOT/'reports'/f'{args.run}_candidate_{label}_{stamp}.json')))
+        report_copy(SimpleNamespace(run=args.run))
+        print('COPY_COMPARISON_READY: published policy and optimizer resume are unchanged. Upload the new report ZIP.',flush=True)
 
 
 def train_copy(args):
@@ -500,6 +528,8 @@ def report_copy(args):
     if run.parent!=(ROOT/'runs').resolve(): raise ValueError('Invalid run name')
     state=json.loads((run/'copy_state.json').read_text())
     published=state.get('published',state['best'])
+    roles={name:{k:record[k] for k in ('sha256','timesteps')} for name,record in
+           [('published',published),('validation',state['best']),('resume',state['resume'])]}
     config=json.loads((run/'config.json').read_text())
     tracking=json.loads((run/'wandb_status.json').read_text()) if (run/'wandb_status.json').exists() else {}
     hashes={published['sha256'],state['best']['sha256']}
@@ -523,6 +553,13 @@ def report_copy(args):
         active_collection['prefix_episodes']+=int(entry.get('prefix_episodes',0))
         for key,allowed in [('by_teacher',BOT_NAMES),('by_opponent',BOT_NAMES),('by_scenario',SCENARIOS)]:
             for name,count in numbers(entry.get('kept_'+key,{}),allowed).items():active_collection[key][name]+=count
+    probe_keys={'trials','contact_fraction','score_fraction','contact_score_fraction','concede_fraction',
+                'timeout_fraction','touches_per_trial','active_control_fraction','forward_throttle_fraction','boost_fraction'}
+    candidate_checks=[]
+    for raw in state.get('last_candidate_probes',[])[:2]:
+        if raw.get('sha256') not in hashes:continue
+        candidate_checks.append(dict(sha256=raw['sha256'],**numbers(raw,{'timesteps','validation_loss'}),
+                                     probe=numbers(raw.get('probe'),probe_keys)))
     report=dict(kind='frozen_teacher_copying',run=run.name,generated_utc=datetime.now(timezone.utc).isoformat(),
         teachers=[n for n in state['teachers'] if n in BOT_NAMES],
         teacher_lock_sha256=state['teacher_lock_sha256'],
@@ -534,6 +571,9 @@ def report_copy(args):
             reset_weights=numbers(config['curriculum']['weights'],SCENARIOS)),
         progress=numbers(state,{'round','epoch','collected_decisions','validation_decisions','gradient_updates','examples_seen','best_loss'}),
         best_checkpoint={k:published[k] for k in ['sha256','timesteps']},
+        checkpoint_roles=roles,
+        training_phase=state['phase'] if state.get('phase') in {'validation','collection','fit'} else None,
+        last_candidate_probes=candidate_checks,
         validation_best_checkpoint={k:state['best'][k] for k in ['sha256','timesteps']},
         best_validation=clean_validation(state['best_validation']),history=history,
         active_collection=active_collection,
@@ -547,6 +587,8 @@ def report_copy(args):
         wandb_url=safe_url(tracking.get('url')),
         evaluations=evaluation_summaries(ROOT/'reports',published['sha256'],hashes),
         note='Supervised action-copy metrics, not match win rates. Shared simulator returns mildly weight expert labels; the original teachers reward functions are unknown. PPO is not used. Teacher rollout outcomes are not student outcomes.')
+    if published['sha256']!=state['best']['sha256']:
+        report['review_notes'].insert(0,f'Watch/export use the published {published["timesteps"]}-decision checkpoint; the validation candidate has {state["best"]["timesteps"]} decisions. Run launcher 33 to compare them directly. Published evaluations do not establish the candidate\'s strength.')
     if not config['copy'].get('history_free'):
         report['review_notes'].insert(0,'Legacy copy01 run: filtered transitions and previous-action inputs can inflate validation agreement. Use the corrected fresh copy02 workflow.')
     csv_out=io.StringIO();writer=csv.DictWriter(csv_out,['round','epoch','collected_decisions','train_loss','validation_loss','validation_accuracy'])
@@ -560,10 +602,16 @@ def report_copy(args):
 <h1>Frozen teacher copying</h1><p id="status"></p><p>Loss measures copying accuracy on separate teacher episodes. Playing strength requires simulator evaluations and offline matches.</p><p id="notes"></p>
 <h2>Held-out loss over training epochs</h2><svg id="chart" viewBox="0 0 900 250"></svg>
 <h2>Student's own kickoff monitoring</h2><p>Five standard kickoff starts on both sides against the scripted opponent. This is monitoring feedback used in selection, not an independent strength test.</p><pre id="probe"></pre>
-<h2>Best student's teacher-copy metrics</h2><pre id="metrics"></pre>
+<h2>Checkpoint roles</h2><pre id="checkpoints"></pre>
+<h2>Published policy teacher-copy metrics</h2><pre id="publishedmetrics"></pre>
+<h2>Best held-out candidate teacher-copy metrics</h2><pre id="metrics"></pre>
+<h2>Last candidate kickoff checks</h2><pre id="candidateprobes"></pre>
 <script id="data" type="application/json">'''+payload+'''</script><script>
 const d=JSON.parse(document.getElementById('data').textContent);document.getElementById('status').textContent=d.run+' | '+d.progress.collected_decisions+' collected decisions | '+d.progress.gradient_updates+' supervised updates';document.getElementById('metrics').textContent=JSON.stringify(d.best_validation,null,2);
 document.getElementById('notes').textContent=d.review_notes.join(' • ');
+document.getElementById('checkpoints').textContent=JSON.stringify(d.checkpoint_roles,null,2);
+document.getElementById('publishedmetrics').textContent=JSON.stringify(d.selected_validation,null,2);
+document.getElementById('candidateprobes').textContent=JSON.stringify(d.last_candidate_probes,null,2);
 document.getElementById('probe').textContent=JSON.stringify({matches_best_checkpoint:d.probe_matches_best,...d.student_probe},null,2);
 const ns='http://www.w3.org/2000/svg',svg=document.getElementById('chart'),p=d.history.map((r,i)=>({x:i,y:r.validation.balanced_loss}));if(p.length){let lo=Math.min(...p.map(v=>v.y)),hi=Math.max(...p.map(v=>v.y));if(lo===hi){lo-=.1;hi+=.1}const line=document.createElementNS(ns,'polyline');line.setAttribute('points',p.map(v=>`${40+820*v.x/Math.max(1,p.length-1)},${215-180*(v.y-lo)/(hi-lo)}`).join(' '));line.setAttribute('fill','none');line.setAttribute('stroke','#176bd4');line.setAttribute('stroke-width','2');svg.append(line)}
 </script>'''

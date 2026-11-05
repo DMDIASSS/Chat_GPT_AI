@@ -1,4 +1,6 @@
-# NovaForge v1.5.3
+# NovaForge v1.5.4
+
+**Candidate comparison:** pause with **22**, then run **33_COMPARE_COPY_CANDIDATE.bat** to compare the best held-out candidate against the published policy. **34** watches the candidate; **24** watches the published policy. See [checkpoint roles and the latest report diagnosis](CANDIDATE_REVIEW_v1.5.4.md).
 
 **Windows check fix:** watch tests use an isolated temporary lock; the native UDP protocol check is opt-in and checks exclusive Windows port ownership. Normal **1_CHECK.bat** no longer competes with a live viewer session. See [the check hotfix](CHECK_HOTFIX_v1.5.3.md).
 

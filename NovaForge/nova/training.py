@@ -105,12 +105,24 @@ def new_model(cfg,env):
                device=cfg['device'],seed=cfg['seed'],verbose=1,**params)
 
 
-def resolve_model(path):
+def resolve_model(path,copy_checkpoint='published'):
+    if copy_checkpoint not in {'published','validation','resume'}:raise ValueError('Unknown copy checkpoint selection')
     path=Path(path).resolve()
+    record=None
     if path.is_dir():
-        latest=json.loads((path/'latest.json').read_text())
-        path=path/latest['path']
-    check_model(path)
+        if copy_checkpoint=='published':
+            record=json.loads((path/'latest.json').read_text())
+        else:
+            state=json.loads((path/'copy_state.json').read_text())
+            record=state['best' if copy_checkpoint=='validation' else 'resume']
+        selected=(path/record['path']).resolve()
+        if not selected.is_relative_to(path):raise ValueError('Checkpoint path escapes its run')
+        path=selected
+    elif copy_checkpoint!='published':
+        raise ValueError('Copy checkpoint selection requires a copy run folder')
+    meta=check_model(path)
+    if record and record.get('sha256') and record['sha256']!=meta['sha256']:
+        raise ValueError('Selected checkpoint hash does not match its run record')
     return path
 
 

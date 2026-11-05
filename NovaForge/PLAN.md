@@ -1,6 +1,8 @@
 # Implemented work and next experiments
 
-**Current v1.5.2:** [varied correction collection](LEARNING_UPDATE_v1.5.2.md), preserved copy02 upgrade, reduced fitting reuse, ground scorer and contact-aware goal reporting. Kickoff overrides remain disabled.
+**Current v1.5.4:** [direct candidate review](CANDIDATE_REVIEW_v1.5.4.md) compares the new trained candidate against the older published policy before another learning change. Reports now retain checkpoint roles and future rejected-candidate probes.
+
+**v1.5.2:** [varied correction collection](LEARNING_UPDATE_v1.5.2.md), preserved copy02 upgrade, reduced fitting reuse, ground scorer and contact-aware goal reporting. Kickoff overrides remain disabled.
 
 ## Next work after the current correction
 

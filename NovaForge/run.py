@@ -74,6 +74,7 @@ def main():
     p.add_argument('--carball',default=None,help='Optional custom carball executable')
     p=sub.add_parser('evaluate',help='Seeded first-goal trials on both teams; no automatic promotion')
     p.add_argument('--model',required=True,help='Run folder, full .zip checkpoint, or exported actor .pt')
+    p.add_argument('--copy-checkpoint',choices=['published','validation','resume'],default='published',help='For a copy run folder: published policy, best held-out candidate, or latest optimizer checkpoint')
     p.add_argument('--baseline',default=None)
     p.add_argument('--opponents',default='scripted')
     p.add_argument('--scenarios',default='kickoff')
@@ -86,6 +87,7 @@ def main():
     p.add_argument('--model',required=True)
     p=sub.add_parser('watch',help='Stream the bot to the standalone RLViser application')
     p.add_argument('--model',required=True)
+    p.add_argument('--copy-checkpoint',choices=['published','validation','resume'],default='published')
     p.add_argument('--opponent',choices=['scripted','scorer','nexto','ripple','chronos','galactus'],default='scorer')
     p.add_argument('--scenario',choices=['kickoff','shot','defense','aerial','dribble','recovery','wall'],default='kickoff')
     p.add_argument('--seconds',type=positive_float,default=30)
@@ -125,6 +127,11 @@ def main():
     p.add_argument('--run',default='copy02')
     p=sub.add_parser('copy-upgrade',help='Preserve copy02 weights and switch to varied correction collection')
     p.add_argument('--run',default='copy02')
+    p=sub.add_parser('copy-compare',help='Compare a training candidate against the published copy policy; pause training first')
+    p.add_argument('--run',default='copy02')
+    p.add_argument('--candidate',choices=['validation','resume'],default='validation')
+    p.add_argument('--pairs',type=positive_int,default=5)
+    p.add_argument('--seconds',type=positive_float,default=20)
     p=sub.add_parser('pt-to-toml',help='Package a NovaForge TorchScript .pt actor for RLBot v5')
     p.add_argument('model',nargs='?',help='Actor .pt path; omit to open the Windows file picker')
     p.add_argument('--name',default=None,help='Display name for the packaged bot')
@@ -152,9 +159,9 @@ def main():
     elif args.command in ('pt-to-toml','export-v5'):
         from nova.packaging import package_actor,export_v5
         (package_actor if args.command=='pt-to-toml' else export_v5)(args)
-    elif args.command in ('copy-train','copy-report','copy-upgrade'):
-        from nova.imitation import train_copy, report_copy, upgrade_copy
-        {'copy-train':train_copy,'copy-report':report_copy,'copy-upgrade':upgrade_copy}[args.command](args)
+    elif args.command in ('copy-train','copy-report','copy-upgrade','copy-compare'):
+        from nova.imitation import train_copy, report_copy, upgrade_copy, compare_copy
+        {'copy-train':train_copy,'copy-report':report_copy,'copy-upgrade':upgrade_copy,'copy-compare':compare_copy}[args.command](args)
     elif args.command in ('report','compare-progress'):
         from nova.reporting import report_command, compare_command
         (report_command if args.command=='report' else compare_command)(args)
