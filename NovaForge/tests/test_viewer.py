@@ -117,7 +117,10 @@ def test_rendered_car_one_is_learner_without_mutating_simulator(cfg,side):
 
 def test_watch_prepares_viewer_and_closes_renderer_on_interrupt(tmp_path,cfg,monkeypatch):
     import rlgym.rocket_league.rlviser as adapter
-    from nova import evaluation
+    from nova import evaluation,core
+    # A real watcher may be running while 1_CHECK executes. Tests must never use
+    # its production lock or write into the installed project's work folder.
+    monkeypatch.setattr(core,'ROOT',tmp_path/'isolated_project')
     torch.set_num_threads(1)
     env=ArenaEnv(cfg,opponent='scripted')
     try:
@@ -136,3 +139,14 @@ def test_watch_prepares_viewer_and_closes_renderer_on_interrupt(tmp_path,cfg,mon
     evaluation.watch(Namespace(model=str(path),config=str(config),opponent='scripted',scenario='kickoff',
         seconds=.15,seed=55,viewer_mode='auto',viewer_exe=None))
     assert [x[0] for x in calls]==['prepare','init','close']
+
+
+def test_watch_still_rejects_a_second_session_in_its_own_project(tmp_path,monkeypatch):
+    from filelock import FileLock
+    from nova import evaluation,core
+    monkeypatch.setattr(core,'ROOT',tmp_path)
+    monkeypatch.setattr(evaluation,'_watch_run',lambda args:pytest.fail('Second session must not start'))
+    lock=tmp_path/'work/rlviser-watch.lock';lock.parent.mkdir()
+    with FileLock(str(lock),timeout=0):
+        with pytest.raises(RuntimeError,match='already running'):
+            evaluation.watch(Namespace())

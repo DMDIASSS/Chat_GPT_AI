@@ -1,6 +1,10 @@
-# NovaForge v1.5.2 download
+# NovaForge v1.5.3 download
 
-[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.5.2.zip)
+[Download the ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.5.3.zip)
+
+Fixes the two Windows viewer-check failures: test watches use an isolated lock; the native UDP protocol diagnostic is opt-in, with exclusive wildcard socket preflight on Windows. Merge this ZIP, run 1_CHECK.bat, then run 32 once if copy02 has not yet been upgraded, and resume with 21. Your saved student is preserved.
+
+[Windows check hotfix](NovaForge/CHECK_HOTFIX_v1.5.3.md)
 
 Corrects stalled teacher copying: retained nonkickoff practice, earlier teacher takeovers after student attempts, fewer fitting passes and a ground scoring opponent. Existing copy02 users: pause with 22, merge this ZIP, run 1_CHECK.bat, run 32_UPGRADE_COPY_LEARNING.bat once, then resume with 21. The published student is preserved. Run 27, 30 and 26 after two or three completed new rounds. No improved playing strength or native-backend speed is claimed yet.
 

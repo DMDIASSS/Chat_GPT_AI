@@ -1,5 +1,7 @@
 # Validation evidence and limits
 
+**v1.5.3:** Local teacher-enabled checks: 82 passed, 1 intentionally skipped native UDP integration. The opt-in actual sender check passes separately. Held-port checks safely skip for both fixed ports. The old watch test was reproduced failing with the real project lock held; the fixed test passes under the same condition and separately preserves duplicate-session rejection. A Windows CI workflow checks the core suite, actual packets and occupied ports. See [the hotfix](CHECK_HOTFIX_v1.5.3.md).
+
 **v1.5.2:** Added regression checks for ground-scorer goals on both team sides, routing behind the ball, retained nonkickoff reset coverage, mixed opponents, teacher-only labels after student prefixes, preserved upgrade state/backup/idempotence, and contact-aware goal counts. An actual two-round four-teacher run collected 8,000 decisions, including 12 takeover episodes in the second round; this checks execution, not playing strength. A separate real collection sampled all five configured opponents and all four actual teachers (1,200 attempted decisions, 983 compatible labels). No Windows native-backend speed or 271 comparison is claimed. The teacher-enabled suite passes (82 tests), including the contact-score tie-break; the final release archive is also checked with its core suite.
 
 

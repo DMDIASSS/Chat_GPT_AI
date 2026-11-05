@@ -7,6 +7,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 
 def pytest_addoption(parser):
     parser.addoption('--teachers',action='store_true',help='Exercise downloaded actual Nexto/Ripple models')
+    parser.addoption('--viewer-udp',action='store_true',help='Opt in to the native RLViser UDP integration check; stop all viewers/senders first')
 
 
 @pytest.fixture

@@ -39,6 +39,8 @@ To use only the existing stock viewer, without downloading the camera build:
 
 `--viewer-mode manual` skips NovaForge setup for externally managed viewers; rlviser-py's ordinary launcher behavior still applies. Automatic camera-build installation currently targets Windows x64. Close an old manually opened viewer before the first upgrade if Windows reports its executable is in use.
 
+Normal training checks isolate the mocked watcher and skip native UDP integration. To test native packet framing explicitly, stop watchers/viewers and use `python -m pytest tests/test_viewer_protocol.py --viewer-udp -q -rs`. See [the Windows check hotfix](CHECK_HOTFIX_v1.5.3.md).
+
 Only one watch session per project is allowed, preventing two NovaForge watchers from fighting over the UDP port. Rendered car ID 1 is always the learner, including orange-side and reordered-state starts. Camera settings affect viewing, not policy observations or training rewards.
 
 Upstream: [VirxEC/rlviser](https://github.com/VirxEC/rlviser/tree/a4e524085cdb1601cf9c0af2f815591fb696db54), MIT license included at [viewer/RLVISER_LICENSE.txt](viewer/RLVISER_LICENSE.txt). The camera patch is in [viewer/patch_rlviser.py](viewer/patch_rlviser.py). Actual visual inspection on the user's Windows/GPU remains part of testing.

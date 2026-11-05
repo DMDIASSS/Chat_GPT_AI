@@ -1,4 +1,6 @@
-# NovaForge v1.5.2
+# NovaForge v1.5.3
+
+**Windows check fix:** watch tests use an isolated temporary lock; the native UDP protocol check is opt-in and checks exclusive Windows port ownership. Normal **1_CHECK.bat** no longer competes with a live viewer session. See [the check hotfix](CHECK_HOTFIX_v1.5.3.md).
 
 **Learning correction:** upgrade existing copy02 once with **32_UPGRADE_COPY_LEARNING.bat**, then resume with **21**. This keeps your published student, expands beginner practice beyond kickoffs, adds early teacher takeovers from student attempts, and reduces repeated fitting. **24** now watches against a ground scorer. See [the learning update](LEARNING_UPDATE_v1.5.2.md).
 
