@@ -11,7 +11,9 @@ if errorlevel 1 goto failed
 if errorlevel 1 goto failed
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt
 if errorlevel 1 goto failed
-".venv\Scripts\python.exe" -m pip check
+".venv\Scripts\python.exe" -m pip install --only-binary=:all: --no-deps -r requirements-viewer.txt
+if errorlevel 1 goto failed
+".venv\Scripts\python.exe" run.py doctor
 if errorlevel 1 goto failed
 echo INSTALL_PASS - Next run 1_CHECK.bat
 pause

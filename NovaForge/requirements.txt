@@ -9,7 +9,7 @@ gymnasium==1.4.0
 onnxruntime==1.23.2
 rlgym-compat==2.3.6
 rlbot==2.0.0b56
-rlviser-py==0.6.14
+# Viewer sender: install separately using --no-deps -r requirements-viewer.txt.
 filelock>=3.20,<4
 pytest==8.4.2
 # Replay parsing is an implemented path, so install its otherwise undeclared extras.

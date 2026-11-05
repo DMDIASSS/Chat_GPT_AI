@@ -1,0 +1,5 @@
+# Install only after requirements.txt, with --no-deps --only-binary=:all:.
+# Upstream metadata conflicts: rlgym-rocket-league requires numpy<2, while
+# rlviser-py declares numpy>=2. Keep the tested RLGym NumPy 1.26.4 runtime.
+# The unmodified pinned sender's actual packet check passes on this runtime.
+rlviser-py==0.6.14

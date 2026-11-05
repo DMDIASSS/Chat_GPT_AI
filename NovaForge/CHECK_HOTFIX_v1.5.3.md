@@ -25,6 +25,18 @@ This is not required before training. Stop all watch/sender processes and close 
 
 It uses rlviser-py 0.6.14 to send actual FlatBuffers datagrams in a temporary folder. No viewer executable is provided there; a native stderr message about the missing ./rlviser.exe can appear without failing the packet test. Occupied ports skip the test rather than aborting the check. A narrow race remains because the native sender uses fixed ports and cannot inherit the preflight socket; normal training checks never invoke it.
 
+## Clean-install dependency compatibility
+
+Windows CI also exposed an upstream metadata conflict: rlgym-rocket-league 2.0.1 requires NumPy <2 while rlviser-py 0.6.14 declares NumPy >=2. Both cannot be resolved in one pip requirements transaction. The working training stack keeps NumPy 1.26.4. The unmodified pinned viewer wheel is installed separately with --no-deps, as NovaForge's camera setup already does. Its actual packet framing is tested against that runtime.
+
+0_INSTALL.bat now installs requirements.txt, then requirements-viewer.txt using --only-binary=:all: --no-deps, and verifies actual simulator execution with doctor. pip check will still report that known upstream NumPy metadata mismatch; this is an explicit compatibility exception, not a claim that the metadata agree. Do not blindly upgrade NumPy to fix it: that would violate RLGym's pin instead. Existing installations do not need reinstalling to fix the two reported tests.
+
+Manual clean installs must also run:
+
+```bat
+.venv\Scripts\python.exe -m pip install --only-binary=:all: --no-deps -r requirements-viewer.txt
+```
+
 ## Verification
 
 The old and fixed watch tests were compared while a separate process held the project lock: the old version failed and the fixed version passed. Local teacher-enabled checks pass (82 passed; the native UDP test is skipped by default). The explicit native protocol check passes separately; holding either fixed UDP port makes it skip safely. The GitHub Windows workflow additionally checks the core suite, real packet framing, and occupied-port behavior on windows-2022 / Python 3.11. Its result is separate from visual camera validation on the user's GPU.
