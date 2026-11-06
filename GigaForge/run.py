@@ -217,7 +217,8 @@ def report(name):
 def train(name='native01',*,choice='auto',wandb='online',once=False):
  from filelock import FileLock
  from nova.tracking import Tracker
- run=create(name,choice);settings=read(run/'config.json')
+ run=create(name,choice);settings=read(run/'config.json');settings['device']=device(choice)
+ write(run/'runtime_device.json',dict(device=settings['device'],torch_version=__import__('torch').__version__))
  if sha(run/'config.json')!=read(run/'provenance.json')['config_sha256']:raise ValueError('Training config changed; create a new experiment')
  if (run/'tuning.json').exists():
   tuning=read(run/'tuning.json');settings.update({k:tuning[k] for k in ('games','simulation_threads','torch_threads') if k in tuning})
@@ -312,7 +313,7 @@ def verify(name='native01',choice='auto'):
 
 
 def benchmark(name='native01',choice='auto'):
- run=create(name,choice);settings=read(run/'config.json');results=[]
+ run=create(name,choice);settings=read(run/'config.json');settings['device']=device(choice);results=[]
  for family in ('chronos','galactus'):
   for threads in sorted(set((min(4,os.cpu_count() or 1),min(6,os.cpu_count() or 1)))):
    for games in (16,32,64,128):

@@ -29,7 +29,7 @@ def setup(cpu=False):
   subprocess.run([smi,'--query-gpu=name,memory.total,driver_version','--format=csv,noheader'],check=True)
   cuda=True
  index='https://download.pytorch.org/whl/cu126' if cuda else 'https://download.pytorch.org/whl/cpu'
- subprocess.run([str(python),'-m','pip','install','--upgrade','torch==2.9.1','--index-url',index],check=True)
+ subprocess.run([str(python),'-m','pip','install','--upgrade','torch==2.9.1+'+('cu126' if cuda else 'cpu'),'--index-url',index],check=True)
  nova=ROOT.parent/'novaforge'
  if not nova.exists():nova=ROOT.parent/'NovaForge'
  subprocess.run([str(python),'-m','pip','install','-r',str(nova/'requirements.txt'),'wandb>=0.23,<0.25'],check=True)
