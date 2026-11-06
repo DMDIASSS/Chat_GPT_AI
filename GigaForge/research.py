@@ -23,7 +23,7 @@ def create(m,name='research01',choice='auto',config=None):
  run=m.folder(name).resolve()
  if (run/'lab_state.json').exists():return run
  if run.exists():raise FileExistsError('Choose a new research run name; existing experiments are not converted in place')
- run=m.create(name,choice)
+ run=m.create(name,choice).resolve()
  # Seed from protected retained actors, never from a halted latest candidate.
  source=m.folder('native01');ancestry={}
  if source!=run and (source/'state.json').exists():
@@ -41,7 +41,8 @@ def create(m,name='research01',choice='auto',config=None):
  m.write(run/'lab_provenance.json',dict(config_sha256=m.sha(run/'lab.json'),ancestry=ancestry,
   objective='10*goal_outcome + gamma*Phi(next)-Phi(current); goal terminal potential zero; rollout boundary bootstraps',
   actor_contract='Original 225/258 public features; no privileged opponent controls at inference',
-  native_required='fixed-rollout-v1',sources='RESEARCH_PAPERS.md'))
+  native_required='fixed-rollout-v1',sources='RESEARCH_PAPERS.md',
+  code_sha256={p.resolve().relative_to(m.ROOT.resolve()).as_posix():m.sha(p) for p in [Path(__file__),m.ROOT/'run.py',m.ROOT/'tools/patch_upstream.py',*sorted((m.ROOT/'src').glob('*'))] if p.is_file()}))
  print('RESEARCH_CREATED:',run,'Chronos=Breakout Galactus=Octane; old native01 preserved.',flush=True)
  return run
 
