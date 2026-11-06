@@ -1,4 +1,6 @@
-# NovaForge v1.11.0
+# NovaForge v1.12.0
+
+**Adaptive training opponents:** TriadBot 33 enables concession-rate sampling on your existing selector06; resume with 27. Its bounded weights/history persist in PPO checkpoints, with W&B sampling charts and report summaries. Evaluations remain balanced. Launcher 34 disables it. [Instructions](ADAPTIVE_OPPONENTS_v1.12.md).
 
 **Six-expert Octane selector:** TriadBot launchers 26–32 preserve selector04's exact frozen Fusion and create a new selector06 with Chronos, Galactus V2, Fusion, Ducky, Rain 1v1 and Megabyte. Ripple is excluded from the new run. Model-specific observations and six/eight-tick clocks run on two-tick physics batches. [Setup and limits](OCTANE_SIX_v1.11.md).
 

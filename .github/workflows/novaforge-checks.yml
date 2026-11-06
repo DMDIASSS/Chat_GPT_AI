@@ -72,6 +72,8 @@ jobs:
           python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector_six/latest.pt --force-expert rain
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector_six/latest.pt --force-expert megabyte
+      - name: Checkpointed concession-focused opponent sampling
+        run: python tests/check_opponent_sampling.py
       - name: Isolated RLBot v4 export and official class importer
         run: |
           python -m pip install --target .v4sdk rlbot==1.68.0 "setuptools<81"

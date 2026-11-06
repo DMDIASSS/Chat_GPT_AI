@@ -69,6 +69,8 @@ def session(run,cfg,step):
             adopted_at_timesteps=int(step),identity=identity))
     info=provenance(cfg);save_source(run,info)
     info.update(start_timesteps=int(step),seed=(int(cfg.get('selector_seed',271))+int(step))%2**32,session_id=stamp())
+    sampling=run/'opponent_sampling_policy.json'
+    if sampling.exists():info.update(opponent_sampling_policy=json.loads(sampling.read_text()),opponent_sampling_policy_sha256=sha256(sampling))
     atomic_json(run/'research/sessions'/f'{info["session_id"]}.json',info)
     return info
 
@@ -89,7 +91,7 @@ def bundle(run,parent):
             actor=fusion_asset(run,meta['fusion_teacher']);name=actor.relative_to(run.resolve()).as_posix()
             files.extend((name,name+'.json'))
         files+=['config.json']
-        files += [n for n in ('experiment.json','guard.json','status.json','fork.json','fusion_selection.json','fusion_refinement.json','six_origin.json') if (run/n).exists()]
+        files += [n for n in ('experiment.json','guard.json','status.json','fork.json','fusion_selection.json','fusion_refinement.json','six_origin.json','opponent_sampling_policy.json','opponent_sampling.json') if (run/n).exists()]
         for name in files:
             (stage/name).parent.mkdir(parents=True,exist_ok=True);shutil.copy2(run/name,stage/name)
         record=dict(schema='novaforge-checkpoint-bundle-v1',files={n:sha256(stage/n) for n in files})
@@ -136,8 +138,10 @@ def fork(source,name,objective_name='current',seed=271):
                 frozen=fusion_asset(src,actor['fusion_teacher']);name=frozen.relative_to(src).as_posix()
                 (stage/name).parent.mkdir(parents=True,exist_ok=True)
                 shutil.copy2(frozen,stage/name);shutil.copy2(str(frozen)+'.json',str(stage/name)+'.json')
-                for extra in ('fusion_selection.json','fusion_refinement.json'):
+                for extra in ('fusion_selection.json','fusion_refinement.json','six_origin.json'):
                     if (src/extra).exists():shutil.copy2(src/extra,stage/extra)
+            for extra in ('opponent_sampling_policy.json','opponent_sampling.json'):
+                if (src/extra).exists():shutil.copy2(src/extra,stage/extra)
             atomic_json(stage/'config.json',cfg)
             atomic_json(stage/'guard.json',dict(step=full['timesteps'],checks=0,regressions=0,decision='retain'))
             atomic_json(stage/'fork.json',dict(source_run=src.name,source_actor_sha256=actor['sha256'],
@@ -176,10 +180,14 @@ def report(name='selector01'):
     run=run_path(name);out=run.parent.parent/'reports'/f'{name}_research_{stamp()}.zip';out.parent.mkdir(parents=True,exist_ok=True)
     with FileLock(str(run/'train.lock'),timeout=0):
         with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
-            for n in ('guard.json','wdl.json','fusion_selection.json','fusion_refinement.json','frozen_fusion.pt.json','six_origin.json'):
+            for n in ('guard.json','wdl.json','fusion_selection.json','fusion_refinement.json','frozen_fusion.pt.json','six_origin.json','opponent_sampling_policy.json','opponent_sampling.json'):
                 if (run/n).exists():z.write(run/n,n)
             if (run/'status.json').exists():
-                d=json.loads((run/'status.json').read_text());z.writestr('status.json',json.dumps({k:d[k] for k in ('state','timesteps','halt_reason','metrics','guard') if k in d},indent=2))
+                d=json.loads((run/'status.json').read_text());z.writestr('status.json',json.dumps({k:d[k] for k in ('state','timesteps','halt_reason','metrics','guard','opponent_sampling') if k in d},indent=2))
+            if (run/'guard.json').exists():
+                step=json.loads((run/'guard.json').read_text()).get('step')
+                check=run/'research/guard_checks'/f'{int(step):012d}.json' if step is not None else None
+                if check is not None and check.is_file():z.write(check,'latest_guard_check.json')
             cfg=json.loads((run/'config.json').read_text());z.writestr('objective.json',json.dumps(definition(cfg),indent=2))
             for p in (run/'evaluations').glob('*/evaluation.json'):
                 d=json.loads(p.read_text());d.pop('files',None)

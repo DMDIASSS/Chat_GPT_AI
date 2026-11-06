@@ -47,7 +47,8 @@ class ArenaEnv(gym.Env):
         if self.forced_opponent:
             name=self.forced_opponent
         else:
-            weights=self.cfg['league']['weights']
+            sampler=getattr(self,'opponent_sampler',None)
+            weights=sampler.probabilities() if sampler is not None else self.cfg['league']['weights']
             names=list(weights)
             probabilities=np.asarray(list(weights.values()),dtype=np.float64)
             name=str(self.np_random.choice(names,p=probabilities/probabilities.sum()))

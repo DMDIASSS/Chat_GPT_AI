@@ -122,7 +122,7 @@ def benchmark(cfg,cells,policies,pairs,seconds,stop_path):
 
 
 def protected_hashes(run):
-    names=['config.json','experiment.json','guard.json','status.json','STOP','six_origin.json','fusion_selection.json','fusion_refinement.json']
+    names=['config.json','experiment.json','guard.json','status.json','STOP','six_origin.json','fusion_selection.json','fusion_refinement.json','opponent_sampling_policy.json','opponent_sampling.json']
     names += [n+s for n in ('full.zip','latest.pt','initial.pt','champion.pt','frozen_fusion.pt') for s in ('','.json')]
     return {n:sha256(run/n) if (run/n).is_file() else None for n in names}
 

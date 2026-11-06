@@ -7,7 +7,7 @@ if not root.exists():root=Path(__file__).resolve().parents[1]/'NovaForge'
 sys.path.insert(0,str(root))
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description='TriadBot frozen experts, Fusion selection and isolated four-way training')
-    parser.add_argument('command',choices=['check','watch','export','league','selector-train','selector-pause','selector-status','selector-evaluate','selector-diagnose','selector-routing-evaluate','selector-six-create','selector-six-diagnose','research-backup','research-fork','research-report','fusion-select','fusion-refine-prepare','fusion-refine-train','fusion-refine-pause','selector-four-create'])
+    parser.add_argument('command',choices=['check','watch','export','league','selector-train','selector-pause','selector-status','selector-evaluate','selector-diagnose','selector-routing-evaluate','selector-six-create','selector-six-diagnose','selector-sampling-enable','selector-sampling-disable','research-backup','research-fork','research-report','fusion-select','fusion-refine-prepare','fusion-refine-train','fusion-refine-pause','selector-four-create'])
     parser.add_argument('--selector',default=None);parser.add_argument('--run',default='selector01');parser.add_argument('--source',default='selector01')
     parser.add_argument('--objective',choices=['current','field_only','goals_only'],default='current');parser.add_argument('--seed',type=int,default=271)
     parser.add_argument('--split',choices=['development','validation','test'],default='development')
@@ -38,6 +38,9 @@ if __name__=='__main__':
         from nova.research import run_path
         run=run_path(args.run)
         if args.command=='selector-train':selector.train(args.run,steps=args.steps,forever=not args.once,wandb=args.wandb)
+        elif args.command in ('selector-sampling-enable','selector-sampling-disable'):
+            from nova.opponent_sampling import configure
+            configure(args.run,enabled=args.command=='selector-sampling-enable')
         elif args.command=='selector-six-create':
             from nova.six_selector import create
             create(args.run,args.source)

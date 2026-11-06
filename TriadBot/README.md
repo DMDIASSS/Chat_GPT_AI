@@ -1,4 +1,6 @@
-# TriadBot v1.4.0
+# TriadBot v1.5.0
+
+**New in v1.5.0:** install sibling NovaForge v1.12.0. Pause selector06 with 28, enable adaptive training opponents with 33, then resume the existing model with 27. Launcher 34 restores base sampling. Report 32 now includes sampling weights and detailed future automatic W/D/L checks. See novaforge/ADAPTIVE_OPPONENTS_v1.12.md.
 
 **New in v1.4.0:** install sibling NovaForge v1.11.0. Launchers 26–32 create, train, pause, watch, diagnose, export and report the separate six-expert Octane selector06. It preserves selector04's frozen Fusion, removes Ripple from this new run, and adds Ducky, Rain 1v1 and full-strength Megabyte neural policies. Earlier runs remain available. See novaforge/OCTANE_SIX_v1.11.md.
 

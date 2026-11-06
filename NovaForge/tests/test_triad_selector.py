@@ -93,7 +93,11 @@ def test_selector_guard_stops_after_large_confirmed_drop(tmp_path,monkeypatch):
    old.append(r);rows.append(dict(r,outcome=-1,goals_against=1))
  monkeypatch.setattr(module,'Runner',lambda *a:None)
  monkeypatch.setattr(league,'match_suite',lambda *a:(rows,old))
+ (tmp_path/'latest.pt').write_bytes(b'candidate');(tmp_path/'champion.pt').write_bytes(b'champion')
  model=NS(num_timesteps=131072);state={}
  module.check_progress(tmp_path,settings(),model,state)
  assert (tmp_path/'STOP').exists() and model.selector_halt
  assert state['decision']=='regressed'
+ import json
+ record=json.loads((tmp_path/'research/guard_checks/000000131072.json').read_text())
+ assert record['trials']==rows and record['by_opponent']['chronos']['candidate']['goals_against']==24

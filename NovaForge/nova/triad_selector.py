@@ -171,6 +171,7 @@ class SelectorEnv(Env):
             controls=self.teacher.proposals(self.inner.arena.state,self.inner.previous,self.features[:225],self.inner.mirror)
             self.features,reward,terminal,truncated,info=self.inner.step_world_controls(controls[choice])
         if 'episode' in info:info['selector_counts']=dict(zip(self.names,map(int,self.counts)))
+        if getattr(self,'opponent_sampler',None) is not None:self.opponent_sampler.observe(info)
         return self.context.observation(self.features[:225]),reward,terminal,truncated,info
     def close(self):self.inner.close()
 
@@ -212,6 +213,7 @@ def save_actor(model,path,body,fusion_teacher=None):
 def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
     from .teachers import fetch_teachers
     from .tracking import Tracker,EpisodeWindow,WandBWriter
+    from .opponent_sampling import policy_for,ConcessionSampler,save_state
     torch.set_num_threads(1)
     run=(RUNS/run_name).resolve()
     if run.parent!=RUNS.resolve():raise ValueError('Invalid selector run name')
@@ -223,11 +225,12 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
         names=tuple(cfg.get('selector_experts',NAMES));contract=contract_for(names)
         if names==SIX_NAMES and cfg['env']['learner_hitbox']!='octane':raise ValueError('The six-expert selector requires Octane')
         fetch_teachers(['chronos','galactus','nexto']+(['ducky','rain','megabyte'] if names==SIX_NAMES else ['ripple']))
+        sampling_policy=policy_for(run,cfg['league']['weights'])
         from .research import session
         start=check_model(run/'full.zip',contract)['timesteps'] if (run/'full.zip').exists() else 0
         experiment=session(run,cfg,start)
         atomic_json(run/'config.json',cfg);env=SelectorEnv(cfg,run);tracker=Tracker(run,cfg,mode=wandb,continuous=forever)
-        model=None;state='error';before=None;window=EpisodeWindow()
+        model=None;sampler=None;checkpoint_ready=False;state='error';before=None;window=EpisodeWindow()
         try:
             if (run/'full.zip').exists():
                 check_model(run/'full.zip',contract);model=PPO.load(run/'full.zip',env=env,device='cpu')
@@ -240,6 +243,11 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
                     model.policy.action_net.weight.zero_();model.policy.action_net.bias.copy_(biases)
                 save_actor(model,run/'initial.pt',cfg['env']['learner_hitbox'],cfg.get('fusion_teacher'))
                 shutil.copy2(run/'initial.pt',run/'champion.pt');shutil.copy2(run/'initial.pt.json',run/'champion.pt.json')
+            if sampling_policy is not None and sampling_policy['enabled']:
+                sampler=ConcessionSampler(cfg['league']['weights'],sampling_policy,getattr(model,'opponent_sampling_state',None))
+                env.opponent_sampler=sampler;env.inner.arena.opponent_sampler=sampler
+                print('ADAPTIVE_OPPONENTS:',json.dumps(sampler.summary()),flush=True)
+            checkpoint_ready=True
             model.set_random_seed(experiment['seed'])
             model.set_logger(configure(str(run/'logs'/experiment['session_id']),['stdout','csv']))
             if tracker.run is not None:model.logger.output_formats.append(WandBWriter(tracker))
@@ -252,8 +260,11 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
                     for info in self.locals.get('infos',[]):
                         if 'outcome' in info:window.add(info)
                     if self.n_calls%500==0:
-                        metrics=window.metrics();tracker.log(metrics,self.num_timesteps)
-                        atomic_json(run/'status.json',dict(state='training',timesteps=self.num_timesteps,metrics=metrics,wandb=tracker.status()))
+                        metrics=window.metrics()
+                        if sampler is not None:metrics.update(sampler.metrics())
+                        tracker.log(metrics,self.num_timesteps);save_state(model,sampler,run)
+                        atomic_json(run/'status.json',dict(state='training',timesteps=self.num_timesteps,metrics=metrics,
+                            opponent_sampling=sampler.summary() if sampler is not None else {'enabled':False},wandb=tracker.status()))
                     return not (run/'STOP').exists()
             callback=Callback()
             while not (run/'STOP').exists():
@@ -266,6 +277,7 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
                 if any(not torch.isfinite(p).all() for p in model.policy.parameters()):
                     model.policy.load_state_dict(before);model.policy.optimizer.load_state_dict(optim_before)
                     model.selector_halt='Nonfinite selector update';(run/'STOP').touch()
+                save_state(model,sampler,run)
                 save_ppo(model,run/'full.zip',contract=contract)
                 save_actor(model,run/'latest.pt',cfg['env']['learner_hitbox'],cfg.get('fusion_teacher'))
                 if not (run/'STOP').exists() and model.num_timesteps-checks.get('step',0)>=131072:
@@ -276,11 +288,13 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
             if (run/'STOP').exists():state='stopped'
         except KeyboardInterrupt:state='stopped'
         finally:
-            if model is not None:
+            if model is not None and checkpoint_ready:
+                save_state(model,sampler,run)
                 save_ppo(model,run/'full.zip',contract=contract)
                 save_actor(model,run/'latest.pt',cfg['env']['learner_hitbox'],cfg.get('fusion_teacher'))
                 atomic_json(run/'status.json',dict(state=state,timesteps=model.num_timesteps,
-                    halt_reason=getattr(model,'selector_halt',None),guard=checks if 'checks' in locals() else {},wandb=tracker.status()))
+                    halt_reason=getattr(model,'selector_halt',None),guard=checks if 'checks' in locals() else {},
+                    opponent_sampling=sampler.summary() if sampler is not None else {'enabled':False},wandb=tracker.status()))
             env.close();tracker.finish(state)
 
 
@@ -289,10 +303,12 @@ def check_progress(run,cfg,model,checks):
     from .chronos_guard import paired_statistics,judgement,EvaluationStopped
     settings=cfg['chronos']['guard'];seed=51000001+checks.get('checks',0)*10000000;body=cfg['env']['learner_hitbox']
     try:
+        candidate_sha=sha256(run/'latest.pt');champion_sha=sha256(run/'champion.pt');confirmation=None
         rows,old=match_suite(cfg,Runner(run/'latest.pt',body),Runner(run/'champion.pt',body),4,60,seed,run/'STOP')
         stats=paired_statistics(rows,old);decision=judgement(stats,settings)
         if decision=='improved':
             fresh,prior=match_suite(cfg,Runner(run/'latest.pt',body),Runner(run/'champion.pt',body),4,60,seed+5000000,run/'STOP')
+            confirmation=dict(statistics=paired_statistics(fresh,prior),trials=fresh,baseline_trials=prior,seed_start=seed+5000000)
             if judgement(paired_statistics(fresh,prior),settings)=='improved':
                 shutil.copy2(run/'latest.pt',run/'champion.pt');shutil.copy2(run/'latest.pt.json',run/'champion.pt.json')
             else:decision='retain'
@@ -300,8 +316,12 @@ def check_progress(run,cfg,model,checks):
         if bad>=2 or (decision=='regressed' and stats['mean_delta']<=-.35):
             model.selector_halt='Substantial selector W/D/L regression';(run/'STOP').touch()
         checks.update(step=int(model.num_timesteps),checks=checks.get('checks',0)+1,regressions=bad,
-            decision=decision,statistics=stats,candidate=match_summary(rows),champion=match_summary(old))
-        atomic_json(run/'research/guard_checks'/f'{int(model.num_timesteps):012d}.json',checks)
+            decision=decision,statistics=stats,candidate=match_summary(rows),champion=match_summary(old),
+            by_opponent={op:dict(candidate=match_summary([r for r in rows if r['opponent']==op]),
+                champion=match_summary([r for r in old if r['opponent']==op])) for op in sorted({r['opponent'] for r in rows})})
+        atomic_json(run/'research/guard_checks'/f'{int(model.num_timesteps):012d}.json',dict(checks,
+            candidate_sha256=candidate_sha,champion_sha256_before_check=champion_sha,seed_start=seed,
+            trials=rows,baseline_trials=old,confirmation=confirmation))
         atomic_json(run/'guard.json',checks)
     except EvaluationStopped:pass
 
