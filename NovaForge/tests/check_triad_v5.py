@@ -27,7 +27,7 @@ def send(sock,item):
 def main():
  import tomllib,shlex
  import argparse
- parser=argparse.ArgumentParser();parser.add_argument('--selector');parser.add_argument('--force-expert',choices=['ducky','rain','megabyte']);args=parser.parse_args()
+ parser=argparse.ArgumentParser();parser.add_argument('--selector');parser.add_argument('--force-expert',choices=['ducky','rain','megabyte']);parser.add_argument('--forge-actor');args=parser.parse_args()
  from nova.triad import export
  root=Path(__file__).resolve().parents[1]
  with tempfile.TemporaryDirectory() as temp:
@@ -44,13 +44,16 @@ def main():
    details={k:v for k,v in meta.items() if k not in ('contract','sha256','fusion_teacher')}
    write_model_meta(stage/'actor.pt',contract=SIX_CONTRACT,fusion_teacher=dict(path='frozen_fusion.pt',sha256=sha256(stage/'frozen_fusion.pt')),**details)
    args.selector=str(stage/'actor.pt')
-  folder=export(selector_path=args.selector,destination_parent=Path(temp)/'exports')
+  if args.forge_actor:
+   from nova.forge_export import export_actor_bundle
+   folder=export_actor_bundle(args.forge_actor,Path(temp)/'exports')
+  else:folder=export(selector_path=args.selector,destination_parent=Path(temp)/'exports')
   settings=tomllib.loads((folder/'bot.bot.toml').read_text())['settings']
   octane=tomllib.loads((folder/'loadout.toml').read_text())['blue_loadout']['car_id']==23
   command=settings['run_command'] if os.name=='nt' else shlex.split(settings['run_command_linux'])
   assert not (folder/'.venv').exists()
   # TOML executable/arguments agree with this generated command on both OSes.
-  assert str(sys.executable) in settings['run_command'] and 'run_triad.py' in settings['run_command']
+  assert str(sys.executable) in settings['run_command'] and ('run_forge.py' if args.forge_actor else 'run_triad.py') in settings['run_command']
   with socket.socket() as server:
    server.bind(('127.0.0.1',0));server.listen(1);server.settimeout(45)
    env=dict(os.environ,RLBOT_SERVER_IP='127.0.0.1',RLBOT_SERVER_PORT=str(server.getsockname()[1]),RLBOT_AGENT_ID='test/triad')
@@ -73,7 +76,7 @@ def main():
         air_state=f.AirState.OnGround,dodge_timeout=-1,demolished_timeout=-1,last_input=f.ControllerState(),dodge_dir=f.Vector2(),
         player_id=900+i,team=i,boost=33) for i,(y,yaw) in enumerate([(-4608,np.pi/2),(4608,-np.pi/2)])]
        packet=f.GamePacket(players=cars,balls=[f.BallInfo(physics=f.Physics(location=f.Vector3(0,0,93.15),rotation=f.Rotator(),velocity=f.Vector3(),angular_velocity=f.Vector3()))],
-        boost_pads=[f.BoostPadState(is_active=True) for _ in BOOST_LOCATIONS],match_info=f.MatchInfo(frame_num=frame,seconds_elapsed=frame/120,match_phase=f.MatchPhase.Active))
+        boost_pads=[f.BoostPadState(is_active=True) for _ in BOOST_LOCATIONS],teams=[f.TeamInfo(team_index=0,score=1),f.TeamInfo(team_index=1,score=2)],match_info=f.MatchInfo(frame_num=frame,seconds_elapsed=frame/120,game_time_remaining=150,match_phase=f.MatchPhase.Active))
        send(conn,packet)
        while True:
         msg=receive(conn)
@@ -84,7 +87,7 @@ def main():
       assert received==6 and nonzero
       send(conn,f.DisconnectSignal())
      process.wait(timeout=15);assert process.returncode==0
-     print('TRIAD_V5_TCP_HANDSHAKE_INIT_AND_CONTROLS_PASS')
+     print(('FORGE' if args.forge_actor else 'TRIAD')+'_V5_TCP_HANDSHAKE_INIT_AND_CONTROLS_PASS')
     except BaseException:
      process.kill();process.wait();print((folder/'process.log').read_text());raise
 

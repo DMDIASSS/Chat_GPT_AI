@@ -106,3 +106,7 @@ RocketSim 2.2.1 advertises ABI3 wheels. The inspected internal Windows wheel met
 - Broader Chronos/Galactus port validation with live matches and full prediction traces, and identification of the intended Pulsar deployment model if one is provided.
 
 The full guide gives short tests before long runs and lists the files to send back when a check fails.
+
+## NovaForge 1.14.0 / ForgeLeague 0.1
+
+Local full checks with actual teacher models: **200 passed, 1 optional viewer check skipped**. New tests verify exact native-core initialization logits, trainable Chronos and Galactus cores, critic-only warmup followed by real actor changes, complete optimizer/counter restoration, actor invariance to private inputs, seeded prepared-opponent execution, multi-goal matches and telescoping shaping. The actual tiny-budget pilot runs all four arms, retains ordinary critics when evidence is insufficient, continues the inherited optimizers into both main blocks, freezes curriculum challengers, packages reports and exports both actors. Each independent exported process is tested over the RLBot v5 loopback protocol through handshake, initialization and typed controller packets. This is not a graphical game test. See [research design](FORGELEAGUE_v0.1.md).

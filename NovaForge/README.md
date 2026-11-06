@@ -1,6 +1,8 @@
-# NovaForge v1.13.0
+# NovaForge v1.14.0
 
-**Leave one job running:** TriadBot 35 backs up and resumes selector06, keeps adaptive opponents and regression checks, writes automatic progress reports and exports each new retained champion. Frozen inference and unused-observation work are optimized without changing PPO/rewards/timing. 36 measures local environment speed. [Unattended training and measured limits](UNATTENDED_v1.13.md).
+**New direct-policy league:** Open the sibling `forgeleague` project for two independent trainable actors, a controlled critic pilot and protected exports. Existing selectors stay separate. [Research scope](FORGELEAGUE_v0.1.md).
+
+**Existing selector unattended mode:** TriadBot 35 backs up and resumes selector06, keeps adaptive opponents and regression checks, writes automatic progress reports and exports each new retained champion. Frozen inference and unused-observation work are optimized without changing PPO/rewards/timing. 36 measures local environment speed. [Unattended training and measured limits](UNATTENDED_v1.13.md).
 
 **Adaptive training opponents:** TriadBot 33 enables concession-rate sampling on your existing selector06; resume with 27. Its bounded weights/history persist in PPO checkpoints, with W&B sampling charts and report summaries. Evaluations remain balanced. Launcher 34 disables it. [Instructions](ADAPTIVE_OPPONENTS_v1.12.md).
 
@@ -59,3 +61,7 @@ The review inventories 233 public repositories from the five supplied accounts, 
 Old runs and launchers remain available: [copy02](FROZEN_TEACHER_COPYING.md), [candidate inspection](CANDIDATE_REVIEW_v1.5.4.md), [mixed PPO](MULTI_BOT_GUIDE.md), [reports](PROGRESS_REPORTS.md), [W&B](WANDB_AND_CONTINUOUS.md), [general installation and replay workflow](START_HERE.md), [viewer setup](RLVISER_CAMERA.md), and [earlier export formats](V5_EXPORT.md).
 
 Designed for Windows 10, i5-10300H, GTX 1650 Ti Mobile and 16 GB RAM. Defaults use two simulator workers. Actual laptop CUDA speed and full offline RLBot matches need user testing. The source ZIP contains no model weights; launchers fetch pinned, hash-verified originals. It does not grant new rights over those originals.
+
+## Independent direct-policy research league (1.14.0)
+
+A separate sibling `forgeleague` project trains Chronos-family and Galactus-family actors directly, starting from retained Fusion when available and native Galactus V2. It adds a controlled privileged-critic pilot, frozen snapshot opponents and curriculum challengers, paired WDL safeguards, full optimizer resume and two independent v5 exports. Existing runs are not migrated or reset. See [research scope and validation](FORGELEAGUE_v0.1.md); the sibling ForgeLeague README gives launcher instructions. Strength gains require measured confirmation.

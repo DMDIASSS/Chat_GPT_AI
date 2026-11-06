@@ -1,0 +1,43 @@
+{
+  "version": "forgeleague-v1",
+  "seed": 271031,
+  "device": "cpu",
+  "threads": 1,
+  "match_seconds": 60,
+  "actor_lr": 0.000005,
+  "critic_lr": 0.0003,
+  "anchor_coef": 0.2,
+  "anchor_kl_limit": 0.08,
+  "warmup_rollouts": 2,
+  "pilot_decisions": 8192,
+  "block_decisions": 32768,
+  "checkpoint_decisions": 4096,
+  "specialist_decisions": 8192,
+  "specialists_per_cycle": 2,
+  "checkpoint_keep": 2,
+  "objective": {"version": "timed-match-goal-potential-v1", "goal": 10, "match_result": 10, "field": 0.35, "distance": 0.1},
+  "ppo": {
+    "learning_rate": 0.000005,
+    "n_steps": 1024,
+    "batch_size": 256,
+    "n_epochs": 2,
+    "gamma": 0.999,
+    "gae_lambda": 0.97,
+    "clip_range": 0.05,
+    "ent_coef": 0.0002,
+    "target_kl": 0.01
+  },
+  "evaluation": {
+    "seconds": 60,
+    "pairs": 4,
+    "confirmation_pairs": 8,
+    "minimum_delta": 0.03,
+    "per_opponent_tolerance": 0.15,
+    "regression_delta": 0.1,
+    "test_pairs": 12,
+    "test_seconds": 300
+  },
+  "opponent_sampling": {"uniform_fraction": 0.5, "max_weight_ratio": 3.0},
+  "specialist_profiles": ["pressure", "defense", "recovery", "match"],
+  "max_history_per_family": 4
+}

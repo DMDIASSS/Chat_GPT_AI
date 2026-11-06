@@ -2,7 +2,7 @@ name: NovaForge Windows checks
 on:
   push:
     branches: [codex/novaforge-v1]
-    paths: ['NovaForge/**', 'TriadBot/**', '.github/workflows/novaforge-checks.yml']
+    paths: ['NovaForge/**', 'TriadBot/**', 'ForgeLeague/**', '.github/workflows/novaforge-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -39,6 +39,13 @@ jobs:
           python run.py fetch-teachers --names chronos,ripple,galactus,nexto
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m pytest tests/test_chronos.py tests/test_chronos_finish.py tests/test_triad.py tests/test_triad_selector.py -q --chronos --teachers
+      - name: Independent Chronos and Galactus research league, actual native actors and v5 processes
+        run: |
+          python -m pytest tests/test_forge_league.py -q --teachers
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_forge_league.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_forge_v5.py
       - name: Triad actual export v5 handshake and controls (no new venv)
         run: |
           python tests/check_triad_v5.py

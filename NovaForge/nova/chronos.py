@@ -191,7 +191,7 @@ class ChronosPPO(PPO):
         optimizer_before=copy.deepcopy(self.policy.optimizer.state_dict())
         try:
             self._train_chronos()
-            probe=torch.as_tensor(self.rollout_buffer.observations.reshape(-1,315)[:512],device=self.device)
+            probe=torch.as_tensor(self.rollout_buffer.observations.reshape(-1,self.observation_space.shape[0])[:512],device=self.device)
             with torch.no_grad():anchor_kl=float(self.policy.anchor_kl(probe))
             if not np.isfinite(anchor_kl):raise FloatingPointError('Nonfinite anchor KL')
             if anchor_kl>getattr(self,'anchor_kl_limit',float('inf')):

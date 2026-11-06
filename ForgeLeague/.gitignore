@@ -1,0 +1,6 @@
+runs/
+exports/
+reports/
+.venv/
+__pycache__/
+*.log
