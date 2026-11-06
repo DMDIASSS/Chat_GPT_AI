@@ -11,16 +11,16 @@ def patch(root):
  def change(relative,before,after,count=-1):
   p=root/relative;s=p.read_text(encoding='utf-8-sig')
   if before not in s:raise ValueError('Upstream context changed: '+relative+' / '+before[:50])
-  p.write_text(s.replace(before,after,count))
+  p.write_text(s.replace(before,after,count),encoding='utf8')
  def change_start(relative,before,after):
-  p=root/relative;s=p.read_text();start=s.index('void GGL::Learner::Start()')
+  p=root/relative;s=p.read_text(encoding='utf8');start=s.index('void GGL::Learner::Start()')
   tail=s[start:]
   if before not in tail:raise ValueError('Start context changed: '+before[:40])
-  p.write_text(s[:start]+tail.replace(before,after))
+  p.write_text(s[:start]+tail.replace(before,after),encoding='utf8')
  for p in root.rglob('*'):
   if p.suffix in {'.h','.hpp','.cpp'}:
    s=p.read_text(encoding='utf-8-sig')
-   p.write_text(s.replace('/OBSBuilders/','/ObsBuilders/').replace('/GameStates/','/Gamestates/').replace('/OBSBuilder.h','/ObsBuilder.h'))
+   p.write_text(s.replace('/OBSBuilders/','/ObsBuilders/').replace('/GameStates/','/Gamestates/').replace('/OBSBuilder.h','/ObsBuilder.h'),encoding='utf8')
  change('GigaLearnCPP/CMakeLists.txt','add_library(GigaLearnCPP SHARED ${FILES_SRC})',
   'add_library(GigaLearnCPP STATIC ${FILES_SRC})\ntarget_compile_definitions(GigaLearnCPP PUBLIC GIGAFORGE_STATIC)')
  change('GigaLearnCPP/src/public/GigaLearnCPP/Framework.h','#ifdef WITHIN_GGL',

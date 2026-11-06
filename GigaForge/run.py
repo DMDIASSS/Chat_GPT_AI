@@ -174,7 +174,15 @@ def guard(run,family,candidate):
  decision,result=evaluate(run,family,candidate)
  if decision=='improved':decision,result=evaluate(run,family,candidate,split='confirmation',pairs=read(run/'config.json')['confirmation_pairs'])
  if decision=='improved':
-  write(run/'champions'/f'{family}.json',dict(path=str(candidate.relative_to(run)),reason='Fresh paired confirmation passed',statistics=result['statistics']))
+  protected=run/'champions/generations'/family/sha(candidate/'POLICY.lt')
+  if not protected.exists():
+   protected.parent.mkdir(parents=True,exist_ok=True)
+   with tempfile.TemporaryDirectory(dir=protected.parent) as stage:
+    stage=Path(stage)
+    for file in ('POLICY.lt','SHARED_HEAD.lt'):shutil.copy2(candidate/file,stage/file)
+    seal_generation(stage,family);stage.rename(protected)
+  verify_generation(protected)
+  write(run/'champions'/f'{family}.json',dict(path=str(protected.relative_to(run)),reason='Fresh paired confirmation passed; copied outside rotating checkpoints',statistics=result['statistics']))
  elif decision=='regressed':
   state=read(run/'state.json');state['halt_reason']=family+' regressed against retained champion';write(run/'state.json',state)
  write(run/f'latest_evaluation_{family}.json',result)

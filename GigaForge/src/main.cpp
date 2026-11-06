@@ -140,6 +140,15 @@ int main(int argc,char** argv){
   cfg.ppo.useGuidingPolicy=true;cfg.ppo.guidingPolicyPath=recipe.at("anchor").get<std::string>();cfg.ppo.guidingStrength=.2;
   Learner learner(MakeEnvironment,cfg,Step);
   currentLearner=&learner;
+  for(size_t i=0;i<learner.envSet->arenas.size();i++){
+   for(auto car:learner.envSet->arenas[i]->GetCars()){
+    bool own=!recipe.contains("opponent") || int(car->team)==int(i%2);
+    std::string expected=own?recipe["hitbox"].get<std::string>():recipe["opponent"]["hitbox"].get<std::string>();
+    auto body=expected=="breakout"?CAR_CONFIG_BREAKOUT:CAR_CONFIG_OCTANE;
+    if(car->config.hitboxSize.x!=body.hitboxSize.x)throw std::runtime_error("Arena hitbox mismatch");
+   }
+  }
+  std::cout<<"NATIVE_BODY_CHECK_PASS "<<recipe["family"]<<" "<<recipe["hitbox"]<<std::endl;
   if(recipe.contains("opponent")){
    auto otherConfig=cfg.ppo;Shape(otherConfig,recipe["opponent"]["family"]);
    int size=recipe["opponent"]["family"]=="chronos"?225:258;
