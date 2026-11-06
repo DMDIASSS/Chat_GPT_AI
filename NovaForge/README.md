@@ -1,4 +1,6 @@
-# NovaForge v1.10.0
+# NovaForge v1.10.1
+
+**Routing pilot:** sibling TriadBot launcher 25 compares latest greedy and sampled routing against initialization and fixed experts, with fresh paired starts and a separate report. No training or promotion. [Instructions](ROUTING_TEST_v1.10.1.md).
 
 **Selected/refined Fusion as fourth expert:** [new isolated workflow and launchers 14–24](FOUR_EXPERTS_v1.10.md). [Candidate/2v2 roadmap](EXPERT_AND_TEAM_PLAN_v1.10.md).
 

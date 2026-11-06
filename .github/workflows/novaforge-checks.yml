@@ -56,6 +56,8 @@ jobs:
         run: |
           python tests/check_four_experts.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_selector_routing.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector_four/latest.pt
       - name: Isolated RLBot v4 export and official class importer
         run: |

@@ -7,11 +7,12 @@ if not root.exists():root=Path(__file__).resolve().parents[1]/'NovaForge'
 sys.path.insert(0,str(root))
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description='TriadBot frozen experts, Fusion selection and isolated four-way training')
-    parser.add_argument('command',choices=['check','watch','export','league','selector-train','selector-pause','selector-status','selector-evaluate','selector-diagnose','research-backup','research-fork','research-report','fusion-select','fusion-refine-prepare','fusion-refine-train','fusion-refine-pause','selector-four-create'])
+    parser.add_argument('command',choices=['check','watch','export','league','selector-train','selector-pause','selector-status','selector-evaluate','selector-diagnose','selector-routing-evaluate','research-backup','research-fork','research-report','fusion-select','fusion-refine-prepare','fusion-refine-train','fusion-refine-pause','selector-four-create'])
     parser.add_argument('--selector',default=None);parser.add_argument('--run',default='selector01');parser.add_argument('--source',default='selector01')
     parser.add_argument('--objective',choices=['current','field_only','goals_only'],default='current');parser.add_argument('--seed',type=int,default=271)
     parser.add_argument('--split',choices=['development','validation','test'],default='development')
     parser.add_argument('--skip-body-check',action='store_true')
+    parser.add_argument('--routing-seed',type=int,default=451000001)
     parser.add_argument('--fusion-run',default='all');parser.add_argument('--refinement',default='fusion_refine01');parser.add_argument('--direct',action='store_true')
     parser.add_argument('--max-candidates',type=int,default=12);parser.add_argument('--confirmation-pairs',type=int,default=2);parser.add_argument('--confirmation-seconds',type=float,default=60)
     parser.add_argument('--steps',type=int,default=32768);parser.add_argument('--once',action='store_true');parser.add_argument('--wandb',choices=['online','offline','off'],default='online');parser.add_argument('--pairs',type=int,default=2);parser.add_argument('--seconds',type=float,default=60);args=parser.parse_args()
@@ -41,6 +42,9 @@ if __name__=='__main__':
         elif args.command=='selector-diagnose':
             from nova.selector_diagnostics import diagnose
             diagnose(args.run,pairs=args.pairs,seconds=args.seconds,body_check=not args.skip_body_check)
+        elif args.command=='selector-routing-evaluate':
+            from nova.selector_routing import evaluate
+            evaluate(args.run,pairs=args.pairs,seconds=args.seconds,seed_start=args.routing_seed)
         elif args.command=='selector-pause':
             if not (run/'config.json').exists():raise FileNotFoundError('No selector01 run')
             (run/'STOP').touch();print('Selector stop requested')

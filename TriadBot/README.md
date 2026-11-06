@@ -1,4 +1,6 @@
-# TriadBot v1.3.0
+# TriadBot v1.3.1
+
+**New in v1.3.1:** install sibling NovaForge v1.10.1 and run 25 after pausing selector04 with 19. It compares greedy versus sampled expert routing in 40 short games and writes its own report ZIP. Watch/export defaults and training remain unchanged. See novaforge/ROUTING_TEST_v1.10.1.md.
 
 **New in v1.3.0:** install sibling NovaForge v1.10.0. Launchers 14–24 select a tested Fusion, refine a copy for a bounded budget, then create/train/watch/diagnose/export a separate four-expert selector04. Original selector01 remains available. See novaforge/FOUR_EXPERTS_v1.10.md. Learned watch logs now show actual actor probabilities. This release remains 1v1.
 
