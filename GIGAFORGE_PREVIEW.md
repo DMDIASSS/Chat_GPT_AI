@@ -1,9 +1,7 @@
-# Native trainer source preview and Chronos body correction
+# GigaForge Windows CPU-verified release
 
-[Download ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-GigaForge-native-preview.zip)
+[Download complete ZIP](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-GigaForge-Windows.zip)
 
-Contains chat_gpt_ai/novaforge, triadbot, forgeleague and gigaforge. Pause trainers and merge program files into the existing chat_gpt_ai folder, preserving models, runs and environments. Chronos uses Breakout and Galactus uses Octane. Existing Octane ForgeLeague runs are preserved and automatically forked into a separate Breakout experiment for training/watch/export.
+Contains chat_gpt_ai/novaforge, triadbot, forgeleague and gigaforge, including the verified Windows CPU executable. Read [setup and commands](GigaForge/README.md). CPU native training/resume/parity passed on Windows and Linux; the full existing Python Windows workflow passed too. GPU hardware verification remains necessary on the target PC. No strength gain or laptop SPS promise. Existing models/runs are preserved.
 
-GigaForge is a compiled-and-tested Linux CPU source preview. A verified Windows executable is not included; Windows build validation is running in Actions. The GPU path is not yet hardware-validated. Do not leave this preview training unattended on Windows. Read GigaForge/README.md for build, verification, objective, benchmark and launch instructions.
-
-Linux: 28 actual feature/mask/network comparisons passed; actual native warmup, actor updates, optimizer resume and cross-bot paired WDL passed for both families. Existing Python suite: 174 passed, 28 optional skipped. These are correctness checks, not proof of stronger play or a laptop SPS claim. No user weights, reports or keys are published.
+ZIP SHA256: 997207a5b8b778bc15ff0a0a8ea3e290abfc38ba0946fcabd8738a70c940be20
