@@ -24,7 +24,7 @@ def binary():
  candidates += [ROOT/'native/GigaForge.exe',ROOT/'build/Release/GigaForge.exe',ROOT/'build/GigaForge.exe',ROOT/'build/GigaForge']
  for p in candidates:
   if p.is_file():return p.resolve()
- raise FileNotFoundError('Native executable absent. Build with tools/build_native.py; this source preview has no verified Windows binary yet.')
+ raise FileNotFoundError('Native executable absent. Run 0_SETUP_CPU.bat or 1_SETUP_GPU.bat to restore the pinned native runtime.')
 def environment(threads=4):
  import torch
  env=dict(os.environ);lib=Path(torch.__file__).parent/'lib'
@@ -305,7 +305,7 @@ def verify(name='native01',choice='auto'):
    recipe=base_recipe(run,family,settings,mode='self');recipe['checkpoints']=str(temp/family/'checkpoints')
    recipe.update(probe_input=np.asarray([r['reference'][family]['features'] for r in cases],np.float32).ravel().tolist(),probe_output=str(temp/(family+'_logits.json')),probe_only=True,games=2)
    launch(recipe,log=temp/(family+'.log'))
-   network=GigaNetwork(run/'parents'/family,family)
+   network=GigaNetwork(Path(recipe['anchor']),family)
    with torch.inference_mode():expected=network(torch.tensor([r['reference'][family]['features'] for r in cases])).numpy()
    np.testing.assert_allclose(np.asarray(read(recipe['probe_output'])).reshape(-1,90),expected,rtol=3e-5,atol=5e-5)
  print('NATIVE_FEATURE_MASK_NETWORK_GAE_VERIFICATION_PASS',flush=True)

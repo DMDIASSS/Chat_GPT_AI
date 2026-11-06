@@ -1,17 +1,12 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-echo Blue is Galactus on Octane. Orange is original Chronos on Breakout. Pause training before viewing.
-set "GIGA_PY=.venv_native\Scripts\python.exe"
-if not exist "%GIGA_PY%" set "GIGA_PY=..\novaforge\.venv\Scripts\python.exe"
-if not exist "%GIGA_PY%" goto missing
-"%GIGA_PY%" -u run.py watch --family galactus
+echo Watch retained Galactus on Octane.
+call "%~dp0_RUN.bat" run watch --family galactus
 if errorlevel 1 goto failed
 pause
 exit /b 0
-:missing
-echo Python environment missing. Install NovaForge Python 3.11 first.
 :failed
-echo NATIVE_COMMAND_FAILED - keep the error above. No older project was reset.
+echo NATIVE_COMMAND_FAILED - keep the error above. Existing models and runs were preserved.
 pause
 exit /b 1

@@ -6,6 +6,10 @@ Status: Windows CPU executable included and verified by workflow 42277845367: na
 
 On Windows, pause existing trainers and merge this ZIP's chat_gpt_ai folders into your existing Chat_GPT_AI. Preserve .venv, assets, runs and exports. Open gigaforge/0_SETUP_CPU.bat for the verified CPU runtime, or 1_SETUP_GPU.bat to install the isolated CUDA runtime and test the actual GPU path. If GPU verification fails, retain the error and use the CPU setup; do not start a long GPU run. Existing Python 3.11 NovaForge environment is required to bootstrap setup. Then run 9_VERIFY, 2_BENCHMARK, and 3_START_OR_RESUME. Benchmarking may take several minutes. Pause with 4_PAUSE, watch protected champions with 5/6, export with 7, and send reports from 8. No compiler is required for the included executable. Start with one short block and inspect WDL before an unattended session.
 
+## Dependency reuse update
+
+[Quick update and dependency finder instructions](RUNTIME_UPDATE.md). Setup now reuses compatible installed PyTorch before requesting downloads, and aligns W&B with NovaForge. All BAT files use one saved runtime selection.
+
 ## Source build
 
 Use Python 3.11 with NovaForge requirements and PyTorch 2.9.1. On Windows install Visual Studio 2022 C++ Build Tools. Run `python tools/build_native.py`. The builder downloads an archive pinned by commit and SHA256, applies reviewed patches and builds Release C++. The source is https://github.com/ZealanL/GigaLearnCPP-Leak at 86e11c3881a21225a43c36b14af40f0b3c87e7dd. Credit Zealan and the original GigaLearn, RLGymCPP, RocketSim and Bullet authors. Source licenses/notices remain in the downloaded source; original actor notices remain beside fetched actors. GigaLearn is linked statically to avoid private-symbol DLL export issues. PyTorch runtime must match 2.9.1.

@@ -10,3 +10,8 @@ native/
 tools/runtime/
 __pycache__/
 *.log
+
+.venv_reused_*/
+.venv_managed_*/
+runtime_selection.json
+dependency_report.json
