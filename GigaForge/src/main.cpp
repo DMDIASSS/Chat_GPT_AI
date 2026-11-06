@@ -73,7 +73,9 @@ EnvCreateResult MakeEnvironment(int index){
  if(external)static_cast<GF::Obs*>(e.obsBuilder)->onlyTeam=int(learnerTeam);
  e.actionParser=new GF::Actions(c,otherC,learnerTeam);e.stateSetter=new KickoffState;
  e.terminalConditions={new GoalScoreCondition};
- e.rewards={{new GF::GoalPotential(recipe.at("gamma")),1.f}};
+ std::array<float,5> weights={.35f,.1f,0.f,0.f,0.f};
+ if(recipe.contains("potential_weights"))weights=recipe["potential_weights"].get<std::array<float,5>>();
+ e.rewards={{new GF::GoalPotential(recipe.at("gamma"),weights),1.f}};
  return e;
 }
 void Step(Learner* l,const std::vector<GameState>& states,Report& report){
@@ -87,14 +89,15 @@ void Step(Learner* l,const std::vector<GameState>& states,Report& report){
  if(l->ppo->config.policyLR!=actor)l->ppo->SetLearningRates(actor,recipe.at("critic_lr"));
  for(auto name:{"shared_head","policy"}){
   auto model=l->ppo->models[name];
-  if(model->parameters().front().requires_grad()==warmup)
-   for(auto& parameter:model->parameters())parameter.requires_grad_(!warmup);
+  bool enabled=!warmup && !(std::string(name)=="shared_head" && recipe.value("freeze_shared",false));
+  if(model->parameters().front().requires_grad()!=enabled)
+   for(auto& parameter:model->parameters())parameter.requires_grad_(enabled);
  }
  report["train/critic_warmup"]=warmup;
 }
 int main(int argc,char** argv){
  try{
-  if(argc==2 && std::string(argv[1])=="--selftest")return GF::SelfTest();
+  if(argc==2 && (std::string(argv[1])=="--selftest" || std::string(argv[1])=="--research-selftest"))return GF::SelfTest();
   if(argc==6 && std::string(argv[1])=="--features")return GF::Features(argv[2],argv[3],argv[4],argv[5]);
   if(argc!=2)throw std::runtime_error("Usage: GigaForge recipe.json");
   recipe=json::parse(std::ifstream(argv[1]));
@@ -136,8 +139,9 @@ int main(int argc,char** argv){
   }
   cfg.stopFile=recipe.at("stop_file").get<std::string>();cfg.maxTimesteps=recipe.value("stop_at",uint64_t(0));
   cfg.maxIterations=recipe.value("max_iterations",uint64_t(0));
+  cfg.fixedRollout=recipe.value("fixed_rollout",false);
   cfg.reportFile=recipe.at("metrics_file").get<std::string>();
-  cfg.ppo.useGuidingPolicy=true;cfg.ppo.guidingPolicyPath=recipe.at("anchor").get<std::string>();cfg.ppo.guidingStrength=.2;
+  cfg.ppo.useGuidingPolicy=true;cfg.ppo.guidingPolicyPath=recipe.at("anchor").get<std::string>();cfg.ppo.guidingStrength=recipe.value("anchor_coef",.2f);
   Learner learner(MakeEnvironment,cfg,Step);
   currentLearner=&learner;
   for(size_t i=0;i<learner.envSet->arenas.size();i++){

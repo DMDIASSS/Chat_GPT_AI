@@ -1,8 +1,8 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-echo Start or resume native training; keep existing checkpoints and W&B run.
-call "%~dp0_RUN.bat" run train
+echo Start or resume research01 reward search; keep existing native01 and protected champions.
+call "%~dp0_RUN.bat" run research --run research01
 if errorlevel 1 goto failed
 pause
 exit /b 0

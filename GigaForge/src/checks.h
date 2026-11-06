@@ -17,6 +17,23 @@ inline int SelfTest(){
  if(std::abs(adv.item<float>()-2.75f)>1e-6)throw std::runtime_error("GAE terminal read test failed");
  if(CAR_CONFIG_BREAKOUT.hitboxSize.x==CAR_CONFIG_OCTANE.hitboxSize.x)throw std::runtime_error("Body presets are identical");
  Actions parser(true);if(parser.GetActionAmount()!=90)throw std::runtime_error("Action count mismatch");
+ // PBRS telescopes under the same discount. Truncation keeps the next
+ // potential; only a true scored goal zeros it.
+ for(auto weights:std::vector<std::array<float,5>>{{.35f,.1f,0,0,0},{.35f,.15f,.25f,.1f,.05f},{.2f,.15f,.05f,.4f,.05f},{.15f,.2f,0,.15f,.3f}}){
+  GoalPotential reward(.9f,weights);GameState a,b,c;
+  Player pa={},pb={},pc={};pa.team=pb.team=pc.team=Team::BLUE;
+  pa.pos={0,-1000,17};pb.pos={0,-500,17};pc.pos={0,100,17};
+  a.ball.pos={0,0,93};b.ball.pos={0,700,93};c.ball.pos={0,1500,93};
+  a.players={pa};b.players={pb};c.players={pc};
+  pb.prev=&pa;pc.prev=&pb;b.prev=&a;c.prev=&b;
+  float r1=reward.GetReward(pb,b,false),r2=reward.GetReward(pc,c,true);
+  float expected=-reward.Phi(pa,a)+.81f*reward.Phi(pc,c);
+  if(std::abs(r1+.9f*r2-expected)>1e-5)throw std::runtime_error("PBRS fragment telescoping failed");
+  c.goalScored=true;
+  float terminal=reward.GetReward(pc,c,true);
+  if(std::abs(r1+.9f*terminal-(-reward.Phi(pa,a)+9.f))>1e-5)throw std::runtime_error("PBRS terminal potential failed");
+ }
+ std::cout<<"RESEARCH_FIXED_ROLLOUT_PBRS_GAE_SELFTEST_PASS"<<std::endl;
  std::cout<<"NATIVE_GAE_TERMINAL_TIMEOUT_ORDER_BODY_ACTION_TESTS_PASS"<<std::endl;
  return 0;
 }

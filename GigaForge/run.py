@@ -192,7 +192,10 @@ def candidate_actor(run,family,candidate=False):
  import torch
  from nova.giga_teachers import GigaNetwork
  from nova.forge_models import DirectActor,save_actor
- source=latest(run,family) if candidate else retained(run,family)
+ if candidate and (run/'lab_state.json').exists():
+  from research import candidate_source
+  source=candidate_source(sys.modules[__name__],run,family)
+ else:source=latest(run,family) if candidate else retained(run,family)
  if source is None:source=retained(run,family)
  verify_generation(source)
  actor=DirectActor(family);actor.core.load_state_dict(GigaNetwork(source,family).state_dict(),strict=True)
@@ -346,10 +349,17 @@ def benchmark(name='native01',choice='auto'):
  write(run/'tuning.json',tuning);print('NATIVE_TUNING_SAVED:',run/'tuning.json',flush=True)
 
 if __name__=='__main__':
- parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=['create','verify','benchmark','train','pause','report','export','watch','status'])
+ parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=['create','verify','benchmark','train','pause','report','export','watch','status','research'])
  parser.add_argument('--run',default='native01');parser.add_argument('--device',choices=['auto','cpu','cuda'],default='auto');parser.add_argument('--wandb',choices=['online','offline','off'],default='online')
- parser.add_argument('--family',choices=['chronos','galactus'],default='chronos');parser.add_argument('--once',action='store_true');parser.add_argument('--candidate',action='store_true');args=parser.parse_args()
+ parser.add_argument('--family',choices=['chronos','galactus'],default='chronos');parser.add_argument('--once',action='store_true');parser.add_argument('--hours',type=float);parser.add_argument('--candidate',action='store_true');args=parser.parse_args()
  import torch;torch.set_num_threads(1)
+ explicit_run=any(a=='--run' or a.startswith('--run=') for a in sys.argv[1:])
+ if args.command=='research':
+  import research
+  research.train(sys.modules[__name__],args.run if explicit_run else 'research01',choice=args.device,wandb=args.wandb,once=args.once,hours=args.hours)
+  raise SystemExit(0)
+ if not explicit_run and args.command in ('pause','report','export','watch','status') and (ROOT/'active_research.json').exists():
+  args.run=read(ROOT/'active_research.json')['run']
  if args.command in ('create','verify','benchmark'):globals()[args.command](args.run,args.device)
  elif args.command=='train':train(args.run,choice=args.device,wandb=args.wandb,once=args.once)
  elif args.command=='pause':(folder(args.run)/'STOP').touch();print('NATIVE_STOP_REQUESTED: wait for the current native iteration/checkpoint.')

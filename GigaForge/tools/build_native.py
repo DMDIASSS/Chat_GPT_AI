@@ -63,7 +63,7 @@ def build(archive=None):
  shutil.copy2(executable,native/executable.name)
  # Do not copy CPU torch DLLs beside the executable: the selected runtime's
  # matching CPU/CUDA wheel must supply them via PATH.
- (native/'build.json').write_text(json.dumps(dict(source=COMMIT,torch=torch.__version__,python=sys.version,executable_sha256=sha(native/executable.name)),indent=2))
+ (native/'build.json').write_text(json.dumps(dict(source=COMMIT,torch=torch.__version__,python=sys.version,executable_sha256=sha(native/executable.name),patch_sha256=sha(ROOT/'tools/patch_upstream.py'),app_source_sha256={p.relative_to(ROOT).as_posix():sha(p) for p in (ROOT/'src').glob('*') if p.is_file()}),indent=2))
  print('NATIVE_BUILD_READY:',native/executable.name)
  return native
 if __name__=='__main__':build(sys.argv[1] if len(sys.argv)>1 else None)

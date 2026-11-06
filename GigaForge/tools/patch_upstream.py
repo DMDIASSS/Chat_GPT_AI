@@ -43,6 +43,7 @@ def patch(root):
  change(config,'int numGames = 300;', '''int numGames = 300;
         std::filesystem::path stopFile, reportFile;
         uint64_t maxTimesteps = 0, maxIterations = 0;
+        bool fixedRollout = false;
         std::function<void(const std::vector<RLGC::GameState>&, const IList&)> prepareOpponent;
         std::function<IList()> inferOpponent;''')
  learner='GigaLearnCPP/src/public/GigaLearnCPP/Learner.cpp'
@@ -156,5 +157,19 @@ def patch(root):
  change(ppo,'models.StepOptims();','models.StepOptims(); optimizerSteps++;',1)
  change(ppo,'report["Policy Entropy"] = avgEntropy.Get();',
   'report["Policy Entropy"] = avgEntropy.Get();\n    report["Actor Optimizer Steps"]=trainPolicy?optimizerSteps:0;\n    report["Critic Optimizer Steps"]=trainCritic?optimizerSteps:0;\n    report["PPO Early Stop"]=earlyStop;')
+ # Fixed fragments: keep all current-policy samples, bootstrap unfinished
+ # paths, and never carry old-policy trajectory tails into a new PPO update.
+ change_start(learner,'combinedTraj.Length() < config.ppo.tsPerItr || render',
+  '(config.fixedRollout ? stepsCollected < config.ppo.tsPerItr : combinedTraj.Length() < config.ppo.tsPerItr) || render')
+ change_start(learner,'!terminalType && traj.Length() >= maxEpisodeLength',
+  '!terminalType && (traj.Length() >= maxEpisodeLength || (config.fixedRollout && (step+1)*numRealPlayers>=config.ppo.tsPerItr))')
+ change_start(learner,'report["Used Timesteps"] = combinedTraj.Length();',
+  'report["Used Timesteps"] = combinedTraj.Length();\n                    report["Data Use Fraction"]=double(combinedTraj.Length())/std::max(1,stepsCollected);\n                    if(config.fixedRollout && combinedTraj.Length()!=stepsCollected)throw std::runtime_error("Fixed rollout lost or reused samples");')
+ change(ppo,'bool earlyStop=false; int optimizerSteps=0;',
+  'bool earlyStop=false; int optimizerSteps=0; int64_t optimizerSamples=0;')
+ change(ppo,'models.StepOptims(); optimizerSteps++;',
+  'models.StepOptims(); optimizerSteps++; optimizerSamples+=batch.actions.size(0);',1)
+ change(ppo,'report["PPO Early Stop"]=earlyStop;',
+  'report["PPO Early Stop"]=earlyStop;\n    report["Optimizer Sample Uses"]=optimizerSamples;\n    report["Actor Sample Uses"]=trainPolicy?optimizerSamples:0;')
  print('Pinned GigaLearn patches applied:',root)
 if __name__=='__main__':patch(sys.argv[1])

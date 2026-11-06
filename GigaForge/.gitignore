@@ -15,3 +15,5 @@ __pycache__/
 .venv_managed_*/
 runtime_selection.json
 dependency_report.json
+
+active_research.json

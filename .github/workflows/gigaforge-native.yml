@@ -29,6 +29,10 @@ jobs:
         run: python GigaForge/run.py verify --run native_check --device cpu
       - name: Actual native cross training, warmup, optimizer resume and timed evaluation
         run: python GigaForge/tests/check_native.py
+      - name: Research reward search and fixed-rollout mathematical checks
+        run: python -m pytest GigaForge/tests/test_research.py GigaForge/tests/test_runtime_finder.py -q
+      - name: All-sample native collection, reward profiles, frozen trunks and serial resume
+        run: python GigaForge/tests/check_research_native.py
       - uses: actions/upload-artifact@v4
         with:
           name: GigaForge-windows-CPU-verified-preview

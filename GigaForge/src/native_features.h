@@ -107,19 +107,32 @@ public:
 };
 
 class GoalPotential : public Reward {
- float gamma;
+ float gamma;std::array<float,5> weights;
 public:
- GoalPotential(float g):gamma(g){}
- static float Phi(const Player& p,const GameState& s){
+ GoalPotential(float g,std::array<float,5> w={.35f,.1f,0.f,0.f,0.f}):gamma(g),weights(w){
+  if(!(gamma>0 && gamma<1))throw std::runtime_error("Invalid shaping gamma");
+  for(float x:w)if(!std::isfinite(x)||std::abs(x)>1)throw std::runtime_error("Invalid potential coefficient");
+ }
+ static std::array<float,5> Basis(const Player& p,const GameState& s){
   float dir=p.team==Team::BLUE?1.f:-1.f;
-  return .35f*dir*s.ball.pos.y/5120-.1f*std::min((s.ball.pos-p.pos).Length(),12000.f)/6000;
+  float own=(s.ball.pos-p.pos).Length(),other=12000;
+  for(const auto& x:s.players)if(x.team!=p.team)other=std::min(other,(s.ball.pos-x.pos).Length());
+  float y=dir*s.ball.pos.y,v=dir*s.ball.vel.y;
+  float threat=std::clamp((-y-2000.f)/3120.f,0.f,1.f)*std::clamp(-v/6000.f,0.f,1.f);
+  return {y/5120.f,-std::min(own,12000.f)/6000.f,
+   std::clamp(v/6000.f,-1.f,1.f),-threat,
+   std::clamp((other-own)/6000.f,-1.f,1.f)*std::exp(-own/2500.f)};
+ }
+ float Phi(const Player& p,const GameState& s)const{
+  auto b=Basis(p,s);float value=0;for(int i=0;i<5;i++)value+=weights[i]*b[i];return value;
  }
  float GetReward(const Player& p,const GameState& s,bool final) override {
   if(!s.prev || !p.prev)return 0;
   float goal=0;
   if(s.goalScored)goal=((s.ball.pos.y>0)==(p.team==Team::BLUE))?10.f:-10.f;
+  // Truncation is a sampling boundary, not a task terminal: retain Phi(s').
   return goal+gamma*(s.goalScored?0.f:Phi(p,s))-Phi(*p.prev,*s.prev);
  }
- std::string GetName() override{return "goal-potential-native-v1";}
+ std::string GetName() override{return "goal-potential-native-v2";}
 };
 }
