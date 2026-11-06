@@ -1,4 +1,6 @@
-# TriadBot v1.5.0
+# TriadBot v1.6.0
+
+**New in v1.6.0:** install sibling NovaForge v1.13.0. Pause existing training with 28, then leave 35_LEAVE_RUNNING.bat open. It resumes selector06 in one continuous PPO session, backs up, reports and exports the retained champion automatically. 36 benchmarks environment speed while training is paused. See novaforge/UNATTENDED_v1.13.md.
 
 **New in v1.5.0:** install sibling NovaForge v1.12.0. Pause selector06 with 28, enable adaptive training opponents with 33, then resume the existing model with 27. Launcher 34 restores base sampling. Report 32 now includes sampling weights and detailed future automatic W/D/L checks. See novaforge/ADAPTIVE_OPPONENTS_v1.12.md.
 

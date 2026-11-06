@@ -1,15 +1,15 @@
-# NovaForge v1.12.0 / TriadBot v1.5.0: adaptive training opponents
+# NovaForge v1.13.0 / TriadBot v1.6.0: unattended selector training
 
-[Download both project folders](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-Triad-adaptive-opponents-v1.12.0.zip)
+[Download both project folders](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-Triad-unattended-v1.13.0.zip)
 
-Adds optional concession-per-minute opponent sampling to the existing selector06. Smoothed recent rates focus training on opponents that cause concessions, with 5–30% probability bounds, gradual updates and a retained base mix. State persists in the PPO checkpoint; W&B and reports show probabilities and estimated rates. Balanced W/D/L, rewards, frozen experts and champion protection are unchanged. This is a training experiment, not a demonstrated strength gain.
+Pause existing training with 28 and wait for saving. Copy the ZIP's chat_gpt_ai/novaforge and chat_gpt_ai/triadbot into the existing Chat_GPT_AI, replacing program files; preserve .venv/assets/runs/exports. No dependency reinstall or model reset. Open triadbot/35_LEAVE_RUNNING.bat and leave its console open. Stop with 28 or Ctrl+C.
 
-Pause selector06 with 28 and wait for saving; stop watch consoles. Copy chat_gpt_ai/novaforge and chat_gpt_ai/triadbot into your existing Chat_GPT_AI, replacing program files. Preserve .venv/assets/runs/exports. Run triadbot/33_ENABLE_HARD_OPPONENTS.bat, then 27 to resume your current model. No recreation or dependency reinstall. After a saved segment, pause and run 32 to share the updated report. Launcher 34 restores base sampling on the next resume.
+35 backs up and resumes one continuous selector06 session. It configures adaptive opponents if not previously configured, respects an explicit disabled preference, keeps balanced W/D/L and regression stops, writes reports automatically, and exports each distinct retained champion. Fusion stays a frozen expert; no second training job or viewer starts. Files are under triadbot/reports and triadbot/exports; latest paths are in runs/selector06/autopilot.json.
 
-Future guard reports retain per-opponent W/D/L and complete trials. Earlier aggregate-only reports cannot identify which opponent caused the concessions.
+Frozen expert inference is compiled in float32; unused two-tick observations are skipped; Fusion hash verification and evaluation model loading are cached with reset/invalidation checks. PPO settings, rewards, input timing and checkpoints remain compatible. A cloud environment benchmark measured about 18% higher decision throughput, not 10x–100x. This is not a user-laptop or learning-strength benchmark. Launcher 36 measures local environment speed while paused. A full native GigaLearn backend is not included.
 
-[Full sampling rules, resume and reporting](NovaForge/ADAPTIVE_OPPONENTS_v1.12.md) · [Six-expert setup](NovaForge/OCTANE_SIX_v1.11.md) · [Validation](NovaForge/VALIDATION.md)
+[Unattended instructions, speed evidence and native-backend scope](NovaForge/UNATTENDED_v1.13.md) · [Measured samples](NovaForge/PERFORMANCE_v1.13.json) · [Validation](NovaForge/VALIDATION.md)
 
-Source ZIPs contain no weights, user reports or keys. Existing frozen-teacher/1v1 adapter limits still apply. Published on codex/novaforge-v1; main is unchanged.
+Source only: no model weights, private reports or keys. Existing 1v1/model-adapter limitations remain. Published on codex/novaforge-v1; main is unchanged.
 
-Individual ZIPs: [NovaForge v1.12.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.12.0.zip) and [TriadBot v1.5.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/TriadBot-v1.5.0.zip).
+Individual ZIPs: [NovaForge v1.13.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/NovaForge-v1.13.0.zip) and [TriadBot v1.6.0](https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/TriadBot-v1.6.0.zip).

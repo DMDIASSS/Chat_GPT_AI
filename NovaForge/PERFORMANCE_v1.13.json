@@ -1,0 +1,59 @@
+{
+  "kind": "six_expert_environment_comparison_v1",
+  "host": "managed cloud executor, not the user laptop",
+  "architecture": "x86_64",
+  "threads": 1,
+  "precision": "float32",
+  "baseline": "NovaForge v1.12.0",
+  "optimized": "v1.13.0",
+  "samples": [
+    {
+      "decisions": 2048,
+      "elapsed": 7.185492295000586,
+      "decisions_per_second": 285.0187455388306,
+      "label": "before",
+      "repeat": 0
+    },
+    {
+      "decisions": 2048,
+      "elapsed": 6.064667034996091,
+      "decisions_per_second": 337.69372468134515,
+      "label": "after",
+      "repeat": 0
+    },
+    {
+      "decisions": 2048,
+      "elapsed": 7.1356455180066405,
+      "decisions_per_second": 287.0097729535356,
+      "label": "before",
+      "repeat": 1
+    },
+    {
+      "decisions": 2048,
+      "elapsed": 6.311118639001506,
+      "decisions_per_second": 324.5066551821339,
+      "label": "after",
+      "repeat": 1
+    },
+    {
+      "decisions": 2048,
+      "elapsed": 6.832730897003785,
+      "decisions_per_second": 299.73374202371514,
+      "label": "before",
+      "repeat": 2
+    },
+    {
+      "decisions": 2048,
+      "elapsed": 5.94865023199236,
+      "decisions_per_second": 344.2797811486171,
+      "label": "after",
+      "repeat": 2
+    }
+  ],
+  "median_before": 287.0097729535356,
+  "median_after": 337.69372468134515,
+  "ratio": 1.1765931215729537,
+  "percent_gain": 17.65931215729537,
+  "workload": "Three alternating before/after trials; 512 warmup then 2048 timed native decisions. Six experts rotate at free options; seven base opponents, seeded resets. Identical model fixtures/configuration; startup excluded; resets within measurement included.",
+  "limitations": "No PPO, evaluation/export or learning-strength comparison. Short host-specific samples; native demo respawns and OS scheduling vary. Laptop gains require a local benchmark."
+}

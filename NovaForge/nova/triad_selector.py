@@ -210,10 +210,12 @@ def save_actor(model,path,body,fusion_teacher=None):
         teacher_lock_sha256=sha256(ROOT/'teachers.lock.json'),**details)
 
 
-def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
+def train(run_name='selector01',steps=32768,forever=True,wandb='online',autopilot=False,clear_stop=True):
     from .teachers import fetch_teachers
     from .tracking import Tracker,EpisodeWindow,WandBWriter
     from .opponent_sampling import policy_for,ConcessionSampler,save_state
+    if autopilot:
+        from .autopilot import maintenance
     torch.set_num_threads(1)
     run=(RUNS/run_name).resolve()
     if run.parent!=RUNS.resolve():raise ValueError('Invalid selector run name')
@@ -231,6 +233,7 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
         experiment=session(run,cfg,start)
         atomic_json(run/'config.json',cfg);env=SelectorEnv(cfg,run);tracker=Tracker(run,cfg,mode=wandb,continuous=forever)
         model=None;sampler=None;checkpoint_ready=False;state='error';before=None;window=EpisodeWindow()
+        training_started=time.monotonic();last_throughput={}
         try:
             if (run/'full.zip').exists():
                 check_model(run/'full.zip',contract);model=PPO.load(run/'full.zip',env=env,device='cpu')
@@ -253,14 +256,16 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
             if tracker.run is not None:model.logger.output_formats.append(WandBWriter(tracker))
             if getattr(model,'selector_halt',None):
                 print('SELECTOR_HALTED:',model.selector_halt,'Export the retained champion.');state='stopped';return
-            (run/'STOP').unlink(missing_ok=True)
+            if clear_stop:(run/'STOP').unlink(missing_ok=True)
+            if autopilot:
+                maintenance(run,report=False)
             checks=json.loads((run/'guard.json').read_text()) if (run/'guard.json').exists() else {}
             class Callback(BaseCallback):
                 def _on_step(self):
                     for info in self.locals.get('infos',[]):
                         if 'outcome' in info:window.add(info)
                     if self.n_calls%500==0:
-                        metrics=window.metrics()
+                        metrics=window.metrics();metrics.update(last_throughput)
                         if sampler is not None:metrics.update(sampler.metrics())
                         tracker.log(metrics,self.num_timesteps);save_state(model,sampler,run)
                         atomic_json(run/'status.json',dict(state='training',timesteps=self.num_timesteps,metrics=metrics,
@@ -268,6 +273,7 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
                     return not (run/'STOP').exists()
             callback=Callback()
             while not (run/'STOP').exists():
+                segment_started=time.monotonic();segment_step=int(model.num_timesteps)
                 before=copy.deepcopy(model.policy.state_dict());optim_before=copy.deepcopy(model.policy.optimizer.state_dict())
                 try:model.learn(steps,callback=callback,reset_num_timesteps=False)
                 except BaseException:
@@ -280,9 +286,16 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
                 save_state(model,sampler,run)
                 save_ppo(model,run/'full.zip',contract=contract)
                 save_actor(model,run/'latest.pt',cfg['env']['learner_hitbox'],cfg.get('fusion_teacher'))
+                last_throughput['throughput/training_decisions_per_second']=(model.num_timesteps-segment_step)/max(time.monotonic()-segment_started,1e-9)
                 if not (run/'STOP').exists() and model.num_timesteps-checks.get('step',0)>=131072:
                     atomic_json(run/'status.json',dict(state='evaluating',timesteps=model.num_timesteps))
                     check_progress(run,cfg,model,checks)
+                atomic_json(run/'status.json',dict(state='saved',timesteps=int(model.num_timesteps),
+                    guard=checks,throughput=last_throughput,halt_reason=getattr(model,'selector_halt',None),
+                    opponent_sampling=sampler.summary() if sampler is not None else {'enabled':False},wandb=tracker.status()))
+                if autopilot:maintenance(run)
+                last_throughput['throughput/effective_decisions_per_second']=(model.num_timesteps-start)/max(time.monotonic()-training_started,1e-9)
+                tracker.log(last_throughput,model.num_timesteps)
                 if not forever:state='finished';break
             else:state='stopped'
             if (run/'STOP').exists():state='stopped'
@@ -294,7 +307,8 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
                 save_actor(model,run/'latest.pt',cfg['env']['learner_hitbox'],cfg.get('fusion_teacher'))
                 atomic_json(run/'status.json',dict(state=state,timesteps=model.num_timesteps,
                     halt_reason=getattr(model,'selector_halt',None),guard=checks if 'checks' in locals() else {},
-                    opponent_sampling=sampler.summary() if sampler is not None else {'enabled':False},wandb=tracker.status()))
+                    opponent_sampling=sampler.summary() if sampler is not None else {'enabled':False},throughput=last_throughput,wandb=tracker.status()))
+                if autopilot:maintenance(run)
             env.close();tracker.finish(state)
 
 

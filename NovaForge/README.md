@@ -1,4 +1,6 @@
-# NovaForge v1.12.0
+# NovaForge v1.13.0
+
+**Leave one job running:** TriadBot 35 backs up and resumes selector06, keeps adaptive opponents and regression checks, writes automatic progress reports and exports each new retained champion. Frozen inference and unused-observation work are optimized without changing PPO/rewards/timing. 36 measures local environment speed. [Unattended training and measured limits](UNATTENDED_v1.13.md).
 
 **Adaptive training opponents:** TriadBot 33 enables concession-rate sampling on your existing selector06; resume with 27. Its bounded weights/history persist in PPO checkpoints, with W&B sampling charts and report summaries. Evaluations remain balanced. Launcher 34 disables it. [Instructions](ADAPTIVE_OPPONENTS_v1.12.md).
 

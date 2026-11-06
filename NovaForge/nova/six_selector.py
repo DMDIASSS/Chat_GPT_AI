@@ -85,7 +85,7 @@ def diagnose(name='selector06',pairs=1,seconds=15):
                 candidate.bind=bind
                 policies={'selector_latest':candidate}
                 policies.update({'fixed_'+n:Fixed(run/'latest.pt','octane',n,candidate.teacher) for n in SIX_NAMES})
-                trials={n:[] for n in policies};total=len(policies)*len(OPPONENTS)*pairs*2;done=0
+                trials={n:[] for n in policies};total=len(policies)*len(OPPONENTS)*pairs*2;done=0;opponent_cache={}
                 stop=run/'SIX_DIAGNOSTIC_STOP';stop.unlink(missing_ok=True)
                 print(f'SIX_DIAGNOSTIC_MATCHES: {total} games, {seconds:g} simulated seconds/game; Ctrl+C cancels.',flush=True)
                 for oi,opponent in enumerate(OPPONENTS):
@@ -97,7 +97,7 @@ def diagnose(name='selector06',pairs=1,seconds=15):
                                 prefix=f'SIX GAME {done+1}/{total} {label} vs {opponent} side={side}'
                                 print(prefix+' START',flush=True)
                                 def progress(e):print(prefix+f' RUNNING {e["simulated_seconds"]:.1f}/{e["seconds"]:.1f}s score={e["goals_for"]}:{e["goals_against"]}',flush=True)
-                                row=play_match(cfg,policy,opponent,side,seed,seconds,stop,progress)
+                                row=play_match(cfg,policy,opponent,side,seed,seconds,stop,progress,opponent_cache=opponent_cache)
                                 if first is None:first=row['initial_observation_sha256']
                                 if first!=row['initial_observation_sha256']:raise RuntimeError('Six-expert match starts differ')
                                 trials[label].append(row);done+=1
@@ -141,7 +141,7 @@ def watch(path):
             print('SIX WATCH: learner is car 1 / Octane. Opponent is Chronos. Console shows active expert. Ctrl+C stops.',flush=True)
             while True:
                 start=time.monotonic()
-                _,_,terminal,truncated,_=env.arena.step_control_ticks(clock.controls_for_ticks(env.arena.state,2),2)
+                _,_,terminal,truncated,_=env.arena.step_control_ticks(clock.controls_for_ticks(env.arena.state,2),2,observation=False)
                 frames+=1
                 if frames%2==0:renderer.render(learner_first_state(env.arena.state,env.arena.agent),{})
                 if time.monotonic()-last_log>=3:

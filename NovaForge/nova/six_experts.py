@@ -137,6 +137,8 @@ class Pool:
         self.models.update({n:ExtraNetwork(verify_teacher(n),n) for n in ('ducky','rain','megabyte')})
         for model in self.models.values():
             for parameter in model.parameters():parameter.requires_grad_(False)
+        from .inference import frozen_inference
+        self.models={name:frozen_inference(model) for name,model in self.models.items()}
         self.forecasts={'galactus':BallForecast(),'ducky':DuckyForecast()}
     def reset(self,state,agent,rng):
         self.agent=agent;self.rng=rng
@@ -199,7 +201,8 @@ class Clock:
 class NativeExpert:
     """Standalone new opponent, with native period and deterministic model actions."""
     def __init__(self,name):
-        self.name=name;self.network=ExtraNetwork(verify_teacher(name),name)
+        from .inference import frozen_inference
+        self.name=name;self.network=frozen_inference(ExtraNetwork(verify_teacher(name),name))
         self.forecast=DuckyForecast() if name=='ducky' else None
     def reset(self,state,agent,rng):
         self.agent=agent;self.rng=rng;self.next_tick=int(state.tick_count)
@@ -229,7 +232,7 @@ def transition(env,clock):
     if arena.cfg.get('chronos',{}).get('reward_profile')!='potential_goal_v2':raise ValueError('Six-expert native stepping requires potential_goal_v2')
     initial=arena.potential(arena.state)
     for _ in range(4):
-        _,_,terminal,truncated,info=arena.step_control_ticks(clock.controls_for_ticks(arena.state,2),2)
+        _,_,terminal,truncated,info=arena.step_control_ticks(clock.controls_for_ticks(arena.state,2),2,observation=False)
         if terminal or truncated:break
     env.previous=clock.previous.copy();env.held=clock.held.copy()
     parts={'goal':arena.objective['goal']*info.get('outcome',0)}

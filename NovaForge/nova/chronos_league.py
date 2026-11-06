@@ -18,11 +18,12 @@ def match_summary(rows):
         goals_against=sum(r.get('goals_against',0) for r in rows))
 
 
-def play_match(cfg,policy,opponent,side,seed,seconds,stop_path,progress=None):
+def play_match(cfg,policy,opponent,side,seed,seconds,stop_path,progress=None,opponent_cache=None):
     from .chronos_guard import EvaluationStopped
     cfg=copy.deepcopy(cfg);cfg['curriculum']['adaptive']=False
     if tuple(cfg.get('selector_experts',()))==('chronos','galactus','fusion','ducky','rain','megabyte'):
         cfg['env']['fusion_opponent']=str(policy.gate.fusion_path)
+        if opponent_cache is None:opponent_cache={}
     ticks=0;goals_for=0;goals_against=0;contacts=0;point=0
     initial_hash=None
     match_ticks=int(round(seconds*120/8))*8
@@ -32,6 +33,7 @@ def play_match(cfg,policy,opponent,side,seed,seconds,stop_path,progress=None):
         if Path(stop_path).exists():raise EvaluationStopped()
         cfg['env'].update(episode_seconds=(match_ticks-ticks)/120,no_touch_seconds=(match_ticks+8)/120)
         env=ChronosEnv(cfg,opponent=opponent,scenario='kickoff',side=side)
+        if opponent_cache is not None:env.arena.cache=opponent_cache
         try:
             obs,_=env.reset(seed=seed+point*1000003)
             if initial_hash is None:initial_hash=hashlib.sha256(obs.tobytes()).hexdigest()
@@ -71,6 +73,7 @@ def match_suite(cfg,candidate,baseline,pairs,seconds,seed,stop_path):
     a=candidate if hasattr(candidate,'action') or hasattr(candidate,'world_controls') else ChronosRunner(candidate)
     b=baseline if hasattr(baseline,'action') or hasattr(baseline,'world_controls') else ChronosRunner(baseline)
     rows=[];old=[]
+    cache={} if len(cfg.get('selector_experts',()))==6 else None
     for cell,opponent in enumerate(opponents):
         for pair in range(pairs):
             game_seed=seed+cell*100000+pair
@@ -80,7 +83,8 @@ def match_suite(cfg,candidate,baseline,pairs,seconds,seed,stop_path):
                     print(prefix+' START (loading arena/opponent)',flush=True)
                     def heartbeat(event):
                         print(prefix+f' RUNNING {event["simulated_seconds"]:.1f}/{event["seconds"]:.1f}s score={event["goals_for"]}:{event["goals_against"]} elapsed={event["wall_seconds"]:.0f}s',flush=True)
-                    result=play_match(cfg,policy,opponent,side,game_seed,seconds,stop_path,progress=heartbeat)
+                    extra={'opponent_cache':cache} if cache is not None else {}
+                    result=play_match(cfg,policy,opponent,side,game_seed,seconds,stop_path,progress=heartbeat,**extra)
                     destination.append(result);completed+=1
                     print(prefix+f' DONE score={result["goals_for"]}:{result["goals_against"]} total_elapsed={time.monotonic()-started:.0f}s',flush=True)
                 if rows[-1]['initial_observation_sha256']!=old[-1]['initial_observation_sha256']:

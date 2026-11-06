@@ -155,7 +155,8 @@ class GigaTeacher:
     def __init__(self,kind):
         from .teachers import verify_teacher
         self.kind=kind
-        self.network=GigaNetwork(verify_teacher(kind),kind)
+        from .inference import frozen_inference
+        self.network=frozen_inference(GigaNetwork(verify_teacher(kind),kind))
         self.forecast=BallForecast() if kind=='galactus' else None
 
     def reset(self,state,agent,rng):

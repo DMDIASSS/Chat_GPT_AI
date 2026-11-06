@@ -177,32 +177,37 @@ def evaluation_record(run,cfg,report,split,seed,pairs,seconds):
 
 def report(name='selector01'):
     """Small shareable report: selected metrics/metadata, no weights or raw logs."""
-    run=run_path(name);out=run.parent.parent/'reports'/f'{name}_research_{stamp()}.zip';out.parent.mkdir(parents=True,exist_ok=True)
-    with FileLock(str(run/'train.lock'),timeout=0):
-        with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
-            for n in ('guard.json','wdl.json','fusion_selection.json','fusion_refinement.json','frozen_fusion.pt.json','six_origin.json','opponent_sampling_policy.json','opponent_sampling.json'):
-                if (run/n).exists():z.write(run/n,n)
-            if (run/'status.json').exists():
-                d=json.loads((run/'status.json').read_text());z.writestr('status.json',json.dumps({k:d[k] for k in ('state','timesteps','halt_reason','metrics','guard','opponent_sampling') if k in d},indent=2))
-            if (run/'guard.json').exists():
-                step=json.loads((run/'guard.json').read_text()).get('step')
-                check=run/'research/guard_checks'/f'{int(step):012d}.json' if step is not None else None
-                if check is not None and check.is_file():z.write(check,'latest_guard_check.json')
-            cfg=json.loads((run/'config.json').read_text());z.writestr('objective.json',json.dumps(definition(cfg),indent=2))
-            for p in (run/'evaluations').glob('*/evaluation.json'):
-                d=json.loads(p.read_text());d.pop('files',None)
-                z.writestr('evaluations/'+p.parent.name+'/evaluation.json',json.dumps(d,indent=2))
-                z.write(p.parent/'wdl.json','evaluations/'+p.parent.name+'/wdl.json')
-            pointer=run/'diagnostics/latest.json'
-            if pointer.exists():
-                target=(run/json.loads(pointer.read_text())['path']/'diagnostic.json').resolve()
-                if not target.is_relative_to((run/'diagnostics').resolve()):raise ValueError('Diagnostic report path escapes its run')
-                z.write(target,'latest_diagnostic.json')
-            pointer=run/'six_diagnostics/latest.json'
-            if pointer.exists():
-                target=(run/json.loads(pointer.read_text())['path']/'diagnostic.json').resolve()
-                if not target.is_relative_to((run/'six_diagnostics').resolve()):raise ValueError('Six-expert report path escapes its run')
-                z.write(target,'latest_six_diagnostic.json')
-            z.writestr('limits.txt',LIMITS)
+    run=run_path(name)
+    with FileLock(str(run/'train.lock'),timeout=0):return report_locked(run)
+
+
+def report_locked(run):
+    """Caller owns train.lock; used between learning segments by autopilot."""
+    run=Path(run);out=run.parent.parent/'reports'/f'{run.name}_research_{stamp()}.zip';out.parent.mkdir(parents=True,exist_ok=True)
+    with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
+        for n in ('guard.json','wdl.json','fusion_selection.json','fusion_refinement.json','frozen_fusion.pt.json','six_origin.json','opponent_sampling_policy.json','opponent_sampling.json','autopilot.json'):
+            if (run/n).exists():z.write(run/n,n)
+        if (run/'status.json').exists():
+            d=json.loads((run/'status.json').read_text());z.writestr('status.json',json.dumps({k:d[k] for k in ('state','timesteps','halt_reason','metrics','guard','opponent_sampling','throughput') if k in d},indent=2))
+        if (run/'guard.json').exists():
+            step=json.loads((run/'guard.json').read_text()).get('step')
+            check=run/'research/guard_checks'/f'{int(step):012d}.json' if step is not None else None
+            if check is not None and check.is_file():z.write(check,'latest_guard_check.json')
+        cfg=json.loads((run/'config.json').read_text());z.writestr('objective.json',json.dumps(definition(cfg),indent=2))
+        for p in (run/'evaluations').glob('*/evaluation.json'):
+            d=json.loads(p.read_text());d.pop('files',None)
+            z.writestr('evaluations/'+p.parent.name+'/evaluation.json',json.dumps(d,indent=2))
+            z.write(p.parent/'wdl.json','evaluations/'+p.parent.name+'/wdl.json')
+        pointer=run/'diagnostics/latest.json'
+        if pointer.exists():
+            target=(run/json.loads(pointer.read_text())['path']/'diagnostic.json').resolve()
+            if not target.is_relative_to((run/'diagnostics').resolve()):raise ValueError('Diagnostic report path escapes its run')
+            z.write(target,'latest_diagnostic.json')
+        pointer=run/'six_diagnostics/latest.json'
+        if pointer.exists():
+            target=(run/json.loads(pointer.read_text())['path']/'diagnostic.json').resolve()
+            if not target.is_relative_to((run/'six_diagnostics').resolve()):raise ValueError('Six-expert report path escapes its run')
+            z.write(target,'latest_six_diagnostic.json')
+        z.writestr('limits.txt',LIMITS)
     print('RESEARCH_REPORT_READY:',out,flush=True)
     return out

@@ -57,7 +57,12 @@ class ArenaEnv(gym.Env):
             from .core import check_model
             from .chronos import CHRONOS_CONTRACT
             path=Path(self.cfg['env']['fusion_opponent'])
-            if check_model(path,CHRONOS_CONTRACT)['sha256']!=self.cfg['fusion_teacher']['sha256']:raise ValueError('Frozen Fusion opponent changed')
+            expected=self.cfg['fusion_teacher']['sha256']
+            signature=(str(path.resolve()),expected,tuple((p.stat().st_size,p.stat().st_mtime_ns,p.stat().st_ctime_ns,p.stat().st_ino)
+                for p in (path,Path(str(path)+'.json'))))
+            if getattr(self,'_verified_fusion_signature',None)!=signature:
+                if check_model(path,CHRONOS_CONTRACT)['sha256']!=expected:raise ValueError('Frozen Fusion opponent changed')
+                self._verified_fusion_signature=signature
             name='chronos_snapshot'
         if name in ('latest','history'):
             entries=[]
@@ -149,7 +154,7 @@ class ArenaEnv(gym.Env):
     def step_controls(self,controls):
         return self.step_control_ticks(controls,TICK_SKIP)
 
-    def step_control_ticks(self,controls,ticks):
+    def step_control_ticks(self,controls,ticks,*,observation=True):
         if ticks not in (2,TICK_SKIP):raise ValueError('Supported physics batches are two or four ticks')
         controls=np.asarray(controls,dtype=np.float32)
         if controls.shape==(8,): controls=np.repeat(controls[None,:],ticks,axis=0)
@@ -186,7 +191,7 @@ class ArenaEnv(gym.Env):
                 dribble_seconds=self.dribble_seconds,seconds=self.steps*TICK_SKIP/120,
                 reward_parts=dict(self.reward_parts),
                 episode={'r':self.reward_total,'l':self.steps})
-        return observe(self.state,self.agent,self.previous),reward,terminated,truncated,info
+        return (observe(self.state,self.agent,self.previous) if observation else None),reward,terminated,truncated,info
 
     def close(self):
         self.engine.close()
