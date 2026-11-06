@@ -48,7 +48,7 @@ def build(archive=None):
   if not vswhere.exists():raise RuntimeError('Source build requires Visual Studio 2022 C++ Build Tools. Use the prebuilt native package, or install Microsoft.VisualStudio.2022.BuildTools with VCTools.')
   result=subprocess.check_output([str(vswhere),'-latest','-products','*','-requires','Microsoft.VisualStudio.Component.VC.Tools.x86.x64','-property','installationPath'],text=True).strip()
   vcvars=Path(result)/'VC/Auxiliary/Build/vcvars64.bat'
-  output=subprocess.check_output(['cmd','/d','/s','/c','"'+str(vcvars)+'" >nul && set'],text=True)
+  output=subprocess.check_output('cmd.exe /d /s /c ""'+str(vcvars)+'" >nul && set"',text=True)
   for line in output.splitlines():
    if '=' in line:
     key,value=line.split('=',1);env[key]=value
