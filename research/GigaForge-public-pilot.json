@@ -1,0 +1,263 @@
+{
+  "scope": "Small CPU public-actor pilot; insufficient to establish general playing strength or laptop throughput",
+  "seconds": 110.15435608298867,
+  "state": {
+    "trial": 4,
+    "total_decisions": 65536,
+    "status": "budget_complete",
+    "pending": null,
+    "branches": {
+      "chronos/control": {
+        "restart": 0,
+        "active_path": "branches/chronos/control/cb4e93c281cc_0"
+      },
+      "galactus/control": {
+        "restart": 0,
+        "active_path": "branches/galactus/control/f31e15e118f1_0"
+      },
+      "chronos/attack": {
+        "restart": 0,
+        "active_path": "branches/chronos/attack/cb4e93c281cc_0"
+      },
+      "galactus/attack": {
+        "restart": 0,
+        "active_path": "branches/galactus/attack/f31e15e118f1_0"
+      }
+    },
+    "arms": {
+      "chronos/control": {
+        "n": 1,
+        "score": -0.1875
+      },
+      "galactus/control": {
+        "n": 1,
+        "score": 0.125
+      },
+      "chronos/attack": {
+        "n": 1,
+        "score": -0.125
+      },
+      "galactus/attack": {
+        "n": 1,
+        "score": 0.0
+      }
+    },
+    "payoff": {
+      "chronos": {
+        "original_chronos": {
+          "points": 7.0,
+          "games": 16
+        },
+        "original_galactus": {
+          "points": 6.0,
+          "games": 16
+        }
+      },
+      "galactus": {
+        "original_chronos": {
+          "points": 6.5,
+          "games": 16
+        },
+        "original_galactus": {
+          "points": 9.5,
+          "games": 16
+        }
+      }
+    },
+    "history": [],
+    "results": [
+      {
+        "trial": 0,
+        "family": "chronos",
+        "arm": "control",
+        "decision": "uncertain",
+        "statistics": {
+          "blocks": 8,
+          "delta": -0.1875,
+          "standard_error": 0.13258252147247765,
+          "lower": -0.6094367556053579,
+          "upper": 0.23443675560535793,
+          "by_opponent": {
+            "original_chronos": -0.0625,
+            "original_galactus": -0.3125
+          },
+          "caution": "Approximate 95% paired Student-t interval; adaptive repeated testing is not a lifetime performance guarantee."
+        },
+        "candidate": "branches/chronos/control/cb4e93c281cc_0/checkpoints/16384"
+      },
+      {
+        "trial": 1,
+        "family": "galactus",
+        "arm": "control",
+        "decision": "uncertain",
+        "statistics": {
+          "blocks": 8,
+          "delta": 0.125,
+          "standard_error": 0.1959884137731956,
+          "lower": -0.4987226032910297,
+          "upper": 0.7487226032910297,
+          "by_opponent": {
+            "original_chronos": 0.0625,
+            "original_galactus": 0.1875
+          },
+          "caution": "Approximate 95% paired Student-t interval; adaptive repeated testing is not a lifetime performance guarantee."
+        },
+        "candidate": "branches/galactus/control/f31e15e118f1_0/checkpoints/16384"
+      },
+      {
+        "trial": 2,
+        "family": "chronos",
+        "arm": "attack",
+        "decision": "uncertain",
+        "statistics": {
+          "blocks": 8,
+          "delta": -0.125,
+          "standard_error": 0.11121956512532616,
+          "lower": -0.47895029410841666,
+          "upper": 0.22895029410841666,
+          "by_opponent": {
+            "original_chronos": -0.0625,
+            "original_galactus": -0.1875
+          },
+          "caution": "Approximate 95% paired Student-t interval; adaptive repeated testing is not a lifetime performance guarantee."
+        },
+        "candidate": "branches/chronos/attack/cb4e93c281cc_0/checkpoints/16384"
+      },
+      {
+        "trial": 3,
+        "family": "galactus",
+        "arm": "attack",
+        "decision": "uncertain",
+        "statistics": {
+          "blocks": 8,
+          "delta": 0.0,
+          "standard_error": 0.10206207261596575,
+          "lower": -0.32480706590633435,
+          "upper": 0.32480706590633435,
+          "by_opponent": {
+            "original_chronos": 0.0,
+            "original_galactus": 0.0
+          },
+          "caution": "Approximate 95% paired Student-t interval; adaptive repeated testing is not a lifetime performance guarantee."
+        },
+        "candidate": "branches/galactus/attack/f31e15e118f1_0/checkpoints/16384"
+      }
+    ],
+    "population": {
+      "chronos": [
+        {
+          "name": "control",
+          "potential": [
+            0.35,
+            0.1,
+            0,
+            0,
+            0
+          ],
+          "lr": 5e-06,
+          "anchor": 0.2,
+          "freeze_shared": false
+        },
+        {
+          "name": "attack",
+          "potential": [
+            0.35,
+            0.15,
+            0.25,
+            0.1,
+            0.05
+          ],
+          "lr": 2.5e-06,
+          "anchor": 0.2,
+          "freeze_shared": true
+        }
+      ],
+      "galactus": [
+        {
+          "name": "control",
+          "potential": [
+            0.35,
+            0.1,
+            0,
+            0,
+            0
+          ],
+          "lr": 5e-06,
+          "anchor": 0.2,
+          "freeze_shared": false
+        },
+        {
+          "name": "attack",
+          "potential": [
+            0.35,
+            0.15,
+            0.25,
+            0.1,
+            0.05
+          ],
+          "lr": 2.5e-06,
+          "anchor": 0.2,
+          "freeze_shared": true
+        }
+      ]
+    },
+    "device": "cpu",
+    "last_candidates": {
+      "chronos": "branches/chronos/attack/cb4e93c281cc_0/checkpoints/16384",
+      "galactus": "branches/galactus/attack/f31e15e118f1_0/checkpoints/16384"
+    }
+  },
+  "config": {
+    "block": 16384,
+    "rollout": 4096,
+    "development_pairs": 4,
+    "confirmation_pairs": 8,
+    "seconds": 30,
+    "arms": [
+      {
+        "name": "control",
+        "potential": [
+          0.35,
+          0.1,
+          0,
+          0,
+          0
+        ],
+        "lr": 5e-06,
+        "anchor": 0.2,
+        "freeze_shared": false
+      },
+      {
+        "name": "attack",
+        "potential": [
+          0.35,
+          0.15,
+          0.25,
+          0.1,
+          0.05
+        ],
+        "lr": 2.5e-06,
+        "anchor": 0.2,
+        "freeze_shared": true
+      }
+    ]
+  },
+  "source_commit": "b665b466474afb8dc69d95016968df061d61518c",
+  "native_upstream": "86e11c3881a21225a43c36b14af40f0b3c87e7dd",
+  "torch": "2.9.1+cpu",
+  "python": "3.11.17",
+  "sampling": {
+    "chronos": {
+      "collected": 32768.0,
+      "prepared": 32768.0,
+      "actor_optimizer_steps": 192.0,
+      "data_use_fraction": 1.0
+    },
+    "galactus": {
+      "collected": 32768.0,
+      "prepared": 32768.0,
+      "actor_optimizer_steps": 192.0,
+      "data_use_fraction": 1.0
+    }
+  }
+}

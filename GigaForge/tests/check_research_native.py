@@ -40,6 +40,33 @@ def main():
    state=m.read(study/'lab_state.json');assert state['trial']==2 and state['total_decisions']==2048
    assert m.sha(first_candidate/'POLICY.lt')==saved
    assert all(m.retained(study,f)==(study/'parents'/f).resolve() for f in ('chronos','galactus'))
+   # Regressing one real native branch must not halt the whole coordinator.
+   print('TEST_ONLY_INJECTED_WDL_FOR_CONTROLLER_CHECKS_NOT_STRENGTH_EVIDENCE',flush=True)
+   original_evaluate=research.evaluate
+   fake_bad=dict(decision='regressed',statistics=dict(delta=-.25,lower=-.4,upper=-.1,by_opponent={'c':-.25,'g':-.25}),trials=[])
+   research.evaluate=lambda *a,**k:copy.deepcopy(fake_bad)
+   research.train(m,'lab_ci',choice='cpu',wandb='off',once=True)
+   state=m.read(study/'lab_state.json');assert state['trial']==3 and state['branches']['chronos/attack']['restart']==1
+   assert m.retained(study,'chronos')==(study/'parents/chronos').resolve()
+   # Only a positive screen followed by positive confirmation may promote.
+   fake_good=dict(decision='improved',statistics=dict(delta=.25,lower=.1,upper=.4,by_opponent={'c':.25,'g':.25}),trials=[])
+   answers=iter([copy.deepcopy(fake_good),dict(copy.deepcopy(fake_good),decision='uncertain')])
+   research.evaluate=lambda *a,**k:next(answers)
+   research.train(m,'lab_ci',choice='cpu',wandb='off',once=True)
+   assert m.retained(study,'galactus')==(study/'parents/galactus').resolve()
+   answers=iter([copy.deepcopy(fake_good),copy.deepcopy(fake_good)])
+   research.evaluate=lambda *a,**k:next(answers)
+   research.train(m,'lab_ci',choice='cpu',wandb='off',once=True)
+   best=m.retained(study,'chronos');assert best!=(study/'parents/chronos').resolve()
+   exported=m.candidate_actor(study,'chronos');actor=torch.jit.load(str(exported));native=GigaNetwork(best,'chronos')
+   x=torch.linspace(-1,1,2*228).reshape(2,228)
+   with torch.inference_mode():torch.testing.assert_close(actor(x),native(x[:,:225]),rtol=0,atol=0)
+   # Protected copies must survive rotating/removing a rejected/training directory.
+   candidate=study/m.read(study/'lab_state.json')['last_candidates']['chronos']
+   import shutil;shutil.rmtree(candidate.parent)
+   m.verify_generation(best)
+   research.evaluate=original_evaluate
+
   finally:
    m.folder=original_folder
    if old_pointer is None:pointer.unlink(missing_ok=True)

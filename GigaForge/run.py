@@ -334,7 +334,7 @@ def benchmark(name='native01',choice='auto'):
     with tempfile.TemporaryDirectory(prefix='native_ppo_benchmark_') as temp:
      temp=Path(temp);recipe=base_recipe(run,family,settings,mode='cross')
      recipe.update(checkpoints='',games=candidate['games'],simulation_threads=candidate['simulation_threads'],torch_threads=torch_threads,
-      metrics_file=str(temp/'metrics.jsonl'),max_iterations=3,stop_at=0)
+      metrics_file=str(temp/'metrics.jsonl'),max_iterations=3,stop_at=0,fixed_rollout=True)
      started=time.monotonic();launch(recipe,log=temp/'process.log');elapsed=time.monotonic()-started
      rows=[json.loads(r) for r in (temp/'metrics.jsonl').read_text().splitlines()]
      actor_steps=sum(r.get('Actor Optimizer Steps',0) for r in rows)
@@ -345,7 +345,7 @@ def benchmark(name='native01',choice='auto'):
  selected={f:max((r for r in full if r['family']==f),key=lambda r:r['useful_samples_per_second']) for f in ('chronos','galactus')}
  # Keep per-family thread settings: a compromise can invalidate the measured winner.
  tuning=dict(games={f:selected[f]['games'] for f in selected},by_family=selected,collection=results,full_training=full,
-  scope='Full PPO, one critic warmup plus two actor iterations; epochs, network size and optimizer batch unchanged.')
+  scope='Fixed-rollout full PPO, one critic warmup plus two actor iterations; epochs, network size and optimizer batch unchanged.')
  write(run/'tuning.json',tuning);print('NATIVE_TUNING_SAVED:',run/'tuning.json',flush=True)
 
 if __name__=='__main__':

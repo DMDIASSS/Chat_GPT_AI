@@ -20,7 +20,7 @@ DEFAULT=dict(version='reward-lab-v1',block=32768,rollout=8192,max_branch_decisio
 
 
 def create(m,name='research01',choice='auto',config=None):
- run=m.folder(name)
+ run=m.folder(name).resolve()
  if (run/'lab_state.json').exists():return run
  if run.exists():raise FileExistsError('Choose a new research run name; existing experiments are not converted in place')
  run=m.create(name,choice)
@@ -61,8 +61,8 @@ def pool(m,run,state,family):
  entries=[dict(m.descriptor(run/'parents'/f,f),name='original_'+f) for f in ('chronos','galactus')]
  for f in ('chronos','galactus'):
   current=m.retained(run,f)
-  if current!=(run/'parents'/f).resolve():entries.append(dict(m.descriptor(current,f),name='champion_'+f))
- for i,h in enumerate(state['history'][-4:]):entries.append(dict(m.descriptor(run/h['path'],h['family']),name='history_'+str(i)+'_'+h['family']))
+  if current!=(run/'parents'/f).resolve():entries.append(dict(m.descriptor(current,f),name='champion_'+f+'_'+m.sha(current/'POLICY.lt')[:8]))
+ for i,h in enumerate(state['history'][-4:]):entries.append(dict(m.descriptor(run/h['path'],h['family']),name='history_'+h['family']+'_'+m.sha(run/h['path']/'POLICY.lt')[:8]))
  return entries
 
 
