@@ -104,6 +104,10 @@ class ArenaEnv(gym.Env):
         if own_body not in ('octane','breakout'):raise ValueError('Unsupported learner hitbox')
         opponent=self.opponent_label.split(':')[0]
         other_body=BREAKOUT if opponent=='chronos' else (BREAKOUT if own_body=='breakout' and opponent in ('latest','history','chronos_snapshot') else OCTANE)
+        if 'opponent_hitbox' in self.cfg['env']:
+            requested=self.cfg['env']['opponent_hitbox']
+            if requested not in ('octane','breakout'):raise ValueError('Unsupported opponent hitbox')
+            other_body=BREAKOUT if requested=='breakout' else OCTANE
         for car in desired.cars.values():
             car.hitbox_type=(BREAKOUT if own_body=='breakout' else OCTANE) if car.team_num==side else other_body
         self.state=self.engine.set_state(desired,{})

@@ -51,6 +51,7 @@ class PreparedOpponent:
 class ForgeArena(ChronosArena):
     def _choose_opponent(self,_snapshot_retries=0):
         entry=self.entry;key=(entry['name'],entry.get('sha256'))
+        self.cfg['env']['opponent_hitbox']=entry.get('hitbox','breakout' if entry['name']=='chronos' else 'octane')
         if key not in self.cache:
             if entry.get('path') and sha256(entry['path'])!=entry['sha256']:raise ValueError('Frozen opponent changed')
             base=DirectController(entry['path']) if entry.get('path') else make_opponent(entry['name'])
@@ -70,7 +71,7 @@ class ForgeEnv(gym.Env):
         if not pool:raise ValueError('Opponent pool cannot be empty')
         self.profile=profile;self.forced_side=side;self.scenario=scenario
         arena_cfg=load_config(ROOT/'configs/chronos.json')
-        arena_cfg['env'].update(learner_hitbox='octane',episode_seconds=self.seconds,no_touch_seconds=self.seconds+1)
+        arena_cfg['env'].update(learner_hitbox=cfg.get('hitboxes',{}).get(family,'octane'),episode_seconds=self.seconds,no_touch_seconds=self.seconds+1)
         arena_cfg['curriculum']=dict(adaptive=False,weights=PROFILES[profile])
         arena_cfg['objective']=dict(version='goal-potential-v1',**{k:cfg['objective'][k] for k in ('goal','field','distance')})
         self.arena=ForgeArena(arena_cfg)

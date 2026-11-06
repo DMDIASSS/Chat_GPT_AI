@@ -11,7 +11,7 @@ import torch
 
 from .core import atomic_json, check_model
 from .forge_env import ForgeEnv
-from .forge_models import CORE, contract
+from .forge_models import CORE, contract,check_actor
 
 SEEDS={'development':410000000,'confirmation':710000000,'test':1410000000}
 
@@ -74,7 +74,9 @@ def suite(cfg,family,candidate,baseline,panel,split,cycle,stop_path,*,pairs=None
     rows=[[],[]];paths=[Path(candidate),Path(baseline)]
     actors=[]
     for p in paths:
-        check_model(p,contract(family));actors.append(torch.jit.load(str(p),map_location='cpu').eval())
+        meta=check_actor(p,family)
+        if meta['contract']['hitbox']!=cfg.get('hitboxes',{}).get(family,'octane'):raise ValueError('Evaluation hitbox differs from actor contract')
+        actors.append(torch.jit.load(str(p),map_location='cpu').eval())
     total=len(panel)*pairs*4;done=0;started=time.monotonic()
     print(f'FORGE_EVAL: {split}, {total} games x {seconds:g}s; actors have no private inputs.',flush=True)
     for cell,entry in enumerate(panel):
@@ -104,8 +106,8 @@ def suite(cfg,family,candidate,baseline,panel,split,cycle,stop_path,*,pairs=None
                 finally:env.close()
         print('EVAL_OPPONENT',entry['name'],summary([r for r in rows[0] if r['opponent']==entry['name']]),flush=True)
     report=dict(kind='forgeleague-blind-timed-1v1-v1',family=family,split=split,cycle=cycle,
-        candidate_sha256=check_model(paths[0],contract(family))['sha256'],
-        baseline_sha256=check_model(paths[1],contract(family))['sha256'],
+        candidate_sha256=check_actor(paths[0],family)['sha256'],
+        baseline_sha256=check_actor(paths[1],family)['sha256'],
         summary=summary(rows[0]),baseline_summary=summary(rows[1]),statistics=paired(*rows),
         trials=rows[0],baseline_trials=rows[1],wall_seconds=time.monotonic()-started,
         note='Simulator matches; no goal pauses or overtime. Equal scores are draws. No live RLBot strength claim.')

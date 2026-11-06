@@ -16,7 +16,7 @@ from nova.models import save_ppo
 
 
 def settings():
-    cfg=read(ROOT/'configs/forge_league.json')
+    cfg=read(ROOT/'configs/forge_league.json');cfg['hitboxes']={'chronos':'octane','galactus':'octane'}
     cfg.update(match_seconds=.2,warmup_rollouts=1,checkpoint_decisions=8,pilot_decisions=16,
         specialist_decisions=16,block_decisions=16)
     cfg['ppo'].update(n_steps=8,batch_size=8,n_epochs=1)

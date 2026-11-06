@@ -17,6 +17,9 @@ if __name__=='__main__':
     parser.add_argument('--once',action='store_true');parser.add_argument('--max-tasks',type=int)
     args=parser.parse_args()
     from nova import forge_league as league
+    alias=league.PROJECT/'active_run.json'
+    if alias.exists() and args.run==league.read(alias).get('source'):args.run=league.read(alias)['active']
+    if args.command in ('train','watch','export'):args.run=league.breakout_run(args.run)
     if args.command=='create':league.create(args.run,args.config,args.fusion)
     elif args.command=='fork':league.fork(args.source,args.run,args.config)
     elif args.command=='train':league.run(args.run,wandb=args.wandb,once=args.once,max_tasks=args.max_tasks)

@@ -58,7 +58,7 @@ def main():
             result=subprocess.run([sys.executable,'run_forge.py','--diagnose'],cwd=folder,capture_output=True,text=True)
             assert result.returncode==0,(result.stdout,result.stderr)
             assert sha256(folder/'actor.lt')==sha256(folder/'actor.pt')==initial[family]
-            check_model(folder/'actor.lt',contract(family))
+            check_model(folder/'actor.lt',contract(family,cfg.get('hitboxes',{}).get(family,'octane')))
         with __import__('zipfile').ZipFile(league.report('native_ci')) as z:
             assert 'state.json' in z.namelist() and not any(n.endswith(('.lt','.pt','.zip')) for n in z.namelist())
         forked=league.fork('native_ci','fresh_from_retained',config)

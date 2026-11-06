@@ -18,7 +18,7 @@ import numpy as np
 import torch
 
 from .core import ROOT, check_model, sha256
-from .forge_models import DirectController, context, CORE, TABLE, build_features, native_action_mask, contract
+from .forge_models import DirectController, context, CORE, TABLE, build_features, native_action_mask, contract,check_actor
 
 
 class LiveDriver:
@@ -53,7 +53,7 @@ def create_live_bot(agent_id,actor):
             self.driver=None;self.rng=np.random.default_rng(271031);self.last_frame=None
         def initialize(self):
             self.driver=LiveDriver(actor);self.state=GameState.create_compat_game_state(self.field_info,self.match_config)
-            self._logger.info('FORGE_READY: %s direct actor, Octane, 1v1, no privileged inputs',self.driver.controller.kind)
+            self._logger.info('FORGE_READY: %s direct actor, %s, 1v1, no privileged inputs',self.driver.controller.kind,self.driver.controller.hitbox)
         def get_outputs(self,packet):
             if len(packet.players)!=2 or not packet.balls or len(self.indices)!=1:return {i:ControllerState() for i in self.indices}
             frame=int(packet.match_info.frame_num)
@@ -87,7 +87,7 @@ def boot(default_agent):
 
 def export_actor_bundle(actor,destination_parent,label='retained champion'):
     from .forge_league import read
-    actor=Path(actor).resolve();family=read(str(actor)+'.json')['contract']['family'];meta=check_model(actor,contract(family))
+    actor=Path(actor).resolve();family=read(str(actor)+'.json')['contract']['family'];meta=check_actor(actor,family);body=meta['contract']['hitbox']
     parent=Path(destination_parent);parent.mkdir(parents=True,exist_ok=True)
     source_id=hashlib.sha256(b''.join(p.read_bytes() for p in sorted((ROOT/'nova').glob('*.py')))+(ROOT/'requirements.txt').read_bytes()).hexdigest()[:6]
     stem='Forge_'+family+'_'+meta['sha256'][:10]+'_'+source_id
@@ -111,7 +111,7 @@ def export_actor_bundle(actor,destination_parent,label='retained champion'):
             shutil.copy2(actor,stage/('actor.'+suffix));shutil.copy2(str(actor)+'.json',stage/('actor.'+suffix+'.json'))
         agent_id='DMDIASSS/'+stem
         (stage/'run_forge.py').write_text('from nova.forge_export import boot\nif __name__=="__main__":boot('+repr(agent_id)+')\n')
-        (stage/'loadout.toml').write_text('[blue_loadout]\ncar_id = 23\n[orange_loadout]\ncar_id = 23\n')
+        (stage/'loadout.toml').write_text('[blue_loadout]\ncar_id = '+str(22 if body=='breakout' else 23)+'\n[orange_loadout]\ncar_id = '+str(22 if body=='breakout' else 23)+'\n')
         for portable in (False,True):
             win='.venv\\Scripts\\python.exe' if portable else sys.executable
             linux='.venv/bin/python' if portable else sys.executable
@@ -119,11 +119,11 @@ def export_actor_bundle(actor,destination_parent,label='retained champion'):
             text+='agent_id = '+json.dumps(agent_id+('.portable' if portable else ''))+'\n'
             text+='run_command = '+json.dumps('"'+win+'" run_forge.py')+'\nrun_command_linux = '+json.dumps('"'+linux+'" run_forge.py')+'\n'
             text+='loadout_file = "loadout.toml"\nhivemind = true\n\n[details]\ndeveloper = "NovaForge; original models credited in THIRD_PARTY.md"\n'
-            text+='description = "Independent trained '+family+' family actor. Octane; 1v1; no mind reading at runtime."\nlanguage = "python"\ntags = ["1v1"]\n'
+            text+='description = "Independent trained '+family+' family actor. '+body+'; 1v1; no mind reading at runtime."\nlanguage = "python"\ntags = ["1v1"]\n'
             (stage/('bot.portable.bot.toml' if portable else 'bot.bot.toml')).write_text(text)
         (stage/'DIAGNOSE.bat').write_text('@echo off\ncd /d "%~dp0"\n"'+sys.executable+'" run_forge.py --diagnose\npause\n')
         (stage/'INSTALL.bat').write_text('@echo off\ncd /d "%~dp0"\npy -3.11 -m venv .venv\nif errorlevel 1 goto failed\n".venv\\Scripts\\python.exe" -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu\nif errorlevel 1 goto failed\n".venv\\Scripts\\python.exe" -m pip install -r requirements.txt\nif errorlevel 1 goto failed\necho INSTALLED - import bot.portable.bot.toml in RLBot v5.\npause\nexit /b 0\n:failed\necho INSTALL_FAILED\npause\nexit /b 1\n')
-        (stage/'README.txt').write_text('Import bot.bot.toml on this PC. On another PC run INSTALL.bat, then import bot.portable.bot.toml.\nactor.lt and actor.pt are identical TorchScript archives of the complete actor, requiring this loader and the sidecar contract. They are not native split POLICY/SHARED_HEAD files. TOML describes the launcher; it is not converted neural weights. No critic, private opponent information, selector or team coordination is exported. 1v1 only. Octane.\nExport role: '+label+'\nOriginal checkpoint ancestry and source notices are recorded beside the actor and in THIRD_PARTY.md. No measured strength gain is implied by exporting.\n')
+        (stage/'README.txt').write_text('Import bot.bot.toml on this PC. On another PC run INSTALL.bat, then import bot.portable.bot.toml.\nactor.lt and actor.pt are identical TorchScript archives of the complete actor, requiring this loader and the sidecar contract. They are not native split POLICY/SHARED_HEAD files. TOML describes the launcher; it is not converted neural weights. No critic, private opponent information, selector or team coordination is exported. 1v1 only. Body: '+body+'.\nExport role: '+label+'\nOriginal checkpoint ancestry and source notices are recorded beside the actor and in THIRD_PARTY.md. No measured strength gain is implied by exporting.\n')
         files=sorted(p for p in stage.rglob('*') if p.is_file())
         (stage/'MANIFEST.sha256').write_text(''.join(sha256(p)+'  '+p.relative_to(stage).as_posix()+'\n' for p in files))
         archive=Path(tmp)/(stem+'.zip')
@@ -148,6 +148,7 @@ def watch(name,family):
     from .viewer import prepare_viewer,learner_first_state
     run=run_path(name);cfg=read(run/'config.json');actor_path=champion(run,family)
     actor=torch.jit.load(str(actor_path),map_location='cpu').eval();torch.set_num_threads(1)
+    body=check_actor(actor_path,family)['contract']['hitbox']
     lock=ROOT/'work/rlviser-watch.lock';lock.parent.mkdir(parents=True,exist_ok=True)
     with FileLock(str(lock),timeout=0),chdir(ROOT):
         prepare_viewer(mode='auto')
@@ -156,7 +157,7 @@ def watch(name,family):
         renderer=RLViserRenderer(tick_rate=15)
         try:
             obs,_=env.reset(seed=271031)
-            print(f'WATCH: blue/car 1 = retained {family} actor; orange = original opponent. FOV110 distance270 pitch-4 ballcam. Ctrl+C stops.',flush=True)
+            print(f'WATCH: blue/car 1 = retained {family} actor ({body}); orange = original opponent. FOV110 distance270 pitch-4 ballcam. Ctrl+C stops.',flush=True)
             while True:
                 started=time.monotonic();obs,_,terminal,_,info=env.step(action(actor,obs,family))
                 renderer.render(learner_first_state(env.arena.state,env.arena.agent),{})

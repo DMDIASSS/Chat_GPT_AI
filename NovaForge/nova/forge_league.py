@@ -27,7 +27,7 @@ from .chronos import CHRONOS_CONTRACT, ChronosPPO
 from .core import ROOT, atomic_json, check_model, sha256
 from .forge_env import ForgeEnv, PROFILES
 from .forge_eval import Stopped, suite, judgement, summary
-from .forge_models import FAMILIES, DirectActor, GigaNetwork, contract, new_model, save_actor
+from .forge_models import FAMILIES, DirectActor, GigaNetwork, contract, new_model, save_actor,check_actor
 from .models import save_ppo
 from .teachers import fetch_teachers, verify_teacher
 from .tracking import Tracker
@@ -70,8 +70,8 @@ def validate(cfg):
 
 
 def entry(path,name=None):
-    path=Path(path).resolve();meta=read(str(path)+'.json');check_model(path,contract(meta['contract']['family']))
-    return dict(name=name or meta['contract']['family'],family=meta['contract']['family'],path=str(path),sha256=meta['sha256'])
+    path=Path(path).resolve();meta=read(str(path)+'.json');check_actor(path)
+    return dict(name=name or meta['contract']['family'],family=meta['contract']['family'],path=str(path),sha256=meta['sha256'],hitbox=meta['contract']['hitbox'])
 
 
 def local(run,path):
@@ -104,7 +104,7 @@ def create(name='duel01',config=None,fusion=None):
         raise FileExistsError('Incomplete run exists; choose a new run name to preserve it')
     cfg=validate(read(config or ROOT/'configs/forge_league.json'));torch.set_num_threads(cfg['threads'])
     fetch_teachers(['chronos','galactus','nexto','ripple'])
-    source=Path(fusion).resolve() if fusion else auto_fusion()
+    source=Path(fusion).resolve() if fusion else (auto_fusion() if cfg.get('hitboxes',{}).get('chronos','octane')=='octane' else None)
     if source:check_model(source,CHRONOS_CONTRACT)
     run.parent.mkdir(parents=True,exist_ok=True)
     stage=run.parent/(name+'.creating-'+uuid.uuid4().hex[:8]);stage.mkdir()
@@ -120,7 +120,7 @@ def create(name='duel01',config=None,fusion=None):
                 native.load_state_dict(torch.jit.load(str(source),map_location='cpu').state_dict(),strict=True)
                 origin=dict(kind='selected-frozen-local-Fusion',sha256=sha256(source),file_name=source.name)
             actor.core.load_state_dict(native.state_dict(),strict=True)
-            save_actor(actor,stage/f'parents/{family}.lt',family,timesteps=0,origin=origin)
+            save_actor(actor,stage/f'parents/{family}.lt',family,hitbox=cfg.get('hitboxes',{}).get(family,'octane'),timesteps=0,origin=origin)
             lineage[family]=origin
             atomic_json(stage/f'champions/{family}.json',dict(actor=f'parents/{family}.lt',checkpoint=None,
                 reason='Retained initialization; no measured improvement yet',promotions=0))
@@ -131,7 +131,7 @@ def create(name='duel01',config=None,fusion=None):
             potential='field*team_relative_ball_y/5120-distance*min(car_ball_distance,12000)/6000',
             terminal_potential=0,decision_clock='8 ticks; 7 held then 1 planned; RocketSim adds one tick',
             notes=['Only actor parameters improve controls. Critics are not exported.',
-                'Finite horizon; no overtime or goal pauses; both learners use Octane.',
+                'Finite horizon; no overtime or goal pauses; body assignments recorded in config and actor contracts.',
                 'After an early goal, the unused ticks of that decision are treated as dead time.',
                 'Resume preserves optimizer and completed rollouts but starts a deterministically seeded new match.']))
         with zipfile.ZipFile(stage/'source.zip','w',zipfile.ZIP_DEFLATED) as archive:
@@ -162,11 +162,31 @@ def fork(source,name,config=None):
             target=new/f'parents/{family}.lt';shutil.copy2(path,target)
             origin=dict(kind='retained-Forge-actor',source_run=source,sha256=sha256(path),
                 source_lineage=read(old/'provenance.json')['lineage'][family])
-            write_model_meta(target,contract=contract(family),timesteps=0,origin=origin)
+            write_model_meta(target,contract=contract(family,read(new/'config.json').get('hitboxes',{}).get(family,'octane')),timesteps=0,origin=origin)
             provenance['lineage'][family]=origin
         provenance['fork']=dict(source_run=source,reason='Fresh critic/optimizer and new versioned experiment; both retained actors copied exactly')
         atomic_json(new/'provenance.json',provenance)
     print('FORGE_FORK_CREATED:',new,flush=True);return new
+
+
+def breakout_run(name):
+    """Preserve an Octane experiment; fork its retained actors for Breakout."""
+    alias=PROJECT/'active_run.json'
+    if alias.exists():
+        record=read(alias)
+        if record.get('source')==name:name=record['active']
+    source=run_path(name)
+    if not (source/'config.json').exists():return name
+    cfg=read(source/'config.json')
+    if cfg.get('hitboxes',{}).get('chronos','octane')=='breakout':return name
+    target=name+'_breakout'
+    if not run_path(target).exists():
+        cfg['hitboxes']={'chronos':'breakout','galactus':'octane'}
+        recipe=PROJECT/'body_migrations'/(target+'.json');atomic_json(recipe,cfg)
+        fork(name,target,recipe)
+        print('BREAKOUT_RUN: retained actors transferred to a separate run with fresh critics; old Octane training is preserved.',flush=True)
+    atomic_json(alias,dict(source=name,active=target))
+    return target
 
 
 def panel(run):return [entry(Path(run)/f'parents/{f}.lt','parent_'+f) for f in FAMILIES]+[dict(name='nexto')]
@@ -226,8 +246,8 @@ def _save_generation(model,task,recipe,steps,cfg):
     generation=task/'checkpoints'/f'{steps:012d}'
     checkpoint=generation.with_suffix('.zip');actor=generation.with_suffix('.lt')
     model.forge_rng=dict(torch=torch.get_rng_state(),numpy=np.random.get_state(),python=random.getstate())
-    save_ppo(model,checkpoint,contract=contract(recipe['family']),task=recipe['id'],task_steps=steps,recipe_sha256=sha256(task/'recipe.json'))
-    save_actor(model.policy.actor,actor,recipe['family'],timesteps=int(model.num_timesteps),task=recipe['id'])
+    save_ppo(model,checkpoint,contract=contract(recipe['family'],getattr(model,'forge_hitbox','octane')),task=recipe['id'],task_steps=steps,recipe_sha256=sha256(task/'recipe.json'))
+    save_actor(model.policy.actor,actor,recipe['family'],hitbox=getattr(model,'forge_hitbox','octane'),timesteps=int(model.num_timesteps),task=recipe['id'])
     progress=dict(steps=steps,checkpoint=str(checkpoint.relative_to(task)),actor=str(actor.relative_to(task)),
         actor_sha256=sha256(actor),critic_updates=model.chronos_updates)
     atomic_json(task/'progress.json',progress)
@@ -275,7 +295,7 @@ def _train_task(run,state,cfg,task_id,tracker):
     try:
         source=local(task,progress['checkpoint']) if progress['steps'] else (local(run,recipe['inherit']['checkpoint']) if recipe['inherit'] else None)
         if source:
-            meta=check_model(source,contract(recipe['family']))
+            meta=check_model(source,contract(recipe['family'],cfg.get('hitboxes',{}).get(recipe['family'],'octane')))
             if progress['steps'] and meta['recipe_sha256']!=sha256(task/'recipe.json'):raise ValueError('Task recipe changed after checkpointing')
             if not progress['steps'] and recipe['inherit'] and meta['sha256']!=recipe['inherit_checkpoint_sha256']:raise ValueError('Inherited optimizer checkpoint changed')
             model=ChronosPPO.load(source,env=env,device=cfg['device'])

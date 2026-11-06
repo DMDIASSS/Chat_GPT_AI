@@ -4,7 +4,7 @@
   "device": "cpu",
   "threads": 1,
   "match_seconds": 60,
-  "actor_lr": 0.000005,
+  "actor_lr": 5e-06,
   "critic_lr": 0.0003,
   "anchor_coef": 0.2,
   "anchor_kl_limit": 0.08,
@@ -15,9 +15,15 @@
   "specialist_decisions": 8192,
   "specialists_per_cycle": 2,
   "checkpoint_keep": 2,
-  "objective": {"version": "timed-match-goal-potential-v1", "goal": 10, "match_result": 10, "field": 0.35, "distance": 0.1},
+  "objective": {
+    "version": "timed-match-goal-potential-v1",
+    "goal": 10,
+    "match_result": 10,
+    "field": 0.35,
+    "distance": 0.1
+  },
   "ppo": {
-    "learning_rate": 0.000005,
+    "learning_rate": 5e-06,
     "n_steps": 1024,
     "batch_size": 256,
     "n_epochs": 2,
@@ -37,7 +43,19 @@
     "test_pairs": 12,
     "test_seconds": 300
   },
-  "opponent_sampling": {"uniform_fraction": 0.5, "max_weight_ratio": 3.0},
-  "specialist_profiles": ["pressure", "defense", "recovery", "match"],
-  "max_history_per_family": 4
+  "opponent_sampling": {
+    "uniform_fraction": 0.5,
+    "max_weight_ratio": 3.0
+  },
+  "specialist_profiles": [
+    "pressure",
+    "defense",
+    "recovery",
+    "match"
+  ],
+  "max_history_per_family": 4,
+  "hitboxes": {
+    "chronos": "breakout",
+    "galactus": "octane"
+  }
 }

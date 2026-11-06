@@ -1,0 +1,12 @@
+runs/
+exports/
+reports/
+views/
+vendor/
+cache/
+build/
+native/
+.venv_native/
+tools/runtime/
+__pycache__/
+*.log

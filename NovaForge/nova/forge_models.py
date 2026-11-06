@@ -28,10 +28,11 @@ FAMILIES=('chronos','galactus')
 CORE={'chronos':225,'galactus':258}
 
 
-def contract(family):
+def contract(family,hitbox='octane'):
+    if hitbox not in ('octane','breakout'):raise ValueError('Unsupported hitbox')
     return dict(name='forgeleague-direct-v1',family=family,core=CORE[family],actor_input=CORE[family]+3,
         training_input=CORE[family]+3+90+9,actions=90,action_sha256=hashlib.sha256(TABLE.tobytes()).hexdigest(),
-        hitbox='octane',public_context=['clipped_score_difference/5','remaining_seconds/300','centered_stationary_ball'],
+        hitbox=hitbox,public_context=['clipped_score_difference/5','remaining_seconds/300','centered_stationary_ball'],
         critic_private=['queued_world_controls_8','ticks_until_application/8'],tick_skip=8,planned_delay_ticks=7,
         simulator_delay_ticks=1,scope='1v1')
 
@@ -51,6 +52,13 @@ class DirectActor(nn.Module):
 
     def forward(self,x):
         return self.core(x[:,:self.core_size])+torch.tanh(self.residual(x))
+
+
+def check_actor(path,family=None):
+    meta=json.loads(Path(str(path)+'.json').read_text())
+    actual=meta['contract']['family']
+    if family is not None and actual!=family:raise ValueError('Actor family mismatch')
+    return check_model(path,contract(actual,meta['contract']['hitbox']))
 
 
 class DirectPolicy(ActorCriticPolicy):
@@ -103,10 +111,11 @@ def new_model(cfg,env,family,privileged,initial_actor):
     model.policy.anchor.load_state_dict(initial.state_dict(),strict=True)
     with torch.no_grad():model.policy.value_net[-1].weight.zero_();model.policy.value_net[-1].bias.zero_()
     model.anchor_kl_limit=cfg['anchor_kl_limit']
+    model.forge_hitbox=env.arena.cfg['env']['learner_hitbox']
     return model
 
 
-def save_actor(actor,path,family,**meta):
+def save_actor(actor,path,family,hitbox='octane',**meta):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
     actor=copy.deepcopy(actor).cpu().eval().requires_grad_(False)
     scripted=torch.jit.script(actor)
@@ -115,7 +124,7 @@ def save_actor(actor,path,family,**meta):
     fd,temp=tempfile.mkstemp(dir=path.parent,suffix='.lt');os.close(fd)
     try:
         torch.jit.save(scripted,temp);_sync_serialized_file(temp);os.replace(temp,path)
-        write_model_meta(path,contract=contract(family),**meta)
+        write_model_meta(path,contract=contract(family,hitbox),**meta)
     finally:
         if os.path.exists(temp):os.unlink(temp)
     return path
@@ -124,7 +133,7 @@ def save_actor(actor,path,family,**meta):
 class DirectController(GigaTeacher):
     """Frozen exported actor, deterministic native clock, public score/time only."""
     def __init__(self,path):
-        meta=json.loads(Path(str(path)+'.json').read_text());self.kind=meta['contract']['family'];check_model(path,contract(self.kind))
+        meta=check_actor(path);self.kind=meta['contract']['family'];self.hitbox=meta['contract']['hitbox']
         from .inference import frozen_inference
         self.network=frozen_inference(torch.jit.load(str(path),map_location='cpu'))
         if self.kind=='galactus':
