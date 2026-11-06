@@ -1,0 +1,251 @@
+{
+  "kind": "controlled-public-native-pilot",
+  "wall_seconds": 776.395033023,
+  "lineage": {
+    "chronos": {
+      "kind": "pinned-public-native",
+      "family": "chronos",
+      "teacher_lock": "beef1a764d4cafc2de09af51e958e844fd01d7200f96c7c23f6e7add504bad3b"
+    },
+    "galactus": {
+      "kind": "pinned-public-native",
+      "family": "galactus",
+      "teacher_lock": "beef1a764d4cafc2de09af51e958e844fd01d7200f96c7c23f6e7add504bad3b"
+    }
+  },
+  "config": {
+    "version": "forgeleague-v1",
+    "seed": 271031,
+    "device": "cpu",
+    "threads": 1,
+    "match_seconds": 60,
+    "actor_lr": 5e-06,
+    "critic_lr": 0.0003,
+    "anchor_coef": 0.2,
+    "anchor_kl_limit": 0.08,
+    "warmup_rollouts": 2,
+    "pilot_decisions": 8192,
+    "block_decisions": 32768,
+    "checkpoint_decisions": 4096,
+    "specialist_decisions": 8192,
+    "specialists_per_cycle": 2,
+    "checkpoint_keep": 2,
+    "objective": {
+      "version": "timed-match-goal-potential-v1",
+      "goal": 10,
+      "match_result": 10,
+      "field": 0.35,
+      "distance": 0.1
+    },
+    "ppo": {
+      "learning_rate": 5e-06,
+      "n_steps": 1024,
+      "batch_size": 256,
+      "n_epochs": 2,
+      "gamma": 0.999,
+      "gae_lambda": 0.97,
+      "clip_range": 0.05,
+      "ent_coef": 0.0002,
+      "target_kl": 0.01
+    },
+    "evaluation": {
+      "seconds": 60,
+      "pairs": 4,
+      "confirmation_pairs": 8,
+      "minimum_delta": 0.03,
+      "per_opponent_tolerance": 0.15,
+      "regression_delta": 0.1,
+      "test_pairs": 12,
+      "test_seconds": 300
+    },
+    "opponent_sampling": {
+      "uniform_fraction": 0.5,
+      "max_weight_ratio": 3.0
+    },
+    "specialist_profiles": [
+      "pressure",
+      "defense",
+      "recovery",
+      "match"
+    ],
+    "max_history_per_family": 4
+  },
+  "evaluations": {
+    "pilot_galactus_parent_dev": {
+      "kind": "forgeleague-blind-timed-1v1-v1",
+      "family": "galactus",
+      "split": "development",
+      "cycle": 0,
+      "candidate_sha256": "0a86fe9437006d545bd726e8eb343af851e3b99de3f701bd5464d552b39b1c6a",
+      "baseline_sha256": "699065cd54f88e65de03f0d9dcaff97732109cfa36ffb134b4b3353925aeff2e",
+      "summary": {
+        "matches": 24,
+        "wins": 12,
+        "draws": 4,
+        "losses": 8,
+        "goals_for": 40,
+        "goals_against": 26,
+        "score_rate": 0.5833333333333334
+      },
+      "baseline_summary": {
+        "matches": 24,
+        "wins": 13,
+        "draws": 3,
+        "losses": 8,
+        "goals_for": 41,
+        "goals_against": 26,
+        "score_rate": 0.6041666666666666
+      },
+      "statistics": {
+        "blocks": 12,
+        "delta": -0.020833333333333332,
+        "standard_error": 0.16092541980911762,
+        "lower": -0.43537721476162033,
+        "upper": 0.3937105480949537,
+        "by_opponent": {
+          "parent_chronos": -0.25,
+          "parent_galactus": 0.25,
+          "nexto": -0.0625
+        },
+        "caution": "Approximate 99% paired interval; repeated adaptive checks are not a lifetime guarantee."
+      },
+      "wall_seconds": 164.40734522299317,
+      "note": "Simulator matches; no goal pauses or overtime. Equal scores are draws. No live RLBot strength claim."
+    },
+    "pilot_galactus_critic_dev": {
+      "kind": "forgeleague-blind-timed-1v1-v1",
+      "family": "galactus",
+      "split": "development",
+      "cycle": 0,
+      "candidate_sha256": "5ae13dbc7bd2453de161e72d84564d3ed732fe41b57872d9473fc80f910ee825",
+      "baseline_sha256": "0a86fe9437006d545bd726e8eb343af851e3b99de3f701bd5464d552b39b1c6a",
+      "summary": {
+        "matches": 24,
+        "wins": 11,
+        "draws": 6,
+        "losses": 7,
+        "goals_for": 40,
+        "goals_against": 21,
+        "score_rate": 0.5833333333333334
+      },
+      "baseline_summary": {
+        "matches": 24,
+        "wins": 13,
+        "draws": 3,
+        "losses": 8,
+        "goals_for": 45,
+        "goals_against": 25,
+        "score_rate": 0.6041666666666666
+      },
+      "statistics": {
+        "blocks": 12,
+        "delta": -0.020833333333333332,
+        "standard_error": 0.13975424859373686,
+        "lower": -0.3808402777107995,
+        "upper": 0.33917361104413285,
+        "by_opponent": {
+          "parent_chronos": 0.25,
+          "parent_galactus": -0.375,
+          "nexto": 0.0625
+        },
+        "caution": "Approximate 99% paired interval; repeated adaptive checks are not a lifetime guarantee."
+      },
+      "wall_seconds": 159.23255995601357,
+      "note": "Simulator matches; no goal pauses or overtime. Equal scores are draws. No live RLBot strength claim."
+    },
+    "pilot_chronos_parent_dev": {
+      "kind": "forgeleague-blind-timed-1v1-v1",
+      "family": "chronos",
+      "split": "development",
+      "cycle": 0,
+      "candidate_sha256": "2d3314173e07a05c7bb5f4a9052ccdd335224a94b454bd0467887c9c0e2bcf9b",
+      "baseline_sha256": "379154b28d2680a639b34bddd535d0d98f2abca826669143eda268fc5cee1a1e",
+      "summary": {
+        "matches": 24,
+        "wins": 16,
+        "draws": 4,
+        "losses": 4,
+        "goals_for": 48,
+        "goals_against": 22,
+        "score_rate": 0.75
+      },
+      "baseline_summary": {
+        "matches": 24,
+        "wins": 13,
+        "draws": 5,
+        "losses": 6,
+        "goals_for": 42,
+        "goals_against": 24,
+        "score_rate": 0.6458333333333334
+      },
+      "statistics": {
+        "blocks": 12,
+        "delta": 0.10416666666666667,
+        "standard_error": 0.09845449221359602,
+        "lower": -0.1494521052755567,
+        "upper": 0.35778543860889006,
+        "by_opponent": {
+          "parent_chronos": 0.25,
+          "parent_galactus": 0.0625,
+          "nexto": 0.0
+        },
+        "caution": "Approximate 99% paired interval; repeated adaptive checks are not a lifetime guarantee."
+      },
+      "wall_seconds": 130.64041757500672,
+      "note": "Simulator matches; no goal pauses or overtime. Equal scores are draws. No live RLBot strength claim."
+    },
+    "pilot_chronos_critic_dev": {
+      "kind": "forgeleague-blind-timed-1v1-v1",
+      "family": "chronos",
+      "split": "development",
+      "cycle": 0,
+      "candidate_sha256": "139fa0da0fe383a70db627f918ae60cbe5d34e6664431d5bb120473cd5ae6bdd",
+      "baseline_sha256": "2d3314173e07a05c7bb5f4a9052ccdd335224a94b454bd0467887c9c0e2bcf9b",
+      "summary": {
+        "matches": 24,
+        "wins": 15,
+        "draws": 4,
+        "losses": 5,
+        "goals_for": 44,
+        "goals_against": 19,
+        "score_rate": 0.7083333333333334
+      },
+      "baseline_summary": {
+        "matches": 24,
+        "wins": 15,
+        "draws": 5,
+        "losses": 4,
+        "goals_for": 40,
+        "goals_against": 20,
+        "score_rate": 0.7291666666666666
+      },
+      "statistics": {
+        "blocks": 12,
+        "delta": -0.020833333333333332,
+        "standard_error": 0.08920300401850784,
+        "lower": -0.2506202716850095,
+        "upper": 0.20895360501834284,
+        "by_opponent": {
+          "parent_chronos": 0.0625,
+          "parent_galactus": -0.125,
+          "nexto": 0.0
+        },
+        "caution": "Approximate 99% paired interval; repeated adaptive checks are not a lifetime guarantee."
+      },
+      "wall_seconds": 137.46577766299015,
+      "note": "Simulator matches; no goal pauses or overtime. Equal scores are draws. No live RLBot strength claim."
+    }
+  },
+  "selected_critic": {
+    "chronos": false,
+    "galactus": false
+  },
+  "training_decisions": 32768,
+  "promotions": {
+    "chronos": 0,
+    "galactus": 0
+  },
+  "limitation": "One training seed; 8192 decisions per arm; simulator evaluation. This is not the user Fusion checkpoint or live RLBot strength evidence.",
+  "source_sha256": "24618f680a19067e528ef2ac58a0a7d1d863c95dc35f185b6074e5cdddd9413d",
+  "additional_limits": "Python/Torch and initial-state seeds are recorded. RocketSim native demo respawn randomness is not controlled; exact trajectory repetition is not promised."
+}

@@ -35,9 +35,14 @@ def test_initial_logits_exact_then_core_learns_and_resumes_without_oracle(tmp_pa
             torch.testing.assert_close(initial(x),initial.core(x[:,:CORE[family]]),rtol=0,atol=0)
         model=new_model(cfg,env,family,True,p)
         observations=torch.from_numpy(np.repeat(obs[None,:],2,0))
-        observations[1,-9:]=torch.linspace(-50,50,9)
+        changed=observations.clone();changed[:,-9:]=torch.linspace(-50,50,9)
         with torch.no_grad():
-            torch.testing.assert_close(model.policy.logits(observations)[0],model.policy.logits(observations)[1],rtol=0,atol=0)
+            # Windows BLAS can round identical inputs differently in different
+            # batch rows. Compare each row with itself under private changes.
+            torch.testing.assert_close(model.policy.logits(observations),model.policy.logits(changed),rtol=0,atol=0)
+        observations.requires_grad_(True)
+        private_gradient=torch.autograd.grad(model.policy.logits(observations).sum(),observations)[0][:,-9:]
+        assert torch.count_nonzero(private_gradient)==0
         before={k:v.clone() for k,v in model.policy.actor.core.state_dict().items()}
         model.learn(8)
         assert all(torch.equal(v,before[k]) for k,v in model.policy.actor.core.state_dict().items())
@@ -63,8 +68,10 @@ def test_critic_privilege_mask_and_seeded_opponent_preparation(tmp_path):
     try:
         obs,_=env.reset(seed=271);actor=save_actor(DirectActor('chronos'),tmp_path/'initial.lt','chronos')
         policy=new_model(cfg,env,'chronos',False,actor).policy
-        batch=torch.from_numpy(np.repeat(obs[None,:],2,0));batch[1,-9:]=999
-        with torch.no_grad():torch.testing.assert_close(policy.predict_values(batch)[0],policy.predict_values(batch)[1],rtol=0,atol=0)
+        batch=torch.from_numpy(np.repeat(obs[None,:],2,0));changed=batch.clone();changed[:,-9:]=999
+        with torch.no_grad():
+            policy.value_net[-1].weight.fill_(.1)
+            torch.testing.assert_close(policy.predict_values(batch),policy.predict_values(changed),rtol=0,atol=0)
         assert env.arena.opponent.cached is not None
         prepared=env.arena.opponent.cached[1].copy()
         private_again=env.arena.opponent.prepare(env.arena.state)
