@@ -1,7 +1,9 @@
 {
-  "url": "https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/GigaForge-native-windows-00435d617572.zip",
-  "sha256": "00435d617572edc516fa0e476de082d93519b08bc96ac18993a3b8980e50c2d8",
-  "executable_sha256": "075a65b635cc1bc4051a1c68a4eb75d27610bc5ccfd2e173b232b0ac14735b27",
-  "verified_workflow": 42277845367,
-  "cuda_hardware_verified": false
+  "url": "https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/GigaForge-native-research-f34c6d836e42.zip",
+  "sha256": "f34c6d836e42ae7b08598cad895d513247f13ee138afa68781c3f35b466a1cae",
+  "executable_sha256": "3fc3eaaa51af944d2a87773f9aebcbc82b12812778d53af9ed64a106fc46e128",
+  "verified_workflow": 42306980807,
+  "package_workflow": 42308147316,
+  "cuda_hardware_verified": false,
+  "research_protocol": "fixed-rollout-v1"
 }

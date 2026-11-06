@@ -1,0 +1,19 @@
+{
+  "source_commit": "dc8478e226be5e3eea01e13ad5bbf310dc5bd5af",
+  "native_workflow": 42306980807,
+  "package_workflow": 42308147316,
+  "update": {
+    "path": "GigaForge-Reward-Research-Update.zip",
+    "size": 703153,
+    "sha256": "4c18ad00d96f6a8ee71bd1a0d04cee24444d915420210e4d295a5ff370525ad5"
+  },
+  "complete": {
+    "path": "NovaForge-GigaForge-Research-Windows.zip",
+    "size": 1246307,
+    "sha256": "9f5160873ee00d0b60b3ae798d80e985d6b72ca7196e28827b85e552c33eed4e"
+  },
+  "executable_sha256": "3fc3eaaa51af944d2a87773f9aebcbc82b12812778d53af9ed64a106fc46e128",
+  "strength": "Not established by the short pilot; no universal improvement guarantee",
+  "prepared_data_use": "100% in tested fixed rollouts",
+  "cuda_new_build_hardware_verified": false
+}

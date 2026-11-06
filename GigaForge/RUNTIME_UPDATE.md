@@ -4,7 +4,7 @@ Pause training, then merge this update's chat_gpt_ai/gigaforge into the existing
 
 1. Open 12_FIND_LIBRARIES.bat for a read-only search and dependency_report.json.
 2. Open 1_SETUP_GPU.bat. It now tries existing compatible Python/PyTorch installations first. It accepts working PyTorch 2.9.1 CUDA builds, including your already working 2.9.1+cu126, and verifies the actual GPU path. Use 0_SETUP_CPU.bat for CPU mode.
-3. Open 3_START_OR_RESUME.bat. Every launcher now uses the same selected interpreter. Existing native01 checkpoints and W&B identity are preserved.
+3. Open 3_START_OR_RESUME.bat for research01. Every launcher uses the same selected interpreter. Existing native01 checkpoints and W&B identity remain available in that separate legacy run.
 
 A complete compatible environment is used directly without pip installing anything. If a compatible Torch environment needs a smaller package repair, setup creates a separate child environment that references the existing site-packages and installs fixes locally. Donor package files remain unchanged. Keep that donor environment in place; moving or deleting it breaks the reference. A new runtime is selected only after verification succeeds.
 
