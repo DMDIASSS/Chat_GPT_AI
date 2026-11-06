@@ -1,16 +1,16 @@
 {
   "schema": "novaforge-bot-candidate-audit-v1",
   "inspected_client_date": "2026-11-06",
-  "purpose": "Candidate/source audit, not an installed opponent registry or strength ranking",
-  "selection_policy": "Start with four validated experts, assess a fifth by conditional gameplay improvement and latency. Use a larger verified opponent pool; do not assume top individual WDL gives the best ensemble.",
+  "purpose": "Source audit; three newly integrated experimental ports are explicitly marked. Other candidates remain audit-only.",
+  "selection_policy": "User-requested six-expert Octane experiment, excluding Ripple and preserving the local frozen Fusion. A larger roster is an experiment, not a strength guarantee.",
   "candidates": [
     {
       "name": "Rain",
       "repository": "https://github.com/Reiud-Ad/RainStream.git",
       "commit": "6a9cbb0473526ec2338cbf8c13fc384dd5abbb76",
       "source": "https://github.com/Reiud-Ad/RainStream/tree/6a9cbb0473526ec2338cbf8c13fc384dd5abbb76",
-      "observations": "Author documents 231 observations, tick skip 6, delay 5, separate checkpoints for 1v1/2v2/3v3. Common 8-tick Chronos execution is not native Rain timing.",
-      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "observations": "Author documents 231 observations, tick skip 6, delay 5, separate checkpoints for 1v1/2v2/3v3. Common 8-tick Chronos execution is not native Rain timing. Model-specific 6/8-tick clocks now execute on two-tick simulator batches. See OCTANE_SIX_v1.11.md.",
+      "status": "v1.11 experimental 1v1 port in separate Octane selector06; C++ feature/network fixtures verified; no native strength claim",
       "license_review": "Review model/source terms before redistribution; public files alone are not a new model-license grant"
     },
     {
@@ -18,8 +18,8 @@
       "repository": "https://github.com/SubparN0va/ByteBotpack.git",
       "commit": "c13cf55f3a6e302e05c3b2099fe2b2681165fed8",
       "source": "https://github.com/SubparN0va/ByteBotpack/tree/c13cf55f3a6e302e05c3b2099fe2b2681165fed8",
-      "observations": "Author documents Megabyte full-strength and Kilobyte difficulty profiles, 1v1/2v2/3v3 and shared RLBot LibTorch runtime.",
-      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "observations": "Author documents Megabyte full-strength and Kilobyte difficulty profiles, 1v1/2v2/3v3 and shared RLBot LibTorch runtime. Model-specific 6/8-tick clocks now execute on two-tick simulator batches. See OCTANE_SIX_v1.11.md.",
+      "status": "v1.11 experimental 1v1 port in separate Octane selector06; C++ feature/network fixtures verified; no native strength claim",
       "license_review": "Review model/source terms before redistribution; public files alone are not a new model-license grant"
     },
     {
@@ -45,8 +45,8 @@
       "repository": "https://github.com/bccessnadev/RLBot-Ducky.git",
       "commit": "b785bb6088927f8117c45924d372bba57eb0ed70",
       "source": "https://github.com/bccessnadev/RLBot-Ducky/tree/b785bb6088927f8117c45924d372bba57eb0ed70",
-      "observations": "RocketForge C++ inference submission, POLICY.lt and team batching. Full training/physics adapter compatibility is not established.",
-      "status": "not integrated into NovaForge; no headless parity or strength claim",
+      "observations": "RocketForge C++ inference submission, POLICY.lt and team batching. Full training/physics adapter compatibility is not established. Model-specific 6/8-tick clocks now execute on two-tick simulator batches. See OCTANE_SIX_v1.11.md. DuckyObs_V2_01, 295 inputs; installed RocketSim prediction approximates original V3 backend.",
+      "status": "v1.11 experimental 1v1 port in separate Octane selector06; C++ feature/network fixtures verified; no native strength claim",
       "license_review": "Review model/source terms before redistribution; public files alone are not a new model-license grant"
     },
     {

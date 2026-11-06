@@ -35,7 +35,7 @@ def provenance(cfg):
     # Keep exact project source for replaying a run after an update. No assets,
     # private logs, environment files or user checkpoints enter this archive.
     files=sorted(list((ROOT/'nova').glob('*.py'))+list((ROOT/'configs').glob('*.json'))+
-        [ROOT/n for n in ('run.py','requirements.txt','teachers.lock.json')])
+        [ROOT/n for n in ('run.py','requirements.txt','teachers.lock.json','extra_teachers.lock.json')])
     digests={p.relative_to(ROOT).as_posix():sha256(p) for p in files}
     code=hashlib.sha256(json.dumps(digests,sort_keys=True).encode()).hexdigest()
     versions={}
@@ -89,7 +89,7 @@ def bundle(run,parent):
             actor=fusion_asset(run,meta['fusion_teacher']);name=actor.relative_to(run.resolve()).as_posix()
             files.extend((name,name+'.json'))
         files+=['config.json']
-        files += [n for n in ('experiment.json','guard.json','status.json','fork.json','fusion_selection.json','fusion_refinement.json') if (run/n).exists()]
+        files += [n for n in ('experiment.json','guard.json','status.json','fork.json','fusion_selection.json','fusion_refinement.json','six_origin.json') if (run/n).exists()]
         for name in files:
             (stage/name).parent.mkdir(parents=True,exist_ok=True);shutil.copy2(run/name,stage/name)
         record=dict(schema='novaforge-checkpoint-bundle-v1',files={n:sha256(stage/n) for n in files})
@@ -125,7 +125,7 @@ def fork(source,name,objective_name='current',seed=271):
         cfg['env'].setdefault('learner_hitbox','breakout')
         # These forks are selector experiments with a single simulator worker.
         cfg.update(workers=1,threads=1,device='cpu');cfg['rewards']='shaped'
-        cfg['league']['weights']={n:.25 for n in ('chronos','galactus','ripple','nexto')}
+        cfg['league']['weights']=dict(cfg.get('selector_opponents',{n:.25 for n in ('chronos','galactus','ripple','nexto')}))
         stage=dst.parent/('.incomplete_'+stamp());stage.mkdir()
         try:
             for n in ('full.zip','latest.pt'):
@@ -176,7 +176,7 @@ def report(name='selector01'):
     run=run_path(name);out=run.parent.parent/'reports'/f'{name}_research_{stamp()}.zip';out.parent.mkdir(parents=True,exist_ok=True)
     with FileLock(str(run/'train.lock'),timeout=0):
         with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
-            for n in ('guard.json','wdl.json','fusion_selection.json','fusion_refinement.json','frozen_fusion.pt.json'):
+            for n in ('guard.json','wdl.json','fusion_selection.json','fusion_refinement.json','frozen_fusion.pt.json','six_origin.json'):
                 if (run/n).exists():z.write(run/n,n)
             if (run/'status.json').exists():
                 d=json.loads((run/'status.json').read_text());z.writestr('status.json',json.dumps({k:d[k] for k in ('state','timesteps','halt_reason','metrics','guard') if k in d},indent=2))
@@ -190,6 +190,11 @@ def report(name='selector01'):
                 target=(run/json.loads(pointer.read_text())['path']/'diagnostic.json').resolve()
                 if not target.is_relative_to((run/'diagnostics').resolve()):raise ValueError('Diagnostic report path escapes its run')
                 z.write(target,'latest_diagnostic.json')
+            pointer=run/'six_diagnostics/latest.json'
+            if pointer.exists():
+                target=(run/json.loads(pointer.read_text())['path']/'diagnostic.json').resolve()
+                if not target.is_relative_to((run/'six_diagnostics').resolve()):raise ValueError('Six-expert report path escapes its run')
+                z.write(target,'latest_six_diagnostic.json')
             z.writestr('limits.txt',LIMITS)
     print('RESEARCH_REPORT_READY:',out,flush=True)
     return out

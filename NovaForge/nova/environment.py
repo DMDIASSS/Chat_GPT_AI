@@ -52,6 +52,12 @@ class ArenaEnv(gym.Env):
             probabilities=np.asarray(list(weights.values()),dtype=np.float64)
             name=str(self.np_random.choice(names,p=probabilities/probabilities.sum()))
         label=name
+        if name=='fusion':
+            from .core import check_model
+            from .chronos import CHRONOS_CONTRACT
+            path=Path(self.cfg['env']['fusion_opponent'])
+            if check_model(path,CHRONOS_CONTRACT)['sha256']!=self.cfg['fusion_teacher']['sha256']:raise ValueError('Frozen Fusion opponent changed')
+            name='chronos_snapshot'
         if name in ('latest','history'):
             entries=[]
             if self.league_manifest and self.league_manifest.exists():
@@ -140,17 +146,21 @@ class ArenaEnv(gym.Env):
                 self.since_touch>=self.cfg['env']['no_touch_seconds']*120)
 
     def step_controls(self,controls):
+        return self.step_control_ticks(controls,TICK_SKIP)
+
+    def step_control_ticks(self,controls,ticks):
+        if ticks not in (2,TICK_SKIP):raise ValueError('Supported physics batches are two or four ticks')
         controls=np.asarray(controls,dtype=np.float32)
-        if controls.shape==(8,): controls=np.repeat(controls[None,:],TICK_SKIP,axis=0)
-        if controls.shape!=(TICK_SKIP,8) or not np.isfinite(controls).all() or np.max(np.abs(controls))>1.001:
+        if controls.shape==(8,): controls=np.repeat(controls[None,:],ticks,axis=0)
+        if controls.shape!=(ticks,8) or not np.isfinite(controls).all() or np.max(np.abs(controls))>1.001:
             raise ValueError('Invalid learner controls')
         old=self.state
-        opponent_actions=controls_for_ticks(self.opponent,old)
+        opponent_actions=controls_for_ticks(self.opponent,old,ticks)
         self.state=self.engine.step({self.agent:controls,self.other:opponent_actions},{})
         self.previous=controls[-1].copy()
-        self.steps+=1
+        self.steps+=ticks/TICK_SKIP
         touches=sum(c.ball_touches for c in self.state.cars.values())
-        self.since_touch=0 if touches else self.since_touch+TICK_SKIP
+        self.since_touch=0 if touches else self.since_touch+ticks
         own=self.state.cars[self.agent]
         if own.ball_touches:
             self.own_touches+=int(own.ball_touches)
@@ -158,7 +168,7 @@ class ArenaEnv(gym.Env):
             self.wall_touch |= abs(self.state.ball.position[0])>3300 and self.state.ball.position[2]>180
         rel=self.state.ball.position-own.physics.position
         if own.on_ground and 70<rel[2]<200 and np.linalg.norm(rel[:2])<130:
-            self.dribble_seconds+=TICK_SKIP/120
+            self.dribble_seconds+=ticks/120
         terminated=bool(self.state.goal_scored)
         # Goal takes precedence over a simultaneous horizon/timeout.
         truncated=not terminated and self._truncated()

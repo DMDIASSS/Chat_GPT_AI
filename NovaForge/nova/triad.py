@@ -48,8 +48,11 @@ class TriadClock:
             from .triad_selector import Gate
             self.gate=Gate(selector_path,body)
         self.names=self.gate.names if self.gate is not None else NAMES
-        self.teacher=teacher_pool(self.gate.fusion_path if self.gate is not None else None)
+        self.teacher=teacher_pool(self.gate.fusion_path if self.gate is not None else None,self.names)
         self.selector=FairSelector(seed,names=self.names)
+        if len(self.names)==6:
+            from .six_experts import Clock
+            self.native_clock=Clock(self.teacher,self.gate,self.selector.counts)
         self.reset()
     def status(self):
         if self.gate is None:return dict(mode='random',**self.selector.status())
@@ -59,10 +62,15 @@ class TriadClock:
         self.previous=np.zeros(8,np.float32);self.held=np.zeros(8,np.float32)
         self.pending=None;self.next_decision=None;self.last_frame=None;self.initialized=False
         if self.gate is not None:self.gate.reset()
+        if hasattr(self,'native_clock'):self.native_clock.initialized=False
     def controls(self,state,agent,rng):
         frame=int(state.tick_count)
         if self.last_frame is not None and frame<self.last_frame:self.reset()
         self.last_frame=frame
+        if hasattr(self,'native_clock'):
+            if not self.native_clock.initialized:self.native_clock.reset(state,agent,rng)
+            controls=self.native_clock.update(state);self.selector.last=self.native_clock.last_choice
+            return controls
         if not self.initialized:
             self.teacher.reset(state,agent,rng);self.initialized=True
         if self.pending is not None and frame>=self.pending[0]:
@@ -101,7 +109,7 @@ def create_live_bot(agent_id,selector_path=None,body='breakout'):
             super().__init__(agent_id);torch.set_num_threads(1)
             self.clock=None;self.rng=np.random.default_rng(271);self.last_frame=None;self.last_log=-10000
         def initialize(self):
-            self._logger.info('Loading pinned Chronos / GalactusV2 / Ripple v1.1 after connecting')
+            self._logger.info('Loading pinned frozen experts after connecting')
             self.clock=TriadClock(selector_path=selector_path,body=body);self.create_state()
             self._logger.info('TRIAD_READY: %s selector, %s body, experts=%s','learned' if self.clock.gate else 'fair random',body,self.clock.names)
         def create_state(self):self.state=GameState.create_compat_game_state(self.field_info,self.match_config)
@@ -157,6 +165,11 @@ def watch(selector_path=None):
 
 
 def _watch_in_project(selector_path=None):
+    if selector_path is not None:
+        from .triad_selector import selector_meta,SIX_NAMES
+        if tuple(selector_meta(selector_path)['contract']['actions'])==SIX_NAMES:
+            from .six_selector import watch
+            return watch(selector_path)
     from filelock import FileLock
     from .viewer import prepare_viewer,learner_first_state
     from .training import load_config
@@ -194,20 +207,24 @@ def _watch_in_project(selector_path=None):
 
 def export(selector_path=None,destination_parent=None):
     from .teachers import fetch_teachers,verify_teacher
-    fetch_teachers(['chronos','galactus','ripple'])
     parent=Path(destination_parent) if destination_parent is not None else ROOT.parent/'triadbot/exports'
     parent.mkdir(parents=True,exist_ok=True)
     stem='TriadBot_'+uuid.uuid4().hex[:8];destination=parent/stem
     body='breakout'
+    names=NAMES
     if selector_path is not None:
         from .triad_selector import resolve,selector_meta
         from .core import check_model
         selector_path=resolve(selector_path);selector_info=selector_meta(selector_path);body=selector_info['hitbox']
+        names=tuple(selector_info['contract']['actions'])
+        from .triad_selector import Gate
+        Gate(selector_path,body) # validate source pins and owned teacher before bundling
+    external=[n for n in names if n!='fusion'];fetch_teachers(external)
     with tempfile.TemporaryDirectory(dir=parent) as temp:
         stage=Path(temp)/stem;stage.mkdir()
         shutil.copytree(ROOT/'nova',stage/'nova',ignore=shutil.ignore_patterns('__pycache__'))
-        for name in ('requirements.txt','teachers.lock.json','THIRD_PARTY.md'):shutil.copy2(ROOT/name,stage/name)
-        for name in NAMES:shutil.copytree(verify_teacher(name),stage/'assets'/name)
+        for name in ('requirements.txt','teachers.lock.json','extra_teachers.lock.json','THIRD_PARTY.md'):shutil.copy2(ROOT/name,stage/name)
+        for name in external:shutil.copytree(verify_teacher(name),stage/'assets'/name)
         if selector_path is not None:
             shutil.copy2(selector_path,stage/'selector.pt');shutil.copy2(str(selector_path)+'.json',stage/'selector.pt.json')
             if 'fusion_teacher' in selector_info:
@@ -222,11 +239,13 @@ def export(selector_path=None,destination_parent=None):
         (stage/'run_triad.py').write_text('from nova.triad_boot import main\nif __name__=="__main__":main('+repr(agent_id)+', '+repr(body)+')\n')
         from .triad_boot import write_launchers
         write_launchers(stage,sys.executable,agent_id,body,selector_path is not None,
-            fusion=selector_path is not None and 'fusion_teacher' in selector_info)
+            fusion=selector_path is not None and 'fusion_teacher' in selector_info,names=names)
         (stage/'INSTALL.bat').write_text('@echo off\ncd /d "%~dp0"\npy -3.11 -m venv .venv\nif errorlevel 1 goto failed\n".venv\\Scripts\\python.exe" -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu\nif errorlevel 1 goto failed\n".venv\\Scripts\\python.exe" -m pip install -r requirements.txt\nif errorlevel 1 goto failed\necho TRIAD_INSTALLED - add bot.portable.bot.toml in RLBot v5.\npause\nexit /b 0\n:failed\necho INSTALL_FAILED\npause\nexit /b 1\n')
         (stage/'README.txt').write_text('LOCAL: import bot.bot.toml immediately; it uses the exporting Python environment. No INSTALL step is required while that environment stays installed.\nPORTABLE: on another PC run INSTALL.bat, then import bot.portable.bot.toml. Startup diagnostics go to startup.log. DIAGNOSE.bat loads all models without Rocket League.\nDefault body is Breakout. A live car keeps one hitbox while controllers switch; Octane alternatives are generated only for random mode. The learned selector is trained for its fixed body.\nLearned mode selects among three frozen models and commits for 8 decisions (~0.53s). Random mode retains waiting/repetition probabilities. Three models remain separate.\nRipple 276->90 projection and held-control queue approximation can lose skills. No strength gain is claimed. Original notices/hashes are preserved; no new model-license grant is implied.\n')
         if selector_path is not None and 'fusion_teacher' in selector_info:
             with (stage/'README.txt').open('a') as f:f.write('FOUR-EXPERT MODE: this export also contains the hash-locked local Fusion actor under assets/fusion. The four experts stay separate and frozen. The description of three-model mode above applies to the original selector only.\n')
+        if len(names)==6:
+            (stage/'README.txt').write_text('SIX-EXPERT OCTANE MODE: Chronos, Galactus V2, frozen local Fusion, Ducky, Rain 1v1 and Megabyte. Ripple is not bundled. Native 6/8-tick expert periods; greedy gate commits for 8 decisions. LOCAL: import bot.bot.toml using the exporting Python. PORTABLE: run INSTALL.bat, then import bot.portable.bot.toml. DIAGNOSE.bat checks model loading. startup.log records selection. Ducky V3 prediction uses installed RocketSim instead; no native strength parity claim. Model hashes and original readmes retained under assets.\n')
         (stage/'DIAGNOSE.bat').write_text('@echo off\ncd /d "%~dp0"\n"'+sys.executable+'" run_triad.py --diagnose\npause\n')
         files=sorted(p for p in stage.rglob('*') if p.is_file())
         (stage/'MANIFEST.sha256').write_text(''.join(sha256(p)+'  '+p.relative_to(stage).as_posix()+'\n' for p in files))

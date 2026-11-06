@@ -59,6 +59,19 @@ jobs:
           python tests/check_selector_routing.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector_four/latest.pt
+      - name: Six-expert Octane training, native clocks, reports and v5 runtime
+        run: |
+          python tests/check_six_experts.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest tests/test_six_experts.py -q --teachers
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector_six/latest.pt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector_six/latest.pt --force-expert ducky
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector_six/latest.pt --force-expert rain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/check_triad_v5.py --selector ../triadbot/runs/ci_selector_six/latest.pt --force-expert megabyte
       - name: Isolated RLBot v4 export and official class importer
         run: |
           python -m pip install --target .v4sdk rlbot==1.68.0 "setuptools<81"

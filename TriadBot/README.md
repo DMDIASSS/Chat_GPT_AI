@@ -1,4 +1,6 @@
-# TriadBot v1.3.1
+# TriadBot v1.4.0
+
+**New in v1.4.0:** install sibling NovaForge v1.11.0. Launchers 26–32 create, train, pause, watch, diagnose, export and report the separate six-expert Octane selector06. It preserves selector04's frozen Fusion, removes Ripple from this new run, and adds Ducky, Rain 1v1 and full-strength Megabyte neural policies. Earlier runs remain available. See novaforge/OCTANE_SIX_v1.11.md.
 
 **New in v1.3.1:** install sibling NovaForge v1.10.1 and run 25 after pausing selector04 with 19. It compares greedy versus sampled expert routing in 40 short games and writes its own report ZIP. Watch/export defaults and training remain unchanged. See novaforge/ROUTING_TEST_v1.10.1.md.
 

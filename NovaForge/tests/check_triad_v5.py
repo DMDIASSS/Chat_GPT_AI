@@ -27,12 +27,26 @@ def send(sock,item):
 def main():
  import tomllib,shlex
  import argparse
- parser=argparse.ArgumentParser();parser.add_argument('--selector');args=parser.parse_args()
+ parser=argparse.ArgumentParser();parser.add_argument('--selector');parser.add_argument('--force-expert',choices=['ducky','rain','megabyte']);args=parser.parse_args()
  from nova.triad import export
  root=Path(__file__).resolve().parents[1]
  with tempfile.TemporaryDirectory() as temp:
+  if args.force_expert:
+   import shutil,torch
+   from nova.triad_selector import selector_meta,fusion_asset,SIX_NAMES,SIX_CONTRACT
+   from nova.core import write_model_meta,sha256
+   source=Path(args.selector).resolve();meta=selector_meta(source);assert meta['contract']==SIX_CONTRACT
+   stage=Path(temp)/'fixture';stage.mkdir();frozen=fusion_asset(source.parent,meta['fusion_teacher'])
+   shutil.copy2(frozen,stage/'frozen_fusion.pt');shutil.copy2(str(frozen)+'.json',stage/'frozen_fusion.pt.json')
+   network=torch.nn.Linear(240,6)
+   with torch.no_grad():network.weight.zero_();network.bias.zero_();network.bias[SIX_NAMES.index(args.force_expert)]=10
+   torch.jit.save(torch.jit.script(network),str(stage/'actor.pt'))
+   details={k:v for k,v in meta.items() if k not in ('contract','sha256','fusion_teacher')}
+   write_model_meta(stage/'actor.pt',contract=SIX_CONTRACT,fusion_teacher=dict(path='frozen_fusion.pt',sha256=sha256(stage/'frozen_fusion.pt')),**details)
+   args.selector=str(stage/'actor.pt')
   folder=export(selector_path=args.selector,destination_parent=Path(temp)/'exports')
   settings=tomllib.loads((folder/'bot.bot.toml').read_text())['settings']
+  octane=tomllib.loads((folder/'loadout.toml').read_text())['blue_loadout']['car_id']==23
   command=settings['run_command'] if os.name=='nt' else shlex.split(settings['run_command_linux'])
   assert not (folder/'.venv').exists()
   # TOML executable/arguments agree with this generated command on both OSes.
@@ -55,7 +69,7 @@ def main():
       received=0;nonzero=False
       for frame in (0,4,7,8,15,16):
        cars=[f.PlayerInfo(physics=f.Physics(location=f.Vector3(0,y,17),rotation=f.Rotator(0,yaw,0),velocity=f.Vector3(),angular_velocity=f.Vector3()),
-        hitbox=f.BoxShape(131.49236,80.521,30.3) if i==0 else f.BoxShape(118.00738,84.19941,36.159073),hitbox_offset=f.Vector3(),
+        hitbox=f.BoxShape(131.49236,80.521,30.3) if i==0 and not octane else f.BoxShape(118.00738,84.19941,36.159073),hitbox_offset=f.Vector3(),
         air_state=f.AirState.OnGround,dodge_timeout=-1,demolished_timeout=-1,last_input=f.ControllerState(),dodge_dir=f.Vector2(),
         player_id=900+i,team=i,boost=33) for i,(y,yaw) in enumerate([(-4608,np.pi/2),(4608,-np.pi/2)])]
        packet=f.GamePacket(players=cars,balls=[f.BallInfo(physics=f.Physics(location=f.Vector3(0,0,93.15),rotation=f.Rotator(),velocity=f.Vector3(),angular_velocity=f.Vector3()))],

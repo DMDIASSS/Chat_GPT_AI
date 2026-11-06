@@ -1,4 +1,6 @@
-# NovaForge v1.10.1
+# NovaForge v1.11.0
+
+**Six-expert Octane selector:** TriadBot launchers 26–32 preserve selector04's exact frozen Fusion and create a new selector06 with Chronos, Galactus V2, Fusion, Ducky, Rain 1v1 and Megabyte. Ripple is excluded from the new run. Model-specific observations and six/eight-tick clocks run on two-tick physics batches. [Setup and limits](OCTANE_SIX_v1.11.md).
 
 **Routing pilot:** sibling TriadBot launcher 25 compares latest greedy and sampled routing against initialization and fixed experts, with fresh paired starts and a separate report. No training or promotion. [Instructions](ROUTING_TEST_v1.10.1.md).
 

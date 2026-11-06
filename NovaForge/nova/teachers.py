@@ -14,12 +14,13 @@ from .models import FrozenActor
 
 ASSETS=ROOT/'assets'
 BUILTIN_BOTS=('scripted','scorer','demochaser')
-FROZEN_BOTS=('nexto','ripple','chronos','galactus')
+FROZEN_BOTS=('nexto','ripple','chronos','galactus','ducky','rain','megabyte')
 BOT_NAMES=BUILTIN_BOTS+FROZEN_BOTS
 
 
 def _entries(group):
-    return [a for a in json.loads((ROOT/'teachers.lock.json').read_text()) if a['group']==group]
+    path=ROOT/('extra_teachers.lock.json' if group in ('ducky','rain','megabyte') else 'teachers.lock.json')
+    return [a for a in json.loads(path.read_text()) if a['group']==group]
 
 
 def _patch_nexto(data):
@@ -244,17 +245,20 @@ def make_opponent(name,path=None):
     if name in ('chronos','galactus'):
         from .giga_teachers import GigaTeacher
         return GigaTeacher(name)
+    if name in ('ducky','rain','megabyte'):
+        from .six_experts import NativeExpert
+        return NativeExpert(name)
     if name not in factories:
         raise ValueError(f'Unsupported opponent: {name}')
     return factories[name]()
 
 
-def controls_for_ticks(policy,state):
+def controls_for_ticks(policy,state,ticks=TICK_SKIP):
     if hasattr(policy,'controls_for_ticks'):
-        controls=policy.controls_for_ticks(state,TICK_SKIP)
+        controls=policy.controls_for_ticks(state,ticks)
     else:
-        controls=np.repeat(policy.act(state)[None,:],TICK_SKIP,axis=0)
+        controls=np.repeat(policy.act(state)[None,:],ticks,axis=0)
     controls=np.asarray(controls,dtype=np.float32)
-    if controls.shape!=(TICK_SKIP,8) or not np.isfinite(controls).all() or np.max(np.abs(controls))>1.001:
+    if controls.shape!=(ticks,8) or not np.isfinite(controls).all() or np.max(np.abs(controls))>1.001:
         raise ValueError('Opponent must return valid controls for each physics tick')
     return controls

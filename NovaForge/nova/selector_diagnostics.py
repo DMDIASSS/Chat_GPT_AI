@@ -122,7 +122,7 @@ def benchmark(cfg,cells,policies,pairs,seconds,stop_path):
 
 
 def protected_hashes(run):
-    names=['config.json','experiment.json','guard.json','status.json','STOP']
+    names=['config.json','experiment.json','guard.json','status.json','STOP','six_origin.json','fusion_selection.json','fusion_refinement.json']
     names += [n+s for n in ('full.zip','latest.pt','initial.pt','champion.pt','frozen_fusion.pt') for s in ('','.json')]
     return {n:sha256(run/n) if (run/n).is_file() else None for n in names}
 
@@ -139,6 +139,7 @@ def diagnose(run_name='selector01',pairs=1,seconds=30,body_check=True):
             try:
                 cfg=load_config(run/'config.json');body=cfg['env'].get('learner_hitbox','breakout')
                 latest=selector_meta(run/'latest.pt');initial=selector_meta(run/'initial.pt')
+                if len(latest['contract']['actions'])==6:raise ValueError('Use launcher 30 for six-expert native-timing diagnostics')
                 print(f'Checkpoint: {latest["timesteps"]} decisions; {latest["sha256"]}',flush=True)
                 print('LOADING 1/2: latest selector, initial probability reference and three experts',flush=True)
                 candidate=DiagnosticRunner(run/'latest.pt',body,run/'initial.pt')

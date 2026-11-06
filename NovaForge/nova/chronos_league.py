@@ -21,6 +21,8 @@ def match_summary(rows):
 def play_match(cfg,policy,opponent,side,seed,seconds,stop_path,progress=None):
     from .chronos_guard import EvaluationStopped
     cfg=copy.deepcopy(cfg);cfg['curriculum']['adaptive']=False
+    if tuple(cfg.get('selector_experts',()))==('chronos','galactus','fusion','ducky','rain','megabyte'):
+        cfg['env']['fusion_opponent']=str(policy.gate.fusion_path)
     ticks=0;goals_for=0;goals_against=0;contacts=0;point=0
     initial_hash=None
     match_ticks=int(round(seconds*120/8))*8
@@ -36,7 +38,8 @@ def play_match(cfg,policy,opponent,side,seed,seconds,stop_path,progress=None):
             if hasattr(policy,'bind'):policy.bind(env)
             while True:
                 if Path(stop_path).exists():raise EvaluationStopped()
-                if hasattr(policy,'world_controls'):obs,_,terminal,truncated,info=env.step_world_controls(policy.world_controls(obs))
+                if hasattr(policy,'step_env'):obs,_,terminal,truncated,info=policy.step_env(env,obs)
+                elif hasattr(policy,'world_controls'):obs,_,terminal,truncated,info=env.step_world_controls(policy.world_controls(obs))
                 else:obs,_,terminal,truncated,info=env.step(policy.action(obs))
                 ticks+=8
                 now=time.monotonic()
@@ -61,13 +64,14 @@ def match_suite(cfg,candidate,baseline,pairs,seconds,seed,stop_path):
     from .chronos_training import ChronosRunner
     from .chronos_guard import EvaluationStopped
     if Path(stop_path).exists():raise EvaluationStopped()
-    total=4*pairs*2*2;completed=0;started=time.monotonic()
+    opponents=tuple(cfg.get('selector_evaluation_opponents',('chronos','galactus','nexto','ripple')))
+    total=len(opponents)*pairs*2*2;completed=0;started=time.monotonic()
     print(f'WDL_START: {total} games, {seconds:g} simulated seconds each; both team colors. Ctrl+C cancels.',flush=True)
     print('WDL_LOADING: candidate and baseline controllers',flush=True)
     a=candidate if hasattr(candidate,'action') or hasattr(candidate,'world_controls') else ChronosRunner(candidate)
     b=baseline if hasattr(baseline,'action') or hasattr(baseline,'world_controls') else ChronosRunner(baseline)
     rows=[];old=[]
-    for cell,opponent in enumerate(('chronos','galactus','nexto','ripple')):
+    for cell,opponent in enumerate(opponents):
         for pair in range(pairs):
             game_seed=seed+cell*100000+pair
             for side in (0,1):

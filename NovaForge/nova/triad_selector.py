@@ -27,6 +27,9 @@ NAMES=('chronos','galactus','ripple')
 CONTRACT=dict(name='triad-selector-v1',observation=234,actions=list(NAMES),decision_ticks=8,hold_decisions=8)
 FOUR_NAMES=NAMES+('fusion',)
 FOUR_CONTRACT=dict(name='triad-selector-four-v1',observation=236,actions=list(FOUR_NAMES),decision_ticks=8,hold_decisions=8)
+SIX_NAMES=('chronos','galactus','fusion','ducky','rain','megabyte')
+SIX_CONTRACT=dict(name='triad-selector-six-octane-v1',observation=240,actions=list(SIX_NAMES),decision_ticks=8,hold_decisions=8,
+    physics_batch_ticks=2,expert_period_ticks=[8,8,8,8,6,8],expert_delay_ticks=[7,7,7,7,5,7])
 RUNS=ROOT.parent/'triadbot/runs'
 TRAINING_SETTINGS=dict(learning_rate=1e-4,n_steps=512,batch_size=256,n_epochs=4,
     gae_lambda=.97,clip_range=.1,ent_coef=.003,target_kl=.02)
@@ -36,13 +39,14 @@ def contract_for(names):
     names=tuple(names)
     if names==NAMES:return CONTRACT
     if names==FOUR_NAMES:return FOUR_CONTRACT
-    raise ValueError('Supported expert sets are the original three, or those three plus frozen Fusion')
+    if names==SIX_NAMES:return SIX_CONTRACT
+    raise ValueError('Supported expert sets are the original three, four with Fusion, or the six-expert Octane roster')
 
 
 def selector_meta(path):
     data=json.loads(Path(str(path)+'.json').read_text())
     contract=data.get('contract')
-    if contract not in (CONTRACT,FOUR_CONTRACT):raise ValueError('Unsupported selector contract')
+    if contract not in (CONTRACT,FOUR_CONTRACT,SIX_CONTRACT):raise ValueError('Unsupported selector contract')
     return check_model(path,contract)
 
 
@@ -55,7 +59,10 @@ def fusion_asset(folder,record):
     return path
 
 
-def teacher_pool(fusion=None):
+def teacher_pool(fusion=None,names=None):
+    if tuple(names or ())==SIX_NAMES:
+        from .six_experts import Pool
+        return Pool(fusion)
     if fusion is None:
         from .chronos_fusion import TeacherFusion
         return TeacherFusion()
@@ -99,9 +106,11 @@ class SelectorPolicy(ActorCriticPolicy):
 class Gate:
     def __init__(self,path,body='breakout'):
         path=resolve(path);meta=selector_meta(path);self.names=tuple(meta['contract']['actions']);self.n=len(self.names)
-        self.fusion_path=fusion_asset(path.parent,meta['fusion_teacher']) if self.n==4 else None
+        self.fusion_path=fusion_asset(path.parent,meta['fusion_teacher']) if 'fusion' in self.names else None
+        if self.names==SIX_NAMES and body!='octane':raise ValueError('The six-expert selector requires Octane')
         if meta['hitbox']!=body:raise ValueError('Selector was trained for a different hitbox')
         if meta['teacher_lock_sha256']!=sha256(ROOT/'teachers.lock.json'):raise ValueError('Selector teacher pins changed')
+        if self.names==SIX_NAMES and meta.get('extra_teacher_lock_sha256')!=sha256(ROOT/'extra_teachers.lock.json'):raise ValueError('New expert pins changed')
         self.network=torch.jit.load(str(path),map_location='cpu').eval();self.body=body;self.training_steps=meta['timesteps'];self.reset()
     def reset(self):
         self.context=Context(self.body,self.names);self.last_free_choice_probabilities=None
@@ -133,23 +142,34 @@ class SelectorEnv(Env):
     def __init__(self,cfg,run=None):
         self.body=cfg['env']['learner_hitbox']
         self.names=tuple(cfg.get('selector_experts',NAMES));contract=contract_for(self.names)
-        self.fusion_path=fusion_asset(run,cfg['fusion_teacher']) if len(self.names)==4 else None
+        self.fusion_path=fusion_asset(run,cfg['fusion_teacher']) if 'fusion' in self.names else None
+        if self.names==SIX_NAMES:
+            cfg=copy.deepcopy(cfg);cfg['env']['fusion_opponent']=str(self.fusion_path)
         self.inner=ChronosEnv(cfg)
         self.action_space=spaces.Discrete(len(self.names));self.observation_space=spaces.Box(-np.inf,np.inf,(contract['observation'],),np.float32)
         self.teacher=None
     def reset(self,*,seed=None,options=None):
         super().reset(seed=seed)
         if self.teacher is None:
-            self.teacher=teacher_pool(self.fusion_path)
+            self.teacher=teacher_pool(self.fusion_path,self.names)
         self.features,info=self.inner.reset(seed=seed,options=options);self.context=Context(self.body,self.names)
         pool_seed=int(self.np_random.integers(2**32)) if len(self.names)==4 else seed
-        self.teacher.reset(self.inner.arena.state,self.inner.arena.agent,np.random.default_rng(pool_seed))
+        if self.names==SIX_NAMES:
+            from .six_experts import Clock
+            self.native_clock=Clock(self.teacher)
+            self.native_clock.reset(self.inner.arena.state,self.inner.arena.agent,np.random.default_rng(pool_seed))
+        else:self.teacher.reset(self.inner.arena.state,self.inner.arena.agent,np.random.default_rng(pool_seed))
         self.counts=np.zeros(len(self.names),dtype=int)
         return self.context.observation(self.features[:225]),info
     def step(self,choice):
         choice=int(choice);self.context.advance(choice);self.counts[choice]+=1
-        controls=self.teacher.proposals(self.inner.arena.state,self.inner.previous,self.features[:225],self.inner.mirror)
-        self.features,reward,terminal,truncated,info=self.inner.step_world_controls(controls[choice])
+        if self.names==SIX_NAMES:
+            from .six_experts import transition
+            self.native_clock.fixed_choice=choice
+            self.features,reward,terminal,truncated,info=transition(self.inner,self.native_clock)
+        else:
+            controls=self.teacher.proposals(self.inner.arena.state,self.inner.previous,self.features[:225],self.inner.mirror)
+            self.features,reward,terminal,truncated,info=self.inner.step_world_controls(controls[choice])
         if 'episode' in info:info['selector_counts']=dict(zip(self.names,map(int,self.counts)))
         return self.context.observation(self.features[:225]),reward,terminal,truncated,info
     def close(self):self.inner.close()
@@ -158,11 +178,20 @@ class SelectorEnv(Env):
 class Runner:
     def __init__(self,path,body):
         self.gate=Gate(path,body)
-        self.teacher=teacher_pool(self.gate.fusion_path)
+        self.teacher=teacher_pool(self.gate.fusion_path,self.gate.names)
         self.counts=np.zeros(self.gate.n,dtype=np.int64)
     def bind(self,env):
         self.env=env;self.gate.reset()
-        self.teacher.reset(env.arena.state,env.arena.agent,np.random.default_rng(271))
+        if self.gate.names==SIX_NAMES:
+            from .six_experts import Clock
+            self.native_clock=Clock(self.teacher,self.gate,self.counts)
+            self.native_clock.reset(env.arena.state,env.arena.agent,np.random.default_rng(271))
+        else:self.teacher.reset(env.arena.state,env.arena.agent,np.random.default_rng(271))
+    def step_env(self,env,obs):
+        if self.gate.names==SIX_NAMES:
+            from .six_experts import transition
+            return transition(env,self.native_clock)
+        return env.step_world_controls(self.world_controls(obs))
     def world_controls(self,obs):
         env=self.env;choice=self.gate.choose(obs[:225])
         self.counts[choice]+=1
@@ -173,8 +202,9 @@ def save_actor(model,path,body,fusion_teacher=None):
     actor=nn.Sequential(copy.deepcopy(model.policy.mlp_extractor.policy_net),copy.deepcopy(model.policy.action_net)).cpu().eval()
     script=torch.jit.script(actor)
     path=Path(path);temp=path.with_suffix('.tmp.pt');torch.jit.save(script,str(temp));_sync_serialized_file(temp);temp.replace(path)
-    names=FOUR_NAMES if model.action_space.n==4 else NAMES
-    details=dict(fusion_teacher=fusion_teacher) if len(names)==4 else {}
+    names={3:NAMES,4:FOUR_NAMES,6:SIX_NAMES}[model.action_space.n]
+    details=dict(fusion_teacher=fusion_teacher) if 'fusion' in names else {}
+    if names==SIX_NAMES:details['extra_teacher_lock_sha256']=sha256(ROOT/'extra_teachers.lock.json')
     write_model_meta(path,contract=contract_for(names),timesteps=int(model.num_timesteps),hitbox=body,
         teacher_lock_sha256=sha256(ROOT/'teachers.lock.json'),**details)
 
@@ -182,7 +212,7 @@ def save_actor(model,path,body,fusion_teacher=None):
 def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
     from .teachers import fetch_teachers
     from .tracking import Tracker,EpisodeWindow,WandBWriter
-    fetch_teachers(['chronos','galactus','ripple','nexto']);torch.set_num_threads(1)
+    torch.set_num_threads(1)
     run=(RUNS/run_name).resolve()
     if run.parent!=RUNS.resolve():raise ValueError('Invalid selector run name')
     run.mkdir(parents=True,exist_ok=True)
@@ -191,6 +221,8 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
         cfg['env'].setdefault('learner_hitbox','breakout');cfg['league']['weights']=dict(cfg.get('selector_opponents',{n:.25 for n in ('chronos','galactus','ripple','nexto')}))
         cfg.update(workers=1,threads=1,device='cpu')
         names=tuple(cfg.get('selector_experts',NAMES));contract=contract_for(names)
+        if names==SIX_NAMES and cfg['env']['learner_hitbox']!='octane':raise ValueError('The six-expert selector requires Octane')
+        fetch_teachers(['chronos','galactus','nexto']+(['ducky','rain','megabyte'] if names==SIX_NAMES else ['ripple']))
         from .research import session
         start=check_model(run/'full.zip',contract)['timesteps'] if (run/'full.zip').exists() else 0
         experiment=session(run,cfg,start)
@@ -204,7 +236,8 @@ def train(run_name='selector01',steps=32768,forever=True,wandb='online'):
                     gamma=cfg['ppo']['gamma'],seed=cfg.get('selector_seed',271),verbose=1,
                     policy_kwargs=dict(net_arch=dict(pi=[128,128],vf=[128,128])))
                 with torch.no_grad():
-                    model.policy.action_net.weight.zero_();model.policy.action_net.bias.copy_(torch.tensor([1.]+[0.]*(len(names)-1)))
+                    biases=torch.zeros(len(names));biases[names.index(cfg.get('selector_initial_expert','chronos'))]=1.
+                    model.policy.action_net.weight.zero_();model.policy.action_net.bias.copy_(biases)
                 save_actor(model,run/'initial.pt',cfg['env']['learner_hitbox'],cfg.get('fusion_teacher'))
                 shutil.copy2(run/'initial.pt',run/'champion.pt');shutil.copy2(run/'initial.pt.json',run/'champion.pt.json')
             model.set_random_seed(experiment['seed'])
@@ -281,7 +314,7 @@ def evaluate(run_name='selector01',pairs=2,seconds=60,split='development'):
     if split not in SEED_BANKS:raise ValueError('Unknown evaluation split')
     if not isinstance(pairs,int) or not 1<=pairs<=256 or not np.isfinite(seconds) or seconds<=0:raise ValueError('Use 1..256 pairs and positive seconds')
     torch.set_num_threads(1)
-    print(f'SELECTOR_EVALUATION_START: Torch threads={torch.get_num_threads()}, games={4*pairs*2*2}, duration={seconds:g}s simulated/game',flush=True)
+    print(f'SELECTOR_EVALUATION_START: Torch threads={torch.get_num_threads()}; loading run to count match conditions, duration={seconds:g}s simulated/game',flush=True)
     run=(RUNS/run_name).resolve()
     if run.parent!=RUNS.resolve():raise ValueError('Invalid run name')
     if not (run/'config.json').exists():raise FileNotFoundError('No selector run. Start launcher 4 and save a checkpoint first.')
@@ -290,7 +323,7 @@ def evaluate(run_name='selector01',pairs=2,seconds=60,split='development'):
             cfg=load_config(run/'config.json');body=cfg['env']['learner_hitbox']
             latest=selector_meta(run/'latest.pt');initial=selector_meta(run/'initial.pt')
             print(f'Latest selector: {latest["timesteps"]} decisions, SHA256 {latest["sha256"]}',flush=True)
-            print('LOADING 1/2: latest selector and Chronos / GalactusV2 / Ripple v1.1',flush=True)
+            print('LOADING 1/2: latest selector and its frozen experts',flush=True)
             candidate=Runner(run/'latest.pt',body)
             print('LOADING 2/2: initialization and frozen experts',flush=True)
             baseline=Runner(run/'initial.pt',body)

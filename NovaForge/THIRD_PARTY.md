@@ -11,7 +11,15 @@ NovaForge's original source code is licensed under the included MIT license. Thi
 
 `teachers.lock.json` lists immutable source URLs and hashes. Fetching verifies the upstream bytes; loading verifies the installed files against the lock. Keep their source, attribution and applicable terms with any adapted materials you share. Generated demonstration datasets and teacher-derived student checkpoints may also be subject to upstream terms; they are not relicensed by the MIT source-code license.
 
-## Training dependencies
+## Additional Octane experts in v1.11
+
+`extra_teachers.lock.json` pins new downloads separately, preserving the original teacher-lock identity for previous selectors. Public source ZIPs contain original interface adapters and numeric fixtures, not the upstream model weights or C++ implementations. Upstream readmes are downloaded alongside the model files; this project does not grant additional rights over those models.
+
+- **Ducky**, by **bccessnadev**: [RLBot-Ducky](https://github.com/bccessnadev/RLBot-Ducky/tree/b785bb6088927f8117c45924d372bba57eb0ed70), pinned to `b785bb6088927f8117c45924d372bba57eb0ed70`. Downloaded POLICY.lt and agent_setup.json define DuckyObs_V2_01. The source ZIP does not include a new model-license grant. Our ball-prediction backend differs from the native V3 runtime.
+- **Rain**, by **Reiud-Ad**: [RainStream](https://github.com/Reiud-Ad/RainStream/tree/6a9cbb0473526ec2338cbf8c13fc384dd5abbb76), pinned to `6a9cbb0473526ec2338cbf8c13fc384dd5abbb76`. Only its 1v1 shared/policy checkpoint is downloaded. No extra model-license grant is implied.
+- **Megabyte**, by **SubparN0va**: [ByteBotpack](https://github.com/SubparN0va/ByteBotpack/tree/c13cf55f3a6e302e05c3b2099fe2b2681165fed8), pinned to `c13cf55f3a6e302e05c3b2099fe2b2681165fed8`. The installer preserves its upstream MIT license and README. The port uses Megabyte neural weights and the legacy ByteObs interface, without the external difficulty/temperature/kickoff helpers. It is not Kilobyte.
+
+## Dependency notices
 
 - RLGym v2 and RLGym-tools: Apache-2.0. The student's advanced action table is provided by RLGym-tools, with bins selected to match the 276 Ripple controls.
 - RocketSim: MIT. Bundled collision assets supplied through dependencies retain their own provenance.

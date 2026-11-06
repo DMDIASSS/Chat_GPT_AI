@@ -169,9 +169,9 @@ class GigaTeacher:
         if self.forecast: self.forecast.reset()
 
     def controls_for_ticks(self,state,ticks=4):
-        if ticks!=4: raise ValueError('Native teacher scheduling expects four-tick simulator calls')
+        if ticks not in (2,4): raise ValueError('Native teacher scheduling expects two- or four-tick simulator calls')
         tick=int(state.tick_count-self.origin)
-        if tick%4 or self.last_call==tick: raise ValueError('Native teacher must be advanced once per four-tick state')
+        if tick%2 or self.last_call==tick: raise ValueError('Native teacher must be advanced once per simulator state')
         self.last_call=tick
         if tick%8==0:
             pred=self.forecast.samples(state) if self.forecast else None

@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 
 
-def write_launchers(stage,python,agent_id,body='breakout',learned=False,fusion=False):
+def write_launchers(stage,python,agent_id,body='breakout',learned=False,fusion=False,names=None):
     stage=Path(stage)
     variants=[('',body)] if learned else [('',body),('.octane','octane')]
     for suffix,hitbox in variants:
@@ -19,12 +19,15 @@ def write_launchers(stage,python,agent_id,body='breakout',learned=False,fusion=F
             # Local exports work immediately; portable variants use their own venv.
             win='"'+('.venv\\Scripts\\python.exe' if portable else str(python))+'" run_triad.py --body '+hitbox
             linux='"'+('.venv/bin/python' if portable else str(python))+'" run_triad.py --body '+hitbox
-            text='[settings]\nname = '+json.dumps('TriadBot '+('four-expert Fusion selector' if fusion else ('learned selector' if learned else 'random experts'))+' '+hitbox+(' portable' if portable else ''))+'\n'
+            six=names is not None and len(names)==6
+            text='[settings]\nname = '+json.dumps('TriadBot '+('six-expert selector' if six else ('four-expert Fusion selector' if fusion else ('learned selector' if learned else 'random experts')))+' '+hitbox+(' portable' if portable else ''))+'\n'
             text+='agent_id = '+json.dumps(agent_id+suffix+('.portable' if portable else ''))+'\n'
             text+='run_command = '+json.dumps(win)+'\nrun_command_linux = '+json.dumps(linux)+'\n'
             text+='loadout_file = '+json.dumps(loadout)+'\nhivemind = true\n\n[details]\n'
             text+='developer = "NovaForge user; original models credited under assets"\n'
-            text+='description = '+json.dumps('Chronos + GalactusV2 + Ripple v1.1'+(' + frozen local Fusion.' if fusion else '.')+' Fixed body; '+('four' if fusion else 'three')+' frozen experts.')+'\nlanguage = "python"\ntags = ["1v1"]\n'
+            description=('Chronos + GalactusV2 + local Fusion + Ducky + Rain + Megabyte. Fixed Octane; six frozen experts.' if six else
+                'Chronos + GalactusV2 + Ripple v1.1'+(' + frozen local Fusion.' if fusion else '.')+' Fixed body; '+('four' if fusion else 'three')+' frozen experts.')
+            text+='description = '+json.dumps(description)+'\nlanguage = "python"\ntags = ["1v1"]\n'
             (stage/name).write_text(text)
 
 

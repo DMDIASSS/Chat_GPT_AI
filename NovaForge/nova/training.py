@@ -52,8 +52,9 @@ def validate_config(cfg):
         w=cfg[key]['weights']
         if not w or any(not np.isfinite(x) or x<0 for x in w.values()) or sum(w.values())<=0:
             raise ValueError(f'Invalid {key} weights')
-    if set(cfg['league']['weights'])-(set(BOT_NAMES)|{'latest','history'}):
+    if set(cfg['league']['weights'])-(set(BOT_NAMES)|{'latest','history','fusion'}):
         raise ValueError('No headless adapter for one of the league opponents')
+    if 'fusion' in cfg['league']['weights'] and not cfg['env'].get('fusion_opponent'):raise ValueError('Frozen Fusion opponent path is required')
     if set(cfg['curriculum']['weights'])-{'kickoff','shot','defense','dribble','aerial','recovery','wall','replay'}:
         raise ValueError('Unsupported practice scenario')
     if cfg['league']['snapshot_every']<1 or cfg['league']['history_size']<1:

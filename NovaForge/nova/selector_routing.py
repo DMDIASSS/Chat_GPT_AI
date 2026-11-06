@@ -81,6 +81,7 @@ def evaluate(run_name='selector04',pairs=1,seconds=30,seed_start=SEED):
             try:
                 cfg=load_config(run/'config.json');body=cfg['env'].get('learner_hitbox','breakout')
                 latest=selector_meta(run/'latest.pt');initial=selector_meta(run/'initial.pt')
+                if len(latest['contract']['actions'])==6:raise ValueError('Use the six-expert diagnostics launcher for native multi-rate controllers; this pilot supports the earlier three/four-way gates')
                 if latest['contract']!=initial['contract']:raise ValueError('Initial/latest selector contracts differ')
                 greedy=Runner(run/'latest.pt',body)
                 policies=dict(latest_greedy=greedy,latest_sampled=SampledRunner(run/'latest.pt',body),

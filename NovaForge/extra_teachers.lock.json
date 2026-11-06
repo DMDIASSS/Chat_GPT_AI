@@ -1,0 +1,62 @@
+[
+  {
+    "group": "ducky",
+    "target": "UPSTREAM_README.md",
+    "url": "https://raw.githubusercontent.com/bccessnadev/RLBot-Ducky/b785bb6088927f8117c45924d372bba57eb0ed70/README.md",
+    "sha256": "021eb86c71e9a3d32d19f8e1c4a780e971140488518eaea06a0d3350a782d142"
+  },
+  {
+    "group": "ducky",
+    "target": "POLICY.lt",
+    "url": "https://raw.githubusercontent.com/bccessnadev/RLBot-Ducky/b785bb6088927f8117c45924d372bba57eb0ed70/rlbot/POLICY.lt",
+    "sha256": "8dc06f5507d90e1b71aab287dd7bd40595b50dfcf793dd107eec888bf426837c"
+  },
+  {
+    "group": "ducky",
+    "target": "agent_setup.json",
+    "url": "https://raw.githubusercontent.com/bccessnadev/RLBot-Ducky/b785bb6088927f8117c45924d372bba57eb0ed70/rlbot/agent_setup.json",
+    "sha256": "da30ec7b086eaf1e6d54b2fdd29cabbc58509ccd7c1a784e2a0ffaf4584181b3"
+  },
+  {
+    "group": "rain",
+    "target": "UPSTREAM_README.md",
+    "url": "https://raw.githubusercontent.com/Reiud-Ad/RainStream/6a9cbb0473526ec2338cbf8c13fc384dd5abbb76/README.md",
+    "sha256": "47aaf7cd337f82f86f33c7742f4957aa45550fedf53c9e5ee87a4b23e535a0a8"
+  },
+  {
+    "group": "rain",
+    "target": "POLICY.lt",
+    "url": "https://raw.githubusercontent.com/Reiud-Ad/RainStream/6a9cbb0473526ec2338cbf8c13fc384dd5abbb76/rlbot/checkpoint_1v1/POLICY.lt",
+    "sha256": "eccde3a055444f03bbf2a0d655454249582f8163e66e9ce5730d72b49596c76e"
+  },
+  {
+    "group": "rain",
+    "target": "SHARED_HEAD.lt",
+    "url": "https://raw.githubusercontent.com/Reiud-Ad/RainStream/6a9cbb0473526ec2338cbf8c13fc384dd5abbb76/rlbot/checkpoint_1v1/SHARED_HEAD.lt",
+    "sha256": "80606babbbfe6f68f2831153c65cd8e2f1067764907bda094d446692c1b3c92d"
+  },
+  {
+    "group": "megabyte",
+    "target": "UPSTREAM_LICENSE.txt",
+    "url": "https://raw.githubusercontent.com/SubparN0va/ByteBotpack/c13cf55f3a6e302e05c3b2099fe2b2681165fed8/LICENSE",
+    "sha256": "f0ba71ebccbeff216c6bde8d8976d60f0988f3b52ce4cb3b691ca87fbf46df2a"
+  },
+  {
+    "group": "megabyte",
+    "target": "UPSTREAM_README.md",
+    "url": "https://raw.githubusercontent.com/SubparN0va/ByteBotpack/c13cf55f3a6e302e05c3b2099fe2b2681165fed8/README.md",
+    "sha256": "8ae980552decb339f9dfcdf4e910231f99f6d5f6f9ac2f2421ef4d22aef949b5"
+  },
+  {
+    "group": "megabyte",
+    "target": "POLICY.lt",
+    "url": "https://raw.githubusercontent.com/SubparN0va/ByteBotpack/c13cf55f3a6e302e05c3b2099fe2b2681165fed8/rlbot/megabyte/POLICY.lt",
+    "sha256": "fe6f2e8e827edbd576282710dec300311c767b102a1fc91c01a5d607f3d8d06a"
+  },
+  {
+    "group": "megabyte",
+    "target": "SHARED_HEAD.lt",
+    "url": "https://raw.githubusercontent.com/SubparN0va/ByteBotpack/c13cf55f3a6e302e05c3b2099fe2b2681165fed8/rlbot/megabyte/SHARED_HEAD.lt",
+    "sha256": "7f6d907aa02faac685a4569be595f8bc077c07b4ca47bd8ba888d5d3ceb3175b"
+  }
+]
