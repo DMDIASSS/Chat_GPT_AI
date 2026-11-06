@@ -1,0 +1,27 @@
+name: Package verified GigaForge Windows runtime
+on:
+  push:
+    branches: [codex/novaforge-v1]
+    paths: ['.github/workflows/gigaforge-package.yml', 'research/package_gigaforge.py']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: GigaForge-windows-CPU-verified-preview
+          path: verified-native
+          run-id: 42277845367
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: python research/package_gigaforge.py
+      - name: Publish verified binary and complete ZIP
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add downloads GigaForge/native_release.json GigaForge/README.md GIGAFORGE_PREVIEW.md
+          git commit -m 'Package Windows CPU-verified GigaForge runtime and launch instructions [skip ci]'
+          git push origin HEAD:codex/novaforge-v1
