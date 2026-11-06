@@ -40,7 +40,9 @@ def read(path):return json.loads(Path(path).read_text(encoding='utf8'))
 
 def run_path(name):
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}',name):raise ValueError('Use a simple run name, no path separators')
-    return PROJECT/'runs'/name
+    # Windows temp/profile paths may use an 8.3 alias (RUNNER~1). Keep the
+    # run and every resolved artifact in the same canonical namespace.
+    return (PROJECT/'runs'/name).resolve()
 
 
 def validate(cfg):
@@ -269,7 +271,7 @@ def _train_task(run,state,cfg,task_id,tracker):
     task_cfg=copy.deepcopy(cfg);task_cfg['seed']=recipe['seed']
     env=ForgeEnv(task_cfg,recipe['family'],recipe['pool'],profile=recipe['profile'])
     start=time.monotonic();base_steps=progress['steps'];session_start_steps=base_steps;last_log=start
-    model=None
+    model=None;callback=None
     try:
         source=local(task,progress['checkpoint']) if progress['steps'] else (local(run,recipe['inherit']['checkpoint']) if recipe['inherit'] else None)
         if source:
@@ -325,7 +327,12 @@ def _train_task(run,state,cfg,task_id,tracker):
                 if getattr(model,'training_halt_reason',None):raise RuntimeError(model.training_halt_reason)
         return progress
     finally:
-        env.close();del model;gc.collect()
+        try:
+            if model is not None and hasattr(model,'_logger'):model.logger.close()
+        finally:
+            # SB3 callback locals can retain a reference cycle to the model.
+            if callback is not None:callback.locals={};callback.model=None
+            env.close();del model;gc.collect()
 
 
 def log_evaluation(tracker,state,family,report,kind):

@@ -135,6 +135,22 @@ def test_configuration_validation_rejects_silent_reward_or_budget_edits():
     with pytest.raises(ValueError):validate(cfg)
 
 
+def test_run_paths_resolve_aliases_before_relative_checkpoint_storage(tmp_path,monkeypatch):
+    import os
+    from nova import forge_league as league
+    target=tmp_path/'actual_project';target.mkdir()
+    alias=tmp_path/'project_alias'
+    if os.name=='nt':
+        # Real 8.3 Windows aliases are exercised by check_forge_league.py's
+        # TemporaryDirectory. Symlink privileges aren't required for this test.
+        alias=target/'..'/'actual_project'
+    else:alias.symlink_to(target,target_is_directory=True)
+    monkeypatch.setattr(league,'PROJECT',alias)
+    run=league.run_path('alias_case')
+    assert run.parent.parent==target.resolve()
+    assert league.local(run,'tasks/model.zip').relative_to(run)==Path('tasks/model.zip')
+
+
 @pytest.mark.parametrize('family',FAMILIES)
 def test_actual_pretrained_initialization_and_causal_queue(tmp_path,family,request):
     if not request.config.getoption('--teachers'):pytest.skip('Use --teachers with downloaded native models')
