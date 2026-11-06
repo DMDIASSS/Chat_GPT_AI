@@ -1,0 +1,48 @@
+name: Package verified GigaForge reward research
+on:
+  push:
+    branches: [codex/novaforge-v1]
+    paths: ['research/package_research_release.py', '.github/workflows/gigaforge-research-package.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  windows-package:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    env:
+      NATIVE_VERIFIED_RUN: '42306980807'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: NovaForge/requirements.txt
+      - name: Install matching CPU runtime for controller verification
+        run: |
+          python -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install -r NovaForge/requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: GigaForge-windows-CPU-verified-preview
+          path: verified-native
+          run-id: 42306980807
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify current controller against the tested native executable
+        env:
+          GIGAFORGE_EXE: ${{ github.workspace }}\verified-native\GigaForge.exe
+        run: |
+          python -m pytest GigaForge/tests/test_research.py GigaForge/tests/test_runtime_finder.py -q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python GigaForge/tests/check_research_native.py
+      - run: python research/package_research_release.py
+      - name: Publish complete package and smaller update
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add GigaForge/native_release.json GigaForge/README.md GigaForge/RUNTIME_UPDATE.md GIGAFORGE_RESEARCH_DOWNLOAD.md research/GigaForge-research-release.json
+          git add -f downloads/GigaForge-native-research-*.zip downloads/GigaForge-Reward-Research-Update.zip downloads/NovaForge-GigaForge-Research-Windows.zip
+          git commit -m 'Publish Windows-verified native reward research packages [skip ci]'
+          git push origin HEAD:codex/novaforge-v1

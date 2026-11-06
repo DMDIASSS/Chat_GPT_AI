@@ -107,8 +107,12 @@ def decision(result,cfg):
 def evaluate(m,run,state,family,candidate,split,cfg,tracker):
  from nova.forge_eval import summary
  settings=m.read(run/'config.json');settings['device']=state['device']
+ panel=[dict(m.descriptor(run/'parents'/f,f),name='original_'+f) for f in ('chronos','galactus')]
+ other='galactus' if family=='chronos' else 'chronos'
+ current_other=m.retained(run,other)
+ if current_other!=(run/'parents'/other).resolve():panel.append(dict(m.descriptor(current_other,other),name='accepted_'+other+'_'+m.sha(current_other/'POLICY.lt')[:8]))
  spec=dict(candidate=m.descriptor(candidate,family),baseline=m.descriptor(m.retained(run,family),family),
-  opponents=[dict(m.descriptor(run/'parents'/f,f),name='original_'+f) for f in ('chronos','galactus')],
+  opponents=panel,
   pairs=cfg['confirmation_pairs'] if split=='confirmation' else cfg['development_pairs'],seconds=cfg['seconds'],
   seed=(710000000 if split=='confirmation' else 410000000)+state['trial']*10000,
   output=str(run/'evaluations'/f'lab_{state["trial"]:05d}_{family}_{split}.json'),stop_file=str(run/'STOP'))
@@ -234,6 +238,9 @@ def train(m,name='research01',choice='auto',wandb='online',once=False,hours=None
       metrics_file=str(branch/'metrics.jsonl'),seed=cfg['seed']+state['trial']*100003)
      if pending['opponent']:recipe['opponent']=pending['opponent']
      m.write(branch/'recipe.json',recipe)
+     tracker.log({f'research/{family}/actor_lr':recipe['actor_lr'],f'research/{family}/anchor_coefficient':arm['anchor'],
+      f'research/{family}/freeze_shared':float(arm['freeze_shared']),
+      **{f'research/{family}/potential_{key}':value for key,value in zip(('field','distance','shot','defense','possession'),arm['potential'])}},state['total_decisions'])
      if current:
       if not (current/'native.json').exists():m.seal_generation(current,family)
       m.verify_generation(current)
@@ -250,7 +257,8 @@ def train(m,name='research01',choice='auto',wandb='online',once=False,hours=None
       tracker.log({family+'/'+k:v for k,v in r.items() if isinstance(v,(float,int))},state['total_decisions']-amount+max(0,int(r['Total Timesteps'])-(int(current.name)-amount)))
      m.write(branch/'progress.json',dict(logged_rows=len(rows)))
      speed={f'throughput/{family}/end_to_end_samples_per_second':amount/max(elapsed,1e-6)} if ran_native else {}
-     tracker.log({**speed,f'learning/{family}/data_use_fraction':sum(r['Used Timesteps'] for r in new)/max(1,sum(r['Collected Timesteps'] for r in new))},state['total_decisions'])
+     if new:
+      tracker.log({**speed,f'learning/{family}/data_use_fraction':sum(r['Used Timesteps'] for r in new)/max(1,sum(r['Collected Timesteps'] for r in new))},state['total_decisions'])
      pending['anchor_halt']=any(r.get('Guard Halt') for r in new)
      pending['phase']='evaluate' if int(current.name)>=pending['target'] or pending['anchor_halt'] else 'train'
      state.setdefault('last_candidates',{})[family]=str(current.relative_to(run));persist(m,run,state)
@@ -258,7 +266,7 @@ def train(m,name='research01',choice='auto',wandb='online',once=False,hours=None
      if pending['phase']=='train':continue
     state['status']='evaluating';persist(m,run,state)
     if pending.get('anchor_halt'):
-     result=dict(decision='regressed',statistics=dict(delta=-.5));retire=True
+     result=dict(decision='anchor_limit',statistics=dict(delta=None,reason='Frozen-anchor KL limit; no WDL measured'));retire=True
     else:
      result=evaluate(m,run,state,family,current,'development',cfg,tracker)
      # Confirm both improvements and apparent regressions on fresh seeds.
@@ -270,13 +278,18 @@ def train(m,name='research01',choice='auto',wandb='online',once=False,hours=None
      for row in result['trials']:
       item=state['payoff'].setdefault(family,{}).setdefault(row['opponent'],dict(points=0,games=0))
       item['points']+=(row['outcome']+1)/2;item['games']+=1
-    if result['decision']=='improved':
+    promoted=result['decision']=='improved'
+    if promoted:
      protect(m,run,state,family,current,result)
      print('RESEARCH_PROMOTED:',family,'fresh confirmation passed',flush=True)
-    entry=state['arms'].setdefault(pending['key'],dict(n=0,score=0));entry['n']+=1;entry['score']+=result['statistics']['delta']
+    entry=state['arms'].setdefault(pending['key'],dict(n=0,score=0));entry['n']+=1;entry['score']+=(result['statistics']['delta'] if result['statistics']['delta'] is not None else -.5) # Search penalty, never a fabricated WDL measurement.
     if retire or int(current.name)>=cfg['max_branch_decisions']:
      record=state['branches'].setdefault(pending['key'],dict(restart=0));record['restart']+=1
      print('RESEARCH_BRANCH_RETIRED:',family,arm['name'],'champion preserved; next trial continues automatically.',flush=True)
+    if promoted:
+     state['arms']={k:v for k,v in state['arms'].items() if not k.startswith(family+'/')}
+     state['payoff'][family]={}
+    tracker.log({f'evaluation/{family}/promoted':float(promoted)},state['total_decisions'])
     state['results'].append(dict(trial=state['trial'],family=family,arm=arm['name'],decision=result['decision'],statistics=result['statistics'],candidate=str(current.relative_to(run))))
     state['trial']+=1;state['pending']=None;state['status']='training'
     if state['trial']%8==0:evolve(state,cfg)
@@ -287,7 +300,8 @@ def train(m,name='research01',choice='auto',wandb='online',once=False,hours=None
    state['status']='paused' if (run/'STOP').exists() else 'budget_complete'
   except KeyboardInterrupt:
    (run/'STOP').touch();state['status']='paused'
-  except Exception:
+  except Exception as error:
+   state['error']=dict(type=type(error).__name__,message=str(error)[:2000])
    if (run/'STOP').exists():state['status']='paused';print('RESEARCH_PAUSED: evaluation interrupted; saved checkpoint retained.',flush=True)
    else:state['status']='error';raise
   finally:
