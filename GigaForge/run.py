@@ -362,8 +362,9 @@ def benchmark(name='native01',choice='auto'):
 if __name__=='__main__':
  parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=['create','verify','benchmark','train','pause','report','export','watch','status','research'])
  parser.add_argument('--run',default='native01');parser.add_argument('--device',choices=['auto','cpu','cuda'],default='auto');parser.add_argument('--wandb',choices=['online','offline','off'],default='online')
- parser.add_argument('--family',choices=['chronos','galactus'],default='chronos');parser.add_argument('--once',action='store_true');parser.add_argument('--hours',type=float);parser.add_argument('--candidate',action='store_true');parser.add_argument('--trial',type=int);args=parser.parse_args()
+ parser.add_argument('--family',choices=['chronos','galactus'],default='chronos');parser.add_argument('--once',action='store_true');parser.add_argument('--hours',type=float);parser.add_argument('--candidate',action='store_true');parser.add_argument('--trial',type=int);parser.add_argument('--opponent',choices=['chronos','galactus']);args=parser.parse_args()
  if args.trial is not None and (args.command!='watch' or args.trial<0):parser.error('--trial requires watch and a nonnegative trial number')
+ if args.opponent is not None and args.command!='watch':parser.error('--opponent is a watch option')
  import torch;torch.set_num_threads(1)
  explicit_run=any(a=='--run' or a.startswith('--run=') for a in sys.argv[1:])
  if args.command=='research':
@@ -397,5 +398,5 @@ if __name__=='__main__':
    forge_league.champion=lambda ignored,f:actor
    forge_league.run_path=lambda ignored:view
    print('NATIVE_WATCH:',family,'Breakout' if family=='chronos' else 'Octane',label,flush=True)
-   watch(args.run,family,label=label)
+   watch(args.run,family,label=label,opponent=args.opponent)
   finally:forge_league.champion=original;forge_league.run_path=original_path

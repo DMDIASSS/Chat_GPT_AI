@@ -140,12 +140,14 @@ def export(name):
     return [export_actor_bundle(champion(run,family),PROJECT/'exports'/name) for family in ('chronos','galactus')]
 
 
-def watch(name,family,label='retained'):
+def watch(name,family,label='retained',opponent=None):
     from filelock import FileLock
     from .forge_league import run_path,champion,read
     from .forge_env import ForgeEnv
     from .forge_eval import action
     from .viewer import prepare_viewer,learner_first_state
+    opponent=opponent or ('galactus' if family=='chronos' else 'chronos')
+    if opponent not in ('chronos','galactus'):raise ValueError('Watch opponent must be chronos or galactus')
     run=run_path(name);cfg=read(run/'config.json');actor_path=champion(run,family)
     actor=torch.jit.load(str(actor_path),map_location='cpu').eval();torch.set_num_threads(1)
     body=check_actor(actor_path,family)['contract']['hitbox']
@@ -153,11 +155,12 @@ def watch(name,family,label='retained'):
     with FileLock(str(lock),timeout=0),chdir(ROOT):
         prepare_viewer(mode='auto')
         from rlgym.rocket_league.rlviser import RLViserRenderer
-        env=ForgeEnv(cfg,family,[dict(name='galactus' if family=='chronos' else 'chronos')],profile='match',side=0,scenario='kickoff')
+        env=ForgeEnv(cfg,family,[dict(name=opponent)],profile='match',side=0,scenario='kickoff')
         renderer=RLViserRenderer(tick_rate=15)
         try:
             obs,_=env.reset(seed=271031)
-            print(f'WATCH: blue/car 1 = {label} {family} actor ({body}); orange = original opponent. FOV110 distance270 pitch-4 ballcam. Ctrl+C stops.',flush=True)
+            opponent_body='breakout' if opponent=='chronos' else 'octane'
+            print(f'WATCH: blue/car 1 = {label} {family} actor ({body}); orange = original {opponent} ({opponent_body}). FOV110 distance270 pitch-4 ballcam. Ctrl+C stops.',flush=True)
             while True:
                 started=time.monotonic();obs,_,terminal,_,info=env.step(action(actor,obs,family))
                 renderer.render(learner_first_state(env.arena.state,env.arena.agent),{})

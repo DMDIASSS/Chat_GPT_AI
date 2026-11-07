@@ -26,6 +26,22 @@ def main():
   assert meta['role']=='trial 62 candidate (unverified)' and meta['contract']['hitbox']=='breakout'
   x=torch.linspace(-1,1,4*228).reshape(4,228)
   with torch.inference_mode():torch.testing.assert_close(torch.jit.load(str(actor))(x),GigaNetwork(source,'chronos')(x[:,:225]),rtol=0,atol=0)
+  # Same-family viewing uses a frozen original Chronos and Breakout on both sides.
+  from nova.forge_env import ForgeEnv
+  from nova.forge_eval import action
+  from rlgym.rocket_league.common_values import BREAKOUT
+  cfg=m.read(m.NOVA/'configs/forge_league.json');cfg['hitboxes']={'chronos':'breakout','galactus':'octane'}
+  env=ForgeEnv(cfg,'chronos',[dict(name='chronos')],profile='match',side=0,scenario='kickoff',seconds=.2)
+  try:
+   obs,info=env.reset(seed=271031)
+   assert info['opponent']=='chronos' and env.arena.opponent.base.kind=='chronos'
+   assert all(car.hitbox_type==BREAKOUT for car in env.arena.state.cars.values())
+   script=torch.jit.load(str(actor)).eval();done=False
+   while not done:
+    obs,_,done,_,info=env.step(action(script,obs,'chronos'))
+   assert info['opponent']=='chronos'
+   print('WATCH_CHRONOS_VS_ORIGINAL_CHRONOS_BOTH_BREAKOUT_PASS',flush=True)
+  finally:env.close()
   shutil.rmtree(source);assert trial_watch.prepare(m,run,'chronos',62)==actor
   # Recover from a prior direct actor export after all split weights are gone.
   cache=run/'export_actors/chronos/cache.lt';cache.parent.mkdir(parents=True);shutil.copy2(actor,cache);shutil.copy2(str(actor)+'.json',str(cache)+'.json')
