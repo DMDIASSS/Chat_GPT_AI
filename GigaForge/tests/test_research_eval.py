@@ -121,3 +121,13 @@ def test_population_waits_for_repeated_measurements():
  for arm in r.ARMS:state['arms']['chronos/'+arm['name']]=dict(n=1,score=.1)
  r.evolve(state,r.DEFAULT)
  assert state['population']['chronos']==r.ARMS
+
+
+def test_busy_predecessor_does_not_leave_an_unresumable_new_run(tmp_path):
+ from filelock import FileLock
+ m=fake_runner(tmp_path);m.folder=lambda n:tmp_path/n
+ m.create=lambda *a:pytest.fail('Must not create a study while predecessor is locked')
+ m.write(tmp_path/'research01/lab_state.json',dict(status='training'))
+ with FileLock(str(tmp_path/'research01/train.lock'),timeout=0):
+  with pytest.raises(RuntimeError,match='Pause research01'):r.create(m,'research02')
+ assert not (tmp_path/'research02').exists()

@@ -21,11 +21,13 @@ DEFAULT=dict(version='reward-lab-v2',block=65536,rollout=8192,max_branch_decisio
  arms=ARMS,history_size=6,default_hours=5,seed=271031)
 
 
-def create(m,name='research01',choice='auto',config=None):
+def create(m,name='research02',choice='auto',config=None):
  run=m.folder(name).resolve()
  if (run/'lab_state.json').exists():return run
  if run.exists():raise FileExistsError('Choose a new research run name; existing experiments are not converted in place')
- run=m.create(name,choice).resolve()
+ cfg=copy.deepcopy(DEFAULT)
+ if config:cfg.update(copy.deepcopy(config))
+ if cfg['rollout']<256 or cfg['block']<2*cfg['rollout']:raise ValueError('Each branch block needs critic warmup plus actor updates')
  # Seed from protected retained actors, never from a halted latest candidate.
  source=m.folder('native01');ancestry={}
  # New studies may inherit approved research champions, never an experimental
@@ -33,10 +35,13 @@ def create(m,name='research01',choice='auto',config=None):
  if (config or {}).get('version',DEFAULT['version'])=='reward-lab-v2' and name!='research01':
   previous=m.folder('research01')
   if (previous/'lab_state.json').exists():
-   from filelock import FileLock
-   with FileLock(str(previous/'train.lock'),timeout=0):
-    status=m.read(previous/'lab_state.json')['status']
-    if status not in ('training','evaluating'):source=previous
+   from filelock import FileLock,Timeout
+   try:
+    with FileLock(str(previous/'train.lock'),timeout=0):
+     status=m.read(previous/'lab_state.json')['status']
+     if status not in ('training','evaluating'):source=previous
+   except Timeout as error:raise RuntimeError('Pause research01 with 4_PAUSE and wait for it to finish before starting research02. No new study was created.') from error
+ run=m.create(name,choice).resolve()
  if source!=run and (source/'state.json').exists():
   for family in ('chronos','galactus'):
    parent=m.retained(source,family);m.verify_generation(parent)
@@ -44,9 +49,6 @@ def create(m,name='research01',choice='auto',config=None):
    for file in ('POLICY.lt','SHARED_HEAD.lt'):shutil.copy2(parent/file,target/file)
    m.seal_generation(target,family);ancestry[family]=dict(source=str(parent),sha256=m.sha(parent/'POLICY.lt'))
   if (source/'tuning.json').exists():shutil.copy2(source/'tuning.json',run/'tuning.json')
- cfg=copy.deepcopy(DEFAULT)
- if config:cfg.update(copy.deepcopy(config))
- if cfg['rollout']<256 or cfg['block']<2*cfg['rollout']:raise ValueError('Each branch block needs critic warmup plus actor updates')
  m.write(run/'lab.json',cfg)
  m.write(run/'lab_state.json',dict(trial=0,total_decisions=0,status='ready',pending=None,branches={},arms={},payoff={},history=[],results=[],population={}))
  m.write(run/'lab_provenance.json',dict(config_sha256=m.sha(run/'lab.json'),ancestry=ancestry,
