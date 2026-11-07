@@ -30,9 +30,27 @@ jobs:
         with:
           path: GigaForge/native
           key: native-windows-2022-torch291-py311-${{ hashFiles('GigaForge/src/**', 'GigaForge/CMakeLists.txt', 'GigaForge/tools/build_native.py', 'GigaForge/tools/patch_upstream.py') }}
+      - uses: actions/cache/restore@v4
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        id: build-cache
+        with:
+          path: |
+            GigaForge/build
+            GigaForge/vendor
+            GigaForge/cache
+          key: native-objects-windows2022-torch291-${{ hashFiles('GigaForge/tools/patch_upstream.py', 'GigaForge/CMakeLists.txt', 'GigaForge/tools/build_native.py') }}-${{ github.run_id }}
+          restore-keys: native-objects-windows2022-torch291-${{ hashFiles('GigaForge/tools/patch_upstream.py', 'GigaForge/CMakeLists.txt', 'GigaForge/tools/build_native.py') }}-
       - name: Pinned native Release build
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: python GigaForge/tools/build_native.py
+      - uses: actions/cache/save@v4
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            GigaForge/build
+            GigaForge/vendor
+            GigaForge/cache
+          key: ${{ steps.build-cache.outputs.cache-primary-key }}
       - uses: actions/cache/save@v4
         if: steps.native-cache.outputs.cache-hit != 'true'
         with:

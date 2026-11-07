@@ -101,7 +101,7 @@ inline json Evaluate(const json& spec,torch::Device device,std::function<void(PP
  }
  result["wall_seconds"]=std::chrono::duration<double>(std::chrono::steady_clock::now()-started).count();
  result["player_decisions"]=ticks*games.size()*2;
- result["evaluation_protocol"]="arena-rng-v3";
+ result["evaluation_protocol"]="arena-rng-v4";
  for(auto& model:models)model.model.Free();
  return result;
 }

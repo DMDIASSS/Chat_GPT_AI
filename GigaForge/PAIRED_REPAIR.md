@@ -15,9 +15,11 @@ Full-length identical-model comparisons exposed thread-dependent demo respawns:
 5 of 64 paired comparisons produced different final scores. Each evaluation
 arena now preserves its own RocketSim random-engine state across physics jobs.
 The same check after repair matched all 64 comparisons. The new executable
-reports arena-rng-v3, and the coordinator rejects an older evaluator before
+reports arena-rng-v4, and the coordinator rejects an older evaluator before
 starting training. Old cached jobs cannot match the new binary fingerprint.
-Training physics and deployed actors are unchanged. This removes an avoidable
+Car updates now follow stable car IDs rather than pointer-hash iteration order,
+which varied between Windows arenas. Physics constants, model features, weights,
+action contracts and hitboxes are unchanged. This removes an avoidable
 source of comparison noise; it does not make different policies deterministic
 copies or guarantee reproducibility across CPU/GPU/platforms.
 

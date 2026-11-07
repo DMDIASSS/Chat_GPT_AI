@@ -35,6 +35,16 @@ def patch(root):
             int count = text ? std::stoi(text) : int(std::min(8u,std::max(1u,std::thread::hardware_concurrency()/2)));
             if(count<1 || count>64) throw std::runtime_error("Invalid simulation thread count");
             _tp = new dp::thread_pool(count);''')
+ # Pointer-hash iteration gives different arenas different car update orders
+ # on Windows. Use stable car IDs for physics, boost claims and player arrays.
+ arena='GigaLearnCPP/RLGymCPP/RocketSim/src/Sim/Arena/Arena.h'
+ change(arena,'#include "../../BaseInc.h"','#include "../../BaseInc.h"\n#include <set>')
+ change(arena,'std::unordered_set<Car*> _cars;', '''struct StableCarOrder {
+        bool operator()(const Car* a,const Car* b)const{return a->id<b->id;}
+    };
+    using CarCollection=std::set<Car*,StableCarOrder>;
+    CarCollection _cars;''')
+ change(arena,'const std::unordered_set<Car*>& GetCars()', 'const CarCollection& GetCars()')
  env='GigaLearnCPP/RLGymCPP/src/RLGymCPP/EnvSet/EnvSet.cpp'
  change(env,'userInfo->arenaIdx = idx;','userInfo->arenaIdx = int(arenas.size()) - 1;')
  change(env,'g_ThreadPool.StartBatchedJobs(fnCreateArenas, config.numArenas, false);',

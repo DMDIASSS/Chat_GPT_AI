@@ -247,7 +247,7 @@ def train(m,name='research02',choice='auto',wandb='online',once=False,hours=None
  subprocess.run([str(m.binary()),'--research-selftest'],env=m.environment(),check=True)
  if cfg['version']=='reward-lab-v2':
   probe=subprocess.run([str(m.binary()),'--evaluation-protocol'],env=m.environment(),capture_output=True,text=True)
-  if probe.returncode or probe.stdout.strip()!='arena-rng-v3':raise RuntimeError('Install the paired-evaluation update native executable before resuming research02. Models were preserved.')
+  if probe.returncode or probe.stdout.strip()!='arena-rng-v4':raise RuntimeError('Install the paired-evaluation update native executable before resuming research02. Models were preserved.')
  with FileLock(str(run/'train.lock'),timeout=0):
   (run/'STOP').unlink(missing_ok=True);state=m.read(run/'lab_state.json');state['device']=m.device(choice)
   state.pop('error',None)
