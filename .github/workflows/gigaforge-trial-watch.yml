@@ -1,0 +1,27 @@
+name: Exact trial watch checks
+on:
+  push:
+    branches: [codex/novaforge-v1]
+    paths: ['GigaForge/trial_watch.py', 'GigaForge/tests/test_trial_watch.py', 'GigaForge/tests/check_trial_watch_native.py', '.github/workflows/gigaforge-trial-watch.yml']
+permissions:
+  contents: read
+jobs:
+  windows-trial-watch:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: NovaForge/requirements.txt
+      - name: Install pinned test runtime
+        run: |
+          python -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install -r NovaForge/requirements.txt
+      - name: Exact selection, retention and wrong-model rejection
+        run: python -m pytest GigaForge/tests/test_trial_watch.py GigaForge/tests/test_research.py GigaForge/tests/test_research_eval.py GigaForge/tests/test_research_pacing.py -q
+      - name: Real actor conversion, pinning, parity and export recovery
+        run: python GigaForge/tests/check_trial_watch_native.py

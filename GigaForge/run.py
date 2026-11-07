@@ -362,7 +362,8 @@ def benchmark(name='native01',choice='auto'):
 if __name__=='__main__':
  parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=['create','verify','benchmark','train','pause','report','export','watch','status','research'])
  parser.add_argument('--run',default='native01');parser.add_argument('--device',choices=['auto','cpu','cuda'],default='auto');parser.add_argument('--wandb',choices=['online','offline','off'],default='online')
- parser.add_argument('--family',choices=['chronos','galactus'],default='chronos');parser.add_argument('--once',action='store_true');parser.add_argument('--hours',type=float);parser.add_argument('--candidate',action='store_true');args=parser.parse_args()
+ parser.add_argument('--family',choices=['chronos','galactus'],default='chronos');parser.add_argument('--once',action='store_true');parser.add_argument('--hours',type=float);parser.add_argument('--candidate',action='store_true');parser.add_argument('--trial',type=int);args=parser.parse_args()
+ if args.trial is not None and (args.command!='watch' or args.trial<0):parser.error('--trial requires watch and a nonnegative trial number')
  import torch;torch.set_num_threads(1)
  explicit_run=any(a=='--run' or a.startswith('--run=') for a in sys.argv[1:])
  if args.command=='research':
@@ -381,7 +382,12 @@ if __name__=='__main__':
  elif args.command=='watch':
   from nova.forge_export import watch
   from nova import forge_league
-  run=folder(args.run);family=args.family;actor=candidate_actor(run,family,args.candidate)
+  run=folder(args.run);family=args.family
+  label='candidate' if args.candidate else 'retained'
+  if args.trial is not None:
+   from trial_watch import prepare
+   actor=prepare(sys.modules[__name__],run,family,args.trial);label=f'trial {args.trial} candidate (unverified)'
+  else:actor=candidate_actor(run,family,args.candidate)
   # Read-only view folder, with a direct actor and its declared body.
   view=ROOT/'views'/args.run;view.mkdir(parents=True,exist_ok=True)
   cfg=read(NOVA/'configs/forge_league.json');cfg['hitboxes']={'chronos':'breakout','galactus':'octane'};write(view/'config.json',cfg)
@@ -390,6 +396,6 @@ if __name__=='__main__':
   try:
    forge_league.champion=lambda ignored,f:actor
    forge_league.run_path=lambda ignored:view
-   print('NATIVE_WATCH:',family,'Breakout' if family=='chronos' else 'Octane','candidate' if args.candidate else 'retained champion',flush=True)
-   watch(args.run,family)
+   print('NATIVE_WATCH:',family,'Breakout' if family=='chronos' else 'Octane',label,flush=True)
+   watch(args.run,family,label=label)
   finally:forge_league.champion=original;forge_league.run_path=original_path

@@ -140,7 +140,7 @@ def export(name):
     return [export_actor_bundle(champion(run,family),PROJECT/'exports'/name) for family in ('chronos','galactus')]
 
 
-def watch(name,family):
+def watch(name,family,label='retained'):
     from filelock import FileLock
     from .forge_league import run_path,champion,read
     from .forge_env import ForgeEnv
@@ -157,7 +157,7 @@ def watch(name,family):
         renderer=RLViserRenderer(tick_rate=15)
         try:
             obs,_=env.reset(seed=271031)
-            print(f'WATCH: blue/car 1 = retained {family} actor ({body}); orange = original opponent. FOV110 distance270 pitch-4 ballcam. Ctrl+C stops.',flush=True)
+            print(f'WATCH: blue/car 1 = {label} {family} actor ({body}); orange = original opponent. FOV110 distance270 pitch-4 ballcam. Ctrl+C stops.',flush=True)
             while True:
                 started=time.monotonic();obs,_,terminal,_,info=env.step(action(actor,obs,family))
                 renderer.render(learner_first_state(env.arena.state,env.arena.agent),{})

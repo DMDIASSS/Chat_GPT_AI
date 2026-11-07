@@ -222,6 +222,32 @@ def evolve(state,cfg):
   print('RESEARCH_NEW_REWARD:',family,child,flush=True)
 
 
+def preserve_tested(m,run,state,family,candidate,result):
+ """Two positive confirmation point estimates, never automatic champions."""
+ if result.get('split')!='confirmation' or result['statistics']['delta']<=0:return
+ from trial_watch import identity
+ from research_eval import digest
+ files=identity(m,candidate);tag=digest(files)
+ item=dict(trial=state['trial'],family=family,files=files,statistics=result['statistics'],
+  summary=result['summary'],baseline_summary=result['baseline_summary'],verified_champion=False,
+  source_candidate=str(candidate.relative_to(run)),path=str(Path('tested_candidates')/family/tag))
+ entries=state.setdefault('tested_candidates',{}).setdefault(family,[])
+ if any(e['files']==files for e in entries):return
+ rank=lambda e:e['statistics']['delta']
+ if len(entries)>=2 and rank(item)<=min(map(rank,entries)):return
+ target=run/item['path']
+ if not target.exists():
+  target.mkdir(parents=True)
+  for name in ('POLICY.lt','SHARED_HEAD.lt'):shutil.copy2(candidate/name,target/name)
+  m.seal_generation(target,family)
+ m.verify_generation(target);entries.append(item);entries.sort(key=rank,reverse=True)
+ removed=entries[2:];del entries[2:]
+ for old in removed:
+  path=run/old['path']
+  if path.is_dir() and not path.is_symlink() and path.resolve().is_relative_to((run/'tested_candidates'/family).resolve()):shutil.rmtree(path)
+ m.write(run/'tested_candidates'/f'{family}.json',entries)
+
+
 def prune_branches(m,run,state):
  """Prune only retired experiment checkpoints; champions and current candidates stay."""
  active_keys={family+'/'+a['name'] for family,arms in state.get('population',{}).items() for a in arms}
@@ -330,6 +356,8 @@ def train(m,name='research02',choice='auto',wandb='online',once=False,hours=None
        state['confirmations']=state.get('confirmations',0)+1;pending['confirmation_index']=state['confirmations'];persist(m,run,state)
       result=evaluate(m,run,state,family,current,'confirmation',cfg,tracker)
       if result['decision']=='improved' and screen not in ('promising','improved'):result['decision']='uncertain'
+      if cfg['version']=='reward-lab-v2':
+       preserve_tested(m,run,state,family,current,result);persist(m,run,state)
      retire=result['decision']=='regressed'
      for row in result['trials']:
       item=state['payoff'].setdefault(family,{}).setdefault(row['opponent'],dict(points=0,games=0))
