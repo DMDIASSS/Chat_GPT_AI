@@ -1,0 +1,43 @@
+{
+  "source_commit": "497a550c11b6bd8af2c7026a17c35fde241f5f25",
+  "update": {
+    "path": "GigaForge-Autonomous-Research02-Update.zip",
+    "bytes": 41873,
+    "sha256": "8154f1d647f43540f7faea53bd79bdde062a2a4af7c7d9f144540f0126ac0b5e"
+  },
+  "native_changed": false,
+  "weights_bundled": false,
+  "complete": {
+    "path": "NovaForge-GigaForge-Autonomous-Windows.zip",
+    "bytes": 1264845,
+    "sha256": "0c3c69a7803c7b2178d2551e1e8f4afa99fce0027c5523cbd73a94f73ee3aece"
+  },
+  "linux_tests": "26 passed, 2 Windows-specific skipped",
+  "windows_workflow": 42358740393,
+  "windows_job": 128362397215,
+  "windows_conclusion": "success",
+  "native_workflow": 42306980807,
+  "linux_native": "Actual legacy and v2 training/evaluation/cache/resume/protected promotion-controller checks passed; injected verdicts are not skill evidence",
+  "strength": "Not established by short correctness checks; no new trained champion bundled",
+  "speed_profile": {
+    "hardware": "Managed Linux CPU, not user laptop/GPU",
+    "results": [
+      {
+        "batch_pairs": 8,
+        "wall_seconds": 30.368540878000204,
+        "native_seconds": 18.022648836,
+        "games": 256,
+        "player_decisions": 76800,
+        "player_decisions_per_wall_second": 2528.932829157953
+      },
+      {
+        "batch_pairs": 32,
+        "wall_seconds": 25.5968081500032,
+        "native_seconds": 15.924422146,
+        "games": 256,
+        "player_decisions": 76800,
+        "player_decisions_per_wall_second": 3000.37409156385
+      }
+    ]
+  }
+}
