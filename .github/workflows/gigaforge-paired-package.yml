@@ -1,0 +1,34 @@
+name: Package verified paired evaluation repair
+on:
+  push:
+    branches: [codex/novaforge-v1]
+    paths: ['research/package_paired_eval_release.py', '.github/workflows/gigaforge-paired-package.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  windows-package:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    env:
+      NATIVE_VERIFIED_RUN: '42369829783'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: GigaForge-windows-CPU-verified-preview
+          path: verified-native
+          run-id: 42369829783
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: python research/package_paired_eval_release.py
+      - name: Publish packages with their validation record
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add GigaForge/native_release.json GigaForge/README.md GigaForge/VALIDATION_AUTONOMOUS.md GIGAFORGE_PAIRED_REPAIR_DOWNLOAD.md research/GigaForge-paired-eval-release.json
+          git add -f downloads/GigaForge-native-paired-*.zip downloads/GigaForge-Paired-Eval-Training-Focus-Update.zip downloads/NovaForge-GigaForge-Paired-Eval-Windows.zip
+          git commit -m 'Publish Windows-verified paired evaluator and training-focus packages [skip ci]'
+          git push origin HEAD:codex/novaforge-v1
