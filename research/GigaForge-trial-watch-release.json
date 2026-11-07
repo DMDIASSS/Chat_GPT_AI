@@ -1,0 +1,23 @@
+{
+  "source_commit": "54b7d47747ff9753dc0926d30aad2285b5b15203",
+  "windows_workflow": 42388147613,
+  "windows_job": 128449834118,
+  "windows_result": "25 tests passed; real actor conversion/pinning/exact parity and export recovery passed",
+  "trial": 62,
+  "run": "research02",
+  "family": "chronos",
+  "branch_decisions": 1048576,
+  "score_difference": 0.046875,
+  "promotion": "uncertain; unverified",
+  "original_model_files": {
+    "SHARED_HEAD_lt": "713b9b0549e86960ff2fe2050d97292bcf550cf3afd6a244ae13f51a56cb679a",
+    "POLICY_lt": "525e7be99e606885c9da4b5420c20f52961c224e8cbbf33b651d9c4890b25a44"
+  },
+  "weights_available": "Unknown on user's PC; report contains identities, not weights. Exact lookup fails closed.",
+  "archive": {
+    "path": "GigaForge-Exact-Trial-Watch.zip",
+    "bytes": 30224,
+    "sha256": "d23da07d07836ce4dff05de6a85701777fd0dd66cb367f4478eb37a86dc17e14"
+  },
+  "tests_note": "Synthetic trial outcomes test model selection, not playing strength. The user's trained actor was not available for the conversion test."
+}
