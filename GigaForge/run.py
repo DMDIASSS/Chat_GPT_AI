@@ -360,13 +360,18 @@ def benchmark(name='native01',choice='auto'):
  write(run/'tuning.json',tuning);print('NATIVE_TUNING_SAVED:',run/'tuning.json',flush=True)
 
 if __name__=='__main__':
- parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=['create','verify','benchmark','train','pause','report','export','watch','status','research'])
+ parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=['create','verify','benchmark','train','pause','report','export','watch','status','research','h2h'])
  parser.add_argument('--run',default='native01');parser.add_argument('--device',choices=['auto','cpu','cuda'],default='auto');parser.add_argument('--wandb',choices=['online','offline','off'],default='online')
- parser.add_argument('--family',choices=['chronos','galactus'],default='chronos');parser.add_argument('--once',action='store_true');parser.add_argument('--hours',type=float);parser.add_argument('--candidate',action='store_true');parser.add_argument('--trial',type=int);parser.add_argument('--opponent',choices=['chronos','galactus']);args=parser.parse_args()
+ parser.add_argument('--family',choices=['chronos','galactus'],default='chronos');parser.add_argument('--once',action='store_true');parser.add_argument('--hours',type=float);parser.add_argument('--candidate',action='store_true');parser.add_argument('--trial',type=int);parser.add_argument('--opponent',choices=['chronos','galactus']);parser.add_argument('--rounds',type=int,default=200);parser.add_argument('--seconds',type=float,default=100.);parser.add_argument('--batch-pairs',type=int,default=25);parser.add_argument('--seed',type=int,default=1580000000);args=parser.parse_args()
  if args.trial is not None and (args.command!='watch' or args.trial<0):parser.error('--trial requires watch and a nonnegative trial number')
  if args.opponent is not None and args.command!='watch':parser.error('--opponent is a watch option')
  import torch;torch.set_num_threads(1)
  explicit_run=any(a=='--run' or a.startswith('--run=') for a in sys.argv[1:])
+ if args.command=='h2h':
+  import head_to_head
+  selected=args.run if explicit_run else (read(ROOT/'active_research.json')['run'] if (ROOT/'active_research.json').exists() else 'research02')
+  head_to_head.run(sys.modules[__name__],selected,args.device,args.rounds,args.seconds,args.batch_pairs,args.seed)
+  raise SystemExit(0)
  if args.command=='research':
   import research
   selected=args.run if explicit_run else (read(ROOT/'active_research.json')['run'] if (ROOT/'active_research.json').exists() else 'research02')
