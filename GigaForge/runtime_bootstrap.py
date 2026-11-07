@@ -70,6 +70,9 @@ if __name__=='__main__':
   from setup_runtime import setup
   setup(cpu='--cpu' in args)
  elif command=='find':find('cpu' if '--cpu' in args else 'cuda')
+ elif command=='native-check':
+  data=selected_or_existing()
+  raise SystemExit(subprocess.call([data['python'],'-u',str(ROOT/'native_access.py'),'--repair'],cwd=ROOT,env=clean_env()))
  elif command=='repair-wandb':raise SystemExit(repair_wandb())
  elif command=='run':raise SystemExit(run_command(args))
  else:raise ValueError('Unknown bootstrap command: '+command)

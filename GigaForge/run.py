@@ -4,6 +4,8 @@ import argparse,copy,hashlib,json,os,re,shutil,signal,subprocess,sys,tempfile,ti
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parent
+from native_access import install_error_handler
+install_error_handler()
 NOVA=ROOT.parent/'novaforge'
 if not NOVA.exists():NOVA=ROOT.parent/'NovaForge'
 sys.path.insert(0,str(NOVA))
