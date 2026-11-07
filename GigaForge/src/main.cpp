@@ -97,6 +97,9 @@ void Step(Learner* l,const std::vector<GameState>& states,Report& report){
 }
 int main(int argc,char** argv){
  try{
+  if(argc==2 && std::string(argv[1])=="--evaluation-protocol"){
+   std::cout<<"arena-rng-v3"<<std::endl;return 0;
+  }
   if(argc==2 && (std::string(argv[1])=="--selftest" || std::string(argv[1])=="--research-selftest"))return GF::SelfTest();
   if(argc==6 && std::string(argv[1])=="--features")return GF::Features(argv[2],argv[3],argv[4],argv[5]);
   if(argc!=2)throw std::runtime_error("Usage: GigaForge recipe.json");

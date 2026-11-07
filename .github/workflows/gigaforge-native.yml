@@ -46,6 +46,13 @@ jobs:
         run: python -m pytest GigaForge/tests/test_research.py GigaForge/tests/test_runtime_finder.py -q
       - name: All-sample native collection, reward profiles, frozen trunks and serial resume
         run: python GigaForge/tests/check_research_native.py
+      - name: Autonomous evaluation, pacing and native resume
+        run: |
+          python -m pytest GigaForge/tests/test_research_eval.py GigaForge/tests/test_research_pacing.py GigaForge/tests/test_native_access.py -q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python GigaForge/tests/check_autonomous_native.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python GigaForge/tests/check_eval_rng.py
       - uses: actions/upload-artifact@v4
         with:
           name: GigaForge-windows-CPU-verified-preview

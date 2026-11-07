@@ -67,7 +67,7 @@ def fake_runner(tmp_path):
   for i,o in enumerate(spec['opponents']):
    for p in range(spec['pairs']):
     for s in (0,1):data.append(dict(opponent=o['name'],seed=spec['seed']+i*10000+p,side=s,seconds=spec['seconds'],goals_for=1,goals_against=1,outcome=0))
-  write(spec['output'],dict(trials=data,baseline_trials=copy.deepcopy(data),wall_seconds=1.,player_decisions=2*len(data)*int(15*spec['seconds'])))
+  write(spec['output'],dict(evaluation_protocol='arena-rng-v3',trials=data,baseline_trials=copy.deepcopy(data),wall_seconds=1.,player_decisions=2*len(data)*int(15*spec['seconds'])))
  m.launch=launch
  return m
 

@@ -55,7 +55,7 @@ def create(m,name='research02',choice='auto',config=None):
   objective='10*goal_outcome + gamma*Phi(next)-Phi(current); goal terminal potential zero; rollout boundary bootstraps',
   actor_contract='Original 225/258 public features; no privileged opponent controls at inference',
   native_required='fixed-rollout-v1',sources='RESEARCH_PAPERS.md',
-  code_sha256={p.resolve().relative_to(m.ROOT.resolve()).as_posix():m.sha(p) for p in [Path(__file__),m.ROOT/'research_eval.py',m.ROOT/'run.py',m.ROOT/'tools/patch_upstream.py',*sorted((m.ROOT/'src').glob('*'))] if p.is_file()}))
+  code_sha256={p.resolve().relative_to(m.ROOT.resolve()).as_posix():m.sha(p) for p in [Path(__file__),m.ROOT/'research_eval.py',m.ROOT/'research_pacing.py',m.ROOT/'run.py',m.ROOT/'tools/patch_upstream.py',*sorted((m.ROOT/'src').glob('*'))] if p.is_file()}))
  print('RESEARCH_CREATED:',run,'Chronos=Breakout Galactus=Octane; old native01 preserved.',flush=True)
  return run
 
@@ -245,10 +245,16 @@ def train(m,name='research02',choice='auto',wandb='online',once=False,hours=None
  # Reject an old binary instead of silently running the old data-dropping loop.
  import subprocess
  subprocess.run([str(m.binary()),'--research-selftest'],env=m.environment(),check=True)
+ if cfg['version']=='reward-lab-v2':
+  probe=subprocess.run([str(m.binary()),'--evaluation-protocol'],env=m.environment(),capture_output=True,text=True)
+  if probe.returncode or probe.stdout.strip()!='arena-rng-v3':raise RuntimeError('Install the paired-evaluation update native executable before resuming research02. Models were preserved.')
  with FileLock(str(run/'train.lock'),timeout=0):
   (run/'STOP').unlink(missing_ok=True);state=m.read(run/'lab_state.json');state['device']=m.device(choice)
   state.pop('error',None)
+  from research_pacing import configure
+  cfg=configure(m,run,state,cfg);persist(m,run,state)
   tracker=Tracker(run,dict(m.read(run/'config.json'),research=cfg),mode=wandb,continuous=not once)
+  tracker.log({},state['total_decisions']);tracker.save_status()
   start_time=time.monotonic();limit=(hours if hours is not None else cfg['default_hours'])*3600
   m.write(m.ROOT/'active_research.json',dict(run=name))
   try:
@@ -258,7 +264,11 @@ def train(m,name='research02',choice='auto',wandb='online',once=False,hours=None
     if not pending:
      family=('chronos','galactus')[state['trial']%2]
      population=state.setdefault('population',{}).setdefault(family,copy.deepcopy(cfg['arms']))
-     arm=choose_arm(state,family,population);key=family+'/'+arm['name']
+     if cfg.get('profile_schedule')=='training-focus-v1':
+      from research_pacing import choose
+      arm=choose(state,family,population,choose_arm)
+     else:arm=choose_arm(state,family,population)
+     key=family+'/'+arm['name']
      revision=state['branches'].get(key,dict(restart=0));anchor=m.retained(run,family)
      branch=run/'branches'/family/arm['name']/(m.sha(anchor/'POLICY.lt')[:12]+'_'+str(revision['restart']))
      state['branches'].setdefault(key,dict(restart=0))['active_path']=str(branch.relative_to(run))
@@ -266,7 +276,7 @@ def train(m,name='research02',choice='auto',wandb='online',once=False,hours=None
      rng=random.Random(cfg['seed']+state['trial']);entries=pool(m,run,state,family)
      opponent=None if state['trial']%5==4 else choose_opponent(entries,state['payoff'].get(family,{}),rng)
      pending=dict(family=family,arm=arm,key=key,branch=str(branch.relative_to(run)),anchor=str(anchor.relative_to(run)),
-      start=native_start,target=native_start+cfg['block'],accounted=native_start,phase='train',opponent=opponent)
+      start=native_start,target=min(native_start+cfg['block'],cfg['max_branch_decisions']),accounted=native_start,phase='train',opponent=opponent)
      state['pending']=pending;persist(m,run,state)
     family=pending['family'];arm=pending['arm'];branch=run/pending['branch'];branch.mkdir(parents=True,exist_ok=True)
     current=latest_in(branch)
@@ -300,6 +310,7 @@ def train(m,name='research02',choice='auto',wandb='online',once=False,hours=None
      speed={f'throughput/{family}/end_to_end_samples_per_second':amount/max(elapsed,1e-6)} if ran_native else {}
      if new:
       tracker.log({**speed,f'learning/{family}/data_use_fraction':sum(r['Used Timesteps'] for r in new)/max(1,sum(r['Collected Timesteps'] for r in new))},state['total_decisions'])
+     tracker.save_status()
      pending['anchor_halt']=any(r.get('Guard Halt') for r in new)
      pending['phase']='evaluate' if int(current.name)>=pending['target'] or pending['anchor_halt'] else 'train'
      state.setdefault('last_candidates',{})[family]=str(current.relative_to(run));persist(m,run,state)
@@ -335,6 +346,7 @@ def train(m,name='research02',choice='auto',wandb='online',once=False,hours=None
      state['arms']={k:v for k,v in state['arms'].items() if not k.startswith(family+'/')}
      state['payoff'][family]={}
     tracker.log({f'evaluation/{family}/promoted':float(promoted)},state['total_decisions'])
+    tracker.save_status()
     state['results'].append(dict(trial=state['trial'],family=family,arm=arm['name'],decision=result['decision'],statistics=result['statistics'],candidate=str(current.relative_to(run))))
     state['trial']+=1;state['pending']=None;state['status']='training'
     if state['trial']%8==0:evolve(state,cfg)

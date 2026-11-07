@@ -16,9 +16,18 @@ struct EvalGame {
  std::string opponentName;
  std::array<std::unique_ptr<Obs>,2> obs;
  std::vector<Action> planned=std::vector<Action>(2);
+ // RocketSim's default respawn RNG is thread-local. Persist its state per
+ // match so paired actors cannot receive different respawns just because the
+ // worker scheduler assigned them to different threads.
+ std::default_random_engine random;
+ void Step(int ticks){
+  auto& worker=RocketSim::Math::GetRandEngine();worker=random;
+  arena->Step(ticks);random=worker;
+ }
  void Reset(){
-  RocketSim::Math::GetRandEngine().seed(seed+goalCount*1000003);
+  auto& worker=RocketSim::Math::GetRandEngine();worker.seed(seed+goalCount*1000003);
   arena->ResetToRandomKickoff();
+  random=worker;
   state=GameState(arena.get());previous=GameState();
   for(auto& builder:obs)builder->Reset(state);
  }
@@ -62,7 +71,7 @@ inline json Evaluate(const json& spec,torch::Device device,std::function<void(PP
    }
   }
   // Physics advances held controls while the batched networks run.
-  g_ThreadPool.StartBatchedJobs([&](int i){games[i]->arena->Step(7);},int(games.size()),true);
+  g_ThreadPool.StartBatchedJobs([&](int i){games[i]->Step(7);},int(games.size()),true);
   for(size_t m=0;m<models.size();m++)if(!indices[m].empty()){
    auto x=torch::tensor(features[m]).reshape({-1,models[m].chronos?225:258}).to(device);
    auto mask=torch::tensor(masks[m]).reshape({-1,90}).to(device);torch::Tensor actions;
@@ -77,7 +86,7 @@ inline json Evaluate(const json& spec,torch::Device device,std::function<void(PP
   g_ThreadPool.StartBatchedJobs([&](int i){
    auto& g=*games[i];
    for(size_t p=0;p<g.state.players.size();p++)g.arena->GetCar(g.state.players[p].carId)->controls=CarControls(g.planned[p]);
-   g.arena->Step(1);g.previous=g.state;g.state.UpdateFromArena(g.arena.get(),g.planned,&g.previous);
+   g.Step(1);g.previous=g.state;g.state.UpdateFromArena(g.arena.get(),g.planned,&g.previous);
    if(g.state.goalScored){
     bool scored=(g.state.ball.pos.y>0)==(g.side==0);g.forGoals+=scored;g.againstGoals+=!scored;g.goalCount++;g.Reset();
    }
@@ -92,6 +101,7 @@ inline json Evaluate(const json& spec,torch::Device device,std::function<void(PP
  }
  result["wall_seconds"]=std::chrono::duration<double>(std::chrono::steady_clock::now()-started).count();
  result["player_decisions"]=ticks*games.size()*2;
+ result["evaluation_protocol"]="arena-rng-v3";
  for(auto& model:models)model.model.Free();
  return result;
 }

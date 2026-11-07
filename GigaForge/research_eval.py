@@ -19,6 +19,7 @@ def model_identity(m,descriptor):
 
 
 def validate(result,spec):
+ if result.get('evaluation_protocol')!='arena-rng-v3':raise ValueError('Update the native executable: evaluation requires arena-rng-v3')
  expected={(o['name'],spec['seed']+i*10000+p,s) for i,o in enumerate(spec['opponents'])
   for p in range(spec['pairs']) for s in (0,1)}
  for key in ('trials','baseline_trials'):
@@ -98,7 +99,7 @@ def native_jobs(m,run,state,family,candidate,baseline,panel,split,cfg):
  base=(410000000 if split=='development' else 710000000)+state['trial']*10000
  if split=='initial_confirmation':base+=1000000000
  root=run/'evaluations'/'jobs';root.mkdir(parents=True,exist_ok=True)
- identity=dict(protocol='fixed-evaluation-v2',binary=m.sha(m.binary()),device=recipe['device'],
+ identity=dict(protocol='fixed-evaluation-v3',binary=m.sha(m.binary()),device=recipe['device'],
   torch_version=torch.__version__,cuda_runtime=torch.version.cuda,
   meshes={p.relative_to(meshes).as_posix():m.sha(p) for p in sorted(meshes.rglob('*')) if p.is_file()} if meshes else {},
   torch_threads=recipe['torch_threads'],simulation_threads=recipe['simulation_threads'],

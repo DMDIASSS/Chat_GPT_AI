@@ -1,10 +1,13 @@
 # Autonomous research02
 
+Current update: [paired evaluation repair and automatic training focus](PAIRED_REPAIR.md).
+This update includes a NEW prebuilt native executable. Replace the native program
+files while preserving models, optimizer checkpoints and the selected runtime.
+
 Pause older trainers with their 4_PAUSE button and wait for them to finish. Merge
 the update's chat_gpt_ai/gigaforge into your existing Chat_GPT_AI/gigaforge.
-Your models, runs, environments and native executable are preserved. This update
-uses the already verified fixed-rollout-v1 executable; no new CUDA download/build
-is required for an existing working install.
+Your models, runs and environments are preserved. No new CUDA download or local
+build is required for an existing working install.
 
 Run **17_START_AUTONOMOUS_RESEARCH.bat once**. It creates research02 and selects it
 for the other buttons. Thereafter **3_START_OR_RESUME** resumes the active study.
