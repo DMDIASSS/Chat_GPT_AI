@@ -1,0 +1,39 @@
+name: GigaForge autonomous evaluation checks
+on:
+  push:
+    branches: [codex/novaforge-v1]
+    paths: ['GigaForge/research.py', 'GigaForge/research_eval.py', 'GigaForge/run.py', 'GigaForge/tests/test_research*.py', 'GigaForge/tests/check_autonomous_native.py', '.github/workflows/gigaforge-autonomous.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  windows-controller:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: NovaForge/requirements.txt
+      - name: Install pinned CPU test runtime
+        run: |
+          python -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install -r NovaForge/requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: GigaForge-windows-CPU-verified-preview
+          path: verified-native
+          run-id: 42306980807
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Statistical gates, resumable batches and runtime/access tests
+        run: python -m pytest GigaForge/tests/test_research.py GigaForge/tests/test_research_eval.py GigaForge/tests/test_runtime_finder.py GigaForge/tests/test_native_access.py -q
+      - name: Real native legacy and autonomous orchestration checks
+        env:
+          GIGAFORGE_EXE: ${{ github.workspace }}\verified-native\GigaForge.exe
+        run: |
+          python GigaForge/tests/check_research_native.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python GigaForge/tests/check_autonomous_native.py

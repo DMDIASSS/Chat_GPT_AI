@@ -49,7 +49,15 @@ def launch(recipe,*,log=None):
    process=subprocess.Popen(cmd,cwd=ROOT,env=env,stdout=output,stderr=subprocess.STDOUT if output else None,
     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name=='nt' else 0,start_new_session=os.name!='nt')
    try:
-    while process.poll() is None:time.sleep(.5)
+    began=notice=time.monotonic()
+    while process.poll() is None:
+     time.sleep(.5)
+     if log and 'evaluation' in recipe and time.monotonic()-notice>=10:
+      with Path(log).open('rb') as progress:
+       progress.seek(0,2);progress.seek(max(0,progress.tell()-4096));tail=progress.read().decode('utf8',errors='replace')
+      lines=[line for line in tail.splitlines() if line.startswith('NATIVE_EVAL ')]
+      print('NATIVE_EVAL_RUNNING:',int(time.monotonic()-began),'wall seconds;',lines[-1] if lines else 'loading models / starting physics',flush=True)
+      notice=time.monotonic()
    except KeyboardInterrupt:
     stop=recipe.get('stop_file')
     if stop:
@@ -359,7 +367,8 @@ if __name__=='__main__':
  explicit_run=any(a=='--run' or a.startswith('--run=') for a in sys.argv[1:])
  if args.command=='research':
   import research
-  research.train(sys.modules[__name__],args.run if explicit_run else 'research01',choice=args.device,wandb=args.wandb,once=args.once,hours=args.hours)
+  selected=args.run if explicit_run else (read(ROOT/'active_research.json')['run'] if (ROOT/'active_research.json').exists() else 'research02')
+  research.train(sys.modules[__name__],selected,choice=args.device,wandb=args.wandb,once=args.once,hours=args.hours)
   raise SystemExit(0)
  if not explicit_run and args.command in ('pause','report','export','watch','status') and (ROOT/'active_research.json').exists():
   args.run=read(ROOT/'active_research.json')['run']

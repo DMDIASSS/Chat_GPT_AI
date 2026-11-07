@@ -14,8 +14,10 @@ ARMS=[
  dict(name='defense',potential=[.20,.15,.05,.40,.05],lr=2.5e-6,anchor=.3,freeze_shared=True),
  dict(name='possession',potential=[.15,.20,0,.15,.30],lr=2.5e-6,anchor=.3,freeze_shared=True),
 ]
-DEFAULT=dict(version='reward-lab-v1',block=32768,rollout=8192,max_branch_decisions=131072,
- development_pairs=8,confirmation_pairs=16,seconds=60,minimum_delta=.03,opponent_tolerance=.15,
+DEFAULT=dict(version='reward-lab-v2',block=65536,rollout=8192,max_branch_decisions=524288,
+ development_pairs=32,confirmation_pairs=128,evaluation_batch_pairs=32,
+ seconds=60,minimum_delta=.03,opponent_tolerance=.10,goal_rate_tolerance=.25,
+ confirmation_error_budget=.05,evolve_min_trials=3,
  arms=ARMS,history_size=6,default_hours=5,seed=271031)
 
 
@@ -26,6 +28,15 @@ def create(m,name='research01',choice='auto',config=None):
  run=m.create(name,choice).resolve()
  # Seed from protected retained actors, never from a halted latest candidate.
  source=m.folder('native01');ancestry={}
+ # New studies may inherit approved research champions, never an experimental
+ # candidate. A stopped/paused predecessor is read-only throughout this copy.
+ if (config or {}).get('version',DEFAULT['version'])=='reward-lab-v2' and name!='research01':
+  previous=m.folder('research01')
+  if (previous/'lab_state.json').exists():
+   from filelock import FileLock
+   with FileLock(str(previous/'train.lock'),timeout=0):
+    status=m.read(previous/'lab_state.json')['status']
+    if status not in ('training','evaluating'):source=previous
  if source!=run and (source/'state.json').exists():
   for family in ('chronos','galactus'):
    parent=m.retained(source,family);m.verify_generation(parent)
@@ -42,7 +53,7 @@ def create(m,name='research01',choice='auto',config=None):
   objective='10*goal_outcome + gamma*Phi(next)-Phi(current); goal terminal potential zero; rollout boundary bootstraps',
   actor_contract='Original 225/258 public features; no privileged opponent controls at inference',
   native_required='fixed-rollout-v1',sources='RESEARCH_PAPERS.md',
-  code_sha256={p.resolve().relative_to(m.ROOT.resolve()).as_posix():m.sha(p) for p in [Path(__file__),m.ROOT/'run.py',m.ROOT/'tools/patch_upstream.py',*sorted((m.ROOT/'src').glob('*'))] if p.is_file()}))
+  code_sha256={p.resolve().relative_to(m.ROOT.resolve()).as_posix():m.sha(p) for p in [Path(__file__),m.ROOT/'research_eval.py',m.ROOT/'run.py',m.ROOT/'tools/patch_upstream.py',*sorted((m.ROOT/'src').glob('*'))] if p.is_file()}))
  print('RESEARCH_CREATED:',run,'Chronos=Breakout Galactus=Octane; old native01 preserved.',flush=True)
  return run
 
@@ -105,6 +116,9 @@ def decision(result,cfg):
 
 
 def evaluate(m,run,state,family,candidate,split,cfg,tracker):
+ if cfg['version']=='reward-lab-v2':
+  from research_eval import evaluate as evaluate_v2
+  return evaluate_v2(m,run,state,family,candidate,split,cfg,tracker)
  from nova.forge_eval import summary
  settings=m.read(run/'config.json');settings['device']=state['device']
  panel=[dict(m.descriptor(run/'parents'/f,f),name='original_'+f) for f in ('chronos','galactus')]
@@ -164,10 +178,34 @@ def candidate_source(m,run,family):
  return run/entry if entry else m.retained(run,family)
 
 
+def preserve_promising(m,run,state,family,candidate,result):
+ """Keep two best positive-screen actors per family outside native rotation."""
+ if result['statistics'].get('delta',0)<=0:return
+ entries=state.setdefault('shortlist',{}).setdefault(family,[])
+ rank=lambda item:(item['statistics'].get('lower') if item['statistics'].get('lower') is not None else -10,item['statistics']['delta'])
+ from research_eval import digest
+ actor_hash=digest({n:m.sha(candidate/n) for n in ('SHARED_HEAD.lt','POLICY.lt')})
+ item=dict(trial=state['trial'],statistics=result['statistics'],sha256=actor_hash,verified_champion=False)
+ item['path']=str(Path('shortlist')/family/item['sha256'])
+ if any(v['sha256']==item['sha256'] for v in entries):return
+ if len(entries)>=2 and rank(item)<=min(map(rank,entries)):return
+ target=run/item['path']
+ if not target.exists():
+  target.mkdir(parents=True)
+  for name in ('SHARED_HEAD.lt','POLICY.lt'):shutil.copy2(candidate/name,target/name)
+  m.seal_generation(target,family)
+ m.verify_generation(target);entries.append(item);entries.sort(key=rank,reverse=True)
+ removed=entries[2:];del entries[2:]
+ for old in removed:
+  path=run/old['path']
+  if path.is_dir() and not path.is_symlink() and path.resolve().is_relative_to((run/'shortlist'/family).resolve()):shutil.rmtree(path)
+ m.write(run/'shortlist'/f'{family}.json',entries)
+
+
 def evolve(state,cfg):
  """Bounded PBT-inspired coefficient search; goal reward and base control stay fixed."""
  for family,population in state.get('population',{}).items():
-  if any(state['arms'].get(family+'/'+a['name'],{}).get('n',0)==0 for a in population):continue
+  if any(state['arms'].get(family+'/'+a['name'],{}).get('n',0)<cfg.get('evolve_min_trials',1) for a in population):continue
   def score(a):
    item=state['arms'][family+'/'+a['name']];return item['score']/item['n']
   winner=max(population,key=score);loser=min((a for a in population if a['name']!='control'),key=score)
@@ -197,7 +235,7 @@ def prune_branches(m,run,state):
    if versions.is_dir() and not versions.is_symlink():shutil.rmtree(versions)
 
 
-def train(m,name='research01',choice='auto',wandb='online',once=False,hours=None,config=None):
+def train(m,name='research02',choice='auto',wandb='online',once=False,hours=None,config=None):
  from filelock import FileLock
  from nova.tracking import Tracker
  run=create(m,name,choice,config);cfg=m.read(run/'lab.json')
@@ -207,6 +245,7 @@ def train(m,name='research01',choice='auto',wandb='online',once=False,hours=None
  subprocess.run([str(m.binary()),'--research-selftest'],env=m.environment(),check=True)
  with FileLock(str(run/'train.lock'),timeout=0):
   (run/'STOP').unlink(missing_ok=True);state=m.read(run/'lab_state.json');state['device']=m.device(choice)
+  state.pop('error',None)
   tracker=Tracker(run,dict(m.read(run/'config.json'),research=cfg),mode=wandb,continuous=not once)
   start_time=time.monotonic();limit=(hours if hours is not None else cfg['default_hours'])*3600
   m.write(m.ROOT/'active_research.json',dict(run=name))
@@ -269,11 +308,15 @@ def train(m,name='research01',choice='auto',wandb='online',once=False,hours=None
      result=dict(decision='anchor_limit',statistics=dict(delta=None,reason='Frozen-anchor KL limit; no WDL measured'));retire=True
     else:
      result=evaluate(m,run,state,family,current,'development',cfg,tracker)
+     if cfg['version']=='reward-lab-v2':
+      preserve_promising(m,run,state,family,current,result);persist(m,run,state)
      # Confirm both improvements and apparent regressions on fresh seeds.
      screen=result['decision']
-     if screen in ('improved','regressed'):
+     if screen in ('promising','improved','regressed'):
+      if cfg['version']=='reward-lab-v2' and 'confirmation_index' not in pending:
+       state['confirmations']=state.get('confirmations',0)+1;pending['confirmation_index']=state['confirmations'];persist(m,run,state)
       result=evaluate(m,run,state,family,current,'confirmation',cfg,tracker)
-      if result['decision']=='improved' and screen!='improved':result['decision']='uncertain'
+      if result['decision']=='improved' and screen not in ('promising','improved'):result['decision']='uncertain'
      retire=result['decision']=='regressed'
      for row in result['trials']:
       item=state['payoff'].setdefault(family,{}).setdefault(row['opponent'],dict(points=0,games=0))

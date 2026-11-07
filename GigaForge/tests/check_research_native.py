@@ -32,7 +32,7 @@ def main():
   pointer=m.ROOT/'active_research.json';old_pointer=pointer.read_bytes() if pointer.exists() else None
   original_folder=m.folder;m.folder=lambda name:temp/'serial'/name
   try:
-   tiny=dict(block=1024,rollout=512,development_pairs=1,confirmation_pairs=1,seconds=.2,arms=[copy.deepcopy(research.ARMS[1])])
+   tiny=dict(version='reward-lab-v1',block=1024,rollout=512,development_pairs=1,confirmation_pairs=1,seconds=.2,arms=[copy.deepcopy(research.ARMS[1])])
    research.train(m,'lab_ci',choice='cpu',wandb='off',once=True,config=tiny)
    study=m.folder('lab_ci');state=m.read(study/'lab_state.json');assert state['trial']==1
    first_candidate=study/state['last_candidates']['chronos'];saved=m.sha(first_candidate/'POLICY.lt')

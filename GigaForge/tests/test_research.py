@@ -11,7 +11,7 @@ import research as r
 def test_reward_population_explores_and_preserves_fixed_control():
  state=dict(arms={},population={'chronos':copy.deepcopy(r.ARMS)},trial=8)
  assert r.choose_arm(state,'chronos',r.ARMS)['name']=='control'
- for arm in r.ARMS:state['arms']['chronos/'+arm['name']]=dict(n=2,score=.2 if arm['name']=='attack' else -.2)
+ for arm in r.ARMS:state['arms']['chronos/'+arm['name']]=dict(n=3,score=.2 if arm['name']=='attack' else -.2)
  before=copy.deepcopy(state['population']['chronos'][0]);r.evolve(state,r.DEFAULT)
  assert len(state['population']['chronos'])==4 and state['population']['chronos'][0]==before
  child=next(a for a in state['population']['chronos'] if a['name'].startswith('evolved'))

@@ -1,5 +1,10 @@
 # Start the new reward research system
 
+For the current **research02** update, use [AUTONOMOUS_RESEARCH.md](AUTONOMOUS_RESEARCH.md)
+and start **17_START_AUTONOMOUS_RESEARCH.bat** once. Button 3 now resumes the active
+research run. The instructions below describe the earlier research01 study,
+whose saved configuration and checkpoints remain supported.
+
 Pause older trainers. Merge this update into Chat_GPT_AI, preserving existing environments, models, runs and exports. This update needs the NEW native executable included in the Windows ZIP; an old executable is rejected by the research self-test.
 
 1. Run 1_SETUP_GPU.bat if your runtime is not already selected/working. Compatible libraries are reused. CPU alternative: 0_SETUP_CPU.bat.
