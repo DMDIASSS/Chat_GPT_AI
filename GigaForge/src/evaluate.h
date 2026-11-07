@@ -40,10 +40,13 @@ inline json Evaluate(const json& spec,torch::Device device,std::function<void(PP
   PPOLearner::MakeModels(false,entry.chronos?225:258,90,config.sharedHead,config.policy,config.critic,device,entry.model);
   entry.model.Load(descriptor.at("path").get<std::string>(),false,false);models.push_back(entry);
  };
- add(spec.at("candidate"));add(spec.at("baseline"));for(const auto& o:spec.at("opponents"))add(o);
+ bool compareBaseline=spec.value("compare_baseline",true);
+ add(spec.at("candidate"));
+ if(compareBaseline)add(spec.at("baseline"));else models.emplace_back();
+ for(const auto& o:spec.at("opponents"))add(o);
  std::vector<std::unique_ptr<EvalGame>> games;
  int pairs=spec.at("pairs"),seed=spec.at("seed"),ticks=int(std::round(spec.at("seconds").get<double>()*15));
- for(size_t o=0;o<spec["opponents"].size();o++)for(int p=0;p<pairs;p++)for(int side=0;side<2;side++)for(int candidate=0;candidate<2;candidate++){
+ for(size_t o=0;o<spec["opponents"].size();o++)for(int p=0;p<pairs;p++)for(int side=0;side<2;side++)for(int candidate=compareBaseline?0:1;candidate<2;candidate++){
   auto g=std::make_unique<EvalGame>();g->subject=candidate?0:1;g->opponent=int(o)+2;g->candidate=candidate;
   g->side=side;g->seed=seed+int(o)*10000+p;g->opponentName=spec["opponents"][o]["name"];
   g->arena.reset(Arena::Create(GameMode::SOCCAR));
@@ -102,6 +105,7 @@ inline json Evaluate(const json& spec,torch::Device device,std::function<void(PP
  result["wall_seconds"]=std::chrono::duration<double>(std::chrono::steady_clock::now()-started).count();
  result["player_decisions"]=ticks*games.size()*2;
  result["evaluation_protocol"]="arena-rng-v4";
+ result["direct_head_to_head"]=!compareBaseline;
  for(auto& model:models)model.model.Free();
  return result;
 }

@@ -97,6 +97,9 @@ void Step(Learner* l,const std::vector<GameState>& states,Report& report){
 }
 int main(int argc,char** argv){
  try{
+  if(argc==2 && std::string(argv[1])=="--head-to-head-protocol"){
+   std::cout<<"direct-h2h-v1"<<std::endl;return 0;
+  }
   if(argc==2 && std::string(argv[1])=="--evaluation-protocol"){
    std::cout<<"arena-rng-v4"<<std::endl;return 0;
   }

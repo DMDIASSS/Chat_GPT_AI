@@ -25,6 +25,16 @@ def main():
    results.append(dict(family=family,games_per_actor=len(old),mismatched_pairs=0,seconds_per_game=60))
    print('NATIVE_IDENTICAL_ACTOR_FULL_MATCH_RNG_PASS',json.dumps(results[-1]),flush=True)
  print('NATIVE_PAIRED_ARENA_RNG_V4_PASS',flush=True)
+ # Direct W/D/L mode must run only the requested games, with no baseline copies.
+ with tempfile.TemporaryDirectory(prefix='direct_h2h_') as temp:
+  temp=Path(temp);actor=m.descriptor(run/'parents/chronos','chronos')
+  recipe=m.base_recipe(run,'chronos',settings,mode='self')
+  out=temp/'direct.json';recipe['evaluation']=dict(candidate=actor,opponents=[dict(actor,name='original_chronos')],
+   compare_baseline=False,pairs=2,seconds=.2,seed=1580000000,output=str(out),stop_file=str(temp/'STOP'))
+  m.launch(recipe,log=temp/'direct.log');data=m.read(out)
+  assert data['direct_head_to_head'] and not data['baseline_trials'] and len(data['trials'])==4
+  assert {r['side'] for r in data['trials']}=={0,1}
+  print('NATIVE_DIRECT_H2H_EXACT_ROUND_COUNT_PASS',flush=True)
 
 
 if __name__=='__main__':main()
