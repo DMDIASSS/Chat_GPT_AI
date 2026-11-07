@@ -28,3 +28,5 @@ the tested native opponent panel. There is no guaranteed improvement or laptop
 SPS multiplier. See AUTONOMOUS_RESEARCH.md for exact decisions and limitations.
 
 Current update: [paired evaluation repair and automatic training focus](PAIRED_REPAIR.md). Existing research02: pause with 4, install this update, run 9_VERIFY, then 3 to resume the same checkpoints.
+
+[200-game candidate versus original test](HEAD_TO_HEAD.md): run 20_WDL_BEST_VS_ORIGINAL_200x100.bat with training paused.

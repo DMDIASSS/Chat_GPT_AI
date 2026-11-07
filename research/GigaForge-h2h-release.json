@@ -1,0 +1,20 @@
+{
+  "source_commit": "e378e8f465184dbc13615fc5f39778e7157b7d10",
+  "native_workflow": 42404829974,
+  "package_workflow": 42405532626,
+  "evaluation_protocol": "arena-rng-v4",
+  "head_to_head_protocol": "direct-h2h-v1",
+  "cuda_hardware_verified": false,
+  "scope": "Windows native feature/action/network parity, learning/resume regressions, full clone evaluation, direct round count, real H2H selection/resume/export parity and 100-second matches. Public fixture models only; no private candidate strength claim.",
+  "executable_sha256": "eae5efa44535cc5415caf687785078d0a2cf390463a1dc85e51ae71dacb0fdab",
+  "update": {
+    "path": "GigaForge-200x100-WDL-Update.zip",
+    "bytes": 756500,
+    "sha256": "42d59cb63573f33031c0eccfb463251429da0c55a89044f31838114a3e72cf49"
+  },
+  "complete": {
+    "path": "NovaForge-GigaForge-200x100-WDL-Windows.zip",
+    "bytes": 1295627,
+    "sha256": "0c459e39b6e9ee0f7fb2a314a44ffe70937d2468610cdb7b08ebbf63c56c2aa7"
+  }
+}
