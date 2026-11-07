@@ -1,0 +1,20 @@
+{
+  "source_commit": "85611ca184957ec4588b9c1422d3226579ee82ad",
+  "native_workflow": 42369829783,
+  "package_workflow": 42370362952,
+  "evaluation_protocol": "arena-rng-v4",
+  "cuda_hardware_verified": false,
+  "scope": "Windows feature/action/network parity, real training/resume, all-sample accounting, statistical/pacing checks and identical-actor 60-second evaluation checks; not playing-strength evidence",
+  "executable_sha256": "af4402d2912573afe1a55b368e46083258bc872656dd6cb589d515ea93306c33",
+  "strength": "No confirmed playing-strength improvement from research02; retained starting actors are preserved",
+  "update": {
+    "path": "GigaForge-Paired-Eval-Training-Focus-Update.zip",
+    "bytes": 728292,
+    "sha256": "b38d78eb69958001a0549b86680927c9dc75352d322eb18427a4cc4228b9bb2b"
+  },
+  "complete": {
+    "path": "NovaForge-GigaForge-Paired-Eval-Windows.zip",
+    "bytes": 1271959,
+    "sha256": "8581c6c1af01efd8867698072be4d15530c0e76e13d2abac5369af69105f2bb9"
+  }
+}

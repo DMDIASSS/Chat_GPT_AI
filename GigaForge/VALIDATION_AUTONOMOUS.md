@@ -1,3 +1,5 @@
+Current evaluator: [PAIRED_REPAIR.md](PAIRED_REPAIR.md). The binary hash and timings below describe the earlier autonomous release; the current executable/hash is in native_release.json.
+
 # Autonomous controller validation
 
 The executable is unchanged: fixed-rollout-v1, SHA256
