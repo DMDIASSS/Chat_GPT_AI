@@ -18,6 +18,7 @@ class CollectTests(unittest.TestCase):
   put('vendor/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp',b'modified native optimizer')
   put('exports/research04/bot/bot.bot.toml');put('exports/research04/bot/runtime/nova/forge_models.py')
   nova=root.parent/'NovaForge/nova';nova.mkdir(parents=True);(nova/'forge_models.py').write_text('fixture')
+  configs=nova.parent/'configs';configs.mkdir();(configs/'forge_league.json').write_text('{}')
   return root
  def test_selection_integrity_and_preservation(self):
   with tempfile.TemporaryDirectory() as tmp:
@@ -28,6 +29,7 @@ class CollectTests(unittest.TestCase):
     for f in manifest['files']:self.assertEqual(hashlib.sha256(z.read(f['path'])).hexdigest(),f['sha256'])
     self.assertIn('chat_gpt_ai/gigaforge/src/main.cpp',names)
     self.assertIn('chat_gpt_ai/NovaForge/nova/forge_models.py',names)
+    self.assertIn('chat_gpt_ai/NovaForge/configs/forge_league.json',names)
     self.assertIn('chat_gpt_ai/gigaforge/vendor/GigaLearnCPP/src/private/GigaLearnCPP/PPO/PPOLearner.cpp',names)
     self.assertIn('chat_gpt_ai/gigaforge/exports/research04/bot/runtime/nova/forge_models.py',names)
     self.assertIn('chat_gpt_ai/gigaforge/runs/research04/h2h/example/test.json',names)

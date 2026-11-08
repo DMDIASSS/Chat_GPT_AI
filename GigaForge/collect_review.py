@@ -73,6 +73,9 @@ def collect(root, output=None):
         for folder in ('nova', 'configs', 'tests'):
             for p in walk(nova / folder):
                 add(p)
+        for p in walk(nova / 'configs', code=False):
+            if p.suffix == '.json':
+                add(p)
         for p in sorted(nova.iterdir()):
             if p.is_file() and (p.suffix.lower() in CODE_EXT
                                 or p.name.startswith('requirements') and p.suffix == '.txt'):
