@@ -74,5 +74,10 @@ if __name__=='__main__':
   data=selected_or_existing()
   raise SystemExit(subprocess.call([data['python'],'-u',str(ROOT/'native_access.py'),'--repair'],cwd=ROOT,env=clean_env()))
  elif command=='repair-wandb':raise SystemExit(repair_wandb())
+ elif command=='pilot':
+  data=selected_python();args=list(args)
+  if not any(a=='--device' or a.startswith('--device=') for a in args):args.extend(['--device',data['device']])
+  print('GIGAFORGE_PYTHON:',data['python'],'Device:',data['device'],flush=True)
+  raise SystemExit(subprocess.call([data['python'],'-u',str(ROOT/'stationary_pilot.py'),*args],cwd=ROOT,env=clean_env()))
  elif command=='run':raise SystemExit(run_command(args))
  else:raise ValueError('Unknown bootstrap command: '+command)

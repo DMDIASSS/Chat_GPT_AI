@@ -71,9 +71,45 @@ jobs:
           python GigaForge/tests/check_autonomous_native.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python GigaForge/tests/check_eval_rng.py
-      - name: Stationary objective and reward-counter regression
-        run: python GigaForge/tests/check_stationary_contract.py
+      - name: Stationary objective, guarded caching and native pilot integration
+        run: |
+          python GigaForge/tests/check_stationary_contract.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest GigaForge/tests/test_stationary_jobs.py -q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python GigaForge/tests/check_stationary_pilot.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -c "import json,sys,pathlib;pathlib.Path('GigaForge/runtime_selection.json').write_text(json.dumps(dict(python=sys.executable,device='cpu',source='CI launcher verification')))"
+          cmd /d /c "GigaForge\_RUN.bat pilot verify"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
           name: GigaForge-windows-CPU-verified-preview
           path: GigaForge/native
+
+  stationary-package:
+    needs: windows-native
+    runs-on: windows-2022
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: GigaForge-windows-CPU-verified-preview
+          path: verified-native
+      - name: Package exact verified binary and pilot update
+        run: python research/package_stationary_release.py
+      - name: Publish download and provenance
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add GigaForge/native_release.json research/GigaForge-stationary-pilot-release.json GIGAFORGE_STATIONARY_DOWNLOAD.md
+          git add -f downloads/GigaForge-native-stationary-*.zip downloads/GigaForge-Stationary-Pilot-Update.zip
+          git commit -m 'Publish Windows-verified stationary pilot update [skip ci]'
+          git push origin HEAD:codex/novaforge-v1

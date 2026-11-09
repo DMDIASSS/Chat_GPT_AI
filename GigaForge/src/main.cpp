@@ -94,11 +94,18 @@ EnvCreateResult MakeEnvironment(int index){
  return e;
 }
 void Step(Learner* l,const std::vector<GameState>& states,Report& report){
+ int arenaIndex=0;
  for(const auto& s:states){
   report.AddAvg("game/goal_fraction",float(s.goalScored));
+  if(recipe.contains("opponent") && s.goalScored){
+   bool scored=(s.ball.pos.y>0)==((arenaIndex%2)==0);
+   report["game/learner_goals_for"]+=scored;report["game/learner_goals_against"]+=!scored;
+   report.AddAvg("game/learner_goal_share",float(scored));
+  }
+  arenaIndex++;
   for(const auto& p:s.players)report.AddAvg("game/touch_fraction",float(p.ballTouchedStep));
  }
- report["game/cluster_win_rate"]=GF::WinRateDominanceGoalPotential::CurrentWinRate();
+ // Removed: the old cluster counter counted both player perspectives, not learner wins.
  // Shared trunk is also frozen by SetLearningRates(0, criticLR).
  bool warmup=l->totalIterations<recipe.at("warmup_iterations").get<uint64_t>();
  float actor=warmup?0.f:recipe.at("actor_lr").get<float>();

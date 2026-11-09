@@ -68,7 +68,7 @@ def test_wheel_metadata_and_abi_are_checked(tmp_path):
 def test_all_launchers_use_the_single_runtime_router_and_no_old_wandb_pin():
  root=Path(s.__file__).parent
  for p in root.glob('*.bat'):
-  if p.name=='_RUN.bat':continue
+  if p.name in ('_RUN.bat','COLLECT_SOURCE_AND_RESULTS.bat'):continue # stdlib-only collector needs no ML runtime
   text=p.read_text();assert '_RUN.bat' in text and '.venv_native\\Scripts' not in text
  assert 'wandb>=0.23' not in Path(s.__file__).read_text()
 
