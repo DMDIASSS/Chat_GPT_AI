@@ -1,9 +1,9 @@
 {
-  "url": "https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/GigaForge-native-stationary-b85d886d0f91.zip",
-  "sha256": "b85d886d0f919821ec752a66f1c0b0370cc76c75a62918fa8ba140cec189cb58",
+  "url": "https://github.com/DMDIASSS/Chat_GPT_AI/raw/refs/heads/codex/novaforge-v1/downloads/GigaForge-native-stationary-7ed021deab94.zip",
+  "sha256": "7ed021deab9450fb9a874e5f0765f861c360deb9965f145b95773dbdf302ff34",
   "executable_sha256": "4cd475bc51ed13778d1b07b74cfe7a34cdbfe3c9a0ca30bf93d0b4f5dbca69c0",
-  "verified_workflow": 42565897820,
-  "package_workflow": 42565897820,
+  "verified_workflow": 42566942149,
+  "package_workflow": 42566942149,
   "research_protocol": "fixed-rollout-v1",
   "evaluation_protocol": "arena-rng-v4",
   "head_to_head_protocol": "direct-h2h-v1",
