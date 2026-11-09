@@ -1,0 +1,242 @@
+{
+  "status": "no_demonstrated_improvement",
+  "source_commit": "4f400f0aa9a2a8294807a849d8d3faf584e29182",
+  "executed_controller_sha256": "b8f314a1374a2ed6024fd34f8ac1ecfd313730f465356c83dc93134aa199eccb",
+  "executed_jobs_sha256": "7c63a39327c3fdd1fcaa32f1b8ce0a5fe4bd3c5b0a9782bff6d505be28d260d4",
+  "native_sha256": "be11ebdc1ed781414b57dd116b4285c6836b21c210c4820ef8bb1922bc211282",
+  "hardware": "Cloud CPU; not user GPU",
+  "configuration": {
+    "version": "stationary-pilot-v1",
+    "family": "chronos",
+    "hitbox": "breakout",
+    "device": "cpu",
+    "decisions": 393216,
+    "rollout": 8192,
+    "games": 64,
+    "warmup_iterations": 8,
+    "batch": 256,
+    "minibatch": 256,
+    "epochs": 2,
+    "actor_lr": 3e-06,
+    "critic_lr": 0.0003,
+    "anchor_coef": 0.04,
+    "gamma": 0.999,
+    "gae_lambda": 0.97,
+    "clip_range": 0.05,
+    "temperature": 0.25,
+    "training_seed": 371031,
+    "opponent": "original_chronos",
+    "development_pairs": 32,
+    "evaluation_seconds": 135.0,
+    "arms": {
+      "goal_only": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "goal_potential": [
+        0.12,
+        0.05,
+        0.1,
+        0.08,
+        0.08
+      ]
+    },
+    "native_sha256": "be11ebdc1ed781414b57dd116b4285c6836b21c210c4820ef8bb1922bc211282",
+    "controller_sha256": "b8f314a1374a2ed6024fd34f8ac1ecfd313730f465356c83dc93134aa199eccb",
+    "jobs_sha256": "7c63a39327c3fdd1fcaa32f1b8ce0a5fe4bd3c5b0a9782bff6d505be28d260d4"
+  },
+  "development": {
+    "original_chronos": {
+      "summary": {
+        "games": 128,
+        "wins": 53,
+        "draws": 16,
+        "losses": 59,
+        "score_rate": 0.4765625,
+        "score_interval_95": [
+          0.4235282464580772,
+          0.5295967535419228
+        ],
+        "goals_for": 375,
+        "goals_against": 387,
+        "paired_seed_blocks": 64,
+        "interval_method": "Approximate paired-seed Student-t; Hoeffding fallback for zero sample variance",
+        "automatic_promotion": false
+      },
+      "per_opponent": {
+        "chronos": {
+          "games": 64,
+          "wins": 27,
+          "draws": 10,
+          "losses": 27,
+          "score_rate": 0.5,
+          "score_interval_95": [
+            0.2599193021700198,
+            0.7400806978299802
+          ],
+          "goals_for": 149,
+          "goals_against": 149,
+          "paired_seed_blocks": 32,
+          "interval_method": "Approximate paired-seed Student-t; Hoeffding fallback for zero sample variance",
+          "automatic_promotion": false
+        },
+        "galactus": {
+          "games": 64,
+          "wins": 26,
+          "draws": 6,
+          "losses": 32,
+          "score_rate": 0.453125,
+          "score_interval_95": [
+            0.3446791402066846,
+            0.5615708597933154
+          ],
+          "goals_for": 226,
+          "goals_against": 238,
+          "paired_seed_blocks": 32,
+          "interval_method": "Approximate paired-seed Student-t; Hoeffding fallback for zero sample variance",
+          "automatic_promotion": false
+        }
+      },
+      "panel_score_difference_vs_original": 0.0,
+      "paired_panel_difference": {
+        "delta": 0.0,
+        "interval_95": [
+          -0.3395253789351549,
+          0.3395253789351549
+        ],
+        "paired_seed_blocks": 64,
+        "scope": "Development only; selected from two arms, not independent confirmation"
+      }
+    },
+    "goal_only": {
+      "summary": {
+        "games": 128,
+        "wins": 46,
+        "draws": 29,
+        "losses": 53,
+        "score_rate": 0.47265625,
+        "score_interval_95": [
+          0.38783268156781675,
+          0.5574798184321833
+        ],
+        "goals_for": 366,
+        "goals_against": 378,
+        "paired_seed_blocks": 64,
+        "interval_method": "Approximate paired-seed Student-t; Hoeffding fallback for zero sample variance",
+        "automatic_promotion": false
+      },
+      "per_opponent": {
+        "chronos": {
+          "games": 64,
+          "wins": 21,
+          "draws": 18,
+          "losses": 25,
+          "score_rate": 0.46875,
+          "score_interval_95": [
+            0.3459934518263581,
+            0.5915065481736419
+          ],
+          "goals_for": 138,
+          "goals_against": 151,
+          "paired_seed_blocks": 32,
+          "interval_method": "Approximate paired-seed Student-t; Hoeffding fallback for zero sample variance",
+          "automatic_promotion": false
+        },
+        "galactus": {
+          "games": 64,
+          "wins": 25,
+          "draws": 11,
+          "losses": 28,
+          "score_rate": 0.4765625,
+          "score_interval_95": [
+            0.35251182080834753,
+            0.6006131791916525
+          ],
+          "goals_for": 228,
+          "goals_against": 227,
+          "paired_seed_blocks": 32,
+          "interval_method": "Approximate paired-seed Student-t; Hoeffding fallback for zero sample variance",
+          "automatic_promotion": false
+        }
+      },
+      "panel_score_difference_vs_original": -0.00390625,
+      "paired_panel_difference": {
+        "delta": -0.00390625,
+        "interval_95": [
+          -0.10248367297165221,
+          0.09467117297165221
+        ],
+        "paired_seed_blocks": 64,
+        "scope": "Development only; selected from two arms, not independent confirmation"
+      }
+    },
+    "goal_potential": {
+      "summary": {
+        "games": 128,
+        "wins": 45,
+        "draws": 19,
+        "losses": 64,
+        "score_rate": 0.42578125,
+        "score_interval_95": [
+          0.3505798706807006,
+          0.5009826293192994
+        ],
+        "goals_for": 347,
+        "goals_against": 380,
+        "paired_seed_blocks": 64,
+        "interval_method": "Approximate paired-seed Student-t; Hoeffding fallback for zero sample variance",
+        "automatic_promotion": false
+      },
+      "per_opponent": {
+        "chronos": {
+          "games": 64,
+          "wins": 19,
+          "draws": 12,
+          "losses": 33,
+          "score_rate": 0.390625,
+          "score_interval_95": [
+            0.2883990645079547,
+            0.4928509354920453
+          ],
+          "goals_for": 132,
+          "goals_against": 160,
+          "paired_seed_blocks": 32,
+          "interval_method": "Approximate paired-seed Student-t; Hoeffding fallback for zero sample variance",
+          "automatic_promotion": false
+        },
+        "galactus": {
+          "games": 64,
+          "wins": 26,
+          "draws": 7,
+          "losses": 31,
+          "score_rate": 0.4609375,
+          "score_interval_95": [
+            0.34621629639987506,
+            0.5756587036001249
+          ],
+          "goals_for": 215,
+          "goals_against": 220,
+          "paired_seed_blocks": 32,
+          "interval_method": "Approximate paired-seed Student-t; Hoeffding fallback for zero sample variance",
+          "automatic_promotion": false
+        }
+      },
+      "panel_score_difference_vs_original": -0.05078125,
+      "paired_panel_difference": {
+        "delta": -0.05078125,
+        "interval_95": [
+          -0.14399284924129407,
+          0.04243034924129409
+        ],
+        "paired_seed_blocks": 64,
+        "scope": "Development only; selected from two arms, not independent confirmation"
+      }
+    }
+  },
+  "interpretation": "128 development games per actor against the same original Chronos/Galactus panel; NOT 128 games solely versus original Chronos. Both trained candidates failed to improve panel point score. No independent 2000-game test was spent and no model was promoted. These data do not establish that potential-based shaping never works.",
+  "checkpoint_archive_sha256": "2eefeaafa1f63a7a9b747ebed62a955a3af387126933f7cdf273333dba4aa56c",
+  "next_research_decision": "Retain the original. Inspect critic/advantage calibration and the first-goal-training versus timed-match-evaluation objective mismatch before expanding training. Do not increase reward complexity or run this same failed recipe overnight."
+}
