@@ -19,6 +19,9 @@ def native_contract(m):
     try:d=json.loads(r.stdout)
     except ValueError:raise RuntimeError('Install the COMPLETE stationary-pilot update including native/GigaForge.exe; existing models remain untouched') from None
     if r.returncode or d.get('version')!='stationary-pilot-v1':raise RuntimeError('Native stationary contract unavailable')
+    metadata=m.binary().parent/'build.json'
+    if not metadata.is_file() or m.read(metadata).get('executable_sha256')!=m.sha(m.binary()):
+        raise RuntimeError('Native build metadata is missing or does not match the executable. Restore the complete verified update; models stay untouched.')
     return d
 
 def latest(path):
@@ -39,6 +42,9 @@ def historical_seed_ranges(m):
     ranges=[]
     def visit(value):
         if isinstance(value,dict):
+            interval=value.get('reserved_interval')
+            if isinstance(interval,list) and len(interval)==2 and all(type(v) is int for v in interval):
+                ranges.append(tuple(interval))
             seed=value.get('seed',value.get('base_seed'))
             if type(seed) is int:
                 pairs=value.get('pairs',value.get('rounds',2)//2)
@@ -49,7 +55,11 @@ def historical_seed_ranges(m):
         elif isinstance(value,list):
             for child in value:visit(child)
     for run in (m.ROOT/'runs').glob('*'):
-        for folder in ('evaluations','h2h'):
+        initialization=run/'initialization.json'
+        if initialization.is_file():
+            try:visit(m.read(initialization))
+            except (OSError,ValueError):pass
+        for folder in ('evaluations','h2h','evaluation_jobs'):
             for p in (run/folder).rglob('*.json'):
                 if p.is_symlink() or p.stat().st_size>16*1024**2:continue
                 try:visit(m.read(p))
@@ -80,12 +90,17 @@ def initialize(m,name,args):
     path=study/'pilot_config.json'
     if path.exists():
         previous=m.read(path)
-        if args.device=='auto':config['device']=previous['device']
+        if args.device=='auto':config['device']=m.device(previous['device'])
         if previous!=config:raise ValueError('Experiment configuration or executable changed. Use the original settings/binary or a NEW --run; no in-place objective change.')
         return study,previous
     if study.exists():raise FileExistsError('Use a new run name; existing studies are never converted')
-    from nova.teachers import fetch_teachers,verify_teacher
-    fetch_teachers(['chronos','galactus'])
+    from nova.teachers import fetch_teachers,verify_teacher,ASSETS
+    for family in ('chronos','galactus'):
+        try:verify_teacher(family)
+        except FileNotFoundError:
+            if any((ASSETS/family/name).exists() for name in ('POLICY.lt','SHARED_HEAD.lt','installed.json')):
+                raise RuntimeError('Teacher assets are incomplete. Preserve existing files and restore verified originals separately; this pilot will not overwrite them.') from None
+            fetch_teachers([family]);verify_teacher(family)
     study.mkdir(parents=True)
     parents={}
     for family in ('chronos','galactus'):
@@ -94,6 +109,7 @@ def initialize(m,name,args):
         m.seal_generation(parent,family);parents[family]=model_identity(m,parent,family)
     m.write(path,config)
     m.write(study/'initialization.json',dict(parents=parents,seed_plan=seed_plan(m),native_contract=native_contract(m),
+                native_build=m.read(m.binary().parent/'build.json'),
                 objective='Stationary +/-10 goal outcome; no event bonuses, shared win-rate counters, or defensive curriculum. Same original Chronos opponent and initialization in both arms.',
                 critic='Fresh identical seeded critic; warmup; critic gradients detached from frozen actor trunk',
                 resumption='Native optimizers/counters resume; simulator arenas restart at native invocation boundaries, not bitwise uninterrupted trajectory restoration',
@@ -146,7 +162,7 @@ def train(m,name,args):
 def train_locked(m,name,args):
     study,cfg=initialize(m,name,args);stop=study/'STOP';stop.unlink(missing_ok=True)
     deadline=time.monotonic()+args.minutes*60
-    state=m.read(study/'pilot_state.json');state.pop('error',None)
+    state=m.read(study/'pilot_state.json');state.pop('error',None);state.pop('reason',None)
     print('STATIONARY_PILOT:',study,'two matched arms; original Chronos/Breakout; no champion changes',flush=True)
     print('BUDGET:',args.minutes,'wall minutes; combined resident RAM cap 12 GiB; GPU stop 86 C / 3584 MiB; minimum available RAM 2 GiB. CPU temperature unavailable.',flush=True)
     try:

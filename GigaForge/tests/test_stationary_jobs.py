@@ -60,3 +60,12 @@ def test_new_native_binary_gets_a_different_job_identity(tmp_path,monkeypatch):
     m=fake_runtime(tmp_path);before=j.model_identity(m,tmp_path/'candidate')
     assert before['files']['POLICY.lt']!=before['files']['SHARED_HEAD.lt']
     assert j.digest(dict(native=m.sha(m.binary()),model=before))!=j.digest(dict(native='other',model=before))
+
+def test_prior_pilot_ranges_are_held_out_too(tmp_path):
+    import stationary_pilot as p
+    def write(path,value):path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(value))
+    write(tmp_path/'runs/stationary01/initialization.json',dict(seed_plan=dict(reserved_interval=[1230000000,1230100000])))
+    write(tmp_path/'runs/stationary01/evaluation_jobs/job/completed.json',dict(identity=dict(seed=1230000000,pairs=32)))
+    m=SimpleNamespace(ROOT=tmp_path,read=lambda path:json.loads(path.read_text()))
+    ranges=p.historical_seed_ranges(m)
+    assert (1230000000,1230100000) in ranges and (1230000000,1230000031) in ranges
