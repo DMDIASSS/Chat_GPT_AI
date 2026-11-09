@@ -69,3 +69,15 @@ def test_prior_pilot_ranges_are_held_out_too(tmp_path):
     m=SimpleNamespace(ROOT=tmp_path,read=lambda path:json.loads(path.read_text()))
     ranges=p.historical_seed_ranges(m)
     assert (1230000000,1230100000) in ranges and (1230000000,1230000031) in ranges
+
+def test_external_pause_just_before_native_exit_is_not_reported_as_failure(tmp_path,monkeypatch):
+    stop=tmp_path/'STOP'
+    class Exited:
+        returncode=1
+        def __init__(self,*args,**kwargs):stop.touch()
+        def poll(self):return 1
+    monkeypatch.setattr(j.subprocess,'Popen',Exited)
+    m=SimpleNamespace(ROOT=tmp_path,binary=lambda:tmp_path/'native',environment=lambda _: {},
+                      write=lambda p,v:Path(p).write_text(json.dumps(v)))
+    with pytest.raises(j.PilotPaused,match='Pause requested'):
+        j.launch(m,{},tmp_path/'job',stop,time.monotonic()+10,guard=False)

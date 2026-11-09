@@ -167,7 +167,7 @@ def launch(m,recipe,directory,stop,deadline,*,metrics=None,guard=True):
                 reason='Ctrl+C';Path(stop).touch()
                 if stopping is None:stopping=time.monotonic()
                 print('PILOT_STOP: Ctrl+C; waiting for a completed checkpoint',flush=True)
-        if stopping is not None:raise PilotPaused(reason or 'Paused')
+        if stopping is not None or Path(stop).exists():raise PilotPaused(reason or 'Pause requested')
         if process.returncode:
             raise RuntimeError(f'Native job failed ({process.returncode}); {log}\n'+log.read_text(encoding='utf8',errors='replace')[-5000:])
 
