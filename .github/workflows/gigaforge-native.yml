@@ -71,6 +71,8 @@ jobs:
           python GigaForge/tests/check_autonomous_native.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python GigaForge/tests/check_eval_rng.py
+      - name: Stationary objective and reward-counter regression
+        run: python GigaForge/tests/check_stationary_contract.py
       - uses: actions/upload-artifact@v4
         with:
           name: GigaForge-windows-CPU-verified-preview

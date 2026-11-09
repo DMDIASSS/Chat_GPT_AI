@@ -146,7 +146,7 @@ def patch(root):
   'auto encoded=models["shared_head"]?models["shared_head"]->Forward(obs,false):obs;\n                torch::Tensor probs, logProbs, entropy, ratio, clipped, policyLoss, ppoLoss;')
  change(ppo,'probs = InferPolicyProbsFromModels(models, obs, actionMasks, config.policyTemperature, false);',
   'probs=torch::softmax(models["policy"]->Forward(encoded,false)/config.policyTemperature-1e10f*actionMasks.to(torch::kBool).logical_not(),-1).clamp(1e-11f,1.f);')
- change(ppo,'auto vals = InferCritic(obs);','auto vals = models["critic"]->Forward(encoded,false).flatten();')
+ change(ppo,'auto vals = InferCritic(obs);','auto vals = models["critic"]->Forward(encoded.detach(),false).flatten();')
  change(ppo,'criticLoss = mseLoss(vals, targetValues) * batchSizeRatio;',
   'criticLoss = mseLoss(vals, targetValues) * batchSizeRatio * 0.5f;')
  gae='GigaLearnCPP/src/private/GigaLearnCPP/PPO/GAE.cpp'

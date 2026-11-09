@@ -18,6 +18,7 @@
 
 using namespace GGL;using namespace RLGC;using nlohmann::json;
 json recipe;
+#include "stationary_contract.h"
 ModelSet opponentModels;
 std::vector<std::unique_ptr<GF::Obs>> opponentObs;
 std::vector<float> preparedObs;
@@ -71,11 +72,25 @@ EnvCreateResult MakeEnvironment(int index){
  a->AddCar(Team::ORANGE,!external || learnerTeam==Team::ORANGE?body:otherBody);
  EnvCreateResult e={};e.arena=a;e.obsBuilder=new GF::Obs(c,recipe.at("seed").get<unsigned>()+index);
  if(external)static_cast<GF::Obs*>(e.obsBuilder)->onlyTeam=int(learnerTeam);
- e.actionParser=new GF::Actions(c,otherC,learnerTeam);e.stateSetter=new KickoffState;
+ e.actionParser=new GF::Actions(c,otherC,learnerTeam);
+ float defProb=recipe.value("defensive_curriculum_prob",0.f);
+ if(defProb>0.f)e.stateSetter=new GF::DefensiveCurriculumStateSetter(defProb,learnerTeam,recipe.at("seed").get<unsigned>()+index*7919u+104729u);
+ else e.stateSetter=new KickoffState;
  e.terminalConditions={new GoalScoreCondition};
  std::array<float,5> weights={.35f,.1f,0.f,0.f,0.f};
  if(recipe.contains("potential_weights"))weights=recipe["potential_weights"].get<std::array<float,5>>();
- e.rewards={{new GF::GoalPotential(recipe.at("gamma"),weights),1.f}};
+ if(recipe.value("stationary_objective",std::string())=="goal_only")weights={0,0,0,0,0};
+ if(recipe.value("winrate_dominance_reward",false)){
+  e.rewards={{new GF::WinRateDominanceGoalPotential(recipe.at("gamma"),weights,recipe.value("win_scale",2.f)),1.f}};
+ }else if(recipe.value("validated_antidive_reward",false)){
+  e.rewards={{new GF::ValidatedAntiDiveMechanicsGoalPotential(recipe.at("gamma"),weights,recipe.value("mechanics_scale",1.f),recipe.value("defense_scale",1.f)),1.f}};
+ }else if(recipe.value("defensive_mechanics_reward",false)){
+  e.rewards={{new GF::DefensiveMechanicsGoalPotential(recipe.at("gamma"),weights,recipe.value("mechanics_scale",1.f),recipe.value("defense_scale",1.f)),1.f}};
+ }else if(recipe.value("mechanics_reward",false)){
+  e.rewards={{new GF::MechanicsGoalPotential(recipe.at("gamma"),weights,recipe.value("mechanics_scale",1.f)),1.f}};
+ }else{
+  e.rewards={{new GF::GoalPotential(recipe.at("gamma"),weights),1.f}};
+ }
  return e;
 }
 void Step(Learner* l,const std::vector<GameState>& states,Report& report){
@@ -83,6 +98,7 @@ void Step(Learner* l,const std::vector<GameState>& states,Report& report){
   report.AddAvg("game/goal_fraction",float(s.goalScored));
   for(const auto& p:s.players)report.AddAvg("game/touch_fraction",float(p.ballTouchedStep));
  }
+ report["game/cluster_win_rate"]=GF::WinRateDominanceGoalPotential::CurrentWinRate();
  // Shared trunk is also frozen by SetLearningRates(0, criticLR).
  bool warmup=l->totalIterations<recipe.at("warmup_iterations").get<uint64_t>();
  float actor=warmup?0.f:recipe.at("actor_lr").get<float>();
@@ -97,6 +113,12 @@ void Step(Learner* l,const std::vector<GameState>& states,Report& report){
 }
 int main(int argc,char** argv){
  try{
+  if(argc==2 && std::string(argv[1])=="--stationary-contract"){
+   std::cout<<json({{"version","stationary-pilot-v1"},{"objectives",{"goal_only","goal_potential"}},
+    {"temperature_consistent",true},{"sample_accounting","fixed-rollout-v1"},
+    {"hitboxes",{{"chronos","breakout"},{"galactus","octane"}}}}).dump()<<std::endl;return 0;
+  }
+  if(argc==2 && std::string(argv[1])=="--stationary-selftest")return GF::StationarySelfTest();
   if(argc==2 && std::string(argv[1])=="--head-to-head-protocol"){
    std::cout<<"direct-h2h-v1"<<std::endl;return 0;
   }
@@ -107,6 +129,7 @@ int main(int argc,char** argv){
   if(argc==6 && std::string(argv[1])=="--features")return GF::Features(argv[2],argv[3],argv[4],argv[5]);
   if(argc!=2)throw std::runtime_error("Usage: GigaForge recipe.json");
   recipe=json::parse(std::ifstream(argv[1]));
+  if(!recipe.contains("evaluation"))GF::ValidateStationaryRecipe(recipe);
 #ifdef _WIN32
   // The executable uses PyTorch's common C++ ABI. Register the CUDA backend
   // from a matching CUDA-enabled wheel before the first CUDA hook query.
@@ -129,13 +152,14 @@ int main(int argc,char** argv){
   cfg.deviceType=recipe.value("device","cpu")=="cuda"?LearnerDeviceType::GPU_CUDA:LearnerDeviceType::CPU;
   cfg.sendMetrics=false;cfg.renderMode=false;
   cfg.standardizeObs=false;cfg.standardizeReturns=false;
-  cfg.ppo.rewardClipRange=0;cfg.ppo.gaeGamma=recipe.at("gamma");cfg.ppo.gaeLambda=.97;
+  cfg.ppo.rewardClipRange=0;cfg.ppo.gaeGamma=recipe.at("gamma");cfg.ppo.gaeLambda=recipe.value("gae_lambda",.97f);
   cfg.ppo.tsPerItr=recipe.at("rollout");cfg.ppo.batchSize=recipe.at("batch");cfg.ppo.miniBatchSize=recipe.at("minibatch");
-  cfg.ppo.epochs=2;cfg.ppo.clipRange=.05;
+  cfg.ppo.epochs=recipe.value("epochs",2);cfg.ppo.clipRange=recipe.value("clip_range",.05f);
   // Native entropy is normalized by log(number of valid actions).
   cfg.ppo.entropyScale=.0002f*std::log(90.f);cfg.ppo.maskEntropy=false;
   cfg.ppo.policyLR=0;cfg.ppo.criticLR=recipe.at("critic_lr");
   cfg.ppo.maxEpisodeDuration=recipe.value("trajectory_seconds",60.);
+  cfg.ppo.policyTemperature=recipe.value("policy_temperature",1.f);
   cfg.ppo.useHalfPrecision=false;Shape(cfg.ppo,recipe.at("family"));
   cfg.checkpointFolder=recipe.at("checkpoints").get<std::string>();cfg.tsPerSave=32768;
   cfg.checkpointsToKeep=3;cfg.savePolicyVersions=!cfg.checkpointFolder.empty();cfg.tsPerVersion=32768;cfg.maxOldVersions=4;
@@ -172,8 +196,13 @@ int main(int argc,char** argv){
    auto folder=std::filesystem::path(recipe.at("anchor").get<std::string>());
    learner.ppo->models["shared_head"]->Load(folder,false,false);
    learner.ppo->models["policy"]->Load(folder,false,false);
-   auto seq=learner.ppo->models["critic"]->seq;
-   {torch::NoGradGuard guard;auto& last=seq->at<torch::nn::LinearImpl>(seq->size()-1);last.weight.zero_();last.bias.zero_();}
+   if(recipe.contains("critic_init")){
+    auto cfolder=std::filesystem::path(recipe.at("critic_init").get<std::string>());
+    learner.ppo->models["critic"]->Load(cfolder,false,false);
+   }else{
+    auto seq=learner.ppo->models["critic"]->seq;
+    {torch::NoGradGuard guard;auto& last=seq->at<torch::nn::LinearImpl>(seq->size()-1);last.weight.zero_();last.bias.zero_();}
+   }
   }
   // A cross-language probe checks the exact loaded policy before any updates.
   if(recipe.contains("probe_input")){
