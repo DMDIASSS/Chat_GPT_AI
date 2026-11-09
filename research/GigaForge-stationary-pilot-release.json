@@ -1,0 +1,27 @@
+{
+  "source_commit": "8855afb36a19f4c8e75034cf1cf43c65f1a2cf2a",
+  "verified_workflow": 42565897820,
+  "evaluation_protocol": "arena-rng-v4",
+  "head_to_head_protocol": "direct-h2h-v1",
+  "stationary_protocol": "stationary-pilot-v1",
+  "cuda_hardware_verified": false,
+  "playing_strength_verified": false,
+  "scope": "Windows native feature/action parity, actual updates/resume, fixed-rollout accounting, full identical-model matches, stationary reward/counter regression, exact cached evaluations, paused-study isolation, export logits and real runtime BAT routing. CPU/public-model fixtures only. No live RLBot game claim.",
+  "executable_sha256": "4cd475bc51ed13778d1b07b74cfe7a34cdbfe3c9a0ca30bf93d0b4f5dbca69c0",
+  "update": {
+    "path": "GigaForge-Stationary-Pilot-Update.zip",
+    "bytes": 713910,
+    "sha256": "500f6a5086afe38b77e9c5e4970c267ad98c80c66c128e3152a058366b3e95cc"
+  },
+  "reward_evidence": {
+    "blue_goals_in_native_regression": 100,
+    "legacy_reported_win_rate": 0.5
+  },
+  "changes": [
+    "Reject invalid legacy winrate objective",
+    "Stationary goal-only vs bounded PBRS matched controls",
+    "GPU minibatch 256 without removing epochs/samples",
+    "Identity checked caches and signed seed guards",
+    "Separate resumable study and fixed final test"
+  ]
+}
