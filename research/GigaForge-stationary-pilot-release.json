@@ -1,6 +1,6 @@
 {
-  "source_commit": "4f400f0aa9a2a8294807a849d8d3faf584e29182",
-  "verified_workflow": 42566942149,
+  "source_commit": "e57ad397bc521d407aeadc8e07f45cfcd4d7805e",
+  "verified_workflow": 42568139325,
   "evaluation_protocol": "arena-rng-v4",
   "head_to_head_protocol": "direct-h2h-v1",
   "stationary_protocol": "stationary-pilot-v1",
@@ -10,8 +10,8 @@
   "executable_sha256": "4cd475bc51ed13778d1b07b74cfe7a34cdbfe3c9a0ca30bf93d0b4f5dbca69c0",
   "update": {
     "path": "GigaForge-Stationary-Pilot-Update.zip",
-    "bytes": 714433,
-    "sha256": "93a2e68601c6700d208beda59061819dabb8b072f99139c15fa6221942ac3847"
+    "bytes": 714646,
+    "sha256": "95be5f492cab1d235405c318318737ed07ec1f207be761ed7db1518184735ba8"
   },
   "reward_evidence": {
     "blue_goals_in_native_regression": 100,
