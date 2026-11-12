@@ -1,0 +1,58 @@
+name: RocketHive v4.18 Windows policy audit and runtime checks
+on:
+  push:
+    branches: [codex/novaforge-v1]
+    paths: ['downloads/RocketHive_v4_18_POLICY_AUDIT_RUNTIME_IN_PLACE.zip', '.github/workflows/rockethive-v418.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: CPU test dependencies
+        run: |
+          python -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install "numpy>=1.26,<3" "pyarrow>=20,<30" pytest requests rocketsim
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify all updates and preserve existing user files
+        shell: python
+        run: |
+          import zipfile,hashlib,pathlib,shutil
+          root=pathlib.Path('rockethive_test');root.mkdir()
+          for n in ('models/preserved.pt','data/preserved.txt','.venv/preserved.txt','config.json'):
+              p=root/n;p.parent.mkdir(parents=True,exist_ok=True);p.write_text('PRESERVED')
+          for filename,sha,manifest in [
+              ('RocketHive_v4_15_REPLAY_BC_LIVE_HIVE_IN_PLACE.zip','d2b19a87a3b9f9da9b907d4c7ce28c0ab9cc6150f2c910d2e9443357aa004cde','V415_MANIFEST.sha256'),
+              ('RocketHive_v4_16_REPORT_GALACTUS_2V2_IN_PLACE.zip','fd3ffa353a6a4535a3d0f24a577a277342fe2109a68c745964cb52a28d900fb5','V416_MANIFEST.sha256'),
+              ('RocketHive_v4_17_TRAINING_UNBLOCK_IN_PLACE.zip','ad4ef7bf7d3ed1eedfd79ab6b909ea2604a91d03975695f4fac2cfc5e573f53d','V417_MANIFEST.sha256'),
+              ('RocketHive_v4_18_POLICY_AUDIT_RUNTIME_IN_PLACE.zip','b4a18c86b11b9bcf3a56146e390a626b6fbfd8f2dc6f15bb38a3efebf37be6b6','V418_MANIFEST.sha256')]:
+              p=pathlib.Path('downloads')/filename;assert hashlib.sha256(p.read_bytes()).hexdigest()==sha
+              with zipfile.ZipFile(p) as z:
+                  assert z.testzip() is None
+                  for line in z.read(manifest).decode().splitlines():
+                      h,n=line.split('  ',1);assert hashlib.sha256(z.read(n)).hexdigest()==h
+                  assert not any(n in z.namelist() for n in ('config.json','config_v4.json','requirements.txt'))
+                  z.extractall(root)
+          for n in ('models/preserved.pt','data/preserved.txt','.venv/preserved.txt','config.json'):
+              assert (root/n).read_text()=='PRESERVED'
+          for name in ('config.json','config_v4.json','requirements.txt'):
+              p=pathlib.Path(name);shutil.copy2(root/'v415_reference'/(p.stem+'.example'+p.suffix),root/name)
+      - name: Full suite, preparation-to-optimizer integration and deployment gates
+        working-directory: rockethive_test
+        run: |
+          python -m compileall -q src tools rlbot_hive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest -q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -S -m tools.report_hive_v415
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RocketHive-v418-tested-update
+          path: downloads/RocketHive_v4_18_POLICY_AUDIT_RUNTIME_IN_PLACE.zip
