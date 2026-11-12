@@ -26,7 +26,7 @@ jobs:
         run: |
           import zipfile,hashlib,pathlib,shutil
           p=pathlib.Path('downloads/RocketHive_v4_15_REPLAY_BC_LIVE_HIVE_IN_PLACE.zip')
-          assert hashlib.sha256(p.read_bytes()).hexdigest()=='1a1c49730b6383320d5c4682abd3837216348c692df2f82c892858a740548b1e'
+          assert hashlib.sha256(p.read_bytes()).hexdigest()=='d2b19a87a3b9f9da9b907d4c7ce28c0ab9cc6150f2c910d2e9443357aa004cde'
           with zipfile.ZipFile(p) as z:
               assert z.testzip() is None
               for line in z.read('V415_MANIFEST.sha256').decode().splitlines():
