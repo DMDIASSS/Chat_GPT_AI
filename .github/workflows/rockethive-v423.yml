@@ -30,7 +30,7 @@ jobs:
               p=root/n;p.parent.mkdir(parents=True,exist_ok=True);p.write_text('PRESERVED')
           for filename,sha,manifest in [
               ('RocketHive_FINAL_v4_20_REPLAY_TRAINING_IN_PLACE.zip','c4a20b5b39efa8fa3fb63f97f046e162656c17c90d2ee552b7e2bd14e1943722','V420_MANIFEST.sha256'),
-              ('RocketHive_v4_23_MATCHED_REPLAY_SCENES_UPDATE.zip','593da18da27fec596af8bdba505049fb333afe73ec9f9f99beefcb09f109f68b','V423_MANIFEST.sha256')]:
+              ('RocketHive_v4_23_MATCHED_REPLAY_SCENES_UPDATE.zip','bfb63cbe64d88b29148241507b5cdf6951e288af81f61309fbb55c2241d84f4d','V423_MANIFEST.sha256')]:
               p=pathlib.Path('downloads')/filename;assert hashlib.sha256(p.read_bytes()).hexdigest()==sha
               with zipfile.ZipFile(p) as z:
                   assert z.testzip() is None
