@@ -38,5 +38,5 @@ def main():
     (ROOT/'runtime_python.txt').write_text(str(exe.resolve())+'\n',encoding='utf8')
     r=subprocess.run([str(exe),'-u','-m','attentionforge.cli','verify'],cwd=ROOT)
     if r.returncode:raise RuntimeError('Runtime selected, but verification failed. Keep the error above; no old project was changed.')
-    print('SETUP_READY. Next run BENCHMARK.bat, then START_OR_RESUME.bat. W&B uses your existing saved login if installed.',flush=True)
+    print('SETUP_READY. Open SKILLS.bat and choose 1 for automatic warm start and PPO. W&B uses your existing saved login if installed.',flush=True)
 if __name__=='__main__':main()

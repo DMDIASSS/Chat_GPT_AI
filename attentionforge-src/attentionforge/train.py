@@ -60,9 +60,9 @@ def _train(cfg,folder,max_updates,minutes):
     torch.set_num_threads(int(cfg['torch_threads']));dev=device(cfg)
     random.seed(cfg['seed']);np.random.seed(cfg['seed']);torch.manual_seed(cfg['seed'])
     model=ActorCritic(**cfg['network']).to(dev);opt,optimizer_name=make_optimizer(model,cfg,dev)
-    count=update=0;history=[];history_scores={};wbid=None;previous_wall=0;previous_physics=previous_env=0
+    count=update=0;history=[];history_scores={};wbid=None;previous_wall=0;previous_physics=previous_env=0;recovery_attempts=0
     if ck.exists():
-        saved=load(ck,dev)
+        saved=load(ck,dev);recovery_attempts=saved.get('recovery_attempts',0)
         if saved['config']!=cfg:raise ValueError('This run has a different saved config. Use a new run name for config changes.')
         model.load_state_dict(saved['model']);opt.load_state_dict(saved['optimizer']);configure_optimizer(opt,dev,optimizer_name);count=saved['learning_transitions'];update=saved['updates'];history=saved['history'];history_scores=saved.get('history_scores',{});wbid=saved.get('wandb_id');previous_wall=saved.get('training_wall_seconds',0);previous_physics=saved.get('physics_ticks',0);previous_env=saved.get('env_decisions',0)
         random.setstate(saved['python_rng']);np.random.set_state(saved['numpy_rng']);torch.set_rng_state(saved['torch_rng'].cpu())
@@ -93,7 +93,7 @@ def _train(cfg,folder,max_updates,minutes):
         stopping=True;print('PAUSE_REQUESTED: finishing the current rollout/update, then saving.',flush=True)
     previous_handler=signal.signal(signal.SIGINT,request_stop)
     def save():
-        save_checkpoint(ck,{'format':'attentionforge-checkpoint-v1','config':cfg,'model':model.state_dict(),'optimizer':opt.state_dict(),'learning_transitions':count,'updates':update,'history':history,'history_scores':history_scores,'wandb_id':wbid,'python_rng':random.getstate(),'numpy_rng':np.random.get_state(),'torch_rng':torch.get_rng_state(),'cuda_rng':torch.cuda.get_rng_state_all() if dev.type=='cuda' else None,'training_wall_seconds':previous_wall+time.perf_counter()-start,'physics_ticks':previous_physics+session_physics,'env_decisions':previous_env+session_env})
+        save_checkpoint(ck,{'format':'attentionforge-checkpoint-v1','config':cfg,'model':model.state_dict(),'optimizer':opt.state_dict(),'learning_transitions':count,'updates':update,'history':history,'history_scores':history_scores,'wandb_id':wbid,'python_rng':random.getstate(),'numpy_rng':np.random.get_state(),'torch_rng':torch.get_rng_state(),'cuda_rng':torch.cuda.get_rng_state_all() if dev.type=='cuda' else None,'training_wall_seconds':previous_wall+time.perf_counter()-start,'physics_ticks':previous_physics+session_physics,'env_decisions':previous_env+session_env,'recovery_attempts':recovery_attempts})
     save();print(f'TRAINING: {dev}, {e} arenas, {a} cars, {sum(p.numel() for p in model.parameters()):,}-parameter attention, Octane, {120/cfg["tick_skip"]:g}Hz decisions. PAUSE.bat or Ctrl+C saves.',flush=True)
     training_failed=False
     try:
@@ -111,6 +111,10 @@ def _train(cfg,folder,max_updates,minutes):
             trainmask=~histmask;stats=np.zeros(8,np.float64);extra_stats=np.zeros(10,np.float64);control_abs=possession_abs=0.;h_w=h_d=h_l=0;timeout_states=[]
             histidx=torch.as_tensor(np.flatnonzero(histmask.ravel()),device=dev,dtype=torch.long)
             model.eval()
+            skill_stats=np.zeros(6,np.float64)
+            if cfg.get('skills'):
+                fraction=.6 if count<3000000 else .35 if count<10000000 else .15
+                env.drill_fraction(fraction);env.skill_stage(min(1.,count/10000000))
             for t in range(steps):
                 ob[t]=obs;lm[t]=legal
                 with torch.no_grad():
@@ -125,6 +129,7 @@ def _train(cfg,folder,max_updates,minutes):
                     ix=np.flatnonzero(raw['truncated']);fo,fl=encode(raw['final_world'][ix],raw['final_pads'][ix],locations)
                     timeout_states.append((t,ix,fo.reshape(-1,43,40),fl.reshape(-1,90)))
                 obs,legal=encode(raw['world'],raw['pads'],locations);stats+=raw['info'].sum(axis=0)
+                if 'skill_info' in raw:skill_stats+=raw['skill_info'].sum(axis=0)
                 if 'reward_info' in raw:
                     extra_stats+=raw['reward_info'].sum(axis=0)
                     control_abs+=np.abs(raw['reward_info'][:,0]).sum();possession_abs+=np.abs(raw['reward_info'][:,1]).sum()
@@ -165,6 +170,12 @@ def _train(cfg,folder,max_updates,minutes):
                     logits,v=model(x,l);dist=Categorical(logits=logits,validate_args=False)
                     diff=dist.log_prob(ac)-old;ratio=diff.exp();kl=((ratio-1)-diff).mean()
                     policy=-torch.minimum(ad*ratio,ad*ratio.clamp(1-p['clip'],1+p['clip'])).mean();vl=0.5*(v-ret).square().mean();entropy=dist.entropy().mean();loss=policy+p['value']*vl-p['entropy']*entropy
+                    if cfg.get('skills'):
+                        from .skills import tutor
+                        eligible=(x[:,0,16]>.5)&(x[:,1,26]*2044<180)
+                        weight=cfg['skills']['auxiliary_initial']*max(0.,1-count/cfg['skills']['auxiliary_decay_transitions'])
+                        aux=-dist.log_prob(tutor(x,l))
+                        loss=loss+weight*(aux*eligible).sum()/eligible.sum().clamp_min(1)
                     accepted,grad_norm=checked_step(loss,kl,model,opt,p['max_grad_norm'],p['target_kl'])
                     if not accepted:early=True;break
                     loss_metrics.append(torch.stack((loss.detach(),kl.detach(),entropy.detach(),((ratio.detach()-1).abs()>p['clip']).float().mean())))
@@ -183,9 +194,14 @@ def _train(cfg,folder,max_updates,minutes):
                 while len(history)>cfg['league']['max_history']:
                     old=history.pop(0);(folder/'history'/old).unlink(missing_ok=True);history_scores.pop(old,None)
             elapsed=time.perf_counter()-t0;wall=previous_wall+time.perf_counter()-start
-            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'speed/collection_seconds':rollout_sec,'speed/ppo_seconds':optimize_sec,'performance/gpu_rollout_cache':cache_used,'performance/model_execution':model_execution,'performance/torchscript':model_execution=='torchscript','performance/optimizer':optimizer_name,'performance/adam_fused':optimizer_name=='adam_fused','performance/gpu_peak_mb':torch.cuda.max_memory_allocated(dev)/1024**2 if dev.type=='cuda' else 0.,'train/loss':float(summary[0]),'train/approx_kl':float(summary[1]),'train/entropy':float(summary[2]),'train/clip_fraction':float(summary[3]),'train/kl_early_stop':early,'train/optimizer_minibatches':len(loss_metrics),'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),('reward/approach_blue_sum' if cfg['rewards'].get('profile') in ('rlgym_simple_v1','control_shots_v1') else 'reward/potential_blue_sum'):float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
+            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'speed/collection_seconds':rollout_sec,'speed/ppo_seconds':optimize_sec,'performance/gpu_rollout_cache':cache_used,'performance/model_execution':model_execution,'performance/torchscript':model_execution=='torchscript','performance/optimizer':optimizer_name,'performance/adam_fused':optimizer_name=='adam_fused','performance/gpu_peak_mb':torch.cuda.max_memory_allocated(dev)/1024**2 if dev.type=='cuda' else 0.,'train/loss':float(summary[0]),'train/approx_kl':float(summary[1]),'train/entropy':float(summary[2]),'train/clip_fraction':float(summary[3]),'train/kl_early_stop':early,'train/optimizer_minibatches':len(loss_metrics),'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),('reward/approach_blue_sum' if cfg['rewards'].get('profile') in ('rlgym_simple_v1','control_shots_v1','skills_v1') else 'reward/potential_blue_sum'):float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
             if cfg['rewards'].get('profile')=='control_shots_v1':
                 metrics.update({'control/blue_score_mean':float(extra_stats[0]/(e*steps)),'control/absolute_score_mean':float(control_abs/(e*steps)),'control/floor_tracking_enabled':cfg['rewards'].get('goal_no_floor',0)>0,'reward/possession_absolute_mean':float(possession_abs/(e*steps)),'reward/possession_blue_sum':float(extra_stats[1]),'reward/no_floor_goal_blue_sum':float(extra_stats[2]),'reward/goal_speed_blue_sum':float(extra_stats[3]),'game/no_floor_goals':int(extra_stats[4]),'game/goal_speed_mean':float(extra_stats[5]/metrics['game/goals']) if metrics['game/goals'] else 0.,'game/credited_shot_goals':int(extra_stats[6]),'game/shot_floor_contact_detections':int(extra_stats[7])})
+            if cfg.get('skills'):
+                metrics.update(dict(zip(('skills/contact_events','skills/touch_strength_sum','skills/air_touch_events','skills/reset_events','skills/goal_combo_bonus_sum','skills/shot_touch_sum'),map(float,skill_stats))))
+                metrics['skills/drill_fraction']=fraction
+                metrics['skills/effective_touch_weight']=1-.8*min(1.,count/10000000)
+                metrics['skills/effective_approach_rate']=1-.6*min(1.,count/10000000)
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metrics,allow_nan=False)+'\n')
             atomic_json(folder/'status.json',metrics)
             if wb:
@@ -195,6 +211,11 @@ def _train(cfg,folder,max_updates,minutes):
             cache_label='GPU' if cache_used else 'host'
             print(f'UPDATE {update}: {count:,} learning transitions | {new_samples/elapsed:,.0f}/s end-to-end | touches {int(stats[1]+stats[2])}, goals {int(np.count_nonzero(term)/a)} | KL {metrics["train/approx_kl"]:.4f} | collect {rollout_sec:.1f}s / PPO {optimize_sec:.1f}s | cache {cache_label}',flush=True)
             if time.perf_counter()-last_save>=cfg['checkpoint_every_seconds']:save();last_save=time.perf_counter()
+            if cfg.get('skills') and count//cfg['skills']['auto_evaluate_every']>(count-new_samples)//cfg['skills']['auto_evaluate_every']:
+                save()
+                from .skills import monitor
+                if not monitor(model,cfg,folder,count):
+                    print('SKILL_REGRESSION_STOP: saved latest; retained earlier skill checkpoint. See skill_validation.jsonl.',flush=True);stopping=True
     except BaseException:
         training_failed=True
         raise

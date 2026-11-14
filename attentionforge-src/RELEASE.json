@@ -1,8 +1,9 @@
 {
-  "zip": "AttentionForge_v0_4_CONTROL_REWARDS_UPDATE.zip",
-  "bytes": 431202,
-  "sha256": "ce30d226883113feb11729cf2fab29e10a95538733b741edfcfba5ab2bd8e32e",
-  "files": 30,
-  "requires": "Existing AttentionForge 0.2 or 0.3; program update only. No runs, configs, keys, environments or game assets included.",
-  "windows_native_build_commit": "8c9c6847324e485d638a006116070fa88d94962c"
+  "zip": "AttentionForge_Skills_v0_5_COMPLETE.zip",
+  "bytes": 477405,
+  "sha256": "0f659d873df8fdee0b9c63d8d2501cb89ca9c114a2fbcae496b2b054e1d16c05",
+  "files": 61,
+  "install_folder": "chat_gpt_ai/attention_skills",
+  "windows_build_commit": "6e91b236dd035da97bf30c65bfdbb8b073db257c",
+  "scope": "Complete program/source/native Windows module; reuse existing Torch and Soccar meshes. No runs, user weights, credentials or private logs."
 }

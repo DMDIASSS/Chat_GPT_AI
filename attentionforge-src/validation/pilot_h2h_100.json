@@ -1,0 +1,830 @@
+{
+  "contract": "attentionforge-eval-v1",
+  "candidate_sha256": "f14c7f5d25f524f6b2fd44c3ddde18449c6f992e98d72679ee7d44592083d9a5",
+  "baseline_sha256": "c50f62e7966d270f0d91698a97683a1be5d0933fc213addc63ed7239cfd908f8",
+  "candidate_transitions": 327680,
+  "baseline_transitions": 0,
+  "baseline_path": "/tmp/afskills_128/reward_parent.pt",
+  "master_seed": 1827056493,
+  "rounds": 100,
+  "seconds": 60,
+  "wins": 23,
+  "draws": 68,
+  "losses": 9,
+  "score_rate": 0.57,
+  "score_interval_95": [
+    0.3779354417360158,
+    0.7620645582639841
+  ],
+  "interval_method": "Two-color seed-block scores; bounded Hoeffding 95% interval. No automatic promotion.",
+  "wall_seconds": 92.03760873400097,
+  "hitbox": "Octane",
+  "timing": {
+    "physics_hz": 120,
+    "tick_skip": 8,
+    "action_delay": 1
+  },
+  "timeout_note": "No overtime. Each match lasts at least the requested duration and at most 7 extra physics ticks.",
+  "games": [
+    {
+      "seed": 1827056493,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7201,
+      "score": 1.0
+    },
+    {
+      "seed": 1827064412,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827072331,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827080250,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827088169,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 1,
+      "ticks": 7207,
+      "score": 0.5
+    },
+    {
+      "seed": 1827096088,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827104007,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827111926,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827119845,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827127764,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827135683,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 1,
+      "ticks": 7207,
+      "score": 0.5
+    },
+    {
+      "seed": 1827143602,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7201,
+      "score": 1.0
+    },
+    {
+      "seed": 1827151521,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827159440,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827167359,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827175278,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827183197,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7207,
+      "score": 1.0
+    },
+    {
+      "seed": 1827191116,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827199035,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827206954,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 1,
+      "ticks": 7207,
+      "score": 0.5
+    },
+    {
+      "seed": 1827214873,
+      "color": 0,
+      "goals_for": 3,
+      "goals_against": 0,
+      "ticks": 7205,
+      "score": 1.0
+    },
+    {
+      "seed": 1827222792,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827230711,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7201,
+      "score": 1.0
+    },
+    {
+      "seed": 1827238630,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827246549,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827254468,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827262387,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827270306,
+      "color": 0,
+      "goals_for": 3,
+      "goals_against": 0,
+      "ticks": 7205,
+      "score": 1.0
+    },
+    {
+      "seed": 1827278225,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7207,
+      "score": 1.0
+    },
+    {
+      "seed": 1827286144,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827294063,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827301982,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827056493,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827064412,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827072331,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827080250,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 1,
+      "ticks": 7203,
+      "score": 0.0
+    },
+    {
+      "seed": 1827088169,
+      "color": 1,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7202,
+      "score": 1.0
+    },
+    {
+      "seed": 1827096088,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 1,
+      "ticks": 7203,
+      "score": 0.0
+    },
+    {
+      "seed": 1827104007,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827111926,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 1,
+      "ticks": 7203,
+      "score": 0.0
+    },
+    {
+      "seed": 1827119845,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827127764,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827135683,
+      "color": 1,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7202,
+      "score": 1.0
+    },
+    {
+      "seed": 1827143602,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827151521,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827159440,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 2,
+      "ticks": 7201,
+      "score": 0.0
+    },
+    {
+      "seed": 1827167359,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827175278,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827183197,
+      "color": 1,
+      "goals_for": 2,
+      "goals_against": 0,
+      "ticks": 7204,
+      "score": 1.0
+    },
+    {
+      "seed": 1827191116,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827199035,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827206954,
+      "color": 1,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7202,
+      "score": 1.0
+    },
+    {
+      "seed": 1827214873,
+      "color": 1,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7202,
+      "score": 1.0
+    },
+    {
+      "seed": 1827222792,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827230711,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827238630,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 1,
+      "ticks": 7203,
+      "score": 0.0
+    },
+    {
+      "seed": 1827246549,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827254468,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827262387,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 1,
+      "ticks": 7203,
+      "score": 0.0
+    },
+    {
+      "seed": 1827270306,
+      "color": 1,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7202,
+      "score": 1.0
+    },
+    {
+      "seed": 1827278225,
+      "color": 1,
+      "goals_for": 3,
+      "goals_against": 0,
+      "ticks": 7202,
+      "score": 1.0
+    },
+    {
+      "seed": 1827286144,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827294063,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827301982,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827309901,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827317820,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827325739,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827333658,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7201,
+      "score": 1.0
+    },
+    {
+      "seed": 1827341577,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827349496,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7201,
+      "score": 1.0
+    },
+    {
+      "seed": 1827357415,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827365334,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827373253,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7207,
+      "score": 1.0
+    },
+    {
+      "seed": 1827381172,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827389091,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827397010,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7201,
+      "score": 1.0
+    },
+    {
+      "seed": 1827404929,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827412848,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7201,
+      "score": 1.0
+    },
+    {
+      "seed": 1827420767,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827428686,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 1,
+      "ticks": 7207,
+      "score": 0.5
+    },
+    {
+      "seed": 1827436605,
+      "color": 0,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7207,
+      "score": 1.0
+    },
+    {
+      "seed": 1827444524,
+      "color": 0,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827309901,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827317820,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827325739,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827333658,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827341577,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827349496,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827357415,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827365334,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827373253,
+      "color": 1,
+      "goals_for": 2,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 1.0
+    },
+    {
+      "seed": 1827381172,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 1,
+      "ticks": 7203,
+      "score": 0.0
+    },
+    {
+      "seed": 1827389091,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827397010,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827404929,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 1,
+      "ticks": 7203,
+      "score": 0.0
+    },
+    {
+      "seed": 1827412848,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    },
+    {
+      "seed": 1827420767,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 1,
+      "ticks": 7203,
+      "score": 0.0
+    },
+    {
+      "seed": 1827428686,
+      "color": 1,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7202,
+      "score": 1.0
+    },
+    {
+      "seed": 1827436605,
+      "color": 1,
+      "goals_for": 1,
+      "goals_against": 0,
+      "ticks": 7202,
+      "score": 1.0
+    },
+    {
+      "seed": 1827444524,
+      "color": 1,
+      "goals_for": 0,
+      "goals_against": 0,
+      "ticks": 7200,
+      "score": 0.5
+    }
+  ]
+}

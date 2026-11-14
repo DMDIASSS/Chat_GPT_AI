@@ -40,7 +40,7 @@ def verify(cfg):
     assert torch.isfinite(logits).all() and torch.isfinite(v).all()
     for _ in range(30):r=env.step(np.full((2,cfg['team_size']*2),8,np.int64))
     assert np.isfinite(r['world']).all() and np.isfinite(r['rewards']).all();
-    if cfg['rewards'].get('profile') not in ('rlgym_simple_v1','control_shots_v1'):np.testing.assert_allclose(r['rewards'].sum(1),0,atol=1e-6)
+    if cfg['rewards'].get('profile') not in ('rlgym_simple_v1','control_shots_v1','skills_v1'):np.testing.assert_allclose(r['rewards'].sum(1),0,atol=1e-6)
     print('VERIFY_PASS: native load, 90-action parity, finite public observations, attention inference, finite rewards. This does not certify playing strength.',flush=True)
 
 def report(folder):
@@ -50,25 +50,32 @@ def report(folder):
     manifest={'run':folder.name,'generated_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'runtime':{'python':platform.python_version(),'torch':torch.__version__,'cuda_available':torch.cuda.is_available(),'torch_cuda':torch.version.cuda,'gpu_name':torch.cuda.get_device_name(0) if torch.cuda.is_available() else None},'source_hashes':source_hashes(),'checkpoint_hash':hashlib.sha256((folder/'latest.pt').read_bytes()).hexdigest() if (folder/'latest.pt').is_file() else None,'note':'No weights, credentials, environment variables, or W&B files are included.'}
     with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as z:
         z.writestr('manifest.json',json.dumps(manifest,indent=2))
-        for pattern in ('config.json','status.json','provenance.json','metrics.jsonl','wandb_status.json','session_*.json','execution_profile.json','gpu_batch_profile.json','fork_provenance.json','reward_provenance.json','eval_*.json'):
+        for pattern in ('config.json','status.json','provenance.json','metrics.jsonl','wandb_status.json','session_*.json','execution_profile.json','gpu_batch_profile.json','fork_provenance.json','reward_provenance.json','eval_*.json','bootstrap_quality.json','skills_before.json','skill_validation.jsonl','best_contact.json','contact_test_*.json','recovery.jsonl','skill_regression.json'):
             for p in folder.glob(pattern):z.write(p,'run/'+p.name)
         for p in (ROOT/'attentionforge').glob('*.py'):z.write(p,'source/attentionforge/'+p.name)
-        for p in (ROOT/'native/core.cpp',ROOT/'native/features.h',ROOT/'native/control_rewards.h',ROOT/'config.json',ROOT/'laptop_config.json',ROOT/'laptop_tuned.json',ROOT/'benchmark.json',ROOT/'laptop_autotune.json',ROOT/'FRAMEWORK_REVIEW.md',ROOT/'REWARD_SOURCES.md',ROOT/'GPU_UPDATE.md',ROOT/'REWARD_EXPERIMENTS.md'):
+        for p in (ROOT/'native/core.cpp',ROOT/'native/features.h',ROOT/'native/control_rewards.h',ROOT/'native/skills.h',ROOT/'config.json',ROOT/'laptop_config.json',ROOT/'laptop_tuned.json',ROOT/'benchmark.json',ROOT/'laptop_autotune.json',ROOT/'FRAMEWORK_REVIEW.md',ROOT/'REWARD_SOURCES.md',ROOT/'GPU_UPDATE.md',ROOT/'REWARD_EXPERIMENTS.md',ROOT/'SKILLS_GUIDE.md',ROOT/'SKILLS_VALIDATION.json'):
             if p.is_file():z.write(p,'source/'+str(p.relative_to(ROOT)))
     print('REPORT_READY:',target);return target
 
-def watch(cfg,folder,frames=None,headless=False):
+def watch(cfg,folder,frames=None,headless=False,opponent=None):
     torch.set_num_threads(cfg['torch_threads']);dev=device(cfg);model,saved=policy(folder,dev);cfg=saved['config'];env=batch(cfg,n=1,kickoffs=True);loc=env.pad_locations();raw=env.observe();viewer=None
+    other=None
+    if opponent is not None:
+        parent=load(opponent,dev);other=ActorCritic(**parent['config']['network']).to(dev).eval();other.load_state_dict(parent['model'])
+        if parent['config']['network']!=cfg['network']:raise ValueError('Watch opponent architecture mismatch')
     if not headless:
         from .viewer import Viewer
         viewer=Viewer()
-    print('LIVE MATCH: blue = latest attention policy; orange = same policy. Both Octane. No scripted controller. Ctrl+C exits; no training.',flush=True)
+    print('LIVE MATCH: blue = latest learned policy; orange = '+('frozen warm-start parent' if other is not None else 'same policy')+'. Both Octane. Network controls only. Ctrl+C exits; no training.',flush=True)
     start=time.perf_counter();k=0
     try:
         with torch.no_grad():
             while frames is None or k<frames:
                 ob,lm=encode(raw['world'],raw['pads'],loc);logits,_=model(torch.as_tensor(ob.reshape(-1,43,40),device=dev),torch.as_tensor(lm.reshape(-1,90),device=dev))
-                raw=env.step(logits.argmax(-1).cpu().numpy().reshape(1,-1));k+=1
+                ac=logits.argmax(-1).cpu().numpy().reshape(1,-1)
+                if other is not None:
+                    n=cfg['team_size'];ac[:,n:]=other(torch.as_tensor(ob.reshape(-1,43,40),device=dev),torch.as_tensor(lm.reshape(-1,90),device=dev))[0].argmax(-1).cpu().numpy().reshape(1,-1)[:,n:]
+                raw=env.step(ac);k+=1
                 if viewer:viewer.send(raw,loc)
                 if k%75==0 or raw['info'][0,0]:print('WATCH:',round(k*cfg['tick_skip']/120,1),'seconds; goal blue/orange:',raw['info'][0,0],'; touches this decision:',raw['info'][0,1:3].tolist(),flush=True)
                 if not headless:time.sleep(max(0,k*cfg['tick_skip']/120-(time.perf_counter()-start)))
@@ -83,28 +90,32 @@ def export(folder):
     # Disable native MHA inference fastpath so the graph accepts arbitrary batch sizes.
     torch.backends.mha.set_fastpath_enabled(False)
     frozen=torch.jit.trace(model,(ob,lm),check_trace=True);frozen.save(str(out/'actor.pt'))
+    from .export_v5 import write
+    write(out,frozen)
     rng=np.random.default_rng(913);test=torch.from_numpy(rng.normal(size=(7,43,40)).astype(np.float32));test[:,:,39]=torch.randint(0,7,(7,43));test[:,0,39]=1;legal=torch.rand(7,90)>0.2;legal[:,0]=True
     with torch.no_grad():
         a,_=model(test,legal);b,_=torch.jit.load(str(out/'actor.pt'))(test,legal)
     torch.testing.assert_close(a,b);assert torch.equal(a.argmax(-1),b.argmax(-1))
-    atomic_json(out/'model_config.json',saved['config']);atomic_json(out/'export_manifest.json',{'learning_transitions':saved['learning_transitions'],'actor_sha256':hashlib.sha256((out/'actor.pt').read_bytes()).hexdigest(),'logit_max_abs_error':float((a-b).abs().max()),'action_agreement':1.0,'hitbox':'Octane','architecture':'2-block ego-query attention','format':'TorchScript; not a renamed .lt','scope':'native play and RLBot v4 wrapper; v5 exporter not implemented'})
+    with torch.no_grad():c,_=torch.jit.load(str(out/'actor.lt'))(test,legal)
+    torch.testing.assert_close(a,c);assert torch.equal(a.argmax(-1),c.argmax(-1))
+    atomic_json(out/'model_config.json',saved['config']);atomic_json(out/'export_manifest.json',{'learning_transitions':saved['learning_transitions'],'actor_sha256':hashlib.sha256((out/'actor.pt').read_bytes()).hexdigest(),'actor_lt_sha256':hashlib.sha256((out/'actor.lt').read_bytes()).hexdigest(),'logit_max_abs_error':float((a-b).abs().max()),'action_agreement':1.0,'hitbox':'Octane','architecture':'2-block ego-query attention','format':'TorchScript actor.pt and actor.lt; v5 Python wrapper reads actor.lt directly','scope':'TorchScript PT/CFG v4 and LT/TOML v5 wrappers; live RLBot game needs local verification'})
     import shutil
     shutil.copy(ROOT/'attentionforge/rlbot4_agent.py',out/'bot.py')
     # Copy the same observation implementation used for training; no native module needed in game.
     shutil.copy(ROOT/'attentionforge/observation.py',out/'observation.py')
     shutil.copy(ROOT/'export_bot.cfg',out/'bot.cfg');shutil.copy(ROOT/'appearance.cfg',out/'appearance.cfg')
-    (out/'INSTALL.bat').write_text('@echo off\r\ncd /d "%~dp0"\r\npy -3.11 -m pip install "rlbot>=1.68,<2" "numpy>=1.26,<3" torch\r\npause\r\n')
-    print('EXPORT_READY:',out,'; logits/actions match. RLBot v4 game launch requires local testing. v5/.lt is not claimed.',flush=True)
+    (out/'INSTALL.bat').write_text('@echo off\r\ncd /d "%~dp0"\r\npy -3.11 -m venv .venv_v4\r\n".venv_v4\\Scripts\\python.exe" -m pip install "rlbot>=1.68,<2" "numpy>=1.26,<3" torch\r\npause\r\n')
+    print('EXPORT_READY:',out,'; logits/actions match. v5: bot.bot.toml + actor.lt; v4: bot.cfg + actor.pt. Live Rocket League test requires local verification.',flush=True)
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['verify','benchmark','train','pause','watch','report','export','evaluate','tune','laptop','gpu-profile','reward-setup']);ap.add_argument('--run',default='attention01');ap.add_argument('--config');ap.add_argument('--minutes',type=float);ap.add_argument('--updates',type=int);ap.add_argument('--seconds',type=float,default=10);ap.add_argument('--frames',type=int);ap.add_argument('--headless',action='store_true');ap.add_argument('--rounds',type=int,default=100);ap.add_argument('--opponent');ap.add_argument('--seed',type=int);args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['verify','benchmark','train','pause','watch','report','export','evaluate','tune','laptop','gpu-profile','reward-setup','skills']);ap.add_argument('--run',default='attention01');ap.add_argument('--config');ap.add_argument('--minutes',type=float);ap.add_argument('--updates',type=int);ap.add_argument('--seconds',type=float,default=10);ap.add_argument('--frames',type=int);ap.add_argument('--headless',action='store_true');ap.add_argument('--rounds',type=int,default=100);ap.add_argument('--opponent');ap.add_argument('--seed',type=int);args=ap.parse_args()
     if Path(args.run).name!=args.run or args.run in ('.','..'):ap.error('--run must be a simple folder name')
     cfg=config(args.config);folder=ROOT/'runs'/args.run
     if args.command=='train':train(cfg,folder,args.updates,args.minutes)
     elif args.command=='pause':
         if not folder.is_dir():raise FileNotFoundError(folder)
         (folder/'STOP').write_text('pause requested\n');print('PAUSE_REQUESTED. Wait for PAUSED_AND_SAVED in the trainer window.')
-    elif args.command=='watch':watch(cfg,folder,args.frames,args.headless)
+    elif args.command=='watch':watch(cfg,folder,args.frames,args.headless,args.opponent)
     elif args.command=='export':export(folder)
     elif args.command=='report':report(folder)
     elif args.command=='verify':verify(cfg)
@@ -112,6 +123,9 @@ def main():
     elif args.command=='tune':
         from .tune import tune
         tune()
+    elif args.command=='skills':
+        from .skills import menu
+        menu(args.run)
     elif args.command=='reward-setup':
         from .reward_experiments import setup
         setup(folder)

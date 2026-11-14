@@ -14,8 +14,9 @@ class QueryBlock(nn.Module):
         return q+self.ff(self.norm(q))
 
 class ActorCritic(nn.Module):
-    def __init__(self,width=64,heads=4,blocks=2):
+    def __init__(self,width=64,heads=4,blocks=2,critic_detach=False):
         super().__init__()
+        self.critic_detach=critic_detach
         self.numeric=nn.Linear(39,width); self.types=nn.Embedding(7,width,padding_idx=0)
         self.blocks=nn.ModuleList([QueryBlock(width,heads) for _ in range(blocks)])
         self.norm=nn.LayerNorm(width); self.actor=nn.Linear(width,90);self.critic=nn.Linear(width,1)
@@ -26,4 +27,4 @@ class ActorCritic(nn.Module):
         q=entities[:,:1]; padding=types==0
         for block in self.blocks:q=block(q,entities,padding)
         x=self.norm(q[:,0]);logits=self.actor(x).masked_fill(~legal,-1e9)
-        return logits,self.critic(x).squeeze(-1)
+        return logits,self.critic(x.detach() if self.critic_detach else x).squeeze(-1)

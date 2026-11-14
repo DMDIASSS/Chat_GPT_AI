@@ -8,5 +8,10 @@ goto finish
 :fallback
 python tools\setup_runtime.py
 :finish
-if errorlevel 1 echo SETUP_FAILED - keep the error above. Existing projects were preserved.
+if errorlevel 1 goto failed
 pause
+exit /b 0
+:failed
+echo SETUP_FAILED - keep the error above. Existing projects were preserved.
+pause
+exit /b 1

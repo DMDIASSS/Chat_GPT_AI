@@ -1,0 +1,146 @@
+{
+  "release": "AttentionForge Skills 0.5",
+  "created_utc": "2026-11-14T22:10:08Z",
+  "user_code_review_snapshot": "DMDIASSS/Chat_GPT_AI_Code_Review_20261115_014523 tree 9109bc14fadab0182f204a0c7bbc91cbf96c62e2; all 15 AttentionForge Python files matched prior source",
+  "unit_and_physics_tests": {
+    "passed": 41,
+    "skipped": 1,
+    "skip_reason": "No CUDA GPU in server environment",
+    "command": "python -m pytest -q tests"
+  },
+  "windows_native": {
+    "workflow_run": 43645382341,
+    "commit": "6e91b236dd035da97bf30c65bfdbb8b073db257c",
+    "conclusion": "success",
+    "module_sha256": "03a49c7d014cec12bd3213558cc5cc30083a8f768e249261d3ee6b935a3ff9fe",
+    "artifact_digest": "16b43acc6002eeefa14397357554880c6255a250af288ec3bc84c54216265ff4",
+    "checks": [
+      "Windows CPython 3.11 x64 load",
+      "Action table parity",
+      "Native/reference public observations for 1v1,2v2,3v3",
+      "Goal-gated combo ownership and repetition rejection"
+    ]
+  },
+  "learned_physical_results": {
+    "initial_random_policy": {
+      "stationary": {
+        "blue_contact_fraction": 0.0,
+        "orange_contact_fraction": 0.0,
+        "contact_fraction": 0.0,
+        "capped_mean_contact_seconds": 6.0
+      },
+      "moving": {
+        "blue_contact_fraction": 0.0,
+        "orange_contact_fraction": 0.0,
+        "contact_fraction": 0.0,
+        "capped_mean_contact_seconds": 6.0
+      }
+    },
+    "after_900_BC_minibatches": {
+      "stationary": {
+        "blue_contact_fraction": 0.9375,
+        "orange_contact_fraction": 0.875,
+        "contact_fraction": 0.90625,
+        "capped_mean_contact_seconds": 1.8229166666666667
+      },
+      "moving": {
+        "blue_contact_fraction": 1.0,
+        "orange_contact_fraction": 0.96875,
+        "contact_fraction": 0.984375,
+        "capped_mean_contact_seconds": 1.8364583333333337
+      }
+    },
+    "after_20_small_PPO_updates_fresh_seed": {
+      "stationary_contact_fraction": 0.890625,
+      "moving_contact_fraction": 0.96875
+    },
+    "after_196608_transitions_64_arenas": {
+      "stationary": {
+        "blue_contact_fraction": 0.890625,
+        "orange_contact_fraction": 0.921875,
+        "contact_fraction": 0.90625,
+        "capped_mean_contact_seconds": 1.6427083333333332
+      },
+      "moving": {
+        "blue_contact_fraction": 0.96875,
+        "orange_contact_fraction": 1.0,
+        "contact_fraction": 0.984375,
+        "capped_mean_contact_seconds": 1.5567708333333334
+      }
+    },
+    "after_327680_transitions_128_arenas": {
+      "stationary": {
+        "blue_contact_fraction": 0.84375,
+        "orange_contact_fraction": 0.84375,
+        "contact_fraction": 0.84375,
+        "capped_mean_contact_seconds": 1.9796874999999998
+      },
+      "moving": {
+        "blue_contact_fraction": 1.0,
+        "orange_contact_fraction": 0.984375,
+        "contact_fraction": 0.9921875,
+        "capped_mean_contact_seconds": 1.5119791666666664
+      }
+    },
+    "scope": "Measured basic ball contact in controlled six-second RocketSim scenes, on both colors. Not a rank or overall skill claim."
+  },
+  "match_pilot": {
+    "rounds": 100,
+    "seconds": 60,
+    "wins": 23,
+    "draws": 68,
+    "losses": 9,
+    "score_rate": 0.57,
+    "score_interval_95": [
+      0.3779354417360158,
+      0.7620645582639841
+    ],
+    "candidate_transitions": 327680,
+    "baseline_transitions": 0,
+    "master_seed": 1827056493,
+    "goals_for": 35,
+    "goals_against": 14,
+    "scope": "Candidate vs frozen warm-start parent on fresh balanced-color seeds; no old user actor or external strong bot evaluated."
+  },
+  "export": {
+    "PT_and_LT_source_logit_and_action_parity": "passed",
+    "SDK": "rlbot==2.0.0b56",
+    "SDK_object_packet_adapter_and_one_tick_delay": "passed",
+    "actual_export_model_SDK_diagnose": "passed",
+    "distinct_agent_ids_for_different_exports": "tested to prevent RLBot grouping different actors",
+    "server_CPU_inference_milliseconds": {
+      "median": 0.6690505,
+      "p95": 0.9153936
+    },
+    "live_Rocket_League_match": "not available on server; requires local verification"
+  },
+  "safety_tests": [
+    "Parent and old projects preserved by separate project directory",
+    "Interrupted bootstrap has its own resumable checkpoint",
+    "PPO checkpoint/optimizer resume and history behavior",
+    "Finite gradients, KL early stop and exception checkpoint preservation",
+    "Automatic regression archive/restore, learning-rate reduction and three-attempt bound",
+    "Goal combos do not reward repeated or alternating already-seen events",
+    "Skill contact acceleration matches actual upstream RLGym-tools AdvancedTouchReward",
+    "Full-size 128-arena rollout/update, physical validation, export, headless watch and report"
+  ],
+  "failed_experiment_preserved_in_summary": {
+    "initial_warm_start_then_PPO": "Default 2e-4 continuation without critic-feature protection collapsed fresh-scene contact to 17.2% stationary / 10.9% moving after ten small updates; rejected.",
+    "correction": "2e-5 PPO, detached critic features, legal-only bootstrap smoothing and a fading ground auxiliary objective; retested at 20 updates and 327680 transitions."
+  },
+  "limits": [
+    "The old user-trained attention weights were not uploaded; no direct comparison to that actor was possible.",
+    "100-game parent panel remains statistically uncertain under the conservative interval; no match champion promotion.",
+    "No claim of Nexto/Galactus/Chronos strength, mechanics mastery or guaranteed 2-3 day result.",
+    "Full-scale server pilots are CPU-only, not a laptop CUDA throughput benchmark.",
+    "Recovery and combo mechanisms remain experiments; rare mechanic event proxies are not certified maneuver classification.",
+    "Bootstrapping uses synthetic analytic driving labels, not human replay data."
+  ],
+  "packaging": [
+    "61-file standalone project whitelist",
+    "All ZIP entries pass SHA-256 manifest validation",
+    "No runs, weights, runtime pointers, auth or private logs included",
+    "Extracted standalone project passes native/attention verification and menu startup",
+    "Scripted detached critic passes forward/backward and exact Parameter identity check on CPU"
+  ]
+}

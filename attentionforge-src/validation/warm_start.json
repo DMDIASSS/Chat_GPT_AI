@@ -1,0 +1,32 @@
+{
+  "before": {
+    "stationary": {
+      "blue_contact_fraction": 0.0,
+      "orange_contact_fraction": 0.0,
+      "contact_fraction": 0.0,
+      "capped_mean_contact_seconds": 6.0
+    },
+    "moving": {
+      "blue_contact_fraction": 0.0,
+      "orange_contact_fraction": 0.0,
+      "contact_fraction": 0.0,
+      "capped_mean_contact_seconds": 6.0
+    }
+  },
+  "after": {
+    "stationary": {
+      "blue_contact_fraction": 0.9375,
+      "orange_contact_fraction": 0.875,
+      "contact_fraction": 0.90625,
+      "capped_mean_contact_seconds": 1.8229166666666667
+    },
+    "moving": {
+      "blue_contact_fraction": 1.0,
+      "orange_contact_fraction": 0.96875,
+      "contact_fraction": 0.984375,
+      "capped_mean_contact_seconds": 1.8364583333333337
+    }
+  },
+  "updates": 900,
+  "scope": "Ground-contact drill results; not match strength. Synthetic analytic labels, not human replays."
+}

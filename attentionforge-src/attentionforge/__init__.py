@@ -1,2 +1,2 @@
-"""A fresh attention policy trained with PPO in RocketSim. No pretrained weights."""
-__version__ = '0.4.0'
+"""AttentionForge learned ground warm start and skill PPO."""
+__version__="0.5.0"

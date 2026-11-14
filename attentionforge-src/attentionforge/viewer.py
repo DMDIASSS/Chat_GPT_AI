@@ -9,6 +9,7 @@ def find_viewer():
     else:candidates=[]
     for parent in (ROOT,ROOT.parent,ROOT.parent.parent):
         candidates.append(parent/'third_party/RocketSimVis')
+        candidates.append(parent/'attention_forge/third_party/RocketSimVis')
         candidates.append(parent/'RocketHive_Replicar_v2/third_party/RocketSimVis')
     for p in candidates:
         script=p/'src/main.py';exe=p/'.venv'/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
@@ -17,7 +18,12 @@ def find_viewer():
 
 class Viewer:
     def __init__(self):
-        root,exe=find_viewer();print('VIEWER:',root,flush=True)
+        try:root,exe=find_viewer()
+        except FileNotFoundError:
+            print('Installing the pinned RocketSimVis in an isolated viewer environment once...',flush=True)
+            from tools.setup_viewer import install
+            install();root,exe=find_viewer()
+        print('VIEWER:',root,flush=True)
         self.proc=subprocess.Popen([str(exe),str(ROOT/'tools/viewer_bootstrap.py'),str(root)],cwd=root)
         self.sock=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
     def send(self,raw,locations):

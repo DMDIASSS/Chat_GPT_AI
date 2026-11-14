@@ -1,0 +1,14 @@
+{
+  "stationary": {
+    "blue_contact_fraction": 0.890625,
+    "orange_contact_fraction": 0.921875,
+    "contact_fraction": 0.90625,
+    "capped_mean_contact_seconds": 1.6427083333333332
+  },
+  "moving": {
+    "blue_contact_fraction": 0.96875,
+    "orange_contact_fraction": 1.0,
+    "contact_fraction": 0.984375,
+    "capped_mean_contact_seconds": 1.5567708333333334
+  }
+}
