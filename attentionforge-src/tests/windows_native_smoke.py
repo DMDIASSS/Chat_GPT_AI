@@ -19,3 +19,7 @@ assert n.reward_version>=1
 assert abs(n.control_value(200.,2000.,1000.,100.)+n.control_value(2000.,200.,1000.,100.))<1e-6
 s=n.ShotTrace();s.observe(1,False,1);assert s.clean(0,2,720);s.observe(0,True,3);assert not s.clean(0,4,720)
 print('WINDOWS_REWARD_MATH_AND_TRACKER_PASS')
+
+assert n.reward_version>=2
+c=n.ComboTrace();c.touch(1,0);c.event(0,2,1);a=c.goal(0,2);c.event(0,2,3);assert c.goal(0,4)==a;c.touch(2,5);assert c.goal(0,6)==0
+print('WINDOWS_SKILLS_CHAIN_ANTI_REPEAT_PASS')
