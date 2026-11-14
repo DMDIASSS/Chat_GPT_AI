@@ -5,7 +5,7 @@ from .runtime import ROOT,config
 def menu(run='laptop01'):
     folder=ROOT/'runs'/run
     while True:
-        print('\nATTENTIONFORGE LAPTOP — 1.09M attention, Octane 1v1\n1 Start / resume (first start benchmarks settings)\n2 Watch latest (pause training first)\n3 Evaluate vs first frozen snapshot\n4 Create report ZIP\n5 Export PT + CFG\n6 Benchmark settings only\n7 Request pause from another console\n0 Exit',flush=True)
+        print('\nATTENTIONFORGE LAPTOP — 1.09M attention, Octane 1v1\n1 Start / resume (first start benchmarks settings)\n2 Watch latest (pause training first)\n3 Evaluate vs first frozen snapshot\n4 Create report ZIP\n5 Export PT + CFG\n6 Benchmark settings only\n7 Request pause from another console\n8 Profile GPU minibatches / create separate experiment\n0 Exit',flush=True)
         choice=input('Choose: ').strip()
         try:
             if choice=='0':return
@@ -32,6 +32,9 @@ def menu(run='laptop01'):
             elif choice=='6':
                 from .tune import tune
                 tune();print('Existing runs keep their saved configuration. No training started.')
+            elif choice=='8':
+                from .gpu_profile import profile_gpu
+                profile_gpu(folder)
             elif choice=='7':
                 if not folder.is_dir():raise FileNotFoundError('This run has not started')
                 (folder/'STOP').write_text('pause requested\n');print('Pause requested; wait for PAUSED_AND_SAVED in the trainer window.')

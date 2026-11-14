@@ -5,6 +5,7 @@ import torch
 from torch.distributions import Categorical
 from .model import ActorCritic
 from .performance import sample_actions,RolloutStore
+from .execution import make_optimizer,configure_optimizer,select_model_execution,compile_checked,checked_step
 from .observation import encode
 from .runtime import ROOT,atomic_json,save_checkpoint,source_hashes,batch,device
 
@@ -58,21 +59,24 @@ def _train(cfg,folder,max_updates,minutes):
     ck=folder/'latest.pt';stop=folder/'STOP';stop.unlink(missing_ok=True)
     torch.set_num_threads(int(cfg['torch_threads']));dev=device(cfg)
     random.seed(cfg['seed']);np.random.seed(cfg['seed']);torch.manual_seed(cfg['seed'])
-    model=ActorCritic(**cfg['network']).to(dev);opt=torch.optim.Adam(model.parameters(),lr=cfg['ppo']['learning_rate'],eps=1e-5)
+    model=ActorCritic(**cfg['network']).to(dev);opt,optimizer_name=make_optimizer(model,cfg,dev)
     count=update=0;history=[];history_scores={};wbid=None;previous_wall=0;previous_physics=previous_env=0
     if ck.exists():
         saved=load(ck,dev)
         if saved['config']!=cfg:raise ValueError('This run has a different saved config. Use a new run name for config changes.')
-        model.load_state_dict(saved['model']);opt.load_state_dict(saved['optimizer']);count=saved['learning_transitions'];update=saved['updates'];history=saved['history'];history_scores=saved.get('history_scores',{});wbid=saved.get('wandb_id');previous_wall=saved.get('training_wall_seconds',0);previous_physics=saved.get('physics_ticks',0);previous_env=saved.get('env_decisions',0)
+        model.load_state_dict(saved['model']);opt.load_state_dict(saved['optimizer']);configure_optimizer(opt,dev,optimizer_name);count=saved['learning_transitions'];update=saved['updates'];history=saved['history'];history_scores=saved.get('history_scores',{});wbid=saved.get('wandb_id');previous_wall=saved.get('training_wall_seconds',0);previous_physics=saved.get('physics_ticks',0);previous_env=saved.get('env_decisions',0)
         random.setstate(saved['python_rng']);np.random.set_state(saved['numpy_rng']);torch.set_rng_state(saved['torch_rng'].cpu())
         if dev.type=='cuda' and saved.get('cuda_rng') is not None:torch.cuda.set_rng_state_all([s.cpu() for s in saved['cuda_rng']])
         print('RESUME:',count,'learning transitions. Episodes restart; optimizer and model resume.',flush=True)
     else:
         atomic_json(folder/'config.json',cfg);atomic_json(folder/'provenance.json',{'created_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'source_hashes':source_hashes(),'initialization':'random','native_contract':'attentionforge-v1-raw32-delay1','hitbox':'Octane','physics_hz':120,'decision_hz':120/cfg['tick_skip']})
+    model,model_execution,execution_probes=select_model_execution(model,cfg,dev)
+    atomic_json(folder/'execution_profile.json',{'model_execution':model_execution,'optimizer':optimizer_name,'probes':execution_probes})
+    print('EXECUTION:',model_execution,optimizer_name,'FP32; existing weights/optimizer state preserved.',flush=True)
     from . import _attention_native
     from .runtime import sha
     native_seed=(cfg['seed']+update*104729) % (1<<32)
-    atomic_json(folder/f'session_{time.time_ns()}.json',{'execution_version':'attentionforge-laptop-v2','starting_learning_transitions':count,'starting_update':update,'native_seed':native_seed,'source_hashes':source_hashes(),'native_module_sha256':sha(_attention_native.__file__),'torch':torch.__version__,'device':str(dev)})
+    atomic_json(folder/f'session_{time.time_ns()}.json',{'execution_version':'attentionforge-gpu-v3','model_execution':model_execution,'optimizer':optimizer_name,'starting_learning_transitions':count,'starting_update':update,'native_seed':native_seed,'source_hashes':source_hashes(),'native_module_sha256':sha(_attention_native.__file__),'torch':torch.__version__,'device':str(dev)})
     env=batch(cfg,seed=native_seed);locations=env.pad_locations();raw=env.observe();obs,legal=encode(raw['world'],raw['pads'],locations)
     wb=tracker(cfg,folder,wbid);wbid=wb.id if wb else wbid
     atomic_json(folder/'wandb_status.json',{'available':wb is not None,'id':wbid,'url':getattr(wb,'url',None) if wb else None,'local_metrics':'metrics.jsonl'})
@@ -81,7 +85,9 @@ def _train(cfg,folder,max_updates,minutes):
     ob=np.empty((*shape,43,40),np.float32);lm=np.empty((*shape,90),bool)
     actions=np.empty(shape,np.int64);logs=np.empty(shape,np.float32);vals=np.empty(shape,np.float32);rewards=np.empty(shape,np.float32)
     term=np.empty(shape,bool);trunc=np.empty(shape,bool);tv=np.zeros(shape,np.float32)
-    frozen=ActorCritic(**cfg['network']).to(dev).eval();start=time.perf_counter();last_save=start;session_updates=0;session_physics=session_env=0;last_snapshot=count//cfg['league']['snapshot_every'];stopping=False
+    frozen=ActorCritic(**cfg['network']).to(dev).eval()
+    if model_execution=='torchscript':frozen=compile_checked(frozen)
+    start=time.perf_counter();last_save=start;session_updates=0;session_physics=session_env=0;last_snapshot=count//cfg['league']['snapshot_every'];stopping=False
     def request_stop(*_):
         nonlocal stopping
         stopping=True;print('PAUSE_REQUESTED: finishing the current rollout/update, then saving.',flush=True)
@@ -89,11 +95,14 @@ def _train(cfg,folder,max_updates,minutes):
     def save():
         save_checkpoint(ck,{'format':'attentionforge-checkpoint-v1','config':cfg,'model':model.state_dict(),'optimizer':opt.state_dict(),'learning_transitions':count,'updates':update,'history':history,'history_scores':history_scores,'wandb_id':wbid,'python_rng':random.getstate(),'numpy_rng':np.random.get_state(),'torch_rng':torch.get_rng_state(),'cuda_rng':torch.cuda.get_rng_state_all() if dev.type=='cuda' else None,'training_wall_seconds':previous_wall+time.perf_counter()-start,'physics_ticks':previous_physics+session_physics,'env_decisions':previous_env+session_env})
     save();print(f'TRAINING: {dev}, {e} arenas, {a} cars, {sum(p.numel() for p in model.parameters()):,}-parameter attention, Octane, {120/cfg["tick_skip"]:g}Hz decisions. PAUSE.bat or Ctrl+C saves.',flush=True)
+    training_failed=False
     try:
         while not stopping and not stop.exists():
             if max_updates is not None and session_updates>=max_updates:break
             if minutes is not None and time.perf_counter()-start>=minutes*60:break
-            t0=time.perf_counter();behavior=np.zeros(4,np.float64);selected=None;histmask=np.zeros((e,a),bool)
+            t0=time.perf_counter()
+            if dev.type=='cuda':torch.cuda.reset_peak_memory_stats(dev)
+            behavior=np.zeros(4,np.float64);selected=None;histmask=np.zeros((e,a),bool)
             if history:
                 weights=np.array([(1-history_scores.get(name,0.5))**2+0.05 for name in history]);weights/=weights.sum();selected=np.random.choice(history,p=weights)
                 frozen.load_state_dict(load(folder/'history'/selected,dev)['model'])
@@ -142,8 +151,8 @@ def _train(cfg,folder,max_updates,minutes):
             flat=np.flatnonzero(np.broadcast_to(trainmask,shape).reshape(-1));new_samples=len(flat);rollout_sec=time.perf_counter()-t0
             af=adv.reshape(-1)[flat];advflat=adv.reshape(-1);advflat[flat]=(af-af.mean())/(af.std()+1e-8)
             loss_metrics=[];model.train();early=False
-            store=RolloutStore([ob.reshape(-1,43,40),lm.reshape(-1,90),actions.reshape(-1),logs.reshape(-1),advflat,returns.reshape(-1)],dev,cfg.get('performance',{}).get('rollout_cache_mb',512))
             optimize_start=time.perf_counter()
+            store=RolloutStore([ob.reshape(-1,43,40),lm.reshape(-1,90),actions.reshape(-1),logs.reshape(-1),advflat,returns.reshape(-1)],dev,cfg.get('performance',{}).get('rollout_cache_mb',512))
             for epoch in range(p['epochs']):
                 np.random.shuffle(flat)
                 permutation=store.permutation(flat)
@@ -153,10 +162,9 @@ def _train(cfg,folder,max_updates,minutes):
                     logits,v=model(x,l);dist=Categorical(logits=logits,validate_args=False)
                     diff=dist.log_prob(ac)-old;ratio=diff.exp();kl=((ratio-1)-diff).mean()
                     policy=-torch.minimum(ad*ratio,ad*ratio.clamp(1-p['clip'],1+p['clip'])).mean();vl=0.5*(v-ret).square().mean();entropy=dist.entropy().mean();loss=policy+p['value']*vl-p['entropy']*entropy
-                    health=torch.stack((kl.detach(),loss.detach())).cpu().numpy()
-                    if not np.isfinite(health).all():raise FloatingPointError('Nonfinite PPO loss/KL; latest saved checkpoint preserved')
-                    if health[0]>p['target_kl']*1.5:early=True;break
-                    opt.zero_grad(set_to_none=True);loss.backward();torch.nn.utils.clip_grad_norm_(model.parameters(),p['max_grad_norm'],error_if_nonfinite=True);opt.step();loss_metrics.append(torch.stack((loss.detach(),kl.detach(),entropy.detach(),((ratio.detach()-1).abs()>p['clip']).float().mean())))
+                    accepted,grad_norm=checked_step(loss,kl,model,opt,p['max_grad_norm'],p['target_kl'])
+                    if not accepted:early=True;break
+                    loss_metrics.append(torch.stack((loss.detach(),kl.detach(),entropy.detach(),((ratio.detach()-1).abs()>p['clip']).float().mean())))
                 if early:break
             cache_used=store.cached;del store
             summary=torch.stack(loss_metrics).mean(0).cpu().numpy() if loss_metrics else np.zeros(4)
@@ -172,17 +180,24 @@ def _train(cfg,folder,max_updates,minutes):
                 while len(history)>cfg['league']['max_history']:
                     old=history.pop(0);(folder/'history'/old).unlink(missing_ok=True);history_scores.pop(old,None)
             elapsed=time.perf_counter()-t0;wall=previous_wall+time.perf_counter()-start
-            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'speed/collection_seconds':rollout_sec,'speed/ppo_seconds':optimize_sec,'performance/gpu_rollout_cache':cache_used,'train/loss':float(summary[0]),'train/approx_kl':float(summary[1]),'train/entropy':float(summary[2]),'train/clip_fraction':float(summary[3]),'train/kl_early_stop':early,'train/optimizer_minibatches':len(loss_metrics),'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),('reward/approach_blue_sum' if cfg['rewards'].get('profile')=='rlgym_simple_v1' else 'reward/potential_blue_sum'):float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
+            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'speed/collection_seconds':rollout_sec,'speed/ppo_seconds':optimize_sec,'performance/gpu_rollout_cache':cache_used,'performance/model_execution':model_execution,'performance/torchscript':model_execution=='torchscript','performance/optimizer':optimizer_name,'performance/adam_fused':optimizer_name=='adam_fused','performance/gpu_peak_mb':torch.cuda.max_memory_allocated(dev)/1024**2 if dev.type=='cuda' else 0.,'train/loss':float(summary[0]),'train/approx_kl':float(summary[1]),'train/entropy':float(summary[2]),'train/clip_fraction':float(summary[3]),'train/kl_early_stop':early,'train/optimizer_minibatches':len(loss_metrics),'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),('reward/approach_blue_sum' if cfg['rewards'].get('profile')=='rlgym_simple_v1' else 'reward/potential_blue_sum'):float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metrics,allow_nan=False)+'\n')
             atomic_json(folder/'status.json',metrics)
             if wb:
                 try:wb.log({k:v for k,v in metrics.items() if isinstance(v,(float,int,bool))},step=count)
                 except Exception as ex:
                     print('WANDB_LOG_UNAVAILABLE:',type(ex).__name__,'; local metrics continue.',flush=True);wb=None
-            print(f'UPDATE {update}: {count:,} learning transitions | {new_samples/elapsed:,.0f}/s end-to-end | touches {int(stats[1]+stats[2])}, goals {int(np.count_nonzero(term)/a)} | KL {metrics["train/approx_kl"]:.4f}',flush=True)
+            cache_label='GPU' if cache_used else 'host'
+            print(f'UPDATE {update}: {count:,} learning transitions | {new_samples/elapsed:,.0f}/s end-to-end | touches {int(stats[1]+stats[2])}, goals {int(np.count_nonzero(term)/a)} | KL {metrics["train/approx_kl"]:.4f} | collect {rollout_sec:.1f}s / PPO {optimize_sec:.1f}s | cache {cache_label}',flush=True)
             if time.perf_counter()-last_save>=cfg['checkpoint_every_seconds']:save();last_save=time.perf_counter()
+    except BaseException:
+        training_failed=True
+        raise
     finally:
-        save();signal.signal(signal.SIGINT,previous_handler)
-        atomic_json(folder/'status.json',{'state':'paused','learning_transitions':count,'updates':update,'checkpoint':str(ck),'training_wall_seconds':previous_wall+time.perf_counter()-start})
-        if wb:wb.finish()
-        print('PAUSED_AND_SAVED:',ck,flush=True)
+        if not training_failed:save()
+        signal.signal(signal.SIGINT,previous_handler)
+        atomic_json(folder/'status.json',{'state':'error' if training_failed else 'paused','learning_transitions':count,'updates':update,'checkpoint':str(ck),'training_wall_seconds':previous_wall+time.perf_counter()-start,'checkpoint_preserved_after_error':training_failed})
+        if wb:
+            try:wb.finish()
+            except Exception as ex:print('WANDB_FINISH_UNAVAILABLE:',type(ex).__name__,flush=True)
+        print('TRAINING_FAILED_LAST_CHECKPOINT_PRESERVED:' if training_failed else 'PAUSED_AND_SAVED:',ck,flush=True)

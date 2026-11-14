@@ -5,7 +5,7 @@ class QueryBlock(nn.Module):
     def __init__(self, width, heads):
         super().__init__()
         self.qnorm=nn.LayerNorm(width); self.knorm=nn.LayerNorm(width)
-        self.attention=nn.MultiheadAttention(width,heads,dropout=0,batch_first=True)
+        self.attention=nn.MultiheadAttention(width,heads,dropout=0.0,batch_first=True)
         self.norm=nn.LayerNorm(width)
         self.ff=nn.Sequential(nn.Linear(width,width*2),nn.GELU(),nn.Linear(width*2,width))
     def forward(self,q,entities,padding):

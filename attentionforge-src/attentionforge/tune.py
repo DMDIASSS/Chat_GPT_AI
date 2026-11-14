@@ -8,10 +8,14 @@ from .runtime import ROOT,config,device,batch,atomic_json
 from .observation import encode
 from .model import ActorCritic
 from .performance import sample_actions
+from .execution import make_optimizer,compile_checked
 
 def probe(cfg,steps=16):
     torch.set_num_threads(cfg['torch_threads']);dev=device(cfg);torch.manual_seed(cfg['seed'])
-    model=ActorCritic(**cfg['network']).to(dev).eval();env=batch(cfg);loc=env.pad_locations();raw=env.observe();n=cfg['n_envs'];a=2*cfg['team_size']
+    model=ActorCritic(**cfg['network']).to(dev).eval()
+    # Fixed eager path in the first arena sweep; GPU_PROFILE compares execution
+    # backends and larger optimizer batches using the trained checkpoint.
+    env=batch(cfg);loc=env.pad_locations();raw=env.observe();n=cfg['n_envs'];a=2*cfg['team_size']
     peak=0
     def sync():
         if dev.type=='cuda':torch.cuda.synchronize(dev)
@@ -22,7 +26,7 @@ def probe(cfg,steps=16):
             ob,lm=encode(raw['world'],raw['pads'],loc);x=torch.as_tensor(ob.reshape(-1,43,40),device=dev);legal=torch.as_tensor(lm.reshape(-1,90),device=dev);logits,v=model(x,legal);ac,lp=sample_actions(logits)
             packed=torch.stack((ac.float(),lp,v),-1).cpu().numpy();raw=env.step(packed[:,0].astype(np.int64).reshape(n,a))
         sync();collection=time.perf_counter()-start
-    model.train();opt=torch.optim.Adam(model.parameters(),lr=cfg['ppo']['learning_rate'],eps=1e-5)
+    model.train();opt,_=make_optimizer(model,cfg,dev)
     size=cfg['ppo']['batch_size'];index=np.arange(size)%(n*a);tx=x[index].clone();tl=legal[index].clone();old_logits,old_values=model(tx,tl);action,old_lp=sample_actions(old_logits.detach());target=old_values.detach()+torch.linspace(-.2,.2,size,device=dev);adv=torch.linspace(-1,1,size,device=dev)
     del old_logits,old_values
     # Same clipped PPO loss, value and entropy terms as training, on synthetic

@@ -1,0 +1,41 @@
+{
+  "release": "AttentionForge 0.3 GPU execution patch",
+  "created_utc": "2026-11-14T17:15:51Z",
+  "tests": {
+    "passed": 24,
+    "skipped": 1,
+    "skip_reason": "No CUDA GPU is available in this execution environment; actual CUDA fused Adam/scripted test is skipped."
+  },
+  "verified_on_cpu": [
+    "TorchScript preserves parameter identities, checkpoint keys, logits/values and gradients",
+    "Adam moments and step values preserved across load/normalization",
+    "KL rejection leaves weights and optimizer state unchanged",
+    "Nonfinite gradient rejection occurs before optimizer update",
+    "Training exceptions preserve the last completed checkpoint",
+    "Fork copies the trained model, counters, moments, baseline/history and leaves parent checkpoint unchanged",
+    "Scripted training/resume with historical opponents",
+    "Every-step timeout bootstrapping, TorchScript export, headless watch and report",
+    "Disposable eager/script optimizer probes preserve their source model",
+    "Forked continuation resumes inherited counters instead of restarting"
+  ],
+  "cuda_design": {
+    "optimizer_preflight": "Disposable scalar probe chooses fused or foreach before real updates.",
+    "model_execution": "Actual-device eager/script forward+backward probes choose script only above a 5% measured gain and after parity checks.",
+    "larger_batches": [
+      256,
+      512,
+      1024
+    ],
+    "memory_budget": "Probe peak plus resident-rollout allowance within 85% of currently allocatable GPU memory.",
+    "existing_run": "No saved config, architecture, reward, timing, epochs or minibatch changes for ordinary resume.",
+    "batch_experiment": "New fork has larger minibatch only if selected; optimizer-update frequency changes and strength must be evaluated."
+  },
+  "limitations": [
+    "No laptop CUDA performance result or guaranteed speedup is claimed.",
+    "No held-out playing-strength evaluation was performed for this execution patch.",
+    "The CUDA profiler/automatic selector need first-run validation on the user GPU.",
+    "Synthetic optimizer throughput and estimated complete-update throughput are explicitly labeled.",
+    "Native CPU simulation remains; this is not a RocketGPU/RocketChad3 integration."
+  ],
+  "normal_completion_save_after_error_guard_test": true
+}
