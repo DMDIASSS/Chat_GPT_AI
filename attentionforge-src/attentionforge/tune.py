@@ -24,6 +24,7 @@ def probe(cfg,steps=16):
         sync();collection=time.perf_counter()-start
     model.train();opt=torch.optim.Adam(model.parameters(),lr=cfg['ppo']['learning_rate'],eps=1e-5)
     size=cfg['ppo']['batch_size'];index=np.arange(size)%(n*a);tx=x[index].clone();tl=legal[index].clone();old_logits,old_values=model(tx,tl);action,old_lp=sample_actions(old_logits.detach());target=old_values.detach()+torch.linspace(-.2,.2,size,device=dev);adv=torch.linspace(-1,1,size,device=dev)
+    del old_logits,old_values
     # Same clipped PPO loss, value and entropy terms as training, on synthetic
     # fixed targets. This is an optimizer timing/memory test, not a strength test.
     for k in range(3):

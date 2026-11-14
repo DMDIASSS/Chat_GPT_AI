@@ -1,0 +1,60 @@
+{
+  "release": "AttentionForge 0.2 laptop update",
+  "date_utc": "2026-11-14T16:34:25Z",
+  "unit_contract_tests": {
+    "passed": 16,
+    "platform": "Linux CPython 3.11 Torch 2.9.1 CPU",
+    "new_checks": [
+      "native/portable encoder agreement for 1v1, 2v2, 3v3",
+      "native reward agreement with actual RLGym/RLGym-tools classes, including goal and contact",
+      "categorical sampling frequencies, log probabilities and masking",
+      "CPU rollout store indexing",
+      "1091163-parameter model shape",
+      "long-run resume seed wrap reproducibility"
+    ]
+  },
+  "windows_native": {
+    "workflow_run": 43615434997,
+    "source_commit": "9405ab9805385ad1d43e3abcd9acb218606efc37",
+    "action_and_observation_parity": "passed on windows-latest CPython3.11 x64",
+    "module": "_attention_native.cp311-win_amd64.pyd",
+    "module_sha256": "192b778e6691271786f522709aa53861bf8b0ae542f206c51bdd2f9447db29f4",
+    "artifact_sha256": "7f4307b3f14650785793366ac8c2d7767cdbc7213ff8285aa74012cb67f863bb"
+  },
+  "integration": {
+    "million_parameter_training_resume": true,
+    "legacy_76251_parameter_full_checkpoint_resume": true,
+    "historical_opponent_path": true,
+    "every-step_timeout_bootstrap_training": true,
+    "source_and_session_provenance_in_report": true,
+    "headless_native_watch": true,
+    "torchscript_export_logit_action_agreement": true,
+    "menu_load_exit": true,
+    "bounded_tuner_two_candidate_smoke": true,
+    "default_laptop_reward_profile_training": true
+  },
+  "performance": {
+    "encoder_case": "32 arenas / 64 players, same fixed observations, 500 calls per implementation after warmup",
+    "numpy_encoder_seconds_per_call": 0.0013070464200009156,
+    "native_encoder_seconds_per_call": 6.359085400072217e-05,
+    "scope": "Observation construction only. Not an overall training speedup.",
+    "overall_cpu_training_speedup_established": false,
+    "laptop_cuda_speedup_established": false,
+    "gpu_resident_rollout_cache_tested_on_gpu": false,
+    "rejected_experiment": "batch-first attention rewrite: forward/gradient parity passed but CPU throughput worsened; reverted in shipped model"
+  },
+  "framework_review": {
+    "RocketChad3_inspected": "0543508f2df13eb3ebeac903dd2125466d0baad3",
+    "RocketGPU_cpu_build_and_benchmark": "743c9ae2163d36c5349494c29f266eb964ae55dc",
+    "RocketGPU_cpu_arena_ticks_per_second": 246067,
+    "RocketChad3_gpu_training_run": false,
+    "RocketGPU_gpu_run": false
+  },
+  "limitations": [
+    "No CUDA GPU/nvcc was available in this environment. Actual GTX1650 rates and GPU-cache execution need user testing.",
+    "Tuner full-update scores are estimates; actual training counters measure new learner transitions including PPO.",
+    "No playing-strength improvement demonstrated by these smoke checks.",
+    "RLBot v4 game launch and GUI require local testing. V5/TOML/LT export is not implemented.",
+    "No trained weights, user reports, replay data or credentials are included."
+  ]
+}

@@ -18,8 +18,8 @@
   "rewards": {
     "profile": "rlgym_simple_v1",
     "goal": 10.0,
-    "approach": 1.0,
-    "touch": 0.25,
+    "approach": 0.2,
+    "touch": 0.02,
     "control_progress": 0.0
   },
   "ppo": {

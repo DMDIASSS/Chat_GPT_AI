@@ -46,7 +46,7 @@ def tracker(cfg,folder,existing_id=None):
         settings=wandb.Settings(init_timeout=15)
         authenticated=bool(os.environ.get('WANDB_API_KEY')) or (Path.home()/'.netrc').exists() or (Path.home()/'_netrc').exists()
         mode=os.environ.get('WANDB_MODE','online' if authenticated else 'offline')
-        return wandb.init(project=cfg['wandb']['project'],id=existing_id,resume='allow' if existing_id else None,config=cfg,dir=str(folder.resolve()),mode=mode,settings=settings)
+        return wandb.init(project=cfg['wandb']['project'],name=folder.name,id=existing_id,resume='allow' if existing_id else None,config=cfg,dir=str(folder.resolve()),mode=mode,settings=settings)
     except Exception as ex:
         print('WANDB_UNAVAILABLE:',type(ex).__name__,'; local metrics continue.',flush=True);return None
 
@@ -69,7 +69,11 @@ def _train(cfg,folder,max_updates,minutes):
         print('RESUME:',count,'learning transitions. Episodes restart; optimizer and model resume.',flush=True)
     else:
         atomic_json(folder/'config.json',cfg);atomic_json(folder/'provenance.json',{'created_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'source_hashes':source_hashes(),'initialization':'random','native_contract':'attentionforge-v1-raw32-delay1','hitbox':'Octane','physics_hz':120,'decision_hz':120/cfg['tick_skip']})
-    env=batch(cfg,seed=cfg['seed']+update*104729);locations=env.pad_locations();raw=env.observe();obs,legal=encode(raw['world'],raw['pads'],locations)
+    from . import _attention_native
+    from .runtime import sha
+    native_seed=(cfg['seed']+update*104729) % (1<<32)
+    atomic_json(folder/f'session_{time.time_ns()}.json',{'execution_version':'attentionforge-laptop-v2','starting_learning_transitions':count,'starting_update':update,'native_seed':native_seed,'source_hashes':source_hashes(),'native_module_sha256':sha(_attention_native.__file__),'torch':torch.__version__,'device':str(dev)})
+    env=batch(cfg,seed=native_seed);locations=env.pad_locations();raw=env.observe();obs,legal=encode(raw['world'],raw['pads'],locations)
     wb=tracker(cfg,folder,wbid);wbid=wb.id if wb else wbid
     atomic_json(folder/'wandb_status.json',{'available':wb is not None,'id':wbid,'url':getattr(wb,'url',None) if wb else None,'local_metrics':'metrics.jsonl'})
     p=cfg['ppo'];steps=int(p['steps']);e=cfg['n_envs'];a=cfg['team_size']*2;shape=(steps,e,a)
@@ -84,7 +88,7 @@ def _train(cfg,folder,max_updates,minutes):
     previous_handler=signal.signal(signal.SIGINT,request_stop)
     def save():
         save_checkpoint(ck,{'format':'attentionforge-checkpoint-v1','config':cfg,'model':model.state_dict(),'optimizer':opt.state_dict(),'learning_transitions':count,'updates':update,'history':history,'history_scores':history_scores,'wandb_id':wbid,'python_rng':random.getstate(),'numpy_rng':np.random.get_state(),'torch_rng':torch.get_rng_state(),'cuda_rng':torch.cuda.get_rng_state_all() if dev.type=='cuda' else None,'training_wall_seconds':previous_wall+time.perf_counter()-start,'physics_ticks':previous_physics+session_physics,'env_decisions':previous_env+session_env})
-    save();print(f'TRAINING: {dev}, {e} arenas, {a} cars, random-initialized attention, Octane, {120/cfg["tick_skip"]:g}Hz decisions. PAUSE.bat or Ctrl+C saves.',flush=True)
+    save();print(f'TRAINING: {dev}, {e} arenas, {a} cars, {sum(p.numel() for p in model.parameters()):,}-parameter attention, Octane, {120/cfg["tick_skip"]:g}Hz decisions. PAUSE.bat or Ctrl+C saves.',flush=True)
     try:
         while not stopping and not stop.exists():
             if max_updates is not None and session_updates>=max_updates:break
@@ -168,7 +172,7 @@ def _train(cfg,folder,max_updates,minutes):
                 while len(history)>cfg['league']['max_history']:
                     old=history.pop(0);(folder/'history'/old).unlink(missing_ok=True);history_scores.pop(old,None)
             elapsed=time.perf_counter()-t0;wall=previous_wall+time.perf_counter()-start
-            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'speed/collection_seconds':rollout_sec,'speed/ppo_seconds':optimize_sec,'performance/gpu_rollout_cache':cache_used,'train/loss':float(summary[0]),'train/approx_kl':float(summary[1]),'train/entropy':float(summary[2]),'train/clip_fraction':float(summary[3]),'train/kl_early_stop':early,'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),('reward/approach_blue_sum' if cfg['rewards'].get('profile')=='rlgym_simple_v1' else 'reward/potential_blue_sum'):float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
+            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'speed/collection_seconds':rollout_sec,'speed/ppo_seconds':optimize_sec,'performance/gpu_rollout_cache':cache_used,'train/loss':float(summary[0]),'train/approx_kl':float(summary[1]),'train/entropy':float(summary[2]),'train/clip_fraction':float(summary[3]),'train/kl_early_stop':early,'train/optimizer_minibatches':len(loss_metrics),'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),('reward/approach_blue_sum' if cfg['rewards'].get('profile')=='rlgym_simple_v1' else 'reward/potential_blue_sum'):float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metrics,allow_nan=False)+'\n')
             atomic_json(folder/'status.json',metrics)
             if wb:

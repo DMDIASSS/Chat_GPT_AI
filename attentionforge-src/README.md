@@ -1,3 +1,9 @@
+# AttentionForge 0.2 laptop update
+
+Start with **[LAPTOP_UPDATE.md](LAPTOP_UPDATE.md)** for the new 1.09M-parameter run, native standard rewards and laptop timing probes. Open **LAPTOP.bat**. Existing `attention01` launchers/runs remain available.
+
+The original 0.1 instructions below describe the legacy 76k run.
+
 # AttentionForge 0.1 — a fresh attention bot
 
 This is a separate project. It does not use Chronos, Galactus, RocketHive, replay retrieval, a selector, pretrained weights or GigaLearn's MLP trainer. It starts with a random **76,251-parameter attention policy**, learns through native RocketSim self-play, and uses batched PyTorch PPO. It reuses an existing Python/CUDA installation and collision meshes when available. It never starts an old trainer.

@@ -6,7 +6,8 @@ def sample_actions(logits):
     # Exponential-race categorical sampling: argmax(logits - log(Exp(1))).
     # Same distribution as softmax/multinomial, without validation reductions
     # that synchronize the GPU with the CPU on every decision.
-    action=(logits-torch.empty_like(logits).exponential_().log()).argmax(-1)
+    noise=torch.empty_like(logits).exponential_().clamp_min_(torch.finfo(logits.dtype).tiny).log_()
+    action=(logits-noise).argmax(-1)
     log_prob=F.log_softmax(logits,dim=-1).gather(-1,action.unsqueeze(-1)).squeeze(-1)
     return action,log_prob
 

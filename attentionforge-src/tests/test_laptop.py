@@ -65,15 +65,7 @@ def test_laptop_model_has_expected_capacity():
     torch.set_num_threads(1);n=ActorCritic(width=256,heads=4,blocks=2)
     assert sum(x.numel() for x in n.parameters())==1091163
 
-def test_attention_fastpath_matches_original_outputs_and_gradients():
-    import copy
-    from attentionforge.model import QueryBlock
-    torch.set_num_threads(1);torch.manual_seed(198)
-    old=QueryBlock(64,4);new=copy.deepcopy(old)
-    x=torch.randn(7,43,64);q=torch.randn(7,1,64);padding=torch.rand(7,43)<.25;padding[:,0]=False
-    def reference(block):
-        k=block.knorm(x);a=q+block.attention(block.qnorm(q),k,k,key_padding_mask=padding,need_weights=False)[0]
-        return a+block.ff(block.norm(a))
-    a=reference(old);b=new(q,x,padding);torch.testing.assert_close(a,b,rtol=2e-5,atol=2e-6)
-    a.square().mean().backward();b.square().mean().backward()
-    for (name,p),(_,other) in zip(old.named_parameters(),new.named_parameters()):torch.testing.assert_close(p.grad,other.grad,rtol=3e-4,atol=2e-7,msg=name)
+@native
+def test_long_run_resume_seed_wrap_is_reproducible():
+    c=config();a=batch(c,n=1,seed=(1<<32)+391);b=batch(c,n=1,seed=391)
+    np.testing.assert_array_equal(a.observe()['world'],b.observe()['world'])

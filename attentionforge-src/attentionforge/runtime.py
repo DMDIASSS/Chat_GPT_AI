@@ -37,7 +37,9 @@ def meshes():
 
 def batch(cfg,n=None,seed=None,kickoffs=False):
     from . import _attention_native
-    return _attention_native.Batch(str(meshes()),int(n or cfg['n_envs']),int(cfg['team_size']),int(cfg['native_threads']),int(cfg['seed'] if seed is None else seed),int(cfg['tick_skip']),int(cfg['action_delay']),float(cfg['ppo']['gamma']),float(cfg['episode_seconds']),float(cfg['no_touch_seconds']),cfg['rewards'],kickoffs)
+    if cfg['rewards'].get('profile')=='rlgym_simple_v1' and getattr(_attention_native,'feature_version',0)<2:
+        raise RuntimeError('The new native module was not loaded. Close trainers/watch windows, re-extract this update, then run SETUP.bat.')
+    return _attention_native.Batch(str(meshes()),int(n or cfg['n_envs']),int(cfg['team_size']),int(cfg['native_threads']),(int(cfg['seed'] if seed is None else seed) % (1<<32)),int(cfg['tick_skip']),int(cfg['action_delay']),float(cfg['ppo']['gamma']),float(cfg['episode_seconds']),float(cfg['no_touch_seconds']),cfg['rewards'],kickoffs)
 
 def config(path=None):return json.loads(Path(path or ROOT/'config.json').read_text())
 
