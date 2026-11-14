@@ -23,7 +23,7 @@ def action_table():
     return np.asarray(a,np.float32)
 ACTIONS=action_table()
 
-def encode(world,pads,locations):
+def encode_reference(world,pads,locations):
     world=np.asarray(world,np.float32); pads=np.asarray(pads,np.float32)
     e,rows,_=world.shape; n=rows-1;team=n//2
     if n not in (2,4,6):raise ValueError('Only balanced 1v1, 2v2, 3v3 are supported')
@@ -70,3 +70,15 @@ def encode(world,pads,locations):
     legal&=~(no_jump[:,:,None]&(ACTIONS[None,None,:,5]>0))
     legal&=~((ego[:,:,15:16]<=0)&(ACTIONS[None,None,:,6]>0))
     return out,legal
+
+# Native execution uses the identical public-state contract. Exports retain the
+# NumPy reference so deployment does not require this training extension.
+try:
+    from . import _attention_native as _native
+except ImportError:
+    _native=None
+
+def encode(world,pads,locations):
+    if _native is not None and hasattr(_native,'encode'):
+        return _native.encode(world,pads,locations)
+    return encode_reference(world,pads,locations)

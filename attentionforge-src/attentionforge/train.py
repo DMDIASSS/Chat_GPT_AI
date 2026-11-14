@@ -1,9 +1,10 @@
-import contextlib,copy,json,os,random,time,signal,sys
+import contextlib,copy,json,os,random,time,signal,sys,math
 from pathlib import Path
 import numpy as np
 import torch
 from torch.distributions import Categorical
 from .model import ActorCritic
+from .performance import sample_actions,RolloutStore
 from .observation import encode
 from .runtime import ROOT,atomic_json,save_checkpoint,source_hashes,batch,device
 
@@ -94,20 +95,22 @@ def _train(cfg,folder,max_updates,minutes):
                 frozen.load_state_dict(load(folder/'history'/selected,dev)['model'])
                 nh=max(1,int(e*cfg['league']['history_env_fraction']))
                 for j in range(nh):histmask[j,(j%2)*cfg['team_size']:((j%2)+1)*cfg['team_size']]=True
-            trainmask=~histmask;stats=np.zeros(8,np.float64);h_w=h_d=h_l=0
+            trainmask=~histmask;stats=np.zeros(8,np.float64);h_w=h_d=h_l=0;timeout_states=[]
+            histidx=torch.as_tensor(np.flatnonzero(histmask.ravel()),device=dev,dtype=torch.long)
             model.eval()
             for t in range(steps):
                 ob[t]=obs;lm[t]=legal
                 with torch.no_grad():
                     ot=torch.as_tensor(obs.reshape(-1,43,40),device=dev);lt=torch.as_tensor(legal.reshape(-1,90),device=dev)
-                    logits,v=model(ot,lt);dist=Categorical(logits=logits);ac=dist.sample();lp=dist.log_prob(ac)
+                    logits,v=model(ot,lt);ac,lp=sample_actions(logits)
                     if selected:
-                        ix=np.flatnonzero(histmask.ravel());hlogits,_=frozen(ot[ix],lt[ix]);ac[ix]=Categorical(logits=hlogits).sample()
-                    actions[t]=ac.cpu().numpy().reshape(e,a);logs[t]=lp.cpu().numpy().reshape(e,a);vals[t]=v.cpu().numpy().reshape(e,a)
+                        hlogits,_=frozen(ot.index_select(0,histidx),lt.index_select(0,histidx));ha,_=sample_actions(hlogits);ac.index_copy_(0,histidx,ha)
+                    packed=torch.stack((ac.float(),lp,v),dim=-1).cpu().numpy().reshape(e,a,3)
+                    actions[t]=packed[:,:,0];logs[t]=packed[:,:,1];vals[t]=packed[:,:,2]
                 raw=env.step(actions[t]);rewards[t]=raw['rewards'];term[t]=raw['terminated'][:,None];trunc[t]=raw['truncated'][:,None];tv[t]=0
                 if np.any(raw['truncated']):
                     ix=np.flatnonzero(raw['truncated']);fo,fl=encode(raw['final_world'][ix],raw['final_pads'][ix],locations)
-                    with torch.no_grad():tv[t,ix]=model(torch.as_tensor(fo.reshape(-1,43,40),device=dev),torch.as_tensor(fl.reshape(-1,90),device=dev))[1].cpu().numpy().reshape(len(ix),a)
+                    timeout_states.append((t,ix,fo.reshape(-1,43,40),fl.reshape(-1,90)))
                 obs,legal=encode(raw['world'],raw['pads'],locations);stats+=raw['info'].sum(axis=0)
                 cars=raw['world'][:,1:]
                 behavior+=np.array([np.linalg.norm(cars[:,:,:3]-raw['world'][:,0:1,:3],axis=-1).mean(),np.linalg.norm(cars[:,:,3:6],axis=-1).mean(),(cars[:,:,16]<0.5).mean(),(actions[t]>=24).mean()])
@@ -121,24 +124,39 @@ def _train(cfg,folder,max_updates,minutes):
                 if t%64==0 and (stopping or stop.exists()):
                     # Complete the fixed rollout for PPO; never optimize uninitialized rows.
                     stopping=True
-            with torch.no_grad():next_v=model(torch.as_tensor(obs.reshape(-1,43,40),device=dev),torch.as_tensor(legal.reshape(-1,90),device=dev))[1].cpu().numpy().reshape(e,a)
+            # All rollout weights remain fixed: timeouts can be evaluated together.
+            vx=np.concatenate([obs.reshape(-1,43,40)]+[x[2] for x in timeout_states],axis=0)
+            vm=np.concatenate([legal.reshape(-1,90)]+[x[3] for x in timeout_states],axis=0)
+            predictions=[]
+            with torch.no_grad():
+                for b in range(0,len(vx),p['batch_size']):
+                    predictions.append(model(torch.as_tensor(vx[b:b+p['batch_size']],device=dev),torch.as_tensor(vm[b:b+p['batch_size']],device=dev))[1].cpu().numpy())
+            predictions=np.concatenate(predictions);next_v=predictions[:e*a].reshape(e,a);offset=e*a
+            for t,ix,fo,fl in timeout_states:
+                size=len(ix)*a;tv[t,ix]=predictions[offset:offset+size].reshape(len(ix),a);offset+=size
             adv,returns=gae(rewards,vals,next_v,term,trunc,tv,p['gamma'],p['gae_lambda'])
             flat=np.flatnonzero(np.broadcast_to(trainmask,shape).reshape(-1));new_samples=len(flat);rollout_sec=time.perf_counter()-t0
             af=adv.reshape(-1)[flat];advflat=adv.reshape(-1);advflat[flat]=(af-af.mean())/(af.std()+1e-8)
-            losses=[];kls=[];entropies=[];clipfracs=[];model.train();early=False
+            loss_metrics=[];model.train();early=False
+            store=RolloutStore([ob.reshape(-1,43,40),lm.reshape(-1,90),actions.reshape(-1),logs.reshape(-1),advflat,returns.reshape(-1)],dev,cfg.get('performance',{}).get('rollout_cache_mb',512))
+            optimize_start=time.perf_counter()
             for epoch in range(p['epochs']):
                 np.random.shuffle(flat)
+                permutation=store.permutation(flat)
                 for s in range(0,len(flat),p['batch_size']):
-                    idx=flat[s:s+p['batch_size']]
-                    x=torch.as_tensor(ob.reshape(-1,43,40)[idx],device=dev);l=torch.as_tensor(lm.reshape(-1,90)[idx],device=dev)
-                    logits,v=model(x,l);dist=Categorical(logits=logits);old=torch.as_tensor(logs.reshape(-1)[idx],device=dev);ac=torch.as_tensor(actions.reshape(-1)[idx],device=dev);ad=torch.as_tensor(advflat[idx],device=dev);ret=torch.as_tensor(returns.reshape(-1)[idx],device=dev)
+                    idx=permutation[s:s+p['batch_size']]
+                    x,l,ac,old,ad,ret=store.get(idx)
+                    logits,v=model(x,l);dist=Categorical(logits=logits,validate_args=False)
                     diff=dist.log_prob(ac)-old;ratio=diff.exp();kl=((ratio-1)-diff).mean()
-                    if not torch.isfinite(kl):raise FloatingPointError('Nonfinite PPO KL; latest saved checkpoint preserved')
-                    if kl.item()>p['target_kl']*1.5:early=True;break
                     policy=-torch.minimum(ad*ratio,ad*ratio.clamp(1-p['clip'],1+p['clip'])).mean();vl=0.5*(v-ret).square().mean();entropy=dist.entropy().mean();loss=policy+p['value']*vl-p['entropy']*entropy
-                    if not torch.isfinite(loss):raise FloatingPointError('Nonfinite PPO loss; latest saved checkpoint preserved')
-                    opt.zero_grad(set_to_none=True);loss.backward();torch.nn.utils.clip_grad_norm_(model.parameters(),p['max_grad_norm'],error_if_nonfinite=True);opt.step();losses.append(loss.item());kls.append(kl.item());entropies.append(entropy.item());clipfracs.append(((ratio-1).abs()>p['clip']).float().mean().item())
+                    health=torch.stack((kl.detach(),loss.detach())).cpu().numpy()
+                    if not np.isfinite(health).all():raise FloatingPointError('Nonfinite PPO loss/KL; latest saved checkpoint preserved')
+                    if health[0]>p['target_kl']*1.5:early=True;break
+                    opt.zero_grad(set_to_none=True);loss.backward();torch.nn.utils.clip_grad_norm_(model.parameters(),p['max_grad_norm'],error_if_nonfinite=True);opt.step();loss_metrics.append(torch.stack((loss.detach(),kl.detach(),entropy.detach(),((ratio.detach()-1).abs()>p['clip']).float().mean())))
                 if early:break
+            cache_used=store.cached;del store
+            summary=torch.stack(loss_metrics).mean(0).cpu().numpy() if loss_metrics else np.zeros(4)
+            optimize_sec=time.perf_counter()-optimize_start
             count+=new_samples;update+=1;session_updates+=1;session_env+=steps*e;session_physics+=int(stats[7])
             if selected and h_w+h_l:
                 score=h_w/(h_w+h_l);history_scores[selected]=0.8*history_scores.get(selected,0.5)+0.2*score
@@ -150,7 +168,7 @@ def _train(cfg,folder,max_updates,minutes):
                 while len(history)>cfg['league']['max_history']:
                     old=history.pop(0);(folder/'history'/old).unlink(missing_ok=True);history_scores.pop(old,None)
             elapsed=time.perf_counter()-t0;wall=previous_wall+time.perf_counter()-start
-            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'train/loss':float(np.mean(losses)) if losses else 0.,'train/approx_kl':float(np.mean(kls)) if kls else 0.,'train/entropy':float(np.mean(entropies)) if entropies else 0.,'train/clip_fraction':float(np.mean(clipfracs)) if clipfracs else 0.,'train/kl_early_stop':early,'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),'reward/potential_blue_sum':float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
+            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'speed/collection_seconds':rollout_sec,'speed/ppo_seconds':optimize_sec,'performance/gpu_rollout_cache':cache_used,'train/loss':float(summary[0]),'train/approx_kl':float(summary[1]),'train/entropy':float(summary[2]),'train/clip_fraction':float(summary[3]),'train/kl_early_stop':early,'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),('reward/approach_blue_sum' if cfg['rewards'].get('profile')=='rlgym_simple_v1' else 'reward/potential_blue_sum'):float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metrics,allow_nan=False)+'\n')
             atomic_json(folder/'status.json',metrics)
             if wb:

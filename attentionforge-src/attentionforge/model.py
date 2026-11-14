@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 class QueryBlock(nn.Module):
     def __init__(self, width, heads):
@@ -9,8 +10,17 @@ class QueryBlock(nn.Module):
         self.norm=nn.LayerNorm(width)
         self.ff=nn.Sequential(nn.Linear(width,width*2),nn.GELU(),nn.Linear(width*2,width))
     def forward(self,q,entities,padding):
-        k=self.knorm(entities)
-        q=q+self.attention(self.qnorm(q),k,k,key_padding_mask=padding,need_weights=False)[0]
+        # Keep [batch, entities, width] throughout projection. nn.MultiheadAttention
+        # otherwise transposes this cross-attention to sequence-first and copies
+        # packed keys/values back. Reuse its exact weights/checkpoint names.
+        x=self.knorm(entities);batch,length,width=x.shape
+        heads=self.attention.num_heads;depth=width//heads
+        w=self.attention.in_proj_weight;b=self.attention.in_proj_bias
+        query=F.linear(self.qnorm(q),w[:width],b[:width]).reshape(batch,1,heads,depth).transpose(1,2)
+        kv=F.linear(x,w[width:],b[width:]).reshape(batch,length,2,heads,depth).permute(2,0,3,1,4)
+        attended=F.scaled_dot_product_attention(query,kv[0],kv[1],attn_mask=(~padding)[:,None,None,:],dropout_p=0.0)
+        attended=attended.transpose(1,2).reshape(batch,1,width)
+        q=q+F.linear(attended,self.attention.out_proj.weight,self.attention.out_proj.bias)
         return q+self.ff(self.norm(q))
 
 class ActorCritic(nn.Module):

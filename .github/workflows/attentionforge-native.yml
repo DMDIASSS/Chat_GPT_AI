@@ -27,6 +27,7 @@ jobs:
           cmake --build build --config Release --parallel 4
           Copy-Item build/Release/_attention_native*.pyd attentionforge/
       - run: python -c "from attentionforge import _attention_native as n; from attentionforge.observation import ACTIONS; import numpy as np; np.testing.assert_array_equal(n.action_table(), ACTIONS); print('WINDOWS_NATIVE_LOAD_ACTION_PARITY_PASS', n.contract)"
+      - run: python tests/windows_native_smoke.py
       - uses: actions/upload-artifact@v4
         with:
           name: attentionforge-cp311-windows-x64

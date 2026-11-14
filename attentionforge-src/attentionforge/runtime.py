@@ -61,5 +61,5 @@ def save_checkpoint(path,payload):
         if os.path.exists(tmp):os.unlink(tmp)
 
 def source_hashes():
-    paths=list((ROOT/'attentionforge').glob('*.py'))+[ROOT/'native/core.cpp',ROOT/'config.json']
+    paths=list((ROOT/'attentionforge').glob('*.py'))+list((ROOT/'native').glob('*.cpp'))+list((ROOT/'native').glob('*.h'))+[ROOT/'config.json']
     return {str(p.relative_to(ROOT)):sha(p) for p in paths if p.exists()}

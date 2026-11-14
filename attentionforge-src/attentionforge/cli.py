@@ -37,8 +37,9 @@ def verify(cfg):
     with torch.no_grad():logits,v=model(torch.from_numpy(o.reshape(-1,43,40)),torch.from_numpy(m.reshape(-1,90)))
     assert torch.isfinite(logits).all() and torch.isfinite(v).all()
     for _ in range(30):r=env.step(np.full((2,cfg['team_size']*2),8,np.int64))
-    assert np.isfinite(r['world']).all() and np.isfinite(r['rewards']).all();np.testing.assert_allclose(r['rewards'].sum(1),0,atol=1e-6)
-    print('VERIFY_PASS: native load, 90-action parity, finite public observations, attention inference, zero-sum rewards. This does not certify playing strength.',flush=True)
+    assert np.isfinite(r['world']).all() and np.isfinite(r['rewards']).all();
+    if cfg['rewards'].get('profile')!='rlgym_simple_v1':np.testing.assert_allclose(r['rewards'].sum(1),0,atol=1e-6)
+    print('VERIFY_PASS: native load, 90-action parity, finite public observations, attention inference, finite rewards. This does not certify playing strength.',flush=True)
 
 def report(folder):
     folder=Path(folder)
@@ -50,7 +51,7 @@ def report(folder):
         for pattern in ('config.json','status.json','provenance.json','metrics.jsonl','wandb_status.json','eval_*.json'):
             for p in folder.glob(pattern):z.write(p,'run/'+p.name)
         for p in (ROOT/'attentionforge').glob('*.py'):z.write(p,'source/attentionforge/'+p.name)
-        for p in (ROOT/'native/core.cpp',ROOT/'config.json',ROOT/'benchmark.json'):
+        for p in (ROOT/'native/core.cpp',ROOT/'config.json',ROOT/'benchmark.json',ROOT/'laptop_autotune.json',ROOT/'FRAMEWORK_REVIEW.md',ROOT/'REWARD_SOURCES.md'):
             if p.is_file():z.write(p,'source/'+str(p.relative_to(ROOT)))
     print('REPORT_READY:',target);return target
 
@@ -94,7 +95,7 @@ def export(folder):
     print('EXPORT_READY:',out,'; logits/actions match. RLBot v4 game launch requires local testing. v5/.lt is not claimed.',flush=True)
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['verify','benchmark','train','pause','watch','report','export','evaluate']);ap.add_argument('--run',default='attention01');ap.add_argument('--config');ap.add_argument('--minutes',type=float);ap.add_argument('--updates',type=int);ap.add_argument('--seconds',type=float,default=10);ap.add_argument('--frames',type=int);ap.add_argument('--headless',action='store_true');ap.add_argument('--rounds',type=int,default=100);ap.add_argument('--opponent');ap.add_argument('--seed',type=int);args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['verify','benchmark','train','pause','watch','report','export','evaluate','tune','laptop']);ap.add_argument('--run',default='attention01');ap.add_argument('--config');ap.add_argument('--minutes',type=float);ap.add_argument('--updates',type=int);ap.add_argument('--seconds',type=float,default=10);ap.add_argument('--frames',type=int);ap.add_argument('--headless',action='store_true');ap.add_argument('--rounds',type=int,default=100);ap.add_argument('--opponent');ap.add_argument('--seed',type=int);args=ap.parse_args()
     if Path(args.run).name!=args.run or args.run in ('.','..'):ap.error('--run must be a simple folder name')
     cfg=config(args.config);folder=ROOT/'runs'/args.run
     if args.command=='train':train(cfg,folder,args.updates,args.minutes)
@@ -106,6 +107,12 @@ def main():
     elif args.command=='report':report(folder)
     elif args.command=='verify':verify(cfg)
     elif args.command=='benchmark':benchmark(cfg,args.seconds)
+    elif args.command=='tune':
+        from .tune import tune
+        tune()
+    elif args.command=='laptop':
+        from .laptop import menu
+        menu(args.run)
     elif args.command=='evaluate':
         from .evaluate import evaluate
         evaluate(folder,args.rounds,args.seconds,args.opponent,args.seed)
