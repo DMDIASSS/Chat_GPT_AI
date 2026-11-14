@@ -156,7 +156,7 @@ public:
  void drill_fraction(float fraction){if(!std::isfinite(fraction)||fraction<0||fraction>1)throw std::invalid_argument("Invalid drill fraction");for(auto&e:envs)e->drillFraction=fraction;}
  // Complete public pose injection for bounded ground-driving diagnostics.
  void set_ground(int i,py::array_t<float,py::array::c_style|py::array::forcecast> data){
-  test_state(i,data);auto&e=*envs[i];auto p=data.data();
+  if(i<0||i>=count)throw std::invalid_argument("bad arena index");envs[i]->reset(true);test_state(i,data);auto&e=*envs[i];auto p=data.data();
   for(int a=0;a<agents;a++){auto q=p+(a+1)*32;auto c=e.cars[a]->GetState();Vec f(q[9],q[10],q[11]),u(q[12],q[13],q[14]);
    if(f.Length()<.99f||u.Length()<.99f||std::abs(f.Dot(u))>.01f)throw std::invalid_argument("Ground diagnostic requires orthonormal public orientation");
    c.rotMat=RotMat(f.Normalized(),u.Cross(f).Normalized(),u.Normalized());c.angVel={q[6],q[7],q[8]};e.cars[a]->SetState(c);
