@@ -12,6 +12,7 @@
 #include <cmath>
 namespace py=pybind11;
 using namespace RocketSim;
+#include "control_rewards.h"
 
 // Persistent arena workers. Each arena owns its random stream, independent of scheduling.
 class Pool {
@@ -31,32 +32,66 @@ void vec(float*p,Vec v){p[0]=v.x;p[1]=v.y;p[2]=v.z;}
 void controls(float*p,const CarControls&c){p[0]=c.throttle;p[1]=c.steer;p[2]=c.pitch;p[3]=c.yaw;p[4]=c.roll;p[5]=c.jump;p[6]=c.boost;p[7]=c.handbrake;}
 struct Env {
  Arena* arena=nullptr;std::vector<Car*> cars;std::mt19937 rng;std::default_random_engine physics;
- int goal=-1,ticks=0,noTouch=0;float potential=0;std::vector<int> lastTouch;std::vector<CarControls> previous;
- Env(int team,unsigned seed):rng(seed),physics(seed){ArenaConfig cfg;cfg.noBallRot=false;arena=Arena::Create(GameMode::SOCCAR,cfg,120);for(int t=0;t<2;t++)for(int k=0;k<team;k++)cars.push_back(arena->AddCar(t?Team::ORANGE:Team::BLUE,CAR_CONFIG_OCTANE));lastTouch.resize(cars.size(),-100000);previous.resize(cars.size());arena->SetGoalScoreCallback([](Arena*,Team t,void*ptr){((Env*)ptr)->goal=int(t);},this);}
+ int goal=-1,ticks=0,noTouch=0;float potential=0,goalSpeed=0;ShotTrace shot;std::vector<int> lastTouch;std::vector<CarControls> previous;
+ Env(int team,unsigned seed):rng(seed),physics(seed){ArenaConfig cfg;cfg.noBallRot=false;arena=Arena::Create(GameMode::SOCCAR,cfg,120);for(int t=0;t<2;t++)for(int k=0;k<team;k++)cars.push_back(arena->AddCar(t?Team::ORANGE:Team::BLUE,CAR_CONFIG_OCTANE));lastTouch.resize(cars.size(),-100000);previous.resize(cars.size());arena->SetGoalScoreCallback([](Arena*ar,Team t,void*ptr){auto*e=(Env*)ptr;e->goal=int(t);e->goalSpeed=ar->ball->GetState().vel.Length();},this);}
  ~Env(){delete arena;}
+ float control(float radius,float epsilon){
+  auto b=arena->ball->GetState();float d[2]={1e9f,1e9f};bool valid[2]={false,false};
+  for(size_t a=0;a<cars.size();a++){auto c=cars[a]->GetState();int t=a>=cars.size()/2;if(c.isDemoed)continue;valid[t]=true;d[t]=std::min(d[t],(c.pos-b.pos).Length());}
+  return valid[0]&&valid[1]?control_value(d[0],d[1],radius,epsilon):0.f;
+ }
  float phi(){auto b=arena->ball->GetState();float v[2]={0,0};for(size_t i=0;i<cars.size();i++){auto s=cars[i]->GetState();float c=s.isDemoed?0:std::exp(-(s.pos-b.pos).Length()/1500.f);int t=i>=cars.size()/2;v[t]=std::max(v[t],c);}return v[0]-v[1];}
  void reset(bool kickoffOnly){Math::GetRandEngine()=physics;arena->ResetToRandomKickoff(int(rng()%1000000000));if(!kickoffOnly&&(rng()%2)){BallState b;b.pos={float(int(rng()%5001)-2500),float(int(rng()%7001)-3500),94};arena->ball->SetState(b);for(size_t i=0;i<cars.size();i++){CarState s;float x=std::clamp(b.pos.x+float(int(rng()%2401)-1200),-3500.f,3500.f),y=std::clamp(b.pos.y+float(int(rng()%2401)-1200),-4500.f,4500.f);s.pos={x,y,17};float yaw=float(rng()%6284)/1000-3.14159f;s.rotMat=Angle(yaw,0,0).ToRotMat();s.boost=float(rng()%101);cars[i]->SetState(s);}}
- physics=Math::GetRandEngine();goal=-1;ticks=noTouch=0;std::fill(lastTouch.begin(),lastTouch.end(),-100000);std::fill(previous.begin(),previous.end(),CarControls{});for(auto*c:cars)c->controls=CarControls{};potential=phi();}
+ physics=Math::GetRandEngine();goal=-1;goalSpeed=0;shot.reset();ticks=noTouch=0;std::fill(lastTouch.begin(),lastTouch.end(),-100000);std::fill(previous.begin(),previous.end(),CarControls{});for(auto*c:cars)c->controls=CarControls{};potential=phi();}
  void write(float*w,float*p){auto b=arena->ball->GetState();vec(w,b.pos);vec(w+3,b.vel);vec(w+6,b.angVel);vec(w+9,b.rotMat.forward);vec(w+12,b.rotMat.up);for(size_t i=0;i<cars.size();i++){auto s=cars[i]->GetState();float*q=w+32*(i+1);vec(q,s.pos);vec(q+3,s.vel);vec(q+6,s.angVel);vec(q+9,s.rotMat.forward);vec(q+12,s.rotMat.up);q[15]=s.boost;q[16]=s.isOnGround;q[17]=s.hasJumped;q[18]=s.hasDoubleJumped||s.hasFlipped;q[19]=s.isSupersonic;q[20]=s.isDemoed;controls(q+21,previous[i]);}int j=0;for(auto*pad:arena->GetBoostPads()){auto s=pad->GetState();p[j++]=s.isActive;p[j++]=s.cooldown;}}
 };
 // See REWARD_SOURCES.md: native ports of three established RLGym reward definitions.
 class Batch {
- int count,team,agents,skip,delay,maxTicks,noTouchTicks;float gamma,goalW,approachW,touchW,controlW;bool kickoffOnly; bool simpleRewards=false;
+ int count,team,agents,skip,delay,maxTicks,noTouchTicks;float gamma,goalW,approachW,touchW,controlW;bool kickoffOnly; bool simpleRewards=false,controlRewards=false;float possessionRate=0,goalNoFloor=0,goalSpeedWeight=0,controlRadius=1000,controlEpsilon=100;int shotMaxAge=720;
  std::vector<std::unique_ptr<Env>> envs;std::vector<CarControls> table;Pool pool;
 public:
  Batch(std::string meshes,int n,int teamSize,int threads,unsigned seed,int tickSkip,int actionDelay,float discount,float maxSeconds,float noTouchSeconds,py::dict reward,bool kickoffs):count(n),team(teamSize),agents(teamSize*2),skip(tickSkip),delay(actionDelay),maxTicks(int(maxSeconds*120)),noTouchTicks(int(noTouchSeconds*120)),gamma(discount),kickoffOnly(kickoffs),table(actions()),pool(std::clamp(threads,1,8)){
  if(n<1||n>512||team<1||team>3||skip<1||skip>16||delay<0||delay>=skip||maxTicks<skip||noTouchTicks<skip||gamma<=0||gamma>1)throw std::invalid_argument("Invalid native batch contract");
- simpleRewards=reward.contains("profile")&&py::cast<std::string>(reward["profile"])=="rlgym_simple_v1";
+ std::string profile=reward.contains("profile")?py::cast<std::string>(reward["profile"]):"legacy";
+ if(profile!="legacy"&&profile!="rlgym_simple_v1"&&profile!="control_shots_v1")throw std::invalid_argument("Unknown reward profile");
+ controlRewards=profile=="control_shots_v1";simpleRewards=profile!="legacy";
+ if(controlRewards){
+  possessionRate=reward.contains("possession_rate")?py::cast<float>(reward["possession_rate"]):.2f;
+  goalNoFloor=reward.contains("goal_no_floor")?py::cast<float>(reward["goal_no_floor"]):0.f;
+  goalSpeedWeight=reward.contains("goal_speed")?py::cast<float>(reward["goal_speed"]):0.f;
+  controlRadius=reward.contains("control_radius")?py::cast<float>(reward["control_radius"]):1000.f;
+  controlEpsilon=reward.contains("distance_epsilon")?py::cast<float>(reward["distance_epsilon"]):100.f;
+  float ageSeconds=reward.contains("shot_max_age_seconds")?py::cast<float>(reward["shot_max_age_seconds"]):6.f;
+  if(!std::isfinite(ageSeconds)||ageSeconds<1.f/120||ageSeconds>600)throw std::invalid_argument("Invalid shot age window");
+  shotMaxAge=int(120*ageSeconds);
+  if(!std::isfinite(possessionRate)||!std::isfinite(goalNoFloor)||!std::isfinite(goalSpeedWeight)||!std::isfinite(controlRadius)||!std::isfinite(controlEpsilon)||possessionRate<0||goalNoFloor<0||goalSpeedWeight<0||controlRadius<=0||controlEpsilon<=0||shotMaxAge<1)throw std::invalid_argument("Invalid control/shot reward configuration");
+ }
  goalW=py::cast<float>(reward["goal"]);approachW=py::cast<float>(reward["approach"]);touchW=py::cast<float>(reward["touch"]);controlW=py::cast<float>(reward["control_progress"]);
  static std::once_flag init;std::call_once(init,[&]{RocketSim::Init(meshes,true);});for(int i=0;i<count;i++){envs.emplace_back(new Env(team,seed+7919*i));envs.back()->reset(kickoffOnly);}}
  py::array_t<float> locations(){py::array_t<float>r({34,4});float*p=r.mutable_data();for(auto*b:envs[0]->arena->GetBoostPads()){vec(p,b->config.pos);p[3]=b->config.isBig;p+=4;}return r;}
  py::dict observe(){py::array_t<float>w({count,agents+1,32}),p({count,34,2});std::fill(w.mutable_data(),w.mutable_data()+w.size(),0.f);for(int i=0;i<count;i++)envs[i]->write(w.mutable_data()+i*(agents+1)*32,p.mutable_data()+i*68);py::dict d;d["world"]=w;d["pads"]=p;return d;}
  py::dict step(py::array_t<int64_t,py::array::c_style|py::array::forcecast> ac){if(ac.ndim()!=2||ac.shape(0)!=count||ac.shape(1)!=agents)throw std::invalid_argument("actions must have shape [arenas, cars]");auto ap=ac.data();for(int i=0;i<count*agents;i++)if(ap[i]<0||ap[i]>=int(table.size()))throw std::invalid_argument("action outside table");
- py::array_t<float>w({count,agents+1,32}),p({count,34,2}),fw({count,agents+1,32}),fp({count,34,2}),rw({count,agents}),info({count,8});py::array_t<bool>term(count),trunc(count);
- float*wp=w.mutable_data(),*pp=p.mutable_data(),*fwp=fw.mutable_data(),*fpp=fp.mutable_data(),*rp=rw.mutable_data(),*ip=info.mutable_data();bool*te=term.mutable_data(),*tr=trunc.mutable_data();std::fill(wp,wp+w.size(),0);std::fill(fwp,fwp+fw.size(),0);std::fill(ip,ip+info.size(),0);
- {py::gil_scoped_release release;pool.run(count,[&](int i){Env&e=*envs[i];Math::GetRandEngine()=e.physics;uint64_t before=e.arena->tickCount;bool touched[2]={false,false};bool carTouched[6]={};float touches[2]={0,0};
+ py::array_t<float>w({count,agents+1,32}),p({count,34,2}),fw({count,agents+1,32}),fp({count,34,2}),rw({count,agents}),info({count,8}),rewardInfo({count,10});py::array_t<bool>term(count),trunc(count);
+ float*wp=w.mutable_data(),*pp=p.mutable_data(),*fwp=fw.mutable_data(),*fpp=fp.mutable_data(),*rp=rw.mutable_data(),*ip=info.mutable_data(),*xp=rewardInfo.mutable_data();bool*te=term.mutable_data(),*tr=trunc.mutable_data();std::fill(wp,wp+w.size(),0);std::fill(fwp,fwp+fw.size(),0);std::fill(ip,ip+info.size(),0);std::fill(xp,xp+rewardInfo.size(),0);
+ {py::gil_scoped_release release;pool.run(count,[&](int i){Env&e=*envs[i];Math::GetRandEngine()=e.physics;uint64_t before=e.arena->tickCount;bool touched[2]={false,false};bool carTouched[6]={};float touches[2]={0,0};int floorTicks=0;
  // One physics tick holds the previous decision, then the new action is applied.
- for(int k=0;k<skip;k++){if(k==delay)for(int a=0;a<agents;a++)e.cars[a]->controls=table[ap[i*agents+a]];e.arena->Step(1);e.ticks++;e.noTouch++;for(int a=0;a<agents;a++){auto s=e.cars[a]->GetState();if(s.ballHitInfo.isValid&&s.ballHitInfo.tickCountWhenHit>=before&&s.ballHitInfo.tickCountWhenHit==e.arena->tickCount-1){int t=a>=team;touched[t]=true;carTouched[a]=true;e.noTouch=0;if(e.ticks-e.lastTouch[a]>=30){touches[t]+=1;e.lastTouch[a]=e.ticks;}}}if(e.goal>=0)break;}
+ for(int k=0;k<skip;k++){
+  if(k==delay)for(int a=0;a<agents;a++)e.cars[a]->controls=table[ap[i*agents+a]];
+  e.arena->Step(1);e.ticks++;e.noTouch++;int teamBits=0;
+  for(int a=0;a<agents;a++){
+   auto state=e.cars[a]->GetState();
+   if(state.ballHitInfo.isValid&&state.ballHitInfo.tickCountWhenHit>=before&&state.ballHitInfo.tickCountWhenHit==e.arena->tickCount-1){
+    int t=a>=team;touched[t]=true;carTouched[a]=true;teamBits|=1<<t;e.noTouch=0;
+    if(e.ticks-e.lastTouch[a]>=30){touches[t]+=1;e.lastTouch[a]=e.ticks;}
+   }
+  }
+  if(controlRewards){
+   // Same-tick floor + touch is conservatively classified as a floor contact.
+   e.shot.observe(teamBits,false,e.ticks);
+   if(goalNoFloor>0&&e.shot.owner>=0&&!e.shot.floorSeen){bool floor=ball_floor_contact(e.arena);if(floor){e.shot.floorSeen=true;floorTicks++;}}
+  }
+  if(e.goal>=0)break;
+ }
  for(int a=0;a<agents;a++)e.previous[a]=table[ap[i*agents+a]];e.physics=Math::GetRandEngine();te[i]=e.goal>=0;tr[i]=!te[i]&&(e.ticks>=maxTicks||e.noTouch>=noTouchTicks);
  float g=e.goal<0?0:(e.goal==0?1.f:-1.f);float ph=e.phi();float shaping=approachW*(gamma*(te[i]?0:ph)-e.potential);e.potential=ph;float ctrl[2]={0,0};auto ball=e.arena->ball->GetState();for(int a=0;a<agents;a++){auto s=e.cars[a]->GetState();int t=a>=team;Vec target(0,t?-5120:5120,300);Vec dir=target-ball.pos;float den=std::max(1.f,dir.Length());float progress=std::clamp(ball.vel.Dot(dir)/den/2300.f,0.f,1.f);float close=std::clamp(1-(s.pos-ball.pos).Length()/600.f,0.f,1.f);float match=std::exp(-(s.vel-ball.vel).Length()/800.f);if(!s.isDemoed)ctrl[t]=std::max(ctrl[t],close*match*progress);}
  float touch=touchW*(std::min(1.f,touches[0])-std::min(1.f,touches[1]));float control=controlW*(float(e.arena->tickCount-before)/120)*(ctrl[0]-ctrl[1]);float r=goalW*g+shaping+touch+control;for(int a=0;a<agents;a++)rp[i*agents+a]=(a<team?r:-r);
@@ -71,13 +106,28 @@ public:
   }
   shaping=vpbBlue;touch=touchBlue;control=0;
  }
+ if(controlRewards){
+  float score=e.control(controlRadius,controlEpsilon);float possession=possessionRate*float(e.arena->tickCount-before)/120*score;
+  bool credited=e.goal>=0&&e.shot.credited(e.goal,e.ticks,shotMaxAge);
+  bool clean=credited&&!e.shot.floorSeen;
+  float cleanBonus=clean?goalNoFloor*g:0.f;
+  float speedBonus=credited?goalSpeedWeight*std::clamp(e.goalSpeed/6000.f,0.f,1.f)*g:0.f;
+  for(int a=0;a<agents;a++)rp[i*agents+a]+=(a<team?1.f:-1.f)*(possession+cleanBonus+speedBonus);
+  xp[i*10]=score;xp[i*10+1]=possession;xp[i*10+2]=cleanBonus;xp[i*10+3]=speedBonus;
+  xp[i*10+4]=(clean&&goalNoFloor>0)?1.f:0.f;xp[i*10+5]=e.goal>=0?e.goalSpeed:0;
+  xp[i*10+6]=credited?1.f:0.f;xp[i*10+7]=float(floorTicks);xp[i*10+8]=float(e.shot.owner);xp[i*10+9]=e.shot.owner>=0?(e.ticks-e.shot.touchTick)/120.f:-1.f;
+ }
  ip[i*8]=g;ip[i*8+1]=touched[0];ip[i*8+2]=touched[1];ip[i*8+3]=goalW*g;ip[i*8+4]=shaping;ip[i*8+5]=touch;ip[i*8+6]=control;ip[i*8+7]=float(e.arena->tickCount-before);
  e.write(fwp+i*(agents+1)*32,fpp+i*68);if(te[i]||tr[i])e.reset(kickoffOnly);e.write(wp+i*(agents+1)*32,pp+i*68);
  });}
- py::dict d;d["world"]=w;d["pads"]=p;d["final_world"]=fw;d["final_pads"]=fp;d["rewards"]=rw;d["terminated"]=term;d["truncated"]=trunc;d["info"]=info;return d;
+ py::dict d;d["world"]=w;d["pads"]=p;d["final_world"]=fw;d["final_pads"]=fp;d["rewards"]=rw;d["terminated"]=term;d["truncated"]=trunc;d["info"]=info;d["reward_info"]=rewardInfo;return d;
  }
+ py::dict inspect(int i){if(i<0||i>=count)throw std::invalid_argument("bad arena index");auto&e=*envs[i];py::dict d;d["floor_contact"]=ball_floor_contact(e.arena);d["floor_tracking_enabled"]=controlRewards&&goalNoFloor>0;d["last_touch_team"]=e.shot.owner;d["floor_since_touch"]=e.shot.floorSeen;d["age_ticks"]=e.ticks-e.shot.touchTick;return d;}
  // Controlled, bounded state injection for contract tests only; not used during training.
- void test_state(int i,py::array_t<float,py::array::c_style|py::array::forcecast> data){if(i<0||i>=count||data.ndim()!=2||data.shape(0)!=agents+1||data.shape(1)!=32)throw std::invalid_argument("bad test state");auto& e=*envs[i];auto p=data.data();BallState b;b.pos={p[0],p[1],p[2]};b.vel={p[3],p[4],p[5]};e.arena->ball->SetState(b);for(int a=0;a<agents;a++){auto q=p+(a+1)*32;CarState s;s.pos={q[0],q[1],q[2]};s.vel={q[3],q[4],q[5]};s.rotMat=Angle(0,0,0).ToRotMat();s.boost=q[15];e.cars[a]->SetState(s);}e.goal=-1;e.potential=e.phi();}
+ void test_state(int i,py::array_t<float,py::array::c_style|py::array::forcecast> data){if(i<0||i>=count||data.ndim()!=2||data.shape(0)!=agents+1||data.shape(1)!=32)throw std::invalid_argument("bad test state");auto& e=*envs[i];auto p=data.data();BallState b;b.pos={p[0],p[1],p[2]};b.vel={p[3],p[4],p[5]};e.arena->ball->SetState(b);for(int a=0;a<agents;a++){auto q=p+(a+1)*32;CarState s;s.pos={q[0],q[1],q[2]};s.vel={q[3],q[4],q[5]};s.rotMat=Angle(0,0,0).ToRotMat();s.boost=q[15];e.cars[a]->SetState(s);}e.goal=-1;e.goalSpeed=0;e.shot.reset();e.potential=e.phi();}
 };
 #include "features.h"
-PYBIND11_MODULE(_attention_native,m){m.def("encode",&encode_native);m.attr("feature_version")=2;m.doc()="AttentionForge RocketSim vector environment v1; Octane, 120Hz";m.attr("contract")="attentionforge-v1-raw32-delay1";m.def("action_table",[]{auto a=actions();py::array_t<float>r({int(a.size()),8});for(size_t i=0;i<a.size();i++)controls(r.mutable_data()+i*8,a[i]);return r;});py::class_<Batch>(m,"Batch").def(py::init<std::string,int,int,int,unsigned,int,int,float,float,float,py::dict,bool>()).def("observe",&Batch::observe).def("step",&Batch::step).def("pad_locations",&Batch::locations).def("test_state",&Batch::test_state);}
+PYBIND11_MODULE(_attention_native,m){m.def("encode",&encode_native);m.attr("reward_version")=1;
+ m.def("control_value",&control_value);
+ py::class_<ShotTrace>(m,"ShotTrace").def(py::init<>()).def("reset",&ShotTrace::reset).def("observe",&ShotTrace::observe).def("credited",&ShotTrace::credited).def("clean",&ShotTrace::clean);
+m.attr("feature_version")=2;m.doc()="AttentionForge RocketSim vector environment v1; Octane, 120Hz";m.attr("contract")="attentionforge-v1-raw32-delay1";m.def("action_table",[]{auto a=actions();py::array_t<float>r({int(a.size()),8});for(size_t i=0;i<a.size();i++)controls(r.mutable_data()+i*8,a[i]);return r;});py::class_<Batch>(m,"Batch").def(py::init<std::string,int,int,int,unsigned,int,int,float,float,float,py::dict,bool>()).def("observe",&Batch::observe).def("inspect",&Batch::inspect).def("step",&Batch::step).def("pad_locations",&Batch::locations).def("test_state",&Batch::test_state);}

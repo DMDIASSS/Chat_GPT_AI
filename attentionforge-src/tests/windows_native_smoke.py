@@ -14,3 +14,8 @@ for team in (1,2,3):
     a,m=n.encode(w,p,loc);b,l=encode_reference(w,p,loc)
     np.testing.assert_allclose(a,b,rtol=2e-6,atol=2e-6);np.testing.assert_array_equal(m,l)
 print('WINDOWS_NATIVE_ACTION_AND_OBSERVATION_PARITY_PASS')
+
+assert n.reward_version>=1
+assert abs(n.control_value(200.,2000.,1000.,100.)+n.control_value(2000.,200.,1000.,100.))<1e-6
+s=n.ShotTrace();s.observe(1,False,1);assert s.clean(0,2,720);s.observe(0,True,3);assert not s.clean(0,4,720)
+print('WINDOWS_REWARD_MATH_AND_TRACKER_PASS')
