@@ -52,6 +52,7 @@ def encode(world,pads,locations):
     rotation=np.stack([sign,sign,np.ones(n,np.float32)],axis=-1)[None,:,None,:]
     out[:,:,:,9:12]=selected[:,:,:,9:12]*rotation
     out[:,:,:,12:15]=selected[:,:,:,12:15]*rotation
+    out[:,:,1,9:15]=0 # Ball orientation is not a portable public-state feature.
     out[:,:,:,15]=selected[:,:,:,15]/100
     out[:,:,:,16:21]=selected[:,:,:,16:21]
     out[:,:,:,23]=1-selected[:,:,:,18]

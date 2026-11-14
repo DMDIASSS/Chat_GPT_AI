@@ -18,7 +18,7 @@ def find_viewer():
 class Viewer:
     def __init__(self):
         root,exe=find_viewer();print('VIEWER:',root,flush=True)
-        self.proc=subprocess.Popen([str(exe),str(root/'src/main.py')],cwd=root)
+        self.proc=subprocess.Popen([str(exe),str(ROOT/'tools/viewer_bootstrap.py'),str(root)],cwd=root)
         self.sock=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
     def send(self,raw,locations):
         if self.proc.poll() is not None:raise RuntimeError('RocketSimVis closed or failed; read its error in this console.')

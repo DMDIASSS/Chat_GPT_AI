@@ -1,0 +1,69 @@
+{
+  "release": "AttentionForge 0.1.0",
+  "date_utc": "2026-11-14T15:15:50Z",
+  "unit_contract_tests": {
+    "passed": 10,
+    "platform": "Linux CPython 3.11 Torch 2.9.1 CPU",
+    "checks": [
+      "90-action native/Python parity",
+      "team-rotation feature symmetry",
+      "no opponent-action leakage and padding",
+      "attention permutation invariance and gradient flow",
+      "terminal/truncation GAE",
+      "atomic checkpoint and optimizer reload",
+      "native single/multiple worker determinism",
+      "goal direction and terminal potential",
+      "action delay and timeout final observations",
+      "touch detection and bounded touch reward"
+    ]
+  },
+  "integration": {
+    "updates": 24,
+    "new_learning_transitions": 352256,
+    "wall_seconds": 126.82950879900022,
+    "resume_weights_changed": true,
+    "frozen_history_exercised": true,
+    "goals_observed_in_training": 7.0,
+    "native_headless_watch_frames": 30,
+    "report_zip_generated": true,
+    "frozen_evaluation_pipeline": "8 games x 5 seconds, 0W/8D/0L, confidence interval [0,1]; pipeline smoke check only; not evidence of strength"
+  },
+  "benchmark_cpu_only": {
+    "device": "cpu",
+    "cpu": "",
+    "arenas": 32,
+    "native_threads": 4,
+    "network_parameters": 76251,
+    "seconds": 5.003288711999858,
+    "env_decisions_per_second": 4291.577247681446,
+    "player_decisions_per_second": 8583.154495362893,
+    "physics_ticks_per_second": 34332.61798145157,
+    "scope": "simulation + encoding + inference; excludes PPO updates; not a learning-speed claim"
+  },
+  "export": {
+    "learning_transitions": 352256,
+    "actor_sha256": "585e8d06c59e1349a1891453e3d5811a3e7f116b16c7245388624492a90d0e09",
+    "logit_max_abs_error": 0.0,
+    "action_agreement": 1.0,
+    "hitbox": "Octane",
+    "architecture": "2-block ego-query attention",
+    "format": "TorchScript; not a renamed .lt",
+    "scope": "native play and RLBot v4 wrapper; v5 exporter not implemented"
+  },
+  "windows_native": {
+    "workflow_run": 43608572251,
+    "source_commit": "1f9af0bc5dd38626f635d7fd4d633258eb38841b",
+    "workflow_artifact_sha256": "f4e9ac7822aa493705aca01105707e52e46c22fda2b13aae8d0becd2b54f06bf",
+    "module": "_attention_native.cp311-win_amd64.pyd",
+    "module_sha256": "97570fdaa77d87b5408aa539d7701fd5bea796e4558d9427f1422e578b5ac1e9",
+    "load_and_action_parity": "passed on windows-latest CPython 3.11 x64",
+    "physics_smoke_on_windows": "requires local meshes; SETUP runs this on the user PC"
+  },
+  "limitations": [
+    "No GPU was available in this validation environment; no laptop SPS claim.",
+    "No completed strength benchmark; no Nexto/Ripple/Galactus win claim.",
+    "Windows Rocket League / RLBot game launch and GUI were not available for end-to-end testing.",
+    "RLBot v4 wrapper is supplied; RLBot v5/TOML/LT export is not implemented.",
+    "No smoke-test weights are included; user initialization is random."
+  ]
+}

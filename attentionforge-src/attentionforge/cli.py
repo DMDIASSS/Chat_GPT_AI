@@ -44,10 +44,10 @@ def report(folder):
     folder=Path(folder)
     if not folder.is_dir():raise FileNotFoundError(folder)
     target=ROOT/f'AttentionForge_report_{folder.name}_{time.strftime("%Y%m%d_%H%M%S",time.gmtime())}.zip'
-    manifest={'run':folder.name,'generated_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'runtime':{'python':platform.python_version(),'torch':torch.__version__,'cuda_available':torch.cuda.is_available()},'source_hashes':source_hashes(),'checkpoint_hash':hashlib.sha256((folder/'latest.pt').read_bytes()).hexdigest() if (folder/'latest.pt').is_file() else None,'note':'No weights, credentials, environment variables, or W&B files are included.'}
+    manifest={'run':folder.name,'generated_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'runtime':{'python':platform.python_version(),'torch':torch.__version__,'cuda_available':torch.cuda.is_available(),'torch_cuda':torch.version.cuda,'gpu_name':torch.cuda.get_device_name(0) if torch.cuda.is_available() else None},'source_hashes':source_hashes(),'checkpoint_hash':hashlib.sha256((folder/'latest.pt').read_bytes()).hexdigest() if (folder/'latest.pt').is_file() else None,'note':'No weights, credentials, environment variables, or W&B files are included.'}
     with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as z:
         z.writestr('manifest.json',json.dumps(manifest,indent=2))
-        for pattern in ('config.json','status.json','provenance.json','metrics.jsonl','eval_*.json'):
+        for pattern in ('config.json','status.json','provenance.json','metrics.jsonl','wandb_status.json','eval_*.json'):
             for p in folder.glob(pattern):z.write(p,'run/'+p.name)
         for p in (ROOT/'attentionforge').glob('*.py'):z.write(p,'source/attentionforge/'+p.name)
         for p in (ROOT/'native/core.cpp',ROOT/'config.json',ROOT/'benchmark.json'):
@@ -94,7 +94,7 @@ def export(folder):
     print('EXPORT_READY:',out,'; logits/actions match. RLBot v4 game launch requires local testing. v5/.lt is not claimed.',flush=True)
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['verify','benchmark','train','pause','watch','report','export']);ap.add_argument('--run',default='attention01');ap.add_argument('--config');ap.add_argument('--minutes',type=float);ap.add_argument('--updates',type=int);ap.add_argument('--seconds',type=float,default=10);ap.add_argument('--frames',type=int);ap.add_argument('--headless',action='store_true');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['verify','benchmark','train','pause','watch','report','export','evaluate']);ap.add_argument('--run',default='attention01');ap.add_argument('--config');ap.add_argument('--minutes',type=float);ap.add_argument('--updates',type=int);ap.add_argument('--seconds',type=float,default=10);ap.add_argument('--frames',type=int);ap.add_argument('--headless',action='store_true');ap.add_argument('--rounds',type=int,default=100);ap.add_argument('--opponent');ap.add_argument('--seed',type=int);args=ap.parse_args()
     if Path(args.run).name!=args.run or args.run in ('.','..'):ap.error('--run must be a simple folder name')
     cfg=config(args.config);folder=ROOT/'runs'/args.run
     if args.command=='train':train(cfg,folder,args.updates,args.minutes)
@@ -106,4 +106,7 @@ def main():
     elif args.command=='report':report(folder)
     elif args.command=='verify':verify(cfg)
     elif args.command=='benchmark':benchmark(cfg,args.seconds)
+    elif args.command=='evaluate':
+        from .evaluate import evaluate
+        evaluate(folder,args.rounds,args.seconds,args.opponent,args.seed)
 if __name__=='__main__':main()

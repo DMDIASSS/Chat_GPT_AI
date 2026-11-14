@@ -64,12 +64,13 @@ def _train(cfg,folder,max_updates,minutes):
         if saved['config']!=cfg:raise ValueError('This run has a different saved config. Use a new run name for config changes.')
         model.load_state_dict(saved['model']);opt.load_state_dict(saved['optimizer']);count=saved['learning_transitions'];update=saved['updates'];history=saved['history'];history_scores=saved.get('history_scores',{});wbid=saved.get('wandb_id');previous_wall=saved.get('training_wall_seconds',0);previous_physics=saved.get('physics_ticks',0);previous_env=saved.get('env_decisions',0)
         random.setstate(saved['python_rng']);np.random.set_state(saved['numpy_rng']);torch.set_rng_state(saved['torch_rng'].cpu())
-        if dev.type=='cuda' and saved.get('cuda_rng') is not None:torch.cuda.set_rng_state_all(saved['cuda_rng'])
+        if dev.type=='cuda' and saved.get('cuda_rng') is not None:torch.cuda.set_rng_state_all([s.cpu() for s in saved['cuda_rng']])
         print('RESUME:',count,'learning transitions. Episodes restart; optimizer and model resume.',flush=True)
     else:
         atomic_json(folder/'config.json',cfg);atomic_json(folder/'provenance.json',{'created_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'source_hashes':source_hashes(),'initialization':'random','native_contract':'attentionforge-v1-raw32-delay1','hitbox':'Octane','physics_hz':120,'decision_hz':120/cfg['tick_skip']})
     env=batch(cfg,seed=cfg['seed']+update*104729);locations=env.pad_locations();raw=env.observe();obs,legal=encode(raw['world'],raw['pads'],locations)
     wb=tracker(cfg,folder,wbid);wbid=wb.id if wb else wbid
+    atomic_json(folder/'wandb_status.json',{'available':wb is not None,'id':wbid,'url':getattr(wb,'url',None) if wb else None,'local_metrics':'metrics.jsonl'})
     p=cfg['ppo'];steps=int(p['steps']);e=cfg['n_envs'];a=cfg['team_size']*2;shape=(steps,e,a)
     # Host buffers: no multi-hundred-MB rollout allocation in a 4GB GPU.
     ob=np.empty((*shape,43,40),np.float32);lm=np.empty((*shape,90),bool)
@@ -87,7 +88,7 @@ def _train(cfg,folder,max_updates,minutes):
         while not stopping and not stop.exists():
             if max_updates is not None and session_updates>=max_updates:break
             if minutes is not None and time.perf_counter()-start>=minutes*60:break
-            t0=time.perf_counter();selected=None;histmask=np.zeros((e,a),bool)
+            t0=time.perf_counter();behavior=np.zeros(4,np.float64);selected=None;histmask=np.zeros((e,a),bool)
             if history:
                 weights=np.array([(1-history_scores.get(name,0.5))**2+0.05 for name in history]);weights/=weights.sum();selected=np.random.choice(history,p=weights)
                 frozen.load_state_dict(load(folder/'history'/selected,dev)['model'])
@@ -108,6 +109,8 @@ def _train(cfg,folder,max_updates,minutes):
                     ix=np.flatnonzero(raw['truncated']);fo,fl=encode(raw['final_world'][ix],raw['final_pads'][ix],locations)
                     with torch.no_grad():tv[t,ix]=model(torch.as_tensor(fo.reshape(-1,43,40),device=dev),torch.as_tensor(fl.reshape(-1,90),device=dev))[1].cpu().numpy().reshape(len(ix),a)
                 obs,legal=encode(raw['world'],raw['pads'],locations);stats+=raw['info'].sum(axis=0)
+                cars=raw['world'][:,1:]
+                behavior+=np.array([np.linalg.norm(cars[:,:,:3]-raw['world'][:,0:1,:3],axis=-1).mean(),np.linalg.norm(cars[:,:,3:6],axis=-1).mean(),(cars[:,:,16]<0.5).mean(),(actions[t]>=24).mean()])
                 if selected:
                     for j in range(nh):
                         g=raw['info'][j,0]
@@ -141,13 +144,19 @@ def _train(cfg,folder,max_updates,minutes):
                 score=h_w/(h_w+h_l);history_scores[selected]=0.8*history_scores.get(selected,0.5)+0.2*score
             if count//cfg['league']['snapshot_every']>last_snapshot:
                 name=f'{count:016d}.pt';(folder/'history').mkdir(exist_ok=True);save_checkpoint(folder/'history'/name,{'model':model.state_dict(),'config':cfg,'learning_transitions':count});history.append(name);last_snapshot=count//cfg['league']['snapshot_every']
+                if not (folder/'baseline.pt').exists():
+                    import shutil
+                    shutil.copyfile(folder/'history'/name,folder/'baseline.pt')
                 while len(history)>cfg['league']['max_history']:
                     old=history.pop(0);(folder/'history'/old).unlink(missing_ok=True);history_scores.pop(old,None)
             elapsed=time.perf_counter()-t0;wall=previous_wall+time.perf_counter()-start
-            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'train/loss':float(np.mean(losses)) if losses else 0.,'train/approx_kl':float(np.mean(kls)) if kls else 0.,'train/entropy':float(np.mean(entropies)) if entropies else 0.,'train/clip_fraction':float(np.mean(clipfracs)) if clipfracs else 0.,'train/kl_early_stop':early,'game/goals':int(np.count_nonzero(term))/a,'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),'reward/potential_blue_sum':float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
+            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'train/loss':float(np.mean(losses)) if losses else 0.,'train/approx_kl':float(np.mean(kls)) if kls else 0.,'train/entropy':float(np.mean(entropies)) if entropies else 0.,'train/clip_fraction':float(np.mean(clipfracs)) if clipfracs else 0.,'train/kl_early_stop':early,'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),'reward/potential_blue_sum':float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metrics,allow_nan=False)+'\n')
             atomic_json(folder/'status.json',metrics)
-            if wb:wb.log({k:v for k,v in metrics.items() if isinstance(v,(float,int,bool))},step=count)
+            if wb:
+                try:wb.log({k:v for k,v in metrics.items() if isinstance(v,(float,int,bool))},step=count)
+                except Exception as ex:
+                    print('WANDB_LOG_UNAVAILABLE:',type(ex).__name__,'; local metrics continue.',flush=True);wb=None
             print(f'UPDATE {update}: {count:,} learning transitions | {new_samples/elapsed:,.0f}/s end-to-end | touches {int(stats[1]+stats[2])}, goals {int(np.count_nonzero(term)/a)} | KL {metrics["train/approx_kl"]:.4f}',flush=True)
             if time.perf_counter()-last_save>=cfg['checkpoint_every_seconds']:save();last_save=time.perf_counter()
     finally:
