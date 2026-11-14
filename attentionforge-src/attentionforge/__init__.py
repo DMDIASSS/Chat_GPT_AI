@@ -1,2 +1,2 @@
 """A fresh attention policy trained with PPO in RocketSim. No pretrained weights."""
-__version__ = '0.3.0'
+__version__ = '0.4.0'

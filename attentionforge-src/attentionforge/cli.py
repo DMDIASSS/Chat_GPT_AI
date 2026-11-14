@@ -32,13 +32,15 @@ def benchmark(cfg,seconds=10):
 
 def verify(cfg):
     from . import _attention_native as native
+    if getattr(native,'reward_version',0)<1:raise RuntimeError('The AttentionForge 0.4 native module is not loaded. Close Python windows, re-extract the reward update, and retry SETUP.bat.')
+    print('NATIVE_REWARD_VERSION:',native.reward_version,flush=True)
     torch.set_num_threads(cfg['torch_threads']);np.testing.assert_array_equal(native.action_table(),ACTIONS)
     env=batch(cfg,n=2);r=env.observe();o,m=encode(r['world'],r['pads'],env.pad_locations());model=ActorCritic(**cfg['network']).eval()
     with torch.no_grad():logits,v=model(torch.from_numpy(o.reshape(-1,43,40)),torch.from_numpy(m.reshape(-1,90)))
     assert torch.isfinite(logits).all() and torch.isfinite(v).all()
     for _ in range(30):r=env.step(np.full((2,cfg['team_size']*2),8,np.int64))
     assert np.isfinite(r['world']).all() and np.isfinite(r['rewards']).all();
-    if cfg['rewards'].get('profile')!='rlgym_simple_v1':np.testing.assert_allclose(r['rewards'].sum(1),0,atol=1e-6)
+    if cfg['rewards'].get('profile') not in ('rlgym_simple_v1','control_shots_v1'):np.testing.assert_allclose(r['rewards'].sum(1),0,atol=1e-6)
     print('VERIFY_PASS: native load, 90-action parity, finite public observations, attention inference, finite rewards. This does not certify playing strength.',flush=True)
 
 def report(folder):
@@ -48,10 +50,10 @@ def report(folder):
     manifest={'run':folder.name,'generated_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'runtime':{'python':platform.python_version(),'torch':torch.__version__,'cuda_available':torch.cuda.is_available(),'torch_cuda':torch.version.cuda,'gpu_name':torch.cuda.get_device_name(0) if torch.cuda.is_available() else None},'source_hashes':source_hashes(),'checkpoint_hash':hashlib.sha256((folder/'latest.pt').read_bytes()).hexdigest() if (folder/'latest.pt').is_file() else None,'note':'No weights, credentials, environment variables, or W&B files are included.'}
     with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as z:
         z.writestr('manifest.json',json.dumps(manifest,indent=2))
-        for pattern in ('config.json','status.json','provenance.json','metrics.jsonl','wandb_status.json','session_*.json','execution_profile.json','gpu_batch_profile.json','fork_provenance.json','eval_*.json'):
+        for pattern in ('config.json','status.json','provenance.json','metrics.jsonl','wandb_status.json','session_*.json','execution_profile.json','gpu_batch_profile.json','fork_provenance.json','reward_provenance.json','eval_*.json'):
             for p in folder.glob(pattern):z.write(p,'run/'+p.name)
         for p in (ROOT/'attentionforge').glob('*.py'):z.write(p,'source/attentionforge/'+p.name)
-        for p in (ROOT/'native/core.cpp',ROOT/'native/features.h',ROOT/'config.json',ROOT/'laptop_config.json',ROOT/'laptop_tuned.json',ROOT/'benchmark.json',ROOT/'laptop_autotune.json',ROOT/'FRAMEWORK_REVIEW.md',ROOT/'REWARD_SOURCES.md',ROOT/'GPU_UPDATE.md'):
+        for p in (ROOT/'native/core.cpp',ROOT/'native/features.h',ROOT/'native/control_rewards.h',ROOT/'config.json',ROOT/'laptop_config.json',ROOT/'laptop_tuned.json',ROOT/'benchmark.json',ROOT/'laptop_autotune.json',ROOT/'FRAMEWORK_REVIEW.md',ROOT/'REWARD_SOURCES.md',ROOT/'GPU_UPDATE.md',ROOT/'REWARD_EXPERIMENTS.md'):
             if p.is_file():z.write(p,'source/'+str(p.relative_to(ROOT)))
     print('REPORT_READY:',target);return target
 
@@ -95,7 +97,7 @@ def export(folder):
     print('EXPORT_READY:',out,'; logits/actions match. RLBot v4 game launch requires local testing. v5/.lt is not claimed.',flush=True)
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['verify','benchmark','train','pause','watch','report','export','evaluate','tune','laptop','gpu-profile']);ap.add_argument('--run',default='attention01');ap.add_argument('--config');ap.add_argument('--minutes',type=float);ap.add_argument('--updates',type=int);ap.add_argument('--seconds',type=float,default=10);ap.add_argument('--frames',type=int);ap.add_argument('--headless',action='store_true');ap.add_argument('--rounds',type=int,default=100);ap.add_argument('--opponent');ap.add_argument('--seed',type=int);args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['verify','benchmark','train','pause','watch','report','export','evaluate','tune','laptop','gpu-profile','reward-setup']);ap.add_argument('--run',default='attention01');ap.add_argument('--config');ap.add_argument('--minutes',type=float);ap.add_argument('--updates',type=int);ap.add_argument('--seconds',type=float,default=10);ap.add_argument('--frames',type=int);ap.add_argument('--headless',action='store_true');ap.add_argument('--rounds',type=int,default=100);ap.add_argument('--opponent');ap.add_argument('--seed',type=int);args=ap.parse_args()
     if Path(args.run).name!=args.run or args.run in ('.','..'):ap.error('--run must be a simple folder name')
     cfg=config(args.config);folder=ROOT/'runs'/args.run
     if args.command=='train':train(cfg,folder,args.updates,args.minutes)
@@ -110,6 +112,9 @@ def main():
     elif args.command=='tune':
         from .tune import tune
         tune()
+    elif args.command=='reward-setup':
+        from .reward_experiments import setup
+        setup(folder)
     elif args.command=='gpu-profile':
         from .gpu_profile import profile_gpu
         profile_gpu(folder)

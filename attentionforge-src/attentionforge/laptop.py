@@ -5,7 +5,8 @@ from .runtime import ROOT,config
 def menu(run='laptop01'):
     folder=ROOT/'runs'/run
     while True:
-        print('\nATTENTIONFORGE LAPTOP — 1.09M attention, Octane 1v1\n1 Start / resume (first start benchmarks settings)\n2 Watch latest (pause training first)\n3 Evaluate vs first frozen snapshot\n4 Create report ZIP\n5 Export PT + CFG\n6 Benchmark settings only\n7 Request pause from another console\n8 Profile GPU minibatches / create separate experiment\n0 Exit',flush=True)
+        baseline_label='pinned pre-reward parent' if (folder/'reward_parent.pt').is_file() else 'first frozen snapshot'
+        print(f'\nATTENTIONFORGE — {run}\n1 Start / resume (first start benchmarks settings)\n2 Watch latest (pause training first)\n3 Evaluate vs {baseline_label}\n4 Create report ZIP\n5 Export PT + CFG\n6 Benchmark settings only\n7 Request pause from another console\n8 Profile GPU minibatches / create separate experiment\n0 Exit',flush=True)
         choice=input('Choose: ').strip()
         try:
             if choice=='0':return
@@ -22,7 +23,7 @@ def menu(run='laptop01'):
                 watch(config(),folder)
             elif choice=='3':
                 from .evaluate import evaluate
-                evaluate(folder,rounds=100,seconds=60)
+                evaluate(folder,rounds=100,seconds=60,opponent=folder/'reward_parent.pt' if (folder/'reward_parent.pt').is_file() else None)
             elif choice=='4':
                 from .cli import report
                 report(folder)

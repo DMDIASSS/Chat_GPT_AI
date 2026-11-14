@@ -1,0 +1,67 @@
+{
+  "release": "AttentionForge 0.4 distance-control and goal-style experiments",
+  "created_utc": "2026-11-14T18:10:50Z",
+  "linux_tests": {
+    "passed": 32,
+    "skipped": 1,
+    "skip_reason": "CUDA hardware unavailable in server environment"
+  },
+  "windows": {
+    "python": "CPython 3.11 x64",
+    "workflow_run": 43624530083,
+    "build_commit": "8c9c6847324e485d638a006116070fa88d94962c",
+    "conclusion": "success",
+    "checks": [
+      "Native DLL/module load",
+      "90-action table parity",
+      "Python/native observation parity for 1v1, 2v2 and 3v3 feature tensors",
+      "Control math symmetry",
+      "Shot ownership and floor trace rejection"
+    ],
+    "module_sha256": "60cc48db4e3a53db07c7df868b7fa81d001437d1c83b950bf40415b986f43efa",
+    "artifact_digest": "555b45cd65f73afbcadee20c20bc47033735b2fb8b8d07b1eedeaf8fd2cc54c3"
+  },
+  "linux_physics_checks": [
+    "Control score boundedness, sign symmetry, far-distance attenuation and time scaling",
+    "Native reward profile leaves physical trajectories and observations identical",
+    "Actual contact then airborne goal earns no-floor bonus",
+    "Actual touch then floor bounce between decisions rejects no-floor bonus",
+    "Untouched goal receives base goal reward only",
+    "Same-tick floor/touch, opponent touch, stale shot and simultaneous touch handling",
+    "Fast-goal bonus scaled from captured goal-callback speed"
+  ],
+  "integration": [
+    "Both children copy actor/critic, Adam state and inherited counters",
+    "Parent checkpoint hash unchanged; exact parent pinned in each child",
+    "Two continuation updates per child plus save/resume; additional update verifies magnitude metrics",
+    "Report includes experiment provenance and native reward header",
+    "TorchScript PT export logit/action parity",
+    "Headless watch pipeline",
+    "Four two-second games versus pinned parent: smoke only; not playing-strength evidence"
+  ],
+  "unchanged_contract": {
+    "observations": "feature_version=2",
+    "native_contract": "attentionforge-v1-raw32-delay1",
+    "physics_hz": 120,
+    "tick_skip": 8,
+    "action_delay_ticks": 1,
+    "hitbox": "Octane",
+    "network_parameters": 1091163,
+    "PPO": "inherited without hyperparameter change"
+  },
+  "limitations": [
+    "Distance advantage is a proximity proxy, not interception/true possession",
+    "New terms are objective-changing rewards, not potential-based shaping",
+    "Clean-flight goals can be ground pops; not a flip-reset/aerial detector",
+    "Same-tick ordering is conservatively rejected",
+    "No claim to reproduce an unpublished Catalyst formula or its reported results",
+    "No held-out playing-strength improvement measured",
+    "No server CUDA or user-laptop performance test",
+    "Actual RLBot game launch needs local testing; export supports PT/CFG RLBot v4, not v5 TOML/LT"
+  ],
+  "packaging_checks": [
+    "Overlay on 0.1 + 0.2 + 0.3 installation preserves synthetic checkpoint, configs, runtime selection and local paths",
+    "Every payload file matches its SHA-256 manifest",
+    "Installed reward-setup creates both same-weight children; exact source hash remains unchanged"
+  ]
+}
