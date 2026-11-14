@@ -1,0 +1,13 @@
+runs/
+exports/
+.venv/
+__pycache__/
+*.so
+*.pyd
+*.pt
+runtime_python.txt
+local_paths.json
+AttentionForge_report_*.zip
+benchmark.json
+third_party/
+build/

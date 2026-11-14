@@ -1,0 +1,19 @@
+{
+  "version": "attentionforge-v1",
+  "seed": 74123,
+  "device": "auto",
+  "team_size": 1,
+  "n_envs": 32,
+  "native_threads": 4,
+  "torch_threads": 2,
+  "tick_skip": 8,
+  "action_delay": 1,
+  "episode_seconds": 60,
+  "no_touch_seconds": 15,
+  "network": {"width": 64, "heads": 4, "blocks": 2},
+  "rewards": {"goal": 10.0, "approach": 2.0, "touch": 0.02, "control_progress": 0.2},
+  "ppo": {"steps": 256, "epochs": 2, "batch_size": 512, "learning_rate": 0.0003, "gamma": 0.995, "gae_lambda": 0.95, "clip": 0.2, "entropy": 0.01, "value": 0.5, "max_grad_norm": 0.5, "target_kl": 0.025},
+  "league": {"snapshot_every": 1000000, "max_history": 8, "history_env_fraction": 0.25},
+  "checkpoint_every_seconds": 120,
+  "wandb": {"enabled": true, "project": "attentionforge"}
+}
