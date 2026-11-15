@@ -23,3 +23,9 @@ print('WINDOWS_REWARD_MATH_AND_TRACKER_PASS')
 assert n.reward_version>=2
 c=n.ComboTrace();c.touch(1,0);c.event(0,2,1);a=c.goal(0,2);c.event(0,2,3);assert c.goal(0,4)==a;c.touch(2,5);assert c.goal(0,6)==0
 print('WINDOWS_SKILLS_CHAIN_ANTI_REPEAT_PASS')
+
+assert n.reward_version>=3
+q=n.attack_shot_quality(0,0,94,0,2000,0,0)
+assert q>0.8 and n.attack_shot_quality(0,0,94,900,2000,0,0)<.1
+assert abs(q-n.attack_shot_quality(0,0,94,0,-2000,0,1))<1e-6
+print('WINDOWS_AIM_QUALITY_AND_TEAM_SYMMETRY_PASS')
