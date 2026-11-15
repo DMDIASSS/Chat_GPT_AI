@@ -1,7 +1,1 @@
-# Current issue: ball control without broad scoring or useful aerial/flip execution
-
-User reports center-kickoff boost races explain most goals. Basic contact is retained, but aggregate WDL cannot establish broader scoring.
-
-Offense 0.6 adds targeted training, all-five-kickoff and open-play panels, per-goal timing, separate finishing/air-contact/recovery probes and immutable actor pins. Watch/export remain learned policy inference.
-
-Open: whether the new student learns useful jumps, flips and half-flip-like recoveries, improves open-play finishing, and preserves all kickoff variants. Small tests cannot establish these outcomes. Keep the parent and inspect the automatically generated reports; do not claim a stronger bot from higher shaped reward or a center-only win rate.
+The current user requested only published RLGym/RLGym-tools rewards after weak scoring, kickoff-only goals and limited useful aerials. 0.7 adds LIBRARY.bat -> library01, copying the explicit skills01 parent by default. It strips custom shaping, tutor/rehearsal losses and curricula while retaining optimizer/model/performance/export contracts. Five class definitions are vectorized and checked against upstream 2.0.1 / 2.6.5. This is an unverified reward ablation, not a claimed playing-strength improvement. See LIBRARY_REWARDS.md and LIBRARY_VALIDATION.json. Older OFFENSE/SKILLS launchers remain compatible and unchanged in behavior.

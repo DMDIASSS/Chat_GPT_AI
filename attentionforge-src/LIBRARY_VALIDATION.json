@@ -1,0 +1,35 @@
+{
+  "tests": "See full pytest results",
+  "pipeline": "full 1,091,163-parameter model: inherited actor+Adam, three PPO updates including a resume, six-context balanced head-to-head smoke, headless live simulation vs pinned parent, PT/LT export logit+action parity, report ZIP",
+  "learning_transitions_before": 393216,
+  "learning_transitions_after": 394752,
+  "source_unchanged": true,
+  "reward_metrics_count": 10,
+  "smoke_panel_games": 24,
+  "export": "PT/CFG and TorchScript LT/TOML; actual RLBot client match requires Windows local test",
+  "simulation_and_reward_player_decisions_per_second_server": 84661.74324662273,
+  "reward_only_ms_per_128_arena_step_server": 0.48020843499398325,
+  "runtime": "Linux CPU; user GPU speed and playing strength not certified",
+  "report": "/tmp/aflibrary/AttentionForge_report_library_shipping_smoke_20261115_112438.zip",
+  "seconds": 14.515354984992882,
+  "pytest": {
+    "passed": 63,
+    "skipped": 1,
+    "skipped_reason": "CUDA-only optimizer test on CPU server"
+  },
+  "native_windows_build": "Unchanged 0.6 native v3, compiled and smoke-tested in Windows CI run 43696587298 at commit 9c63f858f1e65c96345a2bdd0bd9629c8241392c",
+  "native_windows_sha256": "33aec2ddf16c807d1941b025cb4942e4e73870883631664a9f4a7d6be93ef855",
+  "definitions": "Outputs checked against all five actual upstream classes, including variable elapsed ticks, simultaneous contacts, landings, goals, timeouts and auto-resets",
+  "physics": "Library and zero-reward native runs produce identical world/pads/terminal states on matched seeds/actions",
+  "guaranteed_playing_strength_improvement": false,
+  "live_rlbot_client_test": "not available on Linux server",
+  "user_gpu_test": "not available on CPU server",
+  "upstream_reference_files": {
+    "rlgym/rocket_league/reward_functions/goal_reward.py": "aba430ce0a1eec814f41a3f737bc81e47f950116fab501901076ae8c37b0f451",
+    "rlgym_tools/rocket_league/reward_functions/advanced_touch_reward.py": "5e31b5589e32e6738742555fcbf418b42a2281dab648caa258bd3e18a0e6aead",
+    "rlgym_tools/rocket_league/reward_functions/velocity_player_to_ball_reward.py": "b27a3c1956886564a448fbd62799dce44bcb3d710803efc841705a9a5acf8039",
+    "rlgym_tools/rocket_league/reward_functions/goal_prob_reward.py": "32ac826fd18ef37b1c16b1cbc6c0b4ab2809ec84bfd91f824f98cd80e15a9fd0",
+    "rlgym_tools/rocket_league/reward_functions/aerial_distance_reward.py": "9b27640acac67d91dba2028065c8b479b13526b4e954bd0b0c02c40219d6cabb",
+    "rlgym_tools/rocket_league/math/solid_angle.py": "912c168c9821031d9f45f1043e98c5294439d0418421bbfcb3ef94cb6e07b7e6"
+  }
+}

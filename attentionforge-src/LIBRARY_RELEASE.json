@@ -1,0 +1,9 @@
+{
+  "version": "0.7",
+  "profile": "rlgym_tools_v1",
+  "parent_default": "runs/skills01/latest.pt",
+  "run": "library01",
+  "native_reward_version": 3,
+  "parameters": 1091163,
+  "reinstall_needed": false
+}

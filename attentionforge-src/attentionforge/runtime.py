@@ -43,7 +43,18 @@ def batch(cfg,n=None,seed=None,kickoffs=False):
         raise RuntimeError('This reward experiment needs the new native module. Close Python trainers/watchers, re-extract the reward update, and run SETUP.bat.')
     if cfg['rewards'].get('profile')=='skills_v1' and getattr(_attention_native,'reward_version',0)<2:raise RuntimeError('Skills training requires the version 2 native reward module; re-extract and restart Python')
     if cfg['rewards'].get('profile')=='attack_v1' and getattr(_attention_native,'reward_version',0)<3:raise RuntimeError('Offense requires native reward version 3; re-extract and restart Python')
-    return _attention_native.Batch(str(meshes()),int(n or cfg['n_envs']),int(cfg['team_size']),int(cfg['native_threads']),(int(cfg['seed'] if seed is None else seed) % (1<<32)),int(cfg['tick_skip']),int(cfg['action_delay']),float(cfg['ppo']['gamma']),float(cfg['episode_seconds']),float(cfg['no_touch_seconds']),cfg['rewards'],kickoffs)
+    rewards=cfg['rewards']
+    library=rewards.get('profile')=='rlgym_tools_v1'
+    if library:
+        if cfg.get('skills') or cfg.get('attack'):raise ValueError('Custom shaping/curricula cannot be combined with library rewards')
+        if cfg['team_size']!=1:raise ValueError('Library reward adapter supports 1v1 only')
+        if getattr(_attention_native,'reward_version',0)<3:raise RuntimeError('Install the bundled version 3 native module and restart Python')
+        rewards={'profile':'rlgym_simple_v1','goal':0.,'approach':0.,'touch':0.,'control_progress':0.}
+    native=_attention_native.Batch(str(meshes()),int(n or cfg['n_envs']),int(cfg['team_size']),int(cfg['native_threads']),(int(cfg['seed'] if seed is None else seed) % (1<<32)),int(cfg['tick_skip']),int(cfg['action_delay']),float(cfg['ppo']['gamma']),float(cfg['episode_seconds']),float(cfg['no_touch_seconds']),rewards,kickoffs)
+    if library:
+        from .library_rewards import LibraryBatch
+        return LibraryBatch(native,cfg['rewards'],cfg['ppo']['gamma'])
+    return native
 
 def config(path=None):return json.loads(Path(path or ROOT/'config.json').read_text())
 

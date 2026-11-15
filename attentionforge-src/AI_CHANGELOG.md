@@ -17,3 +17,10 @@ Changes: native/skills.h and native/core.cpp add distinct-event goal-gated combo
 Tests: 41 passed, one CUDA-only skip. Windows CPython 3.11 native build passed action/observation/chain smoke checks. Physical learned-model pilots, 128-arena continuation, save/resume, exported PT/LT logit/action parity, actual v5 SDK/model diagnosis, headless watch, report creation and regression recovery were exercised. Quantitative results and the failed pilot are in SKILLS_VALIDATION.json and validation/.
 
 Limits: server has no CUDA or Rocket League client. Contact competence and a promising but uncertain parent match panel do not establish competitive rank or a guaranteed training duration. Ground tutor is used in training only; inference always uses the network.
+
+## 0.7 — RLGym library reward ablation
+- Five published reward definitions, batched and parity-tested; no custom shaping or auxiliary CE in the new run.
+- Explicit fork from skills01 (or optional attack01), full actor/optimizer/provenance preservation, new W&B run.
+- Component telemetry, contact/regression checks, balanced six-context evaluation, exact actor pins, watch/report/export menu.
+- Native v3 binary and simulation/network/action contracts reused; no new CUDA/Torch/library installation.
+- The reward preset is experimental; no unmeasured playing-strength claim.

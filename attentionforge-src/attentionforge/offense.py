@@ -55,7 +55,7 @@ def model_pair(folder,opponent=None):
     def snapshot(path):
         data=Path(path).read_bytes();out=torch.load(io.BytesIO(data),map_location='cpu',weights_only=False);out['_loaded_sha256']=hashlib.sha256(data).hexdigest();return out
     candidate=snapshot(folder/'latest.pt');baseline=snapshot(opponent or folder/'reward_parent.pt')
-    provenance=folder/'attack_provenance.json'
+    provenance=folder/('library_provenance.json' if (folder/'library_provenance.json').exists() else 'attack_provenance.json')
     if opponent is None and provenance.exists() and baseline['_loaded_sha256']!=json.loads(provenance.read_text())['parent_sha256']:raise ValueError('Pinned parent changed; refusing to compare a different actor')
     cfg=copy.deepcopy(candidate['config'])
     if any(cfg[k]!=baseline['config'][k] for k in ('network','team_size','tick_skip','action_delay')):raise ValueError('Model contracts differ')
