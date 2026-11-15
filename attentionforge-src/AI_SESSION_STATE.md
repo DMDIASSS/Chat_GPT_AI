@@ -1,11 +1,11 @@
-# AttentionForge Skills handoff
+# AttentionForge Offense 0.6 handoff
 
-Current task: user explicitly requested a complete reward-based attention training project, with measured early improvement, watch, export and unattended checks. Historical replay-only scope in the linked code-review repo is a separate older task.
+Current user objective: keep existing ball control, improve precise scoring, jump/flip use and half-flip-like recovery. User reports most goals arise from a center kickoff boost mismatch.
 
-Implemented: analytic ground-driving BC warm start, physical contact gate, protected PPO continuation, varied curriculum resets, established touch/acceleration rewards, goal-gated distinct-event combos, periodic validation and bounded archive/restore recovery. Separate `attention_skills` project preserves existing runs.
+Implemented: preserve skills01 and fork exact trained state into attack01; native attack_v1 goal/aim/movement rewards; diverse finishing/elevated/recovery and all-five-kickoff resets; temporary legal mechanics rehearsal from successful physical trajectories; separate context panels, early/later goal logs, isolated skill probes, immutable snapshot-safe actor pins and exact pinned watch/export.
 
-Evidence: 41 tests passed, one CUDA-only test skipped; Windows native build passed. After 327,680 PPO transitions, fresh contact tests reached 84.375% stationary and 99.21875% moving, both colors combined. A 100x60-second parent panel yielded 23W/68D/9L and goals 35:14; conservative interval crosses 50%, so match advantage remains unconfirmed. The rejected first continuation pilot and full results are recorded in SKILLS_VALIDATION.json.
+Limits: user actor at 13M was not uploaded. Server pilots use an earlier server-trained model. Short continuation preserved contact but did not establish learned flips/aerials or overall strength. One pilot lost diagonal kickoffs; new reporting exposes this instead of hiding it in an aggregate.
 
-Export: real TorchScript PT and LT readers, SDK-tested v5 adapter/delay clock, unique agent IDs, v4 wrapper; actual Rocket League connection and user-GPU throughput remain unverified. No external strong-bot evaluation or current user actor was available.
+Next local action: pause/exit Python, merge the update into attention_skills, OFFENSE.bat -> 1. Source weights/optimizer/history are inherited; old run stays intact. Menu 4 reports diagnostics, 6 runs longer context panels, 8/9 watch/export the unverified open-play pin.
 
-Next local action: SKILLS.bat, choose 1. It learns ground approaches then starts PPO and monitors contact. Menu 4 packages reports. No private logs, user model files, API keys or game assets are distributed.
+No private Discord exports, API keys, game assets or user weights are distributed. Source, validation and installation details: OFFENSE_GUIDE.md and OFFENSE_VALIDATION.json.

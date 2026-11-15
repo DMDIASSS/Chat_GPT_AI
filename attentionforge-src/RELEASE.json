@@ -1,9 +1,8 @@
 {
-  "zip": "AttentionForge_Skills_v0_5_COMPLETE.zip",
-  "bytes": 477405,
-  "sha256": "0f659d873df8fdee0b9c63d8d2501cb89ca9c114a2fbcae496b2b054e1d16c05",
-  "files": 61,
-  "install_folder": "chat_gpt_ai/attention_skills",
-  "windows_build_commit": "6e91b236dd035da97bf30c65bfdbb8b073db257c",
-  "scope": "Complete program/source/native Windows module; reuse existing Torch and Soccar meshes. No runs, user weights, credentials or private logs."
+  "zip": "AttentionForge_v0_6_OFFENSE_UPDATE.zip",
+  "bytes": 474972,
+  "sha256": "154342c8185f0db3b88389c1c9e0ab33ba8d219a38ff6ea2b66db94c6c300107",
+  "files": 37,
+  "requires": "AttentionForge Skills 0.5 with trained runs/skills01; in-place program update, no old runs/configs/environments replaced.",
+  "windows_build_commit": "9c63f858f1e65c96345a2bdd0bd9629c8241392c"
 }

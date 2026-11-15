@@ -1,0 +1,116 @@
+{
+  "version": "AttentionForge Offense 0.6",
+  "created_utc": "2026-11-15T09:11:08Z",
+  "tests": {
+    "passed": 55,
+    "skipped": 1,
+    "skip_reason": "CUDA-only test unavailable on CPU server",
+    "command": "python -m pytest -q tests"
+  },
+  "windows_native": {
+    "run": 43696587298,
+    "commit": "9c63f858f1e65c96345a2bdd0bd9629c8241392c",
+    "result": "success",
+    "artifact_sha256": "913abd74f2267f33fb6dd883c716132f0ebecf90a2f727ee627a25cc47d3e2bf",
+    "module_sha256": "33aec2ddf16c807d1941b025cb4942e4e73870883631664a9f4a7d6be93ef855"
+  },
+  "verified": [
+    "Exact trained actor/critic and Adam groups preserved on fork; parent hash unchanged",
+    "Profile reward changes preserve forced-scene physical trajectories",
+    "All five official kickoff poses, equal 33 boost, matched seed/color panels",
+    "Identical actors return 50% scenario score",
+    "Real center shot scores while wide shot misses, matching bounded shot proxy",
+    "Actual scripted half-flip-like recovery earns exactly one completion reward",
+    "Actual jump contact earns air-contact bonus; airtime alone does not",
+    "Jump/flip cooldown and wrong-direction rejection",
+    "Half-flip, forward-flip and jump-touch rehearsal keeps only successful legal prefixes",
+    "Old observation/action timing and legacy profiles remain regression-tested",
+    "Actor pins use exact evaluated snapshots and survive history rotation; no silent substitution",
+    "Pinned actor watch and PT/LT export parity",
+    "Fresh continuation/resume, cache reuse, reports and isolated probes"
+  ],
+  "final_rehearsal_demos": {
+    "half_flip": {
+      "trial_arenas": 48,
+      "successful_arenas": 15,
+      "label_rows": 834,
+      "criterion": "Actual RocketSim reward event; forward flips additionally require upright forward-facing landing. No student performance is claimed."
+    },
+    "forward_flip": {
+      "trial_arenas": 48,
+      "successful_arenas": 43,
+      "label_rows": 1900,
+      "criterion": "Actual RocketSim reward event; forward flips additionally require upright forward-facing landing. No student performance is claimed."
+    },
+    "jump_touch": {
+      "trial_arenas": 48,
+      "successful_arenas": 48,
+      "label_rows": 459,
+      "criterion": "Actual RocketSim reward event; forward flips additionally require upright forward-facing landing. No student performance is claimed."
+    }
+  },
+  "development_128_arena_pilot": {
+    "source": "Earlier server-trained learner, not the user actor",
+    "new_transitions": 131072,
+    "ground_contact_after": {
+      "stationary": {
+        "blue_contact_fraction": 0.96875,
+        "orange_contact_fraction": 0.875,
+        "contact_fraction": 0.921875,
+        "capped_mean_contact_seconds": 1.625
+      },
+      "moving": {
+        "blue_contact_fraction": 1.0,
+        "orange_contact_fraction": 1.0,
+        "contact_fraction": 1.0,
+        "capped_mean_contact_seconds": 1.4343749999999997
+      }
+    },
+    "scope": "Basic retention and pipeline check. Earlier development variant used untrimmed demonstration tails and the pre-existing ground auxiliary for its low-step parent; the shipping phase removes both."
+  },
+  "limits": [
+    "No current 13M-step user weights were uploaded; no direct user-actor before/after test.",
+    "Short server pilots did not establish learned jumps/flips/recoveries or a general strength gain.",
+    "One tiny development panel showed a diagonal-kickoff regression; the new breakdown exposes it.",
+    "Unobstructed geometric shot quality omits player interference, spin and wall prediction.",
+    "Recovery/flip events are useful-outcome proxies rather than certified maneuver names.",
+    "Scenario panels reset into their named contexts after goals and are not regulation tournament matches.",
+    "Match pins are exploratory, actor-only candidates; confidence intervals do not correct for repeated selection.",
+    "Live Windows RLBot gameplay and new CUDA throughput remain unverified; source/export and SDK checks are covered by prior compatible adapters."
+  ],
+  "final_shipping_128_arena_test": {
+    "new_transitions": 65536,
+    "source": "earlier server-trained learner; not current user weights",
+    "matched_scene_seed": 148137121,
+    "parent_contact": {
+      "stationary": {
+        "blue_contact_fraction": 0.75,
+        "orange_contact_fraction": 0.75,
+        "contact_fraction": 0.75,
+        "capped_mean_contact_seconds": 2.2854166666666664
+      },
+      "moving": {
+        "blue_contact_fraction": 1.0,
+        "orange_contact_fraction": 1.0,
+        "contact_fraction": 1.0,
+        "capped_mean_contact_seconds": 1.4958333333333336
+      }
+    },
+    "candidate_contact": {
+      "stationary": {
+        "blue_contact_fraction": 0.75,
+        "orange_contact_fraction": 0.75,
+        "contact_fraction": 0.75,
+        "capped_mean_contact_seconds": 2.29375
+      },
+      "moving": {
+        "blue_contact_fraction": 1.0,
+        "orange_contact_fraction": 1.0,
+        "contact_fraction": 1.0,
+        "capped_mean_contact_seconds": 1.5083333333333333
+      }
+    },
+    "result": "Matched controlled contact rates unchanged at 75% stationary and 100% moving on this 16-trial-per-color seed set. Pipeline/retention only, not strength evidence."
+  },
+  "final_short_resume_test": "Fresh phase setup, legal successful-prefix cache, initial probes, PPO, automatic probes, save/resume and report passed."
+}

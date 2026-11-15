@@ -1,2 +1,2 @@
-"""AttentionForge learned ground warm start and skill PPO."""
-__version__="0.5.0"
+"""AttentionForge continuation with scoring and useful-movement objectives."""
+__version__="0.6.0"

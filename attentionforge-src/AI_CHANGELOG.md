@@ -1,3 +1,11 @@
+# Offense 0.6
+
+Changes: native/attack.h and core.cpp add aim-quality and useful movement rewards, exact kickoff/scenario setters and distant recovery drills. offense.py adds state-preserving continuation, context-balanced evaluation with per-goal timing, isolated skill probes and immutable evaluated-actor pins. movement_school.py supplies physics-verified training-only demonstrations, legal labels and atomic caches. train/runtime/cli add loss scheduling, diagnostics, snapshot-safe pinned watch/export and metadata. OFFENSE launchers target the new run.
+
+Validation: CPU tests, Windows native smoke checks, actual scripted physics checks of maneuver detectors, exact actor/optimizer preservation, real continuation and resume, live-simulation headless watch, report and PT/LT export parity. Actual counts and pilot outcomes are in OFFENSE_VALIDATION.json. CUDA and a live Rocket League match remain unverified.
+
+Training changes remain experimental. The current user actor was unavailable for direct testing, and rehearsed maneuvers have not been established in the trained student. Older runs are preserved.
+
 # Changes
 
 ## Skills 0.5

@@ -42,6 +42,7 @@ def batch(cfg,n=None,seed=None,kickoffs=False):
     if cfg['rewards'].get('profile')=='control_shots_v1' and getattr(_attention_native,'reward_version',0)<1:
         raise RuntimeError('This reward experiment needs the new native module. Close Python trainers/watchers, re-extract the reward update, and run SETUP.bat.')
     if cfg['rewards'].get('profile')=='skills_v1' and getattr(_attention_native,'reward_version',0)<2:raise RuntimeError('Skills training requires the version 2 native reward module; re-extract and restart Python')
+    if cfg['rewards'].get('profile')=='attack_v1' and getattr(_attention_native,'reward_version',0)<3:raise RuntimeError('Offense requires native reward version 3; re-extract and restart Python')
     return _attention_native.Batch(str(meshes()),int(n or cfg['n_envs']),int(cfg['team_size']),int(cfg['native_threads']),(int(cfg['seed'] if seed is None else seed) % (1<<32)),int(cfg['tick_skip']),int(cfg['action_delay']),float(cfg['ppo']['gamma']),float(cfg['episode_seconds']),float(cfg['no_touch_seconds']),cfg['rewards'],kickoffs)
 
 def config(path=None):return json.loads(Path(path or ROOT/'config.json').read_text())

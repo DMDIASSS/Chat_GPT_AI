@@ -75,11 +75,23 @@ def _train(cfg,folder,max_updates,minutes):
     print('EXECUTION:',model_execution,optimizer_name,'FP32; existing weights/optimizer state preserved.',flush=True)
     from . import _attention_native
     from .runtime import sha
-    native_seed=(cfg['seed']+update*104729) % (1<<32)
+    native_seed=(cfg['seed']+update*104729) % (0x40000000 if cfg.get('attack') else (1<<32))
     atomic_json(folder/f'session_{time.time_ns()}.json',{'execution_version':'attentionforge-gpu-v3','model_execution':model_execution,'optimizer':optimizer_name,'starting_learning_transitions':count,'starting_update':update,'native_seed':native_seed,'source_hashes':source_hashes(),'native_module_sha256':sha(_attention_native.__file__),'torch':torch.__version__,'device':str(dev)})
     env=batch(cfg,seed=native_seed);locations=env.pad_locations();raw=env.observe();obs,legal=encode(raw['world'],raw['pads'],locations)
     wb=tracker(cfg,folder,wbid);wbid=wb.id if wb else wbid
     atomic_json(folder/'wandb_status.json',{'available':wb is not None,'id':wbid,'url':getattr(wb,'url',None) if wb else None,'local_metrics':'metrics.jsonl'})
+    rehearsal=None
+    if cfg.get('attack'):
+        from .movement_school import load_rehearsal
+        rehearsal=load_rehearsal(cfg,folder)
+        if not (folder/'best_contact.json').exists():
+            from .skills import drills
+            initial_contact=drills(model,cfg,n=16,seed=880001)
+            initial_score=min(v[k] for v in initial_contact.values() for k in ('blue_contact_fraction','orange_contact_fraction'))
+            atomic_json(folder/'best_contact.json',{'minimum_contact_fraction':initial_score,'learning_transitions':count,'quality':initial_contact,'source':'Unmodified parent actor, before offense updates'})
+        if not (folder/'offense_initial_probe.json').exists():
+            from .offense import skill_probes
+            initial_probe=skill_probes(model,cfg,n=16);initial_probe['learning_transitions']=count;atomic_json(folder/'offense_initial_probe.json',initial_probe);print('OFFENSE_BASELINE_PROBES:',initial_probe,flush=True)
     p=cfg['ppo'];steps=int(p['steps']);e=cfg['n_envs'];a=cfg['team_size']*2;shape=(steps,e,a)
     # Host buffers: no multi-hundred-MB rollout allocation in a 4GB GPU.
     ob=np.empty((*shape,43,40),np.float32);lm=np.empty((*shape,90),bool)
@@ -94,7 +106,7 @@ def _train(cfg,folder,max_updates,minutes):
     previous_handler=signal.signal(signal.SIGINT,request_stop)
     def save():
         save_checkpoint(ck,{'format':'attentionforge-checkpoint-v1','config':cfg,'model':model.state_dict(),'optimizer':opt.state_dict(),'learning_transitions':count,'updates':update,'history':history,'history_scores':history_scores,'wandb_id':wbid,'python_rng':random.getstate(),'numpy_rng':np.random.get_state(),'torch_rng':torch.get_rng_state(),'cuda_rng':torch.cuda.get_rng_state_all() if dev.type=='cuda' else None,'training_wall_seconds':previous_wall+time.perf_counter()-start,'physics_ticks':previous_physics+session_physics,'env_decisions':previous_env+session_env,'recovery_attempts':recovery_attempts})
-    save();print(f'TRAINING: {dev}, {e} arenas, {a} cars, {sum(p.numel() for p in model.parameters()):,}-parameter attention, Octane, {120/cfg["tick_skip"]:g}Hz decisions. PAUSE.bat or Ctrl+C saves.',flush=True)
+    save();print(f'TRAINING: {dev}, {e} arenas, {a} cars, {sum(p.numel() for p in model.parameters()):,}-parameter attention, Octane, {120/cfg["tick_skip"]:g}Hz decisions. Ctrl+C requests a save after this rollout/update.',flush=True)
     training_failed=False
     try:
         while not stopping and not stop.exists():
@@ -111,7 +123,7 @@ def _train(cfg,folder,max_updates,minutes):
             trainmask=~histmask;stats=np.zeros(8,np.float64);extra_stats=np.zeros(10,np.float64);control_abs=possession_abs=0.;h_w=h_d=h_l=0;timeout_states=[]
             histidx=torch.as_tensor(np.flatnonzero(histmask.ravel()),device=dev,dtype=torch.long)
             model.eval()
-            skill_stats=np.zeros(6,np.float64)
+            skill_stats=np.zeros(6,np.float64);attack_stats=np.zeros(9,np.float64);backward_count=0.
             if cfg.get('skills'):
                 fraction=.6 if count<3000000 else .35 if count<10000000 else .15
                 env.drill_fraction(fraction);env.skill_stage(min(1.,count/10000000))
@@ -130,10 +142,13 @@ def _train(cfg,folder,max_updates,minutes):
                     timeout_states.append((t,ix,fo.reshape(-1,43,40),fl.reshape(-1,90)))
                 obs,legal=encode(raw['world'],raw['pads'],locations);stats+=raw['info'].sum(axis=0)
                 if 'skill_info' in raw:skill_stats+=raw['skill_info'].sum(axis=0)
+                if cfg.get('attack'):
+                    attack_stats+=raw['attack_info'][:,:9].sum(axis=0)
                 if 'reward_info' in raw:
                     extra_stats+=raw['reward_info'].sum(axis=0)
                     control_abs+=np.abs(raw['reward_info'][:,0]).sum();possession_abs+=np.abs(raw['reward_info'][:,1]).sum()
                 cars=raw['world'][:,1:]
+                if cfg.get('attack'):backward_count+=np.mean(np.sum(cars[:,:,3:6]*cars[:,:,9:12],axis=-1)<-300)
                 behavior+=np.array([np.linalg.norm(cars[:,:,:3]-raw['world'][:,0:1,:3],axis=-1).mean(),np.linalg.norm(cars[:,:,3:6],axis=-1).mean(),(cars[:,:,16]<0.5).mean(),(actions[t]>=24).mean()])
                 if selected:
                     for j in range(nh):
@@ -170,12 +185,20 @@ def _train(cfg,folder,max_updates,minutes):
                     logits,v=model(x,l);dist=Categorical(logits=logits,validate_args=False)
                     diff=dist.log_prob(ac)-old;ratio=diff.exp();kl=((ratio-1)-diff).mean()
                     policy=-torch.minimum(ad*ratio,ad*ratio.clamp(1-p['clip'],1+p['clip'])).mean();vl=0.5*(v-ret).square().mean();entropy=dist.entropy().mean();loss=policy+p['value']*vl-p['entropy']*entropy
-                    if cfg.get('skills'):
+                    if cfg.get('skills') and not cfg.get('attack'):
                         from .skills import tutor
                         eligible=(x[:,0,16]>.5)&(x[:,1,26]*2044<180)
                         weight=cfg['skills']['auxiliary_initial']*max(0.,1-count/cfg['skills']['auxiliary_decay_transitions'])
                         aux=-dist.log_prob(tutor(x,l))
                         loss=loss+weight*(aux*eligible).sum()/eligible.sum().clamp_min(1)
+                    if rehearsal is not None:
+                        elapsed_phase=count-cfg['attack']['start_learning_transitions']
+                        settings=cfg['attack'].get('rehearsal',{})
+                        coefficient=settings.get('weight',.02)*max(0.,1-elapsed_phase/settings.get('decay_new_transitions',5000000))
+                        if coefficient>0:
+                            rx,rl,ry=rehearsal;ri=np.random.randint(0,len(ry),32)
+                            rlogits,_=model(torch.as_tensor(rx[ri],device=dev),torch.as_tensor(rl[ri],device=dev))
+                            loss=loss+coefficient*torch.nn.functional.cross_entropy(rlogits,torch.as_tensor(ry[ri],device=dev))
                     accepted,grad_norm=checked_step(loss,kl,model,opt,p['max_grad_norm'],p['target_kl'])
                     if not accepted:early=True;break
                     loss_metrics.append(torch.stack((loss.detach(),kl.detach(),entropy.detach(),((ratio.detach()-1).abs()>p['clip']).float().mean())))
@@ -194,7 +217,7 @@ def _train(cfg,folder,max_updates,minutes):
                 while len(history)>cfg['league']['max_history']:
                     old=history.pop(0);(folder/'history'/old).unlink(missing_ok=True);history_scores.pop(old,None)
             elapsed=time.perf_counter()-t0;wall=previous_wall+time.perf_counter()-start
-            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'speed/collection_seconds':rollout_sec,'speed/ppo_seconds':optimize_sec,'performance/gpu_rollout_cache':cache_used,'performance/model_execution':model_execution,'performance/torchscript':model_execution=='torchscript','performance/optimizer':optimizer_name,'performance/adam_fused':optimizer_name=='adam_fused','performance/gpu_peak_mb':torch.cuda.max_memory_allocated(dev)/1024**2 if dev.type=='cuda' else 0.,'train/loss':float(summary[0]),'train/approx_kl':float(summary[1]),'train/entropy':float(summary[2]),'train/clip_fraction':float(summary[3]),'train/kl_early_stop':early,'train/optimizer_minibatches':len(loss_metrics),'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),('reward/approach_blue_sum' if cfg['rewards'].get('profile') in ('rlgym_simple_v1','control_shots_v1','skills_v1') else 'reward/potential_blue_sum'):float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
+            metrics={'update':update,'learning_transitions':count,'env_decisions':previous_env+session_env,'physics_ticks':previous_physics+session_physics,'training_wall_seconds':wall,'speed/rollout_player_decisions_per_second':steps*e*a/rollout_sec,'speed/learning_transitions_per_second':new_samples/elapsed,'speed/update_wall_seconds':elapsed,'speed/collection_seconds':rollout_sec,'speed/ppo_seconds':optimize_sec,'performance/gpu_rollout_cache':cache_used,'performance/model_execution':model_execution,'performance/torchscript':model_execution=='torchscript','performance/optimizer':optimizer_name,'performance/adam_fused':optimizer_name=='adam_fused','performance/gpu_peak_mb':torch.cuda.max_memory_allocated(dev)/1024**2 if dev.type=='cuda' else 0.,'train/loss':float(summary[0]),'train/approx_kl':float(summary[1]),'train/entropy':float(summary[2]),'train/clip_fraction':float(summary[3]),'train/kl_early_stop':early,'train/optimizer_minibatches':len(loss_metrics),'game/goals':int(np.count_nonzero(term))/a,'game/mean_ball_distance':float(behavior[0]/steps),'game/mean_car_speed':float(behavior[1]/steps),'game/airborne_fraction':float(behavior[2]/steps),'game/air_action_fraction':float(behavior[3]/steps),'game/touches_blue':int(stats[1]),'game/touches_orange':int(stats[2]),'reward/goal_blue_sum':float(stats[3]),('reward/approach_blue_sum' if cfg['rewards'].get('profile') in ('rlgym_simple_v1','control_shots_v1','skills_v1','attack_v1') else 'reward/potential_blue_sum'):float(stats[4]),'reward/touch_blue_sum':float(stats[5]),'reward/control_blue_sum':float(stats[6]),'league/history_size':len(history),'league/opponent':selected,'device':str(dev),'state':'training'}
             if cfg['rewards'].get('profile')=='control_shots_v1':
                 metrics.update({'control/blue_score_mean':float(extra_stats[0]/(e*steps)),'control/absolute_score_mean':float(control_abs/(e*steps)),'control/floor_tracking_enabled':cfg['rewards'].get('goal_no_floor',0)>0,'reward/possession_absolute_mean':float(possession_abs/(e*steps)),'reward/possession_blue_sum':float(extra_stats[1]),'reward/no_floor_goal_blue_sum':float(extra_stats[2]),'reward/goal_speed_blue_sum':float(extra_stats[3]),'game/no_floor_goals':int(extra_stats[4]),'game/goal_speed_mean':float(extra_stats[5]/metrics['game/goals']) if metrics['game/goals'] else 0.,'game/credited_shot_goals':int(extra_stats[6]),'game/shot_floor_contact_detections':int(extra_stats[7])})
             if cfg.get('skills'):
@@ -202,6 +225,13 @@ def _train(cfg,folder,max_updates,minutes):
                 metrics['skills/drill_fraction']=fraction
                 metrics['skills/effective_touch_weight']=1-.8*min(1.,count/10000000)
                 metrics['skills/effective_approach_rate']=1-.6*min(1.,count/10000000)
+            if cfg.get('attack'):
+                metrics.update(dict(zip(('attack/aim_improvement_reward','attack/useful_launch_reward','attack/useful_flip_reward','attack/backflip_recovery_reward','attack/jump_contact_reward','attack/air_approach_reward','attack/on_target_touches','attack/kickoff_scene_goals','attack/open_scene_goals'),map(float,attack_stats))))
+                metrics['attack/new_transitions']=count-cfg['attack']['start_learning_transitions']
+                metrics['attack/backward_fraction']=float(backward_count/steps)
+                metrics['attack/rehearsal_weight']=.02*max(0.,1-(count-cfg['attack']['start_learning_transitions'])/5000000) if rehearsal is not None else 0.
+                metrics['skills/drill_fraction']=.7
+                metrics['skills/effective_touch_weight']=.1;metrics['skills/effective_approach_rate']=.3
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metrics,allow_nan=False)+'\n')
             atomic_json(folder/'status.json',metrics)
             if wb:
@@ -211,11 +241,15 @@ def _train(cfg,folder,max_updates,minutes):
             cache_label='GPU' if cache_used else 'host'
             print(f'UPDATE {update}: {count:,} learning transitions | {new_samples/elapsed:,.0f}/s end-to-end | touches {int(stats[1]+stats[2])}, goals {int(np.count_nonzero(term)/a)} | KL {metrics["train/approx_kl"]:.4f} | collect {rollout_sec:.1f}s / PPO {optimize_sec:.1f}s | cache {cache_label}',flush=True)
             if time.perf_counter()-last_save>=cfg['checkpoint_every_seconds']:save();last_save=time.perf_counter()
-            if cfg.get('skills') and count//cfg['skills']['auto_evaluate_every']>(count-new_samples)//cfg['skills']['auto_evaluate_every']:
+            period=cfg['attack']['validation_every'] if cfg.get('attack') else cfg.get('skills',{}).get('auto_evaluate_every',1)
+            offset=cfg.get('attack',{}).get('start_learning_transitions',0)
+            if cfg.get('skills') and (count-offset)//period>(count-new_samples-offset)//period:
                 save()
-                from .skills import monitor
+                from .offense import monitor as attack_monitor
+                from .skills import monitor as contact_monitor
+                monitor=attack_monitor if cfg.get('attack') else contact_monitor
                 if not monitor(model,cfg,folder,count):
-                    print('SKILL_REGRESSION_STOP: saved latest; retained earlier skill checkpoint. See skill_validation.jsonl.',flush=True);stopping=True
+                    print('VALIDATION_STOP: saved latest; parent and retained checkpoints preserved. See validation reports.',flush=True);stopping=True
     except BaseException:
         training_failed=True
         raise
