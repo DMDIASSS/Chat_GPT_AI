@@ -54,7 +54,7 @@ struct Env {
  if(kind==7){b.pos.y=sign*float(int(rng()%3001)-1500);b.pos.z=180+float(rng()%450);b.vel={0,sign*float(rng()%500),float(200+rng()%350)};}
  if(kind==8){b.pos.y=float(int(rng()%3001)-1500);b.vel={float(int(rng()%401)-200),float(int(rng()%401)-200),0};}
  arena->ball->SetState(b);
- for(size_t a=0;a<cars.size();a++){int t=a>=cars.size()/2;CarState c;float side=t?-1.f:1.f;float dist=kind==7?float(250+rng()%500):float(350+rng()%900);
+ for(size_t a=0;a<cars.size();a++){int t=a>=cars.size()/2;CarState c;float side=t?-1.f:1.f;float dist=kind==7?float(250+rng()%500):kind==8?float(1800+rng()%1200):float(350+rng()%900);
   c.pos={std::clamp(b.pos.x+float(int(rng()%1201)-600),-3300.f,3300.f),std::clamp(b.pos.y-side*dist,-4450.f,4450.f),17};
   if(kind==6&&t!=attacking)c.pos={float(int(rng()%2201)-1100),-side*4600,17};
   float yaw=std::atan2(b.pos.y-c.pos.y,b.pos.x-c.pos.x)+float(int(rng()%401)-200)/1000;
@@ -199,7 +199,7 @@ public:
   if(i<0||i>=count)throw std::invalid_argument("bad arena index");envs[i]->reset(true);test_state(i,data);auto&e=*envs[i];auto p=data.data();
   for(int a=0;a<agents;a++){auto q=p+(a+1)*32;auto c=e.cars[a]->GetState();Vec f(q[9],q[10],q[11]),u(q[12],q[13],q[14]);
    if(f.Length()<.99f||u.Length()<.99f||std::abs(f.Dot(u))>.01f)throw std::invalid_argument("Ground diagnostic requires orthonormal public orientation");
-   c.rotMat=RotMat(f.Normalized(),u.Cross(f).Normalized(),u.Normalized());c.angVel={q[6],q[7],q[8]};e.cars[a]->SetState(c);
+   c.rotMat=RotMat(f.Normalized(),u.Cross(f).Normalized(),u.Normalized());c.angVel={q[6],q[7],q[8]};e.cars[a]->SetState(c);e.movement[a].reset(move_frame(c));e.airPaid[a]=false;e.airTicks[a]=0;
   }
  }
  py::dict inspect(int i){if(i<0||i>=count)throw std::invalid_argument("bad arena index");auto&e=*envs[i];py::dict d;d["scenario_id"]=e.sceneKind;d["floor_contact"]=ball_floor_contact(e.arena);d["floor_tracking_enabled"]=controlRewards&&goalNoFloor>0;d["last_touch_team"]=e.shot.owner;d["floor_since_touch"]=e.shot.floorSeen;d["age_ticks"]=e.ticks-e.shot.touchTick;return d;}

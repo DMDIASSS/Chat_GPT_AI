@@ -25,7 +25,7 @@ struct MoveTrace {
   bool jump=!prev.jumped&&f.jumped&&(prev.ground||prev.pos.z<35);
   if(jump){
    if(ball.z>150&&ball.z<900&&dist<950&&f.forward.Dot(dir)>.25f&&f.vel.Dot(dir)>0&&tick-lastLaunch>=240){r.launch=.025f;lastLaunch=tick;}
-   if(prev.vel.Dot(prev.forward)<-400&&prev.vel.Dot(flat)>250&&prev.forward.Dot(flat)<-.5f&&dist>400&&tick-lastRecovery>=480){recovering=true;backflipped=false;startForward=prev.forward;started=tick;}
+   if(prev.vel.Dot(prev.forward)<-400&&prev.vel.Dot(flat)>250&&prev.forward.Dot(flat)<-.5f&&dist>900&&tick-lastRecovery>=480){recovering=true;backflipped=false;startForward=prev.forward;started=tick;}
   }
   if(f.flipping&&!prev.flipping){
    Vec dv=f.vel-prev.vel;float gain=dv.Dot(flat);
