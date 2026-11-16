@@ -80,9 +80,15 @@ public:
   auto wp=w.mutable_data(),pp=p.mutable_data(),op=o.mutable_data(),fwp=fw.mutable_data(),fpp=fp.mutable_data(),fop=fo.mutable_data(),rp=r.mutable_data(),cp=parts.mutable_data(),ip=info.mutable_data();auto mp=m.mutable_data(),fmp=fm.mutable_data(),te=term.mutable_data(),tr=trunc.mutable_data();std::fill(wp,wp+w.size(),0.f);std::fill(fwp,fwp+fw.size(),0.f);
   {py::gil_scoped_release release;pool.run(n,[&](int i){auto&e=*envs[i];Math::GetRandEngine()=e.physics;auto before=e.arena->ball->GetState();bool hits[2]={false,false};uint64_t begin=e.arena->tickCount;
    int limit=bp?int(std::min<int64_t>(skip,bp[i])):skip;for(int k=0;k<limit;k++){if(k==delay)for(int a=0;a<2;a++){e.previous[a]=acts[ap[i*2+a]];e.cars[a]->controls=e.previous[a];}
-    e.arena->Step(1);e.ticks++;e.noTouch++;for(int a=0;a<2;a++){auto s=e.cars[a]->GetState();if(s.ballHitInfo.isValid&&s.ballHitInfo.tickCountWhenHit>=begin&&s.ballHitInfo.tickCountWhenHit==e.arena->tickCount-1){hits[a]=true;e.noTouch=0;}}
+    e.arena->Step(1);e.ticks++;e.noTouch++;
     if(e.goal>=0)break;
    }
+   // BallHitInfo keeps the latest contact tick. Reading it once after the
+   // decision avoids copying two complete CarStates on every physics tick.
+   // No-touch time retains ticks since the last hit, exactly as the old loop.
+   uint64_t end=e.arena->tickCount;
+   for(int a=0;a<2;a++){auto state=e.cars[a]->GetState();const auto&hit=state.ballHitInfo;
+    if(hit.isValid&&hit.tickCountWhenHit>=begin&&hit.tickCountWhenHit<end){hits[a]=true;e.noTouch=std::min(e.noTouch,int(end-hit.tickCountWhenHit-1));}}
    e.physics=Math::GetRandEngine();te[i]=e.goal>=0;tr[i]=!te[i]&&(e.ticks>=maxTicks||e.noTouch>=noTouchTicks);float g=e.goal<0?0:e.goal==0?1.f:-1.f;auto after=e.arena->ball->GetState();float potential=phi(after.pos),shape=limit?.25f*(gamma*(te[i]?0:potential)-e.potential):0;e.potential=potential;float impulse=std::min(1.f,(after.vel-before.vel).Length()/3000.f);
    for(int a=0;a<2;a++){float*part=cp+(i*2+a)*3;part[0]=a?-g:g;part[1]=a?-shape:shape;part[2]=hits[a]?impulseWeight*impulse:0;rp[i*2+a]=part[0]+part[1]+part[2];}
    ip[i*6]=g;ip[i*6+1]=hits[0];ip[i*6+2]=hits[1];ip[i*6+3]=float(e.arena->tickCount-begin);ip[i*6+4]=float(e.scene);ip[i*6+5]=float(e.ticks);
