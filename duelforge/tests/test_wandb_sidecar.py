@@ -22,11 +22,11 @@ def test_worker_resumes_existing_id_and_skips_acknowledged_metrics(tmp_path):
     (folder/'metrics.jsonl').write_text('\n'.join(json.dumps({'learning_transitions':s,'game/test':s,'state':'training'}) for s in (100,200,300))+'\n')
     received=[];arguments=[]
     class Run:
-        step=201;url='https://example.invalid/run'
+        step=201;url='https://example.invalid/run';entity='test'
         def log(self,row,step):received.append((row,step))
         def finish(self):pass
     def init(**kw):arguments.append(kw);return Run()
-    fake=S(init=init,Settings=lambda **kw:kw,util=S(generate_id=lambda:'new-id'))
+    fake=S(init=init,Settings=lambda **kw:kw,util=S(generate_id=lambda:'new-id'),Api=lambda **kw:S(run=lambda path:S(lastHistoryStep=200)))
     sidecar.run(root,fake,max_polls=1,interval=0)
     assert arguments[0]['id']=='existing-id'
     assert received==[({'learning_transitions':300,'game/test':300},300)]

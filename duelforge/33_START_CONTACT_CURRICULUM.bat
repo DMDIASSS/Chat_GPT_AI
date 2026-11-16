@@ -16,4 +16,3 @@ echo CONTACT_COMMAND_FAILED - keep output. Original potential01 and last complet
 pause
 exit /b 1
 )
-pause

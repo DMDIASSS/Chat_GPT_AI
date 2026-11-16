@@ -1,0 +1,7 @@
+{
+  "tests": "70 passed, 1 optional Nexto-assets skip",
+  "wandb_sdk_api_verified": "0.31.0 lastHistoryStep and reinit=create_new inspected locally",
+  "online_access_tested": false,
+  "training_weights_modified": false,
+  "failed_gate_bypass": false
+}

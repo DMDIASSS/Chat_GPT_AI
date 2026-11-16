@@ -24,7 +24,7 @@ def gae(rewards,values,next_value,terminated,truncated,timeout_values,gamma,lam)
 
 
 def tracker(cfg,folder,run_id):
-    if os.environ.get('DUELFORGE_WANDB_EXTERNAL')=='1':
+    if cfg.get('acquisition') or os.environ.get('DUELFORGE_WANDB_EXTERNAL')=='1':
         print('WANDB_EXTERNAL: local metrics only in trainer; separate uploader handles network.',flush=True)
         return None
     if not cfg.get('wandb',{}).get('enabled'):return None

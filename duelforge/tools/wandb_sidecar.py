@@ -52,7 +52,7 @@ def exclusive(path):
     finally:f.close()
 
 def run(root,wandb_module=None,max_polls=None,interval=3.):
-    root=Path(root).resolve();polls=0;current=None;wb=None;offset=0;remote_floor=0
+    root=Path(root).resolve();polls=0;current=None;wb=None;offset=0;remote_floor=0;sessions={}
     print('WANDB_UPLOADER: waiting for curriculum; training writes local metrics independently.',flush=True)
     # The trainer creates this directory atomically. Do not create it first.
     while not (root/'curriculum.json').is_file():
@@ -68,8 +68,9 @@ def run(root,wandb_module=None,max_polls=None,interval=3.):
                     folder=active(root)
                     if folder is None:time.sleep(interval);continue
                     if folder!=current:
-                        if wb is not None:wb.finish();wb=None
-                        current=folder;offset=0
+                        if wb is not None:sessions[current]=(wb,offset,remote_floor)
+                        current=folder
+                        wb,offset,remote_floor=sessions.get(folder,(None,0,None))
                     if wb is None:
                         cfg=json.loads((folder/'config.json').read_text())
                         if not cfg.get('wandb',{}).get('enabled'):time.sleep(interval);continue
@@ -79,11 +80,23 @@ def run(root,wandb_module=None,max_polls=None,interval=3.):
                         run_id=ids.get(folder.name) or old.get('id') or wandb_module.util.generate_id()
                         ids[folder.name]=run_id;atomic(idsfile,ids)
                         wb=wandb_module.init(project=cfg['wandb']['project'],name=folder.name,id=run_id,
-                            resume='allow',config=cfg,dir=str(folder),
+                            resume='allow',reinit='create_new',config=cfg,dir=str(folder),
                             mode=os.environ.get('WANDB_MODE','online'),
                             settings=wandb_module.Settings(init_timeout=15))
-                        remote_floor=int(getattr(wb,'step',0));offset=0
+                        remote_floor=None;offset=0
                         print('UPLOADER_CONNECTED:',folder.name,getattr(wb,'url',''),flush=True)
+                    if remote_floor is None:
+                        remote_floor=int(getattr(wb,'step',0))
+                        if os.environ.get('WANDB_MODE','online')=='online':
+                            # SDK Run.step can still be zero after resume in 0.31.
+                            # Query acknowledged server history before replaying.
+                            try:
+                                api=wandb_module.Api(timeout=15)
+                                remote=api.run(f'{wb.entity}/{cfg["wandb"]["project"]}/{ids[folder.name]}')
+                                remote_floor=max(remote_floor,int(remote.lastHistoryStep)+1)
+                            except Exception:
+                                remote_floor=None
+                                raise
                     batch,next_offset=rows(folder/'metrics.jsonl',offset)
                     sent=0
                     for row in batch:
@@ -99,14 +112,16 @@ def run(root,wandb_module=None,max_polls=None,interval=3.):
                 except Exception as ex:
                     print('UPLOADER_RETRY:',type(ex).__name__,str(ex),flush=True)
                     atomic(status,{'state':'retrying','error':str(ex),'training_started':False})
-                    if wb is not None:
-                        try:wb.finish()
-                        except Exception:pass
-                    wb=None;offset=0
+                    # Retry without finish(): SDK/network waits stay in this worker.
+                    # Unconsumed rows remain on disk and offset is committed only
+                    # after the full read batch is queued successfully.
+                    pass
                 if max_polls is None or polls<max_polls:time.sleep(interval)
         except KeyboardInterrupt:print('UPLOADER_STOPPING: trainer is unaffected.',flush=True)
         finally:
-            if wb is not None:wb.finish()
+            if wb is not None:sessions[current]=(wb,offset,remote_floor)
+            print('UPLOADER_CLOSING: flushing runs in this console only; trainer remains independent.',flush=True)
+            for saved,_,_ in sessions.values():saved.finish()
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[1]/'runs/contact01');a=p.parse_args()
