@@ -106,7 +106,8 @@ py::tuple encode_public(py::array_t<float,py::array::c_style|py::array::forcecas
  int n=int(w.shape(0)),inv[34];for(int j=0;j<34;j++){auto a=loc.data()+j*4;float best=1e20f;for(int k=0;k<34;k++){auto b=loc.data()+k*4;float d=(a[0]+b[0])*(a[0]+b[0])+(a[1]+b[1])*(a[1]+b[1])+(a[2]-b[2])*(a[2]-b[2]);if(d<best){best=d;inv[j]=k;}}if(best>.01f)throw std::invalid_argument("pad rotation");}
  py::array_t<float>o({n,2,109});py::array_t<bool>m({n,2,90});auto acts=table();for(int i=0;i<n;i++)for(int a=0;a<2;a++)encode_one(w.data()+i*96,p.data()+i*68,inv,o.mutable_data()+(i*2+a)*109,m.mutable_data()+(i*2+a)*90,a,acts);return py::make_tuple(o,m);
 }
-PYBIND11_MODULE(_native,m){m.attr("contract")="duelforge-109-v1-octane-120hz-skip8-delay7";m.attr("version")=1;m.def("encode",&encode_public);
+#include "potential.h"
+PYBIND11_MODULE(_native,m){m.attr("contract")="duelforge-109-v1-octane-120hz-skip8-delay7";m.attr("version")=1;m.def("predictive_estimate",&predictive_estimate);m.def("encode",&encode_public);
  m.def("action_table",[]{auto a=table();py::array_t<float>x({90,8});for(int i=0;i<90;i++)control(x.mutable_data()+8*i,a[i]);return x;});
  py::class_<Batch>(m,"Batch").def(py::init<std::string,int,int,unsigned,int,int,float,float,float,float>()).def("observe",&Batch::observe).def("step",&Batch::step,py::arg("actions"),py::arg("remaining_ticks")=py::none()).def("pad_locations",&Batch::locations).def("scene",&Batch::scene).def("set_scene",&Batch::set_scene).def("reset_one",&Batch::reset_one).def("inject",&Batch::inject);
 }
