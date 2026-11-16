@@ -1,0 +1,42 @@
+{
+  "status": "phase_1_feasibility_only",
+  "unit_tests": {
+    "passed": 8,
+    "runner": "Python unittest; reward formulas and finite model contracts"
+  },
+  "compiled_native_audit": {
+    "original_ggl_gae": "two faults reproduced in real LibTorch/ASan harness",
+    "minimal_patch": "two isolated fixtures corrected; complete PPO learner not certified"
+  },
+  "probes_run": [
+    "three synthetic model inference/backward/Adam probes, CPU FP32",
+    "warmed serial raw RocketSim binding physics probe",
+    "bounded Python-runtime discovery and benchmark/report ZIP launcher path on Linux"
+  ],
+  "server_runtime": {
+    "python": "3.11",
+    "torch": "2.9.1+cpu",
+    "cuda_available": false,
+    "torch_threads": 2
+  },
+  "not_run": [
+    "actual game bot training",
+    "target GTX 1650 CUDA measurements",
+    "full GGL or Rust trainer build",
+    "live Windows batch execution",
+    "RocketSimVis GUI connection",
+    "RewardServer/BakkesMod runtime integration",
+    "RLBot game-client match"
+  ],
+  "training_started": false,
+  "old_models_imported": false,
+  "primary_docs": [
+    "ARCHITECTURE.md",
+    "REWARDS.md",
+    "FIRST_EXPERIMENT.json",
+    "research/GGL_CORRECTNESS_AUDIT.md",
+    "research/VISUALIZATION_AND_REWARDSERVER.md",
+    "research/OPPONENTS_AND_EVALUATION.md"
+  ],
+  "approval_boundary": "The supplied prompt requires approval of architecture, experiment and resource requirements before expensive training"
+}

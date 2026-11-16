@@ -1,0 +1,15 @@
+{
+  "name": "DuelForge",
+  "version": "0.1-research",
+  "stage": "research_and_feasibility_proposal",
+  "mode": "Rocket League 1v1",
+  "proposed_learner_hitbox": "Octane",
+  "fresh_initialization": true,
+  "existing_project_models_modified": false,
+  "trained_actor_included": false,
+  "complete_trainer_included": false,
+  "game_training_started": false,
+  "approval_required_before_expensive_training": true,
+  "hardware_target": {"cpu": "Intel i5-10300H", "gpu": "GTX 1650 Mobile", "vram_gb": 4, "ram_gb": 16, "os": "Windows 10"},
+  "proposed_experiment": "FIRST_EXPERIMENT.json"
+}

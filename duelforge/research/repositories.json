@@ -1,0 +1,116 @@
+[
+  {
+    "repo": "ZealanL/RocketSim",
+    "branch": "main",
+    "archived": false,
+    "updated": "2026-11-14T18:42:56Z",
+    "license": "MIT",
+    "description": "A C++ library for simulating Rocket League games at maximum efficiency",
+    "url": "https://github.com/ZealanL/RocketSim",
+    "commit": "c2baacb8f4b441dd8505e63c2aeb5a1679b60b02"
+  },
+  {
+    "repo": "ZealanL/GigaLearnCPP-Leak",
+    "branch": "main",
+    "archived": true,
+    "updated": "2025-08-23T23:52:27Z",
+    "description": "The leaked version of GigaLearnCPP",
+    "url": "https://github.com/ZealanL/GigaLearnCPP-Leak",
+    "commit": "86e11c3881a21225a43c36b14af40f0b3c87e7dd"
+  },
+  {
+    "repo": "SubparN0va/GGLBot",
+    "branch": "main",
+    "archived": false,
+    "updated": "2026-09-23T02:57:01Z",
+    "description": "Creates everything you need to get your bot made with GigaLearn (GGL) up and running in RLBot v5",
+    "url": "https://github.com/SubparN0va/GGLBot",
+    "commit": "d5d21daa7653f842699b590d6bf85597c617e4d8"
+  },
+  {
+    "repo": "ZealanL/RLGymPPO_CPP",
+    "branch": "main",
+    "archived": false,
+    "updated": "2024-10-27T03:10:21Z",
+    "description": "A lightning-fast C++ implementation of RLGym-PPO",
+    "url": "https://github.com/ZealanL/RLGymPPO_CPP",
+    "commit": "ee4cc56fc8e43758cc898fdba92a9173a94e52f2"
+  },
+  {
+    "repo": "AechPro/rlgym-ppo",
+    "branch": "main",
+    "archived": false,
+    "updated": "2025-01-06T23:25:15Z",
+    "license": "Apache-2.0",
+    "description": "A vectorized implementation of PPO for use with RLGym",
+    "url": "https://github.com/AechPro/rlgym-ppo",
+    "commit": "4ffd2e924198bf4b2d59f4bf280b29919d7c07ea"
+  },
+  {
+    "repo": "JPK314/rlgym-learn",
+    "branch": "main",
+    "archived": false,
+    "updated": "2026-08-29T15:23:10Z",
+    "license": "Apache-2.0",
+    "description": null,
+    "url": "https://github.com/JPK314/rlgym-learn",
+    "commit": "250379331d21946afaed384dd0fadc857f3df6b6"
+  },
+  {
+    "repo": "VirxEC/rlgymppo_rs",
+    "branch": "master",
+    "archived": false,
+    "updated": "2026-11-13T01:10:50Z",
+    "license": "GPL-2.0",
+    "description": "A Rust implementation of PPO for Rocket League training",
+    "url": "https://github.com/VirxEC/rlgymppo_rs",
+    "commit": "c774b3095e52679025d711aa06842128672ceaa9"
+  },
+  {
+    "repo": "RLGym/rlgym",
+    "branch": "main",
+    "archived": false,
+    "updated": "2026-05-16T17:51:35Z",
+    "license": "Apache-2.0",
+    "description": "A Gym-like environment for Reinforcement Learning in Rocket League",
+    "url": "https://github.com/RLGym/rlgym",
+    "commit": "2fc8d435663454b7fe45d2556777efd65cba8c2d"
+  },
+  {
+    "repo": "HappyBavarian07/RewardServer",
+    "branch": "main",
+    "archived": false,
+    "updated": "2026-11-13T12:56:54Z",
+    "description": "Live reward inspection for Rocket League: BakkesMod overlay plus a local reward evaluation server",
+    "url": "https://github.com/HappyBavarian07/RewardServer",
+    "commit": "fbc3a307112d7bc2ef2d4641fe43213fe963f905"
+  },
+  {
+    "repo": "chrisrca/RocketSimVisWeb",
+    "branch": "main",
+    "archived": false,
+    "updated": "2025-10-12T03:45:58Z",
+    "description": "My three.js rewrite of RocketSimVis for RocketSim.",
+    "url": "https://github.com/chrisrca/RocketSimVisWeb",
+    "commit": "1b3a872151c9d78bb668eb2cd4c79a63f68786bf"
+  },
+  {
+    "repo": "VirxEC/rlviser",
+    "branch": "master",
+    "archived": false,
+    "updated": "2026-06-22T01:05:12Z",
+    "license": "MIT",
+    "description": "A visualizer for the RocketSim project",
+    "url": "https://github.com/VirxEC/rlviser",
+    "commit": "a4e524085cdb1601cf9c0af2f815591fb696db54"
+  },
+  {
+    "repo": "ZealanL/RocketSimVis",
+    "branch": "main",
+    "archived": false,
+    "updated": "2025-01-07T23:30:39Z",
+    "description": "An easy-to-use cool-looking visualizer for RocketSim",
+    "url": "https://github.com/ZealanL/RocketSimVis",
+    "commit": "074a4368f31668ccd651087eebf6a1b459564ad7"
+  }
+]

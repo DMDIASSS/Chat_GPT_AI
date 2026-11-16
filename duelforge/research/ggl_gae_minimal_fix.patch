@@ -1,0 +1,17 @@
+--- a/GigaLearnCPP/src/private/GigaLearnCPP/PPO/GAE.cpp
++++ b/GigaLearnCPP/src/private/GigaLearnCPP/PPO/GAE.cpp
+@@ -74,9 +74,13 @@
+ 			if (truncCount >= numTruncs)
+ 				RG_ERR_CLOSE("GAE encountered too many truncated terminals, not enough val preds (max: " << numTruncs << ")")
+ 
+-			nextValPred = _truncValPreds[truncCount];
++			nextValPred = _truncValPreds[numTruncs - 1 - truncCount];
+ 			truncCount++;
++		} else if (done) {
++			nextValPred = 0;
+ 		} else {
++			if (step + 1 >= valPreds.size(0))
++				RG_ERR_CLOSE("Nonterminal rollout tail requires an explicit bootstrap value");
+ 			nextValPred = _valPreds[step + 1];
+ 		}
+ 

@@ -1,0 +1,47 @@
+=================================================================
+==689==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x5090000004c8 at pc 0x558769732583 bp 0x7fff2683a2d0 sp 0x7fff2683a2c8
+READ of size 4 at 0x5090000004c8 thread T0
+    #0 0x558769732582 in GGL::GAE::Compute(at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor&, at::Tensor&, at::Tensor&, float&, float, float, float, float) <audit>/GAE.cpp:80
+    #1 0x5587696f2808 in main <audit>/main.cpp:10
+    #2 0x7f8350db4ca7  (/lib/x86_64-linux-gnu/libc.so.6+0x29ca7) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+    #3 0x7f8350db4d64 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x29d64) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+    #4 0x5587696f18b0 in _start (<audit>/gae_audit+0x178b0) (BuildId: 72df8974102875a533edcd6b502e5d11ecc4bc59)
+
+0x5090000004c8 is located 0 bytes after 8-byte region [0x5090000004c0,0x5090000004c8)
+allocated by thread T0 here:
+    #0 0x7f83659f824d in posix_memalign ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x7f8351391430 in c10::alloc_cpu(unsigned long) (<torch-lib>/libc10.so+0x8d430) (BuildId: a6639453fcc699a0e86db4cf54a6a6727a352724)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow <audit>/GAE.cpp:80 in GGL::GAE::Compute(at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor&, at::Tensor&, at::Tensor&, float&, float, float, float, float)
+Shadow bytes around the buggy address:
+  0x509000000200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x509000000280: fd fd fd fd fa fa fa fa fa fa fa fa fa fa fa fa
+  0x509000000300: fd fd fd fd fa fa fa fa fa fa fa fa fa fa fa fa
+  0x509000000380: 00 fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x509000000400: 02 fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+=>0x509000000480: fa fa fa fa fa fa fa fa 00[fa]fa fa fa fa fa fa
+  0x509000000500: fa fa fa fa fa fa fa fa 04 fa fa fa fa fa fa fa
+  0x509000000580: fa fa fa fa fa fa fa fa 00 fa fa fa fa fa fa fa
+  0x509000000600: fa fa fa fa fa fa fa fa 00 fa fa fa fa fa fa fa
+  0x509000000680: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x509000000700: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==689==ABORTING

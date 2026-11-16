@@ -1,0 +1,16 @@
+build/
+.venv*/
+__pycache__/
+*.pyc
+runs/
+exports/
+checkpoints/
+*.pt
+*.lt
+*.bpk
+.env
+wandb/
+results/local_*
+results/runtime_selection.json
+results/*_build/
+DuelForge_preflight_*.zip

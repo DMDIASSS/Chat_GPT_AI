@@ -1,0 +1,39 @@
+{
+  "kind": "raw_physics_probe",
+  "bindings": "/workspace/work/venv311/lib/python3.11/site-packages/RocketSim.abi3.so",
+  "results": [
+    {
+      "arenas": 1,
+      "car_count_per_arena": 2,
+      "ticks_per_step": 8,
+      "seconds": 0.4000366310000345,
+      "raw_physics_ticks_per_second": 145066.71515288058,
+      "raw_environment_steps_per_second": 18133.339394110073,
+      "raw_player_decisions_per_second": 36266.678788220146,
+      "execution": "explicit serial loop, warmed up; native trainer worker-pool comparison still required",
+      "scope": "RAW physics via Python bindings, scripted constant inputs. No obs/rewards/inference/PPO; no framework or learning speed claim."
+    },
+    {
+      "arenas": 16,
+      "car_count_per_arena": 2,
+      "ticks_per_step": 8,
+      "seconds": 0.40059897399999045,
+      "raw_physics_ticks_per_second": 194908.13773277876,
+      "raw_environment_steps_per_second": 24363.517216597345,
+      "raw_player_decisions_per_second": 48727.03443319469,
+      "execution": "explicit serial loop, warmed up; native trainer worker-pool comparison still required",
+      "scope": "RAW physics via Python bindings, scripted constant inputs. No obs/rewards/inference/PPO; no framework or learning speed claim."
+    },
+    {
+      "arenas": 64,
+      "car_count_per_arena": 2,
+      "ticks_per_step": 8,
+      "seconds": 0.4009967229999347,
+      "raw_physics_ticks_per_second": 229827.31457387746,
+      "raw_environment_steps_per_second": 28728.414321734683,
+      "raw_player_decisions_per_second": 57456.828643469365,
+      "execution": "explicit serial loop, warmed up; native trainer worker-pool comparison still required",
+      "scope": "RAW physics via Python bindings, scripted constant inputs. No obs/rewards/inference/PPO; no framework or learning speed claim."
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "source_repository": "ZealanL/GigaLearnCPP-Leak",
+  "commit": "86e11c3881a21225a43c36b14af40f0b3c87e7dd",
+  "source_path": "GigaLearnCPP/src/private/GigaLearnCPP/PPO/GAE.cpp",
+  "source_sha256": "8c1c8d622457ab9c6488edefa96c039474ba00f5fd0e2e08752afa1ff80c8459",
+  "method": "Compiled the exact original GAE.cpp unchanged against real installed LibTorch 2.9.1 CPU, using a thin declaration/terminal-enum/log-macro header; standalone harness, not a full GGL build",
+  "compiler": "g++ C++17 -O0 -g -fsanitize=address -fno-omit-frame-pointer",
+  "tests": [
+    {
+      "fixture": "two independent truncation rows; gamma=1,lambda=0,rewards=0,values=0,forward-order timeout values [10,100]",
+      "expected_advantages": [
+        10,
+        100
+      ],
+      "original_advantages": [
+        100,
+        10
+      ],
+      "original_result": "incorrect boundary-to-value mapping",
+      "patched_advantages": [
+        10,
+        100
+      ]
+    },
+    {
+      "fixture": "a truncation row then a normal terminal; two values and one timeout value",
+      "expected_advantages": [
+        10,
+        0
+      ],
+      "original_result": "AddressSanitizer heap-buffer-overflow at original GAE.cpp:80 (_valPreds[step+1])",
+      "patched_advantages": [
+        10,
+        0
+      ],
+      "patched_result": "completed without sanitizer error"
+    }
+  ],
+  "limitations": [
+    "Not an audit of every GGL execution path",
+    "No claim that these faults caused earlier user-project performance",
+    "Minimal patch is not a full fixed-horizon collector implementation",
+    "Small deterministic fixtures do not prove the entire PPO learner is correct"
+  ]
+}
