@@ -12,11 +12,21 @@ def continuous_start(experiment,steps,root,once=False):
         print('CONTINUOUS_NEXT_BLOCK: resuming saved weights; uploader continues independently.',flush=True)
 
 
+def stage_target(experiment,stage):
+    if stage=='active':return experiment.active()
+    names={'contact':'01_contact','possession':'02_possession','trajectory':'03_trajectory'}
+    if stage not in names:raise ValueError('Unknown curriculum stage')
+    folder=ROOT/'runs/contact01'/names[stage]
+    if not (folder/'latest.pt').is_file():raise FileNotFoundError(f'Exact stage checkpoint missing: {folder}. No substitution.')
+    return folder
+
+
 def main():
     p=argparse.ArgumentParser()
     p.add_argument('command',choices=['start','pause','watch','evaluate','export','report','profile'])
     p.add_argument('--steps',type=int,default=5_000_000)
     p.add_argument('--once',action='store_true',help='Stop after one step-budget block; default repeats until paused/gate failure')
+    p.add_argument('--stage',choices=['active','contact','possession','trajectory'],default='active')
     p.add_argument('--games',type=int,default=200)
     p.add_argument('--seconds',type=float,default=100)
     a=p.parse_args()
@@ -31,7 +41,7 @@ def main():
         if not torch.cuda.is_available():raise RuntimeError('CUDA required for this launcher; run 32_INSTALL_CUDA_RUNTIME.bat first. No CPU fallback or model reset.')
         os.environ['DUELFORGE_WANDB_EXTERNAL']='1'
         return continuous_start(experiment,a.steps,ROOT/'runs/contact01',a.once)
-    folder=experiment.active()
+    folder=stage_target(experiment,a.stage)
     if a.command=='watch':
         from duelforge.watch import watch
         return watch(folder,seconds=a.seconds,scene=-2)

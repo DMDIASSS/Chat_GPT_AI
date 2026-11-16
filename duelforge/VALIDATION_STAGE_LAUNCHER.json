@@ -1,0 +1,6 @@
+{
+  "tests": "73 passed, 1 optional Nexto assets skipped",
+  "native_cli_evaluation": "4 games through --stage possession; CPU smoke test",
+  "model_changes": false,
+  "windows_batch_launch_tested": false
+}
