@@ -1,5 +1,5 @@
 """Read saved metrics in a separate process. Never import the trainer/Torch."""
-import argparse,contextlib,json,os,sys,tempfile,time
+import argparse,contextlib,json,os,secrets,sys,tempfile,time
 from pathlib import Path
 
 STAGES=('01_contact','02_possession','03_trajectory')
@@ -77,7 +77,7 @@ def run(root,wandb_module=None,max_polls=None,interval=3.):
                         if wandb_module is None:import wandb as wandb_module
                         hint=folder/'wandb_status.json'
                         old=json.loads(hint.read_text()) if hint.is_file() else {}
-                        run_id=ids.get(folder.name) or old.get('id') or wandb_module.util.generate_id()
+                        run_id=ids.get(folder.name) or old.get('id') or secrets.token_hex(4)
                         ids[folder.name]=run_id;atomic(idsfile,ids)
                         wb=wandb_module.init(project=cfg['wandb']['project'],name=cfg['wandb'].get('name',folder.name),id=run_id,
                             resume='allow',reinit='create_new',config=cfg,dir=str(folder),
