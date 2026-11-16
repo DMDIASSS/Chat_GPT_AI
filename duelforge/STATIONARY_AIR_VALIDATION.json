@@ -1,0 +1,61 @@
+{
+  "version": "stationary-air-v1",
+  "full_suite": {
+    "passed": 100,
+    "skipped": 1,
+    "seconds": 74.89,
+    "skipped_reason": "Optional pinned Nexto assets not installed"
+  },
+  "physics_check": {
+    "stationary_exact_for_seconds": 3,
+    "nonzero_velocity_releases_gravity": true,
+    "passed": true
+  },
+  "pipeline_checks": {
+    "greedy_gated_resume_level": 1,
+    "source_and_validated_candidate_preserved": true,
+    "headless_watch_frames": 120,
+    "watch_max_car_height": 258.7785339355469,
+    "export_identity": {
+      "agent_id": "DMDIASSS/DuelForge_03_trajectory_353dbb00bb48",
+      "actor_lt_sha256": "353dbb00bb48a24068d71269e2575a35c7a3258b5b8ecf4d697a5bb271d09fa9",
+      "actor_pt_sha256": "353dbb00bb48a24068d71269e2575a35c7a3258b5b8ecf4d697a5bb271d09fa9",
+      "source_checkpoint_sha256": "83ed0571d61a7192cbb17b89526d76f73e10cf792baefa118ee9acda3e107584",
+      "learning_transitions": 1004743,
+      "source_export_logits_max_abs_difference": 0.0,
+      "action_agreement": 1.0,
+      "hitbox": "Octane",
+      "format": "TorchScript actor.pt and actor.lt, read by the included RLBot v5 Python wrapper; NOT GGL native parameter archives",
+      "live_rlbot_match_verified": false
+    },
+    "scope": "Linux CPU smoke-test actor. No Windows/Rocket League client match was executed here."
+  },
+  "native_binary_changes": false,
+  "new_runtime_dependencies": [],
+  "preserved_user_runs": [
+    "contact01",
+    "potential01",
+    "air01",
+    "jump01"
+  ],
+  "new_run": "held01",
+  "budget_per_launcher": 500000,
+  "objective": "Real elevated contacts, mixing stationary/moving targets with normal matches",
+  "initial_arena_allocation": {
+    "held": 0.35,
+    "moving": 0.15,
+    "normal": 0.5
+  },
+  "entropy_coefficients": {
+    "drill": 0.02,
+    "normal": 0.003
+  },
+  "windows_validation": "Pure Python update against the existing native ABI; Windows execution and live Rocket League client remain local verification.",
+  "experiment_findings": [
+    "Sampling tasks only at resets diluted four-second drills by long match duration. Fixed arena roles corrected decision allocation.",
+    "Promotion from exploratory successes alone regressed hard greedy contact. Replaced with frozen-policy level gates and at most one level per tested block.",
+    "Final pilot contacted moving targets 40/64 vs frozen source 34/64 on one common-seed panel; another common-seed panel was 32/64 vs 34/64. This is mixed, insufficient evidence of general improvement.",
+    "Normal match pilot was 200 draws and 0 goals. It validates pipeline execution, not playing strength or preserved scoring ability."
+  ],
+  "promotion": "None; source weights never replaced."
+}

@@ -7,7 +7,7 @@ from .runtime import ROOT,model,batch,device,pin,sha,atomic_json
 from .learning import bootstrap_parts
 
 
-def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=None,checkpoint=None):
+def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=None,checkpoint=None,held_drills=False):
     folder=Path(folder)
     if not 0<seconds<=600:raise ValueError('Watch duration must be 0..600 seconds')
     actor,ck,path=model(folder,checkpoint=checkpoint);cfg=copy.deepcopy(ck['config']);dev=device(cfg);torch.set_num_threads(cfg['torch_threads']);actor.to(dev)
@@ -18,12 +18,20 @@ def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=N
     elif opponent=='self':other=actor;label='same frozen learned actor';opphash=ck['_source_sha256']
     else:
         op=folder/'initial.pt' if opponent=='initial' else Path(opponent);other,d,_=model(folder,checkpoint=op,dev=dev);label=(json.loads((folder/'baseline.json').read_text())['label'] if (folder/'baseline.json').is_file() else 'frozen initial policy') if opponent=='initial' else str(op);opphash=d['_source_sha256']
-    if opponent=='initial' and cfg.get('acquisition'):label='frozen curriculum-start parent (unchanged)'
     from .viewer import Viewer
     viewer=None if headless else Viewer();env=batch(cfg,n=1,seconds=seconds+10);env.scene(scene);raw=env.observe();locations=env.pad_locations();records=deque(maxlen=1800);start=time.perf_counter();ticks=0;k=0;score=[0,0];contacts=[0,0];output=folder/'watch'/str(time.time_ns());output.mkdir(parents=True)
+    if held_drills:
+        if not cfg.get('held_ball'):raise ValueError('This checkpoint has no stationary-air curriculum')
+        from .held_ball import HeldBallBatch
+        env=HeldBallBatch(env,cfg,cfg['seed'],force=1)
+        if ck.get('held_curriculum'):env.restore_curriculum(ck['held_curriculum'])
+        raw=env.observe()
+        print('STATIONARY DRILLS: ball sleeps in air until contact; both cars use neural actors. Training scaffold, not a regulation match.',flush=True)
     if cfg.get('predictive',{}).get('enabled'):env.reward.capture_details=True
     print('LIVE WATCH: BLUE = learned actor,',ck['learning_transitions'],'transitions; ORANGE =',label,'; both Octane. No training. Ctrl+C saves the recording.',flush=True)
     metadata={'potential_debug_fields':['blue_phi_before','blue_phi_next_used','eta_blue_seconds','eta_orange_seconds','blue_goal_threat','geometry_warning'],'predictive':cfg.get('predictive',{}),'bootstrap':cfg.get('bootstrap',{}),'model_sha256':ck['_source_sha256'],'learning_transitions':ck['learning_transitions'],'opponent':label,'opponent_sha256':opphash,'scene':scene,'physics_hz':120,'tick_skip':8,'action_delay':7,'rewards':cfg['rewards'],'recording_cap_frames':1800,'note':'Actual native gameplay transitions, not replay imitation or a scripted controller. Top-down inspector is diagnostic, not the 3D viewer.'}
+    metadata['stationary_air_scaffold']=held_drills
+    metadata['held_curriculum']=ck.get('held_curriculum') if held_drills else None
     try:
         with torch.inference_mode():
             while ticks<seconds*120 and (frames is None or k<frames):
