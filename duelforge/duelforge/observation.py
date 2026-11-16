@@ -19,7 +19,7 @@ def action_table():
                     for b in (0,1):
                         if j and y:continue
                         if p==r==j==0:continue
-                        rows.append([b,y,p,y,r,j,b,int(j and (p or y or r))])
+                        rows.append([b,y,p,y,r,j,b,int(bool(j and (p or y or r)))])
     return np.asarray(rows,dtype=np.float32)
 ACTIONS=action_table()
 
