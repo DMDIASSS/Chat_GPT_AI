@@ -61,7 +61,9 @@ def validate(cfg):
 
 def device(cfg):
     import torch
-    name=cfg.get('device','auto');cuda=torch.cuda.is_available()
+    name=os.environ.get('DUELFORGE_DEVICE',cfg.get('device','auto'))
+    if name not in ('auto','cpu','cuda'):raise ValueError('DUELFORGE_DEVICE must be auto, cpu or cuda')
+    cuda=torch.cuda.is_available()
     if name=='cuda' and not cuda:raise RuntimeError('CUDA requested but unavailable; run 0_SETUP.bat to select your existing CUDA Python')
     return torch.device('cuda' if name=='auto' and cuda else 'cpu' if name=='auto' else name)
 
