@@ -1,0 +1,11 @@
+{
+  "tests": "77 passed, 1 optional Nexto-assets skipped",
+  "uploaded_2000_game_result_recomputed": true,
+  "reference_checkpoint_preserved": true,
+  "reward_or_optimizer_reset": false,
+  "promotion_protocol": "training continuation under DuelForge panel-v1 only, not tournament certification",
+  "periodic_reference_check_games": 200,
+  "periodic_reference_check_seconds": 100,
+  "periodic_reference_check_additional_steps": 5000000,
+  "actual_user_model_training_performed_here": false
+}

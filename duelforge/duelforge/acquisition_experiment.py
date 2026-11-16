@@ -130,12 +130,19 @@ def start(root=None,source=None,steps=5_000_000,chunk_steps=None,max_checks=None
     with lock(root):
         root.joinpath('STOP').unlink(missing_ok=True)
         state=json.loads((root/'curriculum.json').read_text())
-        if state['stage_index']==2 and state['probes']:
+        match_reference=None
+        if state['stage_index']==2:
+            from .match_guard import reference
+            match_reference=reference(root,stage_folder(root,2))
+        if state['stage_index']==2 and state['probes'] and match_reference is None:
             prior=json.loads((root/state['probes'][-1]).read_text())
             if prior['stage']=='trajectory' and not prior['gate_passed']:
                 state['status']='trajectory_gate_failed_paused';atomic_json(root/'curriculum.json',state)
                 print('TRAJECTORY_GATE_FAILED: preserving weights; evaluate trajectory and possession before further training.',flush=True)
                 report(root);return state
+        if state['status']=='match_regression_paused':
+            print('MATCH_REGRESSION_PAUSED: pinned reference retained; review the report before more training.',flush=True)
+            report(root);return state
         invocation_start=None;checks=0
         while not (root/'STOP').exists():
             index=state['stage_index'];stage=STAGES[index];folder=stage_folder(root,index)
@@ -184,7 +191,12 @@ def start(root=None,source=None,steps=5_000_000,chunk_steps=None,max_checks=None
             print('CONTACT_SKILL:',round(probe['success_rate']*100,1),'% touch;',
                   round(probe['median_contact_seconds'],2),'s median; gate',passed,flush=True)
             if stage=='trajectory':
-                state['status']='trajectory_training' if passed else 'trajectory_gate_failed_paused'
+                if match_reference is not None:
+                    state['contact_skill_warning']=not bool(passed)
+                    state['status']='trajectory_training'
+                    from .match_guard import check
+                    check(root,folder,state,reached,match_reference)
+                else:state['status']='trajectory_training' if passed else 'trajectory_gate_failed_paused'
             elif passed and reached-initial>=RECIPE[stage+'_min_steps']:
                 state['stage_index']+=1;state['status']='stage_advanced'
                 print('CURRICULUM_ADVANCED:',STAGES[state['stage_index']],flush=True)
@@ -193,8 +205,8 @@ def start(root=None,source=None,steps=5_000_000,chunk_steps=None,max_checks=None
             else:state['status']='more_practice_needed'
             atomic_json(root/'curriculum.json',state)
             if len(state['probes'])==1:report(root)
-            if state['status'] in ('stage_gate_not_met','trajectory_gate_failed_paused') or (max_checks is not None and checks>=max_checks):break
-        if state['status'] not in ('paused','stage_gate_not_met','trajectory_gate_failed_paused'):state['status']='step_budget_saved'
+            if state['status'] in ('stage_gate_not_met','trajectory_gate_failed_paused','match_regression_paused') or (max_checks is not None and checks>=max_checks):break
+        if state['status'] not in ('paused','stage_gate_not_met','trajectory_gate_failed_paused','match_regression_paused'):state['status']='step_budget_saved'
         atomic_json(root/'curriculum.json',state)
         print('CURRICULUM_SAVED:',state['status'],'additional steps',state.get('additional_steps',0),flush=True)
         report(root)
