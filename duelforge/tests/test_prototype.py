@@ -107,7 +107,7 @@ def test_confidence_uses_seed_blocks_and_handles_all_draws():
 def test_watch_creates_actual_frame_record_and_safe_inspector(tmp_path):
     from duelforge.watch import watch
     c=small();m=ActorCritic(32);payload={'model':m.state_dict(),'config':c,'learning_transitions':10};save(tmp_path/'latest.pt',payload);save(tmp_path/'initial.pt',payload)
-    out=watch(tmp_path,seconds=2,frames=20,headless=True);assert (out/'inspect.html').is_file()
+    out=watch(tmp_path,seconds=2,frames=20,headless=True);assert (out/'inspect.html').is_file() and (out/'contact_diagnostics.json').is_file()
     with np.load(out/'frames.npz',allow_pickle=False) as d:
         assert d['world'].shape==(20,3,32);assert d['actions'].shape==(20,2);assert d['obs_blue'].shape==(20,109);assert np.isfinite(d['world']).all()
     text=(out/'inspect.html').read_text();assert 'application/json' in text and 'Ball angular velocity' in text and 'window.fetch' not in text

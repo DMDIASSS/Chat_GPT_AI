@@ -1,3 +1,7 @@
+# DuelForge 0.4 — potential experiment
+
+Read **POTENTIAL_EXPERIMENT.md** first. **23** forks the current trained duel02 actor into potential01; **24** watches against its trained parent; **25** makes a report; **26** evaluates; **27** exports. Existing runs keep their saved settings.
+
 # DuelForge 0.3 update
 
 Read **UPDATE_0_3.md** first. For the new experiment use **17_START_LEARNING_V2.bat**, **18_WATCH_LEARNING_V2.bat**, and **19_REPORT_LEARNING_V2.bat**. Existing duel01 resumes with its original settings.

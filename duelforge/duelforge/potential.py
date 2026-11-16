@@ -102,6 +102,7 @@ def reach_times(world,points,times):
     return eta,hit
 
 def estimate_reference(world,cfg):
+    if not np.isfinite(world).all():raise ValueError('Nonfinite physics state; no reward was produced')
     p=cfg.get('predictive',{});points,t,goals,quality=ball_prediction(world,p.get('horizon',3.),p.get('samples',24));eta,reachable=reach_times(world,points,t)
     intercept=np.tanh((eta[:,1]-eta[:,0])/p.get('temperature',.6))
     threat=np.zeros(len(world),np.float32)
@@ -117,6 +118,7 @@ def estimate_reference(world,cfg):
     return {'phi':phi,'eta':eta,'reachable':reachable,'intercept':intercept,'threat':threat,'prediction_quality':quality}
 
 def estimate(world,cfg):
+    if not np.isfinite(world).all():raise ValueError('Nonfinite physics state; no reward was produced')
     p=cfg.get('predictive',{})
     if not p.get('force_reference',False):
         from . import _native
@@ -127,13 +129,14 @@ def estimate(world,cfg):
 
 class PotentialReward:
     """One update per true transition; absorbing goals, physical timeouts."""
-    def __init__(self,cfg,raw):self.cfg=cfg;self.current=estimate(raw['world'],cfg);self.last={}
+    def __init__(self,cfg,raw):self.cfg=cfg;self.current=estimate(raw['world'],cfg);self.last={};self.capture_details=False;self.last_details={}
     def apply(self,raw):
         nxt=estimate(raw['final_world'],self.cfg);terminal=raw['terminated'];gamma=self.cfg['ppo']['gamma'];weight=self.cfg['predictive']['shaping_weight']
         before=self.current['phi'];after=np.where(terminal,0,nxt['phi']);delta=weight*(gamma*after-before);delta=np.where(raw['info'][:,3]>0,delta,0)
         goal=raw['reward_parts'][:,:,0].copy();parts=np.zeros((len(goal),2,3),np.float32);parts[:,:,0]=goal;parts[:,0,1]=delta;parts[:,1,1]=-delta
         raw['reward_parts']=parts;raw['rewards']=parts.sum(-1)
-        self.last={'eta_mean':float(nxt['eta'].mean()),'unreachable_fraction':float((~nxt['reachable']).mean()),'uncertain_prediction_fraction':float((~nxt['prediction_quality']).mean()),'shaping_abs_mean':float(np.abs(delta).mean())}
+        self.last={'eta_mean':float(nxt['eta'].mean()),'unreachable_fraction':float((~nxt['reachable']).mean()),'uncertain_prediction_fraction':float((~nxt['prediction_quality']).mean()),'shaping_abs_mean':float(np.abs(delta).mean()),'interception_advantage_mean':float(nxt['intercept'].mean()),'goal_threat_mean':float(nxt['threat'].mean())}
+        if self.capture_details:self.last_details={'before':before.copy(),'after':after.copy(),'eta':nxt['eta'].copy(),'threat':nxt['threat'].copy(),'quality':nxt['prediction_quality'].copy()}
         done=terminal|raw['truncated'];self.current=nxt
         if np.any(done):
             reset=estimate(raw['world'][done],self.cfg)

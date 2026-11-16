@@ -1,0 +1,17 @@
+{
+  "parent_unchanged": true,
+  "parent_is_frozen_baseline": true,
+  "critic_reset_actor_retained": true,
+  "updates": 6,
+  "new_training_transitions": 49152,
+  "full_model_parameters": 1216091,
+  "watch_recorded": true,
+  "evaluation_games": 8,
+  "export_sdk_diagnose": true,
+  "report": true,
+  "full_ppo_cpu_sps": {
+    "baseline": 6029.868546073437,
+    "predictive": 5904.407410503313
+  },
+  "scope": "CPU server; short integration and throughput check, not candidate strength confirmation. Baseline retains its old critic; predictive critic is reset."
+}

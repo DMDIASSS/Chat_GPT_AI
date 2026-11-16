@@ -183,6 +183,8 @@ def _train(folder,cfg,minutes,max_updates):
             mean=np.mean(stats,axis=0) if stats else np.zeros(4);memory=rss_mb();gpu_alloc=torch.cuda.max_memory_allocated(dev)/2**20 if dev.type=='cuda' else 0;gpu_res=torch.cuda.memory_reserved(dev)/2**20 if dev.type=='cuda' else 0
             legal_max=float(np.log(np.maximum(1,masks.reshape(-1,90)[index].sum(-1))).mean());normalized_entropy=float(mean[2])/max(legal_max,1e-6)
             metric={'train/entropy_coefficient':entropy_coef,'train/legal_entropy_max_nats':legal_max,'train/entropy_fraction_of_legal_max':normalized_entropy,'game/reverse_throttle_fraction':float(control_stats[0]/T),'game/jump_button_fraction':float(control_stats[1]/T),'game/forward_drive_fraction':float(control_stats[2]/T),'reward/bootstrap/approach':float(bootstrap_sum[:,0].sum()),'reward/bootstrap/new_contact':float(bootstrap_sum[:,1].sum()),'state':'training','update':updates,'learning_transitions':count,'optimizer_examples':consumed,'training_wall_seconds':prior_wall+time.perf_counter()-start,'speed/learner_transitions_per_second':samples/elapsed,'speed/rollout_player_decisions_per_second':T*E*2/collect,'speed/collection_seconds':collect,'speed/ppo_seconds':optimize,'train/loss':float(mean[0]),'train/KL':float(mean[1]),'train/entropy_nats':float(mean[2]),'train/gradient_norm':float(mean[3]),'train/optimizer_minibatches':len(stats),'train/KL_early_stop':early,'game/touches_blue':int(touches[0]),'game/touches_orange':int(touches[1]),'game/goals_blue':int(goals[0]),'game/goals_orange':int(goals[1]),'game/resets':episode_resets,'game/ball_distance_mean':float(behavior[0]/T),'game/car_speed_mean':float(behavior[1]/T),'game/backward_fraction':float(behavior[2]/T),'game/airborne_fraction':float(behavior[3]/T),'game/aerial_table_action_fraction':float(behavior[4]/T),'league/history_size':len(history),'league/frozen_rows':int((~learner).sum()),'resource/trainer_rss_mb':memory,'resource/cuda_allocated_peak_mb':gpu_alloc,'resource/cuda_reserved_mb':gpu_res,'execution':cfg.get('execution','torchscript'),'optimizer':opt_name,'device':str(dev),'physics_ticks':physics,'arena_decisions':arena_decisions,'player_decisions':player_decisions,'rollout_cache_gpu':cache}
+            if cfg.get('predictive',{}).get('enabled'):
+                metric.update({'predictive/'+key:value for key,value in env.reward.last.items()});metric['speed/reward_seconds_per_call']=env.reward_seconds/max(1,env.reward_calls)
             for a in (0,1):
                 for j,name in enumerate(('goal','potential','impulse')):metric[f'reward/{"blue" if a==0 else "orange"}/{name}']=float(parts[a,j])
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metric,allow_nan=False)+'\n')
@@ -201,6 +203,8 @@ def _train(folder,cfg,minutes,max_updates):
                 if wb:
                     try:wb.log({'eval/score_rate_vs_initial':result['overall']['score_rate'],'eval/open_play_score':result['contexts']['open_play']['score_rate']},step=count)
                     except Exception:pass
+                if cfg.get('predictive',{}).get('enabled') and result['overall']['score_interval_95'][1]<.45:
+                    print('PARENT_REGRESSION_PAUSE: validation upper score bound below 45%; experiment saved, trained parent preserved.',flush=True);stopping=True
                 model.train()
     except BaseException:
         error=True;raise

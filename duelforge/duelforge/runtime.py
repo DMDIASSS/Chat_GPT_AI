@@ -52,6 +52,11 @@ def validate(cfg):
     if es and (not 0<=es['end']<=es['start']<=.1 or es['decay_transitions']<=0):raise ValueError('Invalid bounded entropy schedule')
     bs=cfg.get('bootstrap',{})
     if bs.get('enabled') and (not 0<=bs['approach_weight']<=.02 or not 0<=bs['contact_weight']<=.25 or bs['fade_transitions']<=0):raise ValueError('Bootstrap weights/budget out of range')
+    pr=cfg.get('predictive',{})
+    if pr.get('enabled'):
+        if not 1<=pr['horizon']<=4 or not 8<=pr['samples']<=32 or not .1<=pr['temperature']<=2 or not 0<=pr['shaping_weight']<=1:raise ValueError('Invalid predictive reward bounds')
+        if min(pr['intercept_weight'],pr['threat_weight'])<0 or pr['intercept_weight']+pr['threat_weight']>1.000001:raise ValueError('Potential mixture must be nonnegative and bounded by one')
+        if cfg.get('bootstrap',{}).get('enabled'):raise ValueError('Predictive objective excludes contact/approach bootstrap')
     return cfg
 
 def device(cfg):
@@ -81,7 +86,12 @@ def batch(cfg,n=None,seed=None,seconds=None):
     from . import _native
     validate(cfg)
     if _native.contract!=CONTRACT:raise RuntimeError('Wrong native module; close Python windows and re-extract the full prototype')
-    return _native.Batch(meshes(),int(n or cfg['n_envs']),int(cfg['native_threads']),int(cfg['seed'] if seed is None else seed)%(1<<32),8,7,float(cfg['ppo']['gamma']),float(cfg['rewards']['impulse']),float(seconds or cfg['episode_seconds']),float(cfg['no_touch_seconds'] if seconds is None else seconds))
+    env=_native.Batch(meshes(),int(n or cfg['n_envs']),int(cfg['native_threads']),int(cfg['seed'] if seed is None else seed)%(1<<32),8,7,float(cfg['ppo']['gamma']),float(cfg['rewards']['impulse']),float(seconds or cfg['episode_seconds']),float(cfg['no_touch_seconds'] if seconds is None else seconds))
+    if cfg.get('predictive',{}).get('enabled'):
+        if not hasattr(_native,'predictive_estimate') and not cfg['predictive'].get('force_reference',False):raise RuntimeError('Predictive native module missing. Close Python/viewer consoles and extract the new .pyd; on Colab rerun setup to rebuild. No substitute reward used.')
+        from .potential import RewardBatch
+        return RewardBatch(env,cfg)
+    return env
 
 @contextlib.contextmanager
 def lock(folder):

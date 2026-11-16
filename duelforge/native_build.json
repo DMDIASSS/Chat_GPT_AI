@@ -1,15 +1,15 @@
 {
   "status": "success",
-  "workflow_url": "https://github.com/DMDIASSS/Chat_GPT_AI/actions/runs/43800511739",
-  "commit": "3d18a834fe9b2e29fa58d71a8631a534f3b1acd9",
-  "artifact_id": 14195478915,
+  "workflow_url": "https://github.com/DMDIASSS/Chat_GPT_AI/actions/runs/43829316037",
+  "commit": "9824a1a456e261e4009284d7aab8e5d9a326de30",
+  "artifact_id": 14207732391,
   "binary": "duelforge/_native.cp311-win_amd64.pyd",
-  "binary_sha256": "4cf66a72a7de9d0fa7104f921f6e2bc89fe1ed02ba021d753089f38a0132358d",
-  "binary_bytes": 791040,
+  "binary_sha256": "f99847266f1aa0e23ce92b69fc43ae3d18c207c8a9da7795c55ac09d8cd456a9",
+  "binary_bytes": 803328,
   "checks": [
-    "MSVC Windows x64 build",
-    "CPython 3.11 import",
-    "90-action table contract",
-    "109-feature/mask native-Python parity"
+    "MSVC Windows x64 native build",
+    "CPython 3.11 native import",
+    "action/observation/mask contract",
+    "native estimator vs NumPy reference on 48 varied states"
   ]
 }

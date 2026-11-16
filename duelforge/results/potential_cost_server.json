@@ -1,0 +1,16 @@
+{
+  "rows": [
+    {
+      "predictive": false,
+      "completed_updates": 4,
+      "median_learner_sps": 5958.698071342242
+    },
+    {
+      "predictive": true,
+      "completed_updates": 4,
+      "median_learner_sps": 5900.321378014236
+    }
+  ],
+  "scope": "Disposable fresh models; same hardware/network/arenas/epochs. Per-update processing rate excludes initialization/saving. This measures reward cost, not learning benefit.",
+  "hardware": "CPU-only server; clean run after tests completed, not the laptop or T4"
+}

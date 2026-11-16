@@ -1,51 +1,71 @@
 {
-  "version": "0.3-learning-throughput-prototype",
+  "version": "0.4-interception-potential-experiment",
   "date_utc": "2026-11-16",
   "windows_native": {
     "status": "success",
-    "workflow_url": "https://github.com/DMDIASSS/Chat_GPT_AI/actions/runs/43800511739",
-    "commit": "3d18a834fe9b2e29fa58d71a8631a534f3b1acd9",
-    "artifact_id": 14195478915,
+    "workflow_url": "https://github.com/DMDIASSS/Chat_GPT_AI/actions/runs/43829316037",
+    "commit": "9824a1a456e261e4009284d7aab8e5d9a326de30",
+    "artifact_id": 14207732391,
     "binary": "duelforge/_native.cp311-win_amd64.pyd",
-    "binary_sha256": "4cf66a72a7de9d0fa7104f921f6e2bc89fe1ed02ba021d753089f38a0132358d",
-    "binary_bytes": 791040,
+    "binary_sha256": "f99847266f1aa0e23ce92b69fc43ae3d18c207c8a9da7795c55ac09d8cd456a9",
+    "binary_bytes": 803328,
     "checks": [
-      "MSVC Windows x64 build",
-      "CPython 3.11 import",
-      "90-action table contract",
-      "109-feature/mask native-Python parity"
+      "MSVC Windows x64 native build",
+      "CPython 3.11 native import",
+      "action/observation/mask contract",
+      "native estimator vs NumPy reference on 48 varied states"
     ]
   },
-  "tests": {
-    "passed": 35,
+  "full_tests": {
+    "passed": 47,
     "failed": 0,
-    "seconds": 9.39,
-    "log": "results/prototype_0_3_tests.txt"
+    "seconds": 7.73,
+    "log": "results/potential_tests.txt"
   },
   "integration": {
-    "new_config_train_resume": true,
-    "extra_reward_frame_recording": true,
-    "sdk_export_diagnose": true,
-    "report": true
+    "parent_unchanged": true,
+    "parent_is_frozen_baseline": true,
+    "critic_reset_actor_retained": true,
+    "updates": 6,
+    "new_training_transitions": 49152,
+    "full_model_parameters": 1216091,
+    "watch_recorded": true,
+    "evaluation_games": 8,
+    "export_sdk_diagnose": true,
+    "report": true,
+    "full_ppo_cpu_sps": {
+      "baseline": 6029.868546073437,
+      "predictive": 5904.407410503313
+    },
+    "scope": "CPU server; short integration and throughput check, not candidate strength confirmation. Baseline retains its old critic; predictive critic is reset."
+  },
+  "watch_report": {
+    "contact_diagnostics": true,
+    "source_native_header_included": true,
+    "checkpoint_unchanged": true
   },
   "browser_inspector": {
-    "new_five_reward_components": true,
-    "slider_play_pass": true,
-    "javascript_errors": 0
+    "native_gameplay_recording": true,
+    "potential_and_both_interception_times_displayed": true,
+    "slider_and_play": true,
+    "javascript_errors": 0,
+    "visual_review": true
   },
-  "native_parity_and_timing": "results/native_contact_optimization.json",
-  "coarse_physics_rejection": "results/sim_fidelity_lab.json",
-  "small_network_pilot": "results/learning_v2_pilot.json",
-  "full_size_pilot": "results/learning_v2_full_pilot.json",
-  "pilot_claim": "Short discovery diagnostics only. Results are mixed; no demonstrated competitive superiority.",
-  "terminal_reference": "research/TERMINAL_REFERENCE.md",
-  "not_verified": [
-    "GTX 1650 new complete-training speedup",
-    "Actual Rocket League RLBot v5 client match",
-    "Multi-hour learning improvement",
-    "Replacement physics engine with quantified global Rocket League fidelity"
+  "physics_fixtures": "results/potential_physics_validation.json",
+  "performance": "results/potential_cost_server.json",
+  "raw_collection_performance": "results/potential_raw_collection_cost.json",
+  "objective": "Goal differential + discounted bounded relative interception / existing-ball goal-threat potential. No direct touch, approach, speed or mechanic bonus.",
+  "limitations": [
+    "Approximate kinematic reachability; wall/flip/recovery limitations",
+    "Plane-ball predictor; corners/ramps/posts not accurately modeled",
+    "No selective full-car rollout refinement in training",
+    "Limited fixtures, not global simulator accuracy proof",
+    "No local 33.9M user weights available on server; fork applies on the user PC",
+    "No demonstrated match-strength improvement",
+    "No GTX1650/T4 throughput run",
+    "No actual Rocket League RLBot client test",
+    "No Colab CUDA hardware available here"
   ],
-  "trained_weights_included": false,
-  "old_runs_modified": false,
-  "production_physics": "Unchanged RocketSim 120Hz, skip8/delay7"
+  "original_runs_modified": false,
+  "trained_weights_included": false
 }

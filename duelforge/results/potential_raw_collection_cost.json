@@ -1,0 +1,25 @@
+{
+  "scope": "Short CPU raw native-collection checks, excludes inference/PPO, not local laptop throughput.",
+  "rows": [
+    {
+      "arenas": 64,
+      "predictive": false,
+      "collection_player_decisions_s": 47858.06621971031
+    },
+    {
+      "arenas": 64,
+      "predictive": true,
+      "collection_player_decisions_s": 47219.73840330462
+    },
+    {
+      "arenas": 256,
+      "predictive": false,
+      "collection_player_decisions_s": 67986.63479556578
+    },
+    {
+      "arenas": 256,
+      "predictive": true,
+      "collection_player_decisions_s": 52923.72806202377
+    }
+  ]
+}

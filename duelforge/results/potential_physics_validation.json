@@ -1,0 +1,95 @@
+{
+  "scope": "Limited 120Hz RocketSim fixtures; approximate plane-ball predictor and kinematic ETA, not a global accuracy certificate. Contact success is from real simulated collisions.",
+  "ball_cases": [
+    {
+      "case": 0,
+      "position": [
+        0,
+        0,
+        94
+      ],
+      "velocity": [
+        500,
+        0,
+        0
+      ],
+      "max_position_error_uu": 0.4521726667881012,
+      "end_position_error_uu": 0.4521726667881012,
+      "quality_flag": true
+    },
+    {
+      "case": 1,
+      "position": [
+        0,
+        0,
+        800
+      ],
+      "velocity": [
+        300,
+        0,
+        -500
+      ],
+      "max_position_error_uu": 2.7244081497192383,
+      "end_position_error_uu": 1.717206358909607,
+      "quality_flag": true
+    },
+    {
+      "case": 2,
+      "position": [
+        3700,
+        0,
+        400
+      ],
+      "velocity": [
+        1300,
+        0,
+        0
+      ],
+      "max_position_error_uu": 27.662128448486328,
+      "end_position_error_uu": 27.662128448486328,
+      "quality_flag": true
+    },
+    {
+      "case": 3,
+      "position": [
+        0,
+        0,
+        1200
+      ],
+      "velocity": [
+        0,
+        700,
+        500
+      ],
+      "max_position_error_uu": 4.683841228485107,
+      "end_position_error_uu": 4.683841228485107,
+      "quality_flag": true
+    }
+  ],
+  "counterfactual_actions": [
+    {
+      "action": 16,
+      "contact_decisions": 1,
+      "initial_eta_blue": 0.36690351366996765,
+      "final_eta_blue": 0.8208485841751099,
+      "initial_phi": 0.7982096076011658,
+      "final_phi": 0.793386697769165
+    },
+    {
+      "action": 20,
+      "contact_decisions": 0,
+      "initial_eta_blue": 0.36690351366996765,
+      "final_eta_blue": 0.8841350078582764,
+      "initial_phi": 0.7982096076011658,
+      "final_phi": 0.7900100946426392
+    },
+    {
+      "action": 0,
+      "contact_decisions": 0,
+      "initial_eta_blue": 0.36690351366996765,
+      "final_eta_blue": 0.842567503452301,
+      "initial_phi": 0.7982096076011658,
+      "final_phi": 0.7912956476211548
+    }
+  ]
+}

@@ -78,8 +78,9 @@ def start_learning(minutes=60,max_updates=None):
 def pause(folder):
     targets=[];folder=Path(folder)
     if folder.is_dir():targets.append(folder)
-    learning=ROOT/'runs/duel02'
-    if learning.is_dir():targets.append(learning)
+    for name in ('duel02','potential01'):
+        learning=ROOT/'runs'/name
+        if learning.is_dir():targets.append(learning)
     active=ROOT/'experiments/pilot001/active.json'
     if active.is_file():
         state=json.loads(active.read_text());name=state.get('run','')
@@ -101,7 +102,7 @@ def inspect_recording(path):
 def menu(run='duel01'):
     folder=ROOT/'runs'/run
     while True:
-        print('\nDUELFORGE — '+run+'\n1 Start / resume (60-minute cap, saves automatically)\n2 Pause and save\n3 Watch latest vs frozen initial policy (3D + recording)\n4 Watch open play vs initial\n5 Evaluate six contexts vs initial (120 games x 60s)\n6 Create report ZIP\n7 Export latest actor for RLBot v5\n8 Open last frame inspector\n9 Complete collection benchmark (no training)\n10 Fetch / verify Nexto neural opponent\n11 Watch latest vs Nexto neural\n12 Evaluate vs Nexto neural\n13 Fork this run with 20% Nexto training\n14 Bounded 90-minute A/B research pilot\n15 Watch exact best validation pin (unverified)\n16 Confirm 2000 fresh paired games vs frozen initial (100s)\n17 Start / resume learning-v2 experiment (separate duel02, 60 min)\n18 Watch learning-v2 open play\n19 Report learning-v2\n20 Profile physics / inference / full training\n0 Exit',flush=True)
+        print('\nDUELFORGE — '+run+'\n1 Start / resume (60-minute cap, saves automatically)\n2 Pause and save\n3 Watch latest vs frozen initial policy (3D + recording)\n4 Watch open play vs initial\n5 Evaluate six contexts vs initial (120 games x 60s)\n6 Create report ZIP\n7 Export latest actor for RLBot v5\n8 Open last frame inspector\n9 Complete collection benchmark (no training)\n10 Fetch / verify Nexto neural opponent\n11 Watch latest vs Nexto neural\n12 Evaluate vs Nexto neural\n13 Fork this run with 20% Nexto training\n14 Bounded 90-minute A/B research pilot\n15 Watch exact best validation pin (unverified)\n16 Confirm 2000 fresh paired games vs frozen initial (100s)\n17 Start / resume learning-v2 experiment (separate duel02, 60 min)\n18 Watch learning-v2 open play\n19 Report learning-v2\n20 Profile physics / inference / full training\n23 Start/resume potential fork from trained duel02\n24 Watch potential fork vs trained parent\n25 Report potential experiment\n26 Evaluate potential vs parent (200 games x 100s)\n27 Export potential actor to RLBot v5\n0 Exit',flush=True)
         try:
             choice=input('Choose: ').strip()
             if choice=='0':return
@@ -150,6 +151,21 @@ def menu(run='duel01'):
             elif choice=='19':
                 from .report import report
                 report(ROOT/'runs/duel02')
+            elif choice=='23':
+                from .potential_experiment import start
+                start()
+            elif choice=='24':
+                from .watch import watch
+                watch(ROOT/'runs/potential01',scene=5)
+            elif choice=='25':
+                from .report import report
+                report(ROOT/'runs/potential01')
+            elif choice=='26':
+                from .evaluate import evaluate
+                evaluate(ROOT/'runs/potential01',200,100,contexts=['match'])
+            elif choice=='27':
+                from .export import export
+                export(ROOT/'runs/potential01')
             elif choice=='20':
                 from .profile import profile
                 profile()
@@ -164,7 +180,7 @@ def menu(run='duel01'):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('command',choices=['menu','train','pause','watch','evaluate','report','export','verify','benchmark','fetch-nexto','pilot','profile','learn-v2']);p.add_argument('--run',default='duel01');p.add_argument('--config');p.add_argument('--minutes',type=float,default=60);p.add_argument('--updates',type=int);p.add_argument('--seconds',type=float,default=60);p.add_argument('--games',type=int,default=20);p.add_argument('--seed',type=int);p.add_argument('--opponent',default='initial');p.add_argument('--scene',type=int,default=-2);p.add_argument('--frames',type=int);p.add_argument('--headless',action='store_true');p.add_argument('--context',choices=list(__import__('duelforge.evaluate',fromlist=['CONTEXTS']).CONTEXTS));a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('command',choices=['menu','train','pause','watch','evaluate','report','export','verify','benchmark','fetch-nexto','pilot','profile','learn-v2','learn-potential']);p.add_argument('--run',default='duel01');p.add_argument('--config');p.add_argument('--minutes',type=float,default=60);p.add_argument('--updates',type=int);p.add_argument('--seconds',type=float,default=60);p.add_argument('--games',type=int,default=20);p.add_argument('--seed',type=int);p.add_argument('--opponent',default='initial');p.add_argument('--scene',type=int,default=-2);p.add_argument('--frames',type=int);p.add_argument('--headless',action='store_true');p.add_argument('--context',choices=list(__import__('duelforge.evaluate',fromlist=['CONTEXTS']).CONTEXTS));a=p.parse_args()
     if Path(a.run).name!=a.run or a.run in ('.','..'):p.error('Run name must be a simple directory name')
     folder=ROOT/'runs'/a.run
     if a.command=='menu':menu(a.run)
@@ -190,6 +206,9 @@ def main():
     elif a.command=='fetch-nexto':
         from .nexto import fetch
         fetch()
+    elif a.command=='learn-potential':
+        from .potential_experiment import start
+        start(a.minutes,a.updates)
     elif a.command=='learn-v2':
         start_learning(a.minutes,a.updates)
     elif a.command=='profile':
