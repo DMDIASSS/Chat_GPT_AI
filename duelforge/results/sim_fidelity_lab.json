@@ -1,0 +1,122 @@
+{
+  "kind": "coarse_60hz_vs_120hz_physics_lab",
+  "cases": [
+    {
+      "case": 0,
+      "mode": "ground_contact",
+      "position_error_uu_max": 53.29035488125398,
+      "position_error_uu_p95": 51.16379735205346,
+      "velocity_error_uu_s_max": 218.66591254210257
+    },
+    {
+      "case": 1,
+      "mode": "ground_contact",
+      "position_error_uu_max": 53.28872335179024,
+      "position_error_uu_p95": 51.16368002475193,
+      "velocity_error_uu_s_max": 218.6538669221849
+    },
+    {
+      "case": 2,
+      "mode": "ground_contact",
+      "position_error_uu_max": 53.29034150007629,
+      "position_error_uu_p95": 51.16433903471799,
+      "velocity_error_uu_s_max": 218.66597138285047
+    },
+    {
+      "case": 3,
+      "mode": "ground_contact",
+      "position_error_uu_max": 53.28967786592048,
+      "position_error_uu_p95": 51.16412908332646,
+      "velocity_error_uu_s_max": 218.66693694256523
+    },
+    {
+      "case": 4,
+      "mode": "ground_contact",
+      "position_error_uu_max": 53.289481362717126,
+      "position_error_uu_p95": 51.16354386193668,
+      "velocity_error_uu_s_max": 218.66385923600637
+    },
+    {
+      "case": 5,
+      "mode": "ground_contact",
+      "position_error_uu_max": 53.28871004102982,
+      "position_error_uu_p95": 51.16413986031948,
+      "velocity_error_uu_s_max": 218.6526988126534
+    },
+    {
+      "case": 6,
+      "mode": "ground_contact",
+      "position_error_uu_max": 53.28925175208028,
+      "position_error_uu_p95": 51.16443102281529,
+      "velocity_error_uu_s_max": 218.65070018871148
+    },
+    {
+      "case": 7,
+      "mode": "ground_contact",
+      "position_error_uu_max": 53.28989472460326,
+      "position_error_uu_p95": 51.16413412621426,
+      "velocity_error_uu_s_max": 218.65838326794096
+    },
+    {
+      "case": 8,
+      "mode": "airborne_contact",
+      "position_error_uu_max": 34.97139251163194,
+      "position_error_uu_p95": 34.07766355133946,
+      "velocity_error_uu_s_max": 102.32883536663357
+    },
+    {
+      "case": 9,
+      "mode": "airborne_contact",
+      "position_error_uu_max": 34.97139249712532,
+      "position_error_uu_p95": 34.07766355133946,
+      "velocity_error_uu_s_max": 102.32883536663357
+    },
+    {
+      "case": 10,
+      "mode": "airborne_contact",
+      "position_error_uu_max": 34.971270441149855,
+      "position_error_uu_p95": 34.07754486910784,
+      "velocity_error_uu_s_max": 102.32883536663357
+    },
+    {
+      "case": 11,
+      "mode": "airborne_contact",
+      "position_error_uu_max": 34.97127048466994,
+      "position_error_uu_p95": 34.07754486910784,
+      "velocity_error_uu_s_max": 102.32883530701969
+    },
+    {
+      "case": 12,
+      "mode": "airborne_contact",
+      "position_error_uu_max": 34.971148385174494,
+      "position_error_uu_p95": 34.077426186900155,
+      "velocity_error_uu_s_max": 102.32877468442273
+    },
+    {
+      "case": 13,
+      "mode": "airborne_contact",
+      "position_error_uu_max": 34.971148428694725,
+      "position_error_uu_p95": 34.077426186900155,
+      "velocity_error_uu_s_max": 102.32883536663357
+    },
+    {
+      "case": 14,
+      "mode": "airborne_contact",
+      "position_error_uu_max": 34.971270441149855,
+      "position_error_uu_p95": 34.077604210220656,
+      "velocity_error_uu_s_max": 102.32883536663357
+    },
+    {
+      "case": 15,
+      "mode": "airborne_contact",
+      "position_error_uu_max": 34.971148385174494,
+      "position_error_uu_p95": 34.077426186900155,
+      "velocity_error_uu_s_max": 102.32883536663357
+    }
+  ],
+  "measured_raw_fixture_speedup": 1.0218504838346036,
+  "accepted_for_training": false,
+  "fixture_tolerance_pass": false,
+  "decision": "Keep 120Hz production physics. This suite is insufficient to certify a replacement even if its tolerances pass.",
+  "scope": "Two seconds per fixture; same controls at 15Hz, no action delay to isolate the physics shortcut. Production seven-tick delay is also unrepresentable exactly at 60Hz. Not a global accuracy percentage."
+}

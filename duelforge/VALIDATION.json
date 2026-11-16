@@ -1,85 +1,51 @@
 {
-  "version": "0.2-extended-prototype",
+  "version": "0.3-learning-throughput-prototype",
   "date_utc": "2026-11-16",
-  "native_windows": {
+  "windows_native": {
     "status": "success",
-    "workflow_url": "https://github.com/DMDIASSS/Chat_GPT_AI/actions/runs/43794475171",
-    "commit": "3c642e07914834911562bf5fc67222bb4e6d44d1",
-    "artifact_id": 14193149570,
+    "workflow_url": "https://github.com/DMDIASSS/Chat_GPT_AI/actions/runs/43800511739",
+    "commit": "3d18a834fe9b2e29fa58d71a8631a534f3b1acd9",
+    "artifact_id": 14195478915,
     "binary": "duelforge/_native.cp311-win_amd64.pyd",
-    "binary_sha256": "ac3339c5a8e19d019f73fa200f5731cb765e722ee80b8b4daab2883d0870cace",
+    "binary_sha256": "4cf66a72a7de9d0fa7104f921f6e2bc89fe1ed02ba021d753089f38a0132358d",
     "binary_bytes": 791040,
     "checks": [
-      "MSVC x64 build",
+      "MSVC Windows x64 build",
       "CPython 3.11 import",
-      "native/Python 90-action table and contract",
-      "native/Python 109 observation and mask parity"
+      "90-action table contract",
+      "109-feature/mask native-Python parity"
     ]
   },
-  "linux_cpu_tests": {
-    "passed": 29,
+  "tests": {
+    "passed": 35,
     "failed": 0,
-    "seconds": 7.93,
-    "coverage": [
-      "native/Python actions/features/masks",
-      "worker RNG determinism",
-      "five balanced kickoffs",
-      "delay and exact tick budget",
-      "reward reference, goal terminal and timeout handling",
-      "GAE timeout/terminal/tail row alignment",
-      "resume, optimizer and frozen opponent exclusion",
-      "trainer lock and atomic fork failure",
-      "paired-color evaluation, uncertainty and immutable candidate pins",
-      "actual gameplay recording and inspector",
-      "source/PT/LT and real RLBot SDK import",
-      "Nexto upstream features, logits and action agreement",
-      "RLBot packet/boost cooldown conversion and action clock",
-      "pilot pause routing"
-    ]
-  },
-  "bounded_full_model_training": {
-    "device": "CPU",
-    "cuda_available": false,
-    "parameters": 1216091,
-    "arenas": 64,
-    "training_budget_seconds": 90,
-    "completed_updates": 36,
-    "learner_transitions": 583264,
-    "wall_clock_speed_scope": "Complete training loop including collection and PPO; CPU server, not user GPU",
-    "median_learner_transitions_per_second": 6311.055098134572,
-    "competitive_strength_verified": false
+    "seconds": 9.39,
+    "log": "results/prototype_0_3_tests.txt"
   },
   "integration": {
-    "resume": true,
-    "initial_unchanged": true,
-    "updates": 37,
-    "learning_transitions": 597472,
-    "headless_watch_frames": 40,
-    "nexto_headless_watch_frames": 20,
-    "balanced_evaluation_games": 24,
-    "export_action_agreement": 1.0,
-    "rlbot_v5_sdk_diagnose": "DUELFORGE_V5_MODEL_SDK_LOAD_PASS; no live match connection tested",
-    "actor_cpu_inference_ms_mean": 0.23931589333490896,
-    "report_generated_without_weights_or_credentials": true,
-    "scope": "Engineering integration checks on CPU. No competitive improvement claim; no actual Rocket League client connection."
+    "new_config_train_resume": true,
+    "extra_reward_frame_recording": true,
+    "sdk_export_diagnose": true,
+    "report": true
   },
   "browser_inspector": {
-    "actual_recording_loaded": true,
-    "slider_and_play_pass": true,
-    "javascript_errors": 0,
-    "served_over": "loopback HTTP; direct HTML also contains no external dependencies"
+    "new_five_reward_components": true,
+    "slider_play_pass": true,
+    "javascript_errors": 0
   },
-  "setup": {
-    "existing_python_reused": true,
-    "native_feature_action_verify": true,
-    "cuda_torch_installed_or_moved": false
-  },
-  "not_run": [
-    "GTX 1650 complete training throughput and thermal profile",
-    "RocketSimVis graphical startup on user Windows PC",
+  "native_parity_and_timing": "results/native_contact_optimization.json",
+  "coarse_physics_rejection": "results/sim_fidelity_lab.json",
+  "small_network_pilot": "results/learning_v2_pilot.json",
+  "full_size_pilot": "results/learning_v2_full_pilot.json",
+  "pilot_claim": "Short discovery diagnostics only. Results are mixed; no demonstrated competitive superiority.",
+  "terminal_reference": "research/TERMINAL_REFERENCE.md",
+  "not_verified": [
+    "GTX 1650 new complete-training speedup",
     "Actual Rocket League RLBot v5 client match",
-    "2000-game held-out strength confirmation",
-    "Multi-hour competitive learning experiment"
+    "Multi-hour learning improvement",
+    "Replacement physics engine with quantified global Rocket League fidelity"
   ],
-  "claims": "Engineering checks passed. No pretrained competitive actor or measured competitive improvement is included."
+  "trained_weights_included": false,
+  "old_runs_modified": false,
+  "production_physics": "Unchanged RocketSim 120Hz, skip8/delay7"
 }

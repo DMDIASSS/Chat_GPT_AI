@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from .runtime import ROOT,model,batch,device,pin,sha,atomic_json
+from .learning import bootstrap_parts
 
 
 def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=None,checkpoint=None):
@@ -20,7 +21,7 @@ def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=N
     from .viewer import Viewer
     viewer=None if headless else Viewer();env=batch(cfg,n=1,seconds=seconds+10);env.scene(scene);raw=env.observe();locations=env.pad_locations();records=deque(maxlen=1800);start=time.perf_counter();ticks=0;k=0;score=[0,0];contacts=[0,0];output=folder/'watch'/str(time.time_ns());output.mkdir(parents=True)
     print('LIVE WATCH: BLUE = learned actor,',ck['learning_transitions'],'transitions; ORANGE =',label,'; both Octane. No training. Ctrl+C saves the recording.',flush=True)
-    metadata={'model_sha256':ck['_source_sha256'],'learning_transitions':ck['learning_transitions'],'opponent':label,'opponent_sha256':opphash,'scene':scene,'physics_hz':120,'tick_skip':8,'action_delay':7,'rewards':cfg['rewards'],'recording_cap_frames':1800,'note':'Actual native gameplay transitions, not replay imitation or a scripted controller. Top-down inspector is diagnostic, not the 3D viewer.'}
+    metadata={'bootstrap':cfg.get('bootstrap',{}),'model_sha256':ck['_source_sha256'],'learning_transitions':ck['learning_transitions'],'opponent':label,'opponent_sha256':opphash,'scene':scene,'physics_hz':120,'tick_skip':8,'action_delay':7,'rewards':cfg['rewards'],'recording_cap_frames':1800,'note':'Actual native gameplay transitions, not replay imitation or a scripted controller. Top-down inspector is diagnostic, not the 3D viewer.'}
     try:
         with torch.inference_mode():
             while ticks<seconds*120 and (frames is None or k<frames):
@@ -28,7 +29,7 @@ def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=N
                 if nexto is not None:ac[:,1]=nexto.act(raw,locations,np.array([1]))
                 elif other is not actor:ac[:,1]=other(torch.as_tensor(raw['obs'][:,1],device=dev),torch.as_tensor(raw['mask'][:,1],device=dev))[0].argmax(-1).cpu().numpy()
                 probabilities=logits.softmax(-1).cpu().numpy()[0];top=np.argsort(probabilities)[-5:][::-1];v=float(value[0]);raw=env.step(ac);dt=int(raw['info'][0,3]);ticks+=dt;k+=1;g=int(raw['info'][0,0]);score[0]+=g>0;score[1]+=g<0;contacts[0]+=int(raw['info'][0,1]);contacts[1]+=int(raw['info'][0,2])
-                records.append({'time':ticks/120,'world':raw['final_world'][0].tolist(),'pads':raw['final_pads'][0].tolist(),'before_world':before['world'][0].tolist(),'before_pads':before['pads'][0].tolist(),'touches':raw['info'][0,1:3].astype(bool).tolist(),'obs_blue':before['obs'][0,0].tolist(),'actions':ac[0].tolist(),'top_actions':[[int(i),float(probabilities[i])] for i in top],'value_blue':v,'reward_parts':raw['reward_parts'][0].tolist(),'goal':g,'score':score.copy(),'ticks':dt,'reset':bool(raw['terminated'][0] or raw['truncated'][0])})
+                records.append({'time':ticks/120,'world':raw['final_world'][0].tolist(),'pads':raw['final_pads'][0].tolist(),'before_world':before['world'][0].tolist(),'before_pads':before['pads'][0].tolist(),'touches':raw['info'][0,1:3].astype(bool).tolist(),'obs_blue':before['obs'][0,0].tolist(),'actions':ac[0].tolist(),'top_actions':[[int(i),float(probabilities[i])] for i in top],'value_blue':v,'reward_parts':(np.concatenate([raw['reward_parts'][0],bootstrap_parts(cfg,before,raw,ck['learning_transitions'])[0]],axis=-1) if cfg.get('bootstrap',{}).get('enabled') else raw['reward_parts'][0]).tolist(),'goal':g,'score':score.copy(),'ticks':dt,'reset':bool(raw['terminated'][0] or raw['truncated'][0])})
                 if viewer:viewer.send(raw,locations)
                 if k%75==0 or g:print('WATCH:',round(ticks/120,1),'seconds; score',score,'touches',contacts,flush=True)
                 if not headless:time.sleep(max(0,ticks/120-(time.perf_counter()-start)))

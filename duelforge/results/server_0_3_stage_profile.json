@@ -1,0 +1,56 @@
+{
+  "device": "cpu",
+  "gpu": null,
+  "stages": [
+    {
+      "arenas": 32,
+      "native_physics_features_rewards_player_decisions_s": 45417.16356890507,
+      "inference_only_player_decisions_s": 70784.33829580572,
+      "combined_collection_player_decisions_s": 20113.284282582015
+    },
+    {
+      "arenas": 64,
+      "native_physics_features_rewards_player_decisions_s": 49764.04247679957,
+      "inference_only_player_decisions_s": 93242.7221767604,
+      "combined_collection_player_decisions_s": 22009.448090548864
+    },
+    {
+      "arenas": 128,
+      "native_physics_features_rewards_player_decisions_s": 57343.220784735706,
+      "inference_only_player_decisions_s": 98716.60510671708,
+      "combined_collection_player_decisions_s": 27954.45702739402
+    },
+    {
+      "arenas": 256,
+      "native_physics_features_rewards_player_decisions_s": 63816.32771135312,
+      "inference_only_player_decisions_s": 115505.09679478242,
+      "combined_collection_player_decisions_s": 33097.6076893613
+    }
+  ],
+  "scope": "Separate scopes. Physics rates include observations/masks/rewards. Combined collection includes transfers. Full PPO rate below uses distinct scratch runs.",
+  "full_training": [
+    {
+      "arenas": 64,
+      "rollout_steps": 256,
+      "measured_updates": 3,
+      "median_learner_transitions_s": 9235.207258673654,
+      "scratch_run": "benchmarks/profile_1794801577526598323/64"
+    },
+    {
+      "arenas": 128,
+      "rollout_steps": 128,
+      "measured_updates": 3,
+      "median_learner_transitions_s": 10127.217329292447,
+      "scratch_run": "benchmarks/profile_1794801577526598323/128"
+    },
+    {
+      "arenas": 256,
+      "rollout_steps": 64,
+      "measured_updates": 3,
+      "median_learner_transitions_s": 10333.838900981082,
+      "scratch_run": "benchmarks/profile_1794801577526598323/256"
+    }
+  ],
+  "config_changed": false,
+  "hardware_scope": "CPU-only research server, not the user laptop; three updates/case, timing evidence only."
+}

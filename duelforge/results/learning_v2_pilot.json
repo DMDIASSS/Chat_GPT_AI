@@ -1,0 +1,57 @@
+{
+  "scope": "Small width-128 early-learning pilot, two paired seeds. Matched update budgets. Greedy open-play diagnostics, not competitive WDL confirmation or a full-width strength claim.",
+  "rows": [
+    {
+      "arm": "baseline",
+      "seed": 41717,
+      "width": 128,
+      "training_transitions": 524288,
+      "evaluation_seconds": 20.0,
+      "evaluated_player_seconds": 1280.0,
+      "touches": 5,
+      "moving_toward_ball_fraction": 0.0,
+      "jump_button_fraction": 0.925,
+      "reverse_throttle_fraction": 0.0,
+      "mean_ball_distance": 2197.5806982421873
+    },
+    {
+      "arm": "learning_v2",
+      "seed": 41717,
+      "width": 128,
+      "training_transitions": 524288,
+      "evaluation_seconds": 20.0,
+      "evaluated_player_seconds": 1280.0,
+      "touches": 2,
+      "moving_toward_ball_fraction": 0.05932291666666667,
+      "jump_button_fraction": 0.8038020833333334,
+      "reverse_throttle_fraction": 0.0,
+      "mean_ball_distance": 4416.840991210937
+    },
+    {
+      "arm": "baseline",
+      "seed": 41719,
+      "width": 128,
+      "training_transitions": 524288,
+      "evaluation_seconds": 20.0,
+      "evaluated_player_seconds": 1280.0,
+      "touches": 6,
+      "moving_toward_ball_fraction": 0.016770833333333332,
+      "jump_button_fraction": 0.0,
+      "reverse_throttle_fraction": 0.0,
+      "mean_ball_distance": 2407.522782389323
+    },
+    {
+      "arm": "learning_v2",
+      "seed": 41719,
+      "width": 128,
+      "training_transitions": 524288,
+      "evaluation_seconds": 20.0,
+      "evaluated_player_seconds": 1280.0,
+      "touches": 2,
+      "moving_toward_ball_fraction": 0.0,
+      "jump_button_fraction": 0.7221354166666667,
+      "reverse_throttle_fraction": 0.0,
+      "mean_ball_distance": 2055.768556315104
+    }
+  ]
+}

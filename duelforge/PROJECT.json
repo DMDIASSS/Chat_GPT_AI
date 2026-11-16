@@ -1,7 +1,7 @@
 {
   "name": "DuelForge",
-  "version": "0.2-extended-prototype",
-  "stage": "bounded_testable_prototype",
+  "version": "0.3-learning-throughput-prototype",
+  "stage": "bounded_learning_and_parallelism_experiments",
   "mode": "Rocket League 1v1",
   "proposed_learner_hitbox": "Octane",
   "fresh_initialization": true,
@@ -22,5 +22,7 @@
   "approval_scope": "User approved an extended prototype for testing; default sessions are bounded to 60 minutes",
   "implementation": "native C++ RocketSim collector and PyTorch/LibTorch fixed-horizon PPO",
   "network_parameters": 1216091,
-  "skill_improvement_verified": false
+  "skill_improvement_verified": false,
+  "default_new_experiment": "duel02",
+  "entrypoint": "17_START_LEARNING_V2.bat"
 }

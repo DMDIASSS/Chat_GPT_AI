@@ -59,9 +59,27 @@ def fork(source,target,nexto=False):
     return target
 
 
+def start_learning(minutes=60,max_updates=None):
+    from .train import train
+    folder=ROOT/'runs/duel02'
+    if (folder/'latest.pt').is_file():return train(folder,minutes=minutes,max_updates=max_updates)
+    cfg=config(ROOT/'config_learning.json')
+    from .profile import profile,select_arenas
+    # Profile scratch models once before creating the real run. No old run is
+    # resumed; the selected arena count then stays frozen in its checkpoint.
+    result=profile(seconds=1.,full=True,cfg=cfg)
+    cfg['n_envs']=select_arenas(result,cfg['n_envs'])
+    chosen=next((r for r in result['full_training'] if r['arenas']==cfg['n_envs']),None)
+    if chosen:cfg['ppo']['steps']=chosen['rollout_steps']
+    print('LEARNING_V2_START:',cfg['n_envs'],'arenas,',cfg['ppo']['steps'],'rollout decisions; 0.03 -> 0.003 entropy coefficient; temporary approach/contact bootstrap. New run duel02; duel01 preserved.',flush=True)
+    return train(folder,cfg,minutes=minutes,max_updates=max_updates)
+
+
 def pause(folder):
     targets=[];folder=Path(folder)
     if folder.is_dir():targets.append(folder)
+    learning=ROOT/'runs/duel02'
+    if learning.is_dir():targets.append(learning)
     active=ROOT/'experiments/pilot001/active.json'
     if active.is_file():
         state=json.loads(active.read_text());name=state.get('run','')
@@ -83,7 +101,7 @@ def inspect_recording(path):
 def menu(run='duel01'):
     folder=ROOT/'runs'/run
     while True:
-        print('\nDUELFORGE — '+run+'\n1 Start / resume (60-minute cap, saves automatically)\n2 Pause and save\n3 Watch latest vs frozen initial policy (3D + recording)\n4 Watch open play vs initial\n5 Evaluate six contexts vs initial (120 games x 60s)\n6 Create report ZIP\n7 Export latest actor for RLBot v5\n8 Open last frame inspector\n9 Complete collection benchmark (no training)\n10 Fetch / verify Nexto neural opponent\n11 Watch latest vs Nexto neural\n12 Evaluate vs Nexto neural\n13 Fork duel01 -> duel_nexto01 with 20% Nexto training\n14 Bounded 90-minute A/B research pilot\n15 Watch exact best validation pin (unverified)\n16 Confirm 2000 fresh paired games vs frozen initial (100s)\n0 Exit',flush=True)
+        print('\nDUELFORGE — '+run+'\n1 Start / resume (60-minute cap, saves automatically)\n2 Pause and save\n3 Watch latest vs frozen initial policy (3D + recording)\n4 Watch open play vs initial\n5 Evaluate six contexts vs initial (120 games x 60s)\n6 Create report ZIP\n7 Export latest actor for RLBot v5\n8 Open last frame inspector\n9 Complete collection benchmark (no training)\n10 Fetch / verify Nexto neural opponent\n11 Watch latest vs Nexto neural\n12 Evaluate vs Nexto neural\n13 Fork this run with 20% Nexto training\n14 Bounded 90-minute A/B research pilot\n15 Watch exact best validation pin (unverified)\n16 Confirm 2000 fresh paired games vs frozen initial (100s)\n17 Start / resume learning-v2 experiment (separate duel02, 60 min)\n18 Watch learning-v2 open play\n19 Report learning-v2\n20 Profile physics / inference / full training\n0 Exit',flush=True)
         try:
             choice=input('Choose: ').strip()
             if choice=='0':return
@@ -118,11 +136,23 @@ def menu(run='duel01'):
                 from .nexto import fetch
                 fetch()
             elif choice=='13':
-                target=ROOT/'runs/duel_nexto01'
-                if not target.exists():fork(ROOT/'runs/duel01',target,nexto=True)
+                target=ROOT/'runs'/(run+'_nexto')
+                if not target.exists():fork(folder,target,nexto=True)
                 if not (target/'latest.pt').is_file() or load(target/'latest.pt')['config']['league'].get('nexto_fraction')!=.2:raise FileExistsError('Existing Nexto fork is incomplete or has a different config; preserved')
                 from .train import train
                 train(target,minutes=60)
+            elif choice=='17':
+                from .train import train
+                start_learning()
+            elif choice=='18':
+                from .watch import watch
+                watch(ROOT/'runs/duel02',scene=5)
+            elif choice=='19':
+                from .report import report
+                report(ROOT/'runs/duel02')
+            elif choice=='20':
+                from .profile import profile
+                profile()
             elif choice=='14':
                 from .pilot import run_pilot
                 run_pilot()
@@ -134,7 +164,7 @@ def menu(run='duel01'):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('command',choices=['menu','train','pause','watch','evaluate','report','export','verify','benchmark','fetch-nexto','pilot']);p.add_argument('--run',default='duel01');p.add_argument('--config');p.add_argument('--minutes',type=float,default=60);p.add_argument('--updates',type=int);p.add_argument('--seconds',type=float,default=60);p.add_argument('--games',type=int,default=20);p.add_argument('--seed',type=int);p.add_argument('--opponent',default='initial');p.add_argument('--scene',type=int,default=-2);p.add_argument('--frames',type=int);p.add_argument('--headless',action='store_true');p.add_argument('--context',choices=list(__import__('duelforge.evaluate',fromlist=['CONTEXTS']).CONTEXTS));a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('command',choices=['menu','train','pause','watch','evaluate','report','export','verify','benchmark','fetch-nexto','pilot','profile','learn-v2']);p.add_argument('--run',default='duel01');p.add_argument('--config');p.add_argument('--minutes',type=float,default=60);p.add_argument('--updates',type=int);p.add_argument('--seconds',type=float,default=60);p.add_argument('--games',type=int,default=20);p.add_argument('--seed',type=int);p.add_argument('--opponent',default='initial');p.add_argument('--scene',type=int,default=-2);p.add_argument('--frames',type=int);p.add_argument('--headless',action='store_true');p.add_argument('--context',choices=list(__import__('duelforge.evaluate',fromlist=['CONTEXTS']).CONTEXTS));a=p.parse_args()
     if Path(a.run).name!=a.run or a.run in ('.','..'):p.error('Run name must be a simple directory name')
     folder=ROOT/'runs'/a.run
     if a.command=='menu':menu(a.run)
@@ -160,6 +190,11 @@ def main():
     elif a.command=='fetch-nexto':
         from .nexto import fetch
         fetch()
+    elif a.command=='learn-v2':
+        start_learning(a.minutes,a.updates)
+    elif a.command=='profile':
+        from .profile import profile
+        profile()
     elif a.command=='pilot':
         from .pilot import run_pilot
         run_pilot()

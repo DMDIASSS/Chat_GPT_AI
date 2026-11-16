@@ -14,3 +14,6 @@ results/local_*
 results/runtime_selection.json
 results/*_build/
 DuelForge_preflight_*.zip
+
+benchmarks/
+results/stage_profile.json

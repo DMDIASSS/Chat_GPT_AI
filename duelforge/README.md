@@ -1,3 +1,7 @@
+# DuelForge 0.3 update
+
+Read **UPDATE_0_3.md** first. For the new experiment use **17_START_LEARNING_V2.bat**, **18_WATCH_LEARNING_V2.bat**, and **19_REPORT_LEARNING_V2.bat**. Existing duel01 resumes with its original settings.
+
 # DuelForge 0.2 — extended test prototype
 
 A fresh Octane 1v1 bot with native RocketSim collection and a 1,216,091-parameter dense actor/critic. Includes bounded training, full checkpoints, history self-play, optional Nexto, actual gameplay viewing, a frame inspector, evaluation, reports and RLBot v5 export.
@@ -20,7 +24,7 @@ Judge early changes by ball contacts, useful movement and open-play interaction.
 
 Watch uses **RocketSimVis** and actual live simulation, not replay playback. An existing nearby viewer is reused; otherwise its pinned source and GUI-only dependencies are installed once in `third_party/RocketSimVis/.venv`. Torch/CUDA are untouched. FOV 110, distance 270, height 100 are set in the launched viewer. A viewer startup error is printed instead of silently running an invisible match. The browser frame inspector is also available separately from the 3D window.
 
-Menu **10** downloads checksum-verified Nexto assets. **11** watches against Nexto, and **12** evaluates against it. This uses Nexto's neural controls, with its stock scripted kickoff disabled. Nexto remains frozen. Default training does not use it. **13** creates a separate `duel_nexto01` fork with 20% Nexto opponent assignments and resumes that fork; it preserves `duel01`. To reopen that fork's menu, run `_RUN.bat menu --run duel_nexto01`.
+Menu **10** downloads checksum-verified Nexto assets. **11** watches against Nexto, and **12** evaluates against it. This uses Nexto's neural controls, with its stock scripted kickoff disabled. Nexto remains frozen. Default training does not use it. **13** creates a separate `duel01_nexto` fork with 20% Nexto opponent assignments and resumes that fork; it preserves `duel01`. To reopen that fork's menu, run `_RUN.bat menu --run duel01_nexto`.
 
 The optional **14** runs six sequential ten-minute A/B training blocks with three paired initialization seeds, contact-impulse reward 0 versus 0.05, within a 90-minute session budget. It tests an early-learning hypothesis, not a strong-bot claim. Normal start is the simpler first test.
 

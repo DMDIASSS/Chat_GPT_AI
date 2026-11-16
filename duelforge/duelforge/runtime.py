@@ -48,6 +48,10 @@ def validate(cfg):
     if not 0<=nf<=.5 or nf+cfg['league']['history_fraction']>.75:raise ValueError('Nexto fraction must be 0..0.5; total frozen fraction must not exceed 0.75')
     if cfg['ppo']['steps']<8 or cfg['ppo']['batch_size']<16:raise ValueError('PPO rollout/minibatch too small')
     if not 0<=cfg['rewards']['impulse']<=.1:raise ValueError('Impulse weight outside experimental range')
+    es=cfg['ppo'].get('entropy_schedule')
+    if es and (not 0<=es['end']<=es['start']<=.1 or es['decay_transitions']<=0):raise ValueError('Invalid bounded entropy schedule')
+    bs=cfg.get('bootstrap',{})
+    if bs.get('enabled') and (not 0<=bs['approach_weight']<=.02 or not 0<=bs['contact_weight']<=.25 or bs['fade_transitions']<=0):raise ValueError('Bootstrap weights/budget out of range')
     return cfg
 
 def device(cfg):

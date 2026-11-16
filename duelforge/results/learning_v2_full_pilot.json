@@ -1,0 +1,37 @@
+{
+  "scope": "Full-width-512 early-learning pilot, one paired seed. Matched update budgets. Greedy open-play diagnostics, not competitive WDL confirmation or a general strength claim.",
+  "rows": [
+    {
+      "arm": "baseline",
+      "seed": 41717,
+      "width": 512,
+      "training_transitions": 1048576,
+      "evaluation_seconds": 20.0,
+      "evaluated_player_seconds": 1280.0,
+      "touches": 8,
+      "moving_toward_ball_fraction": 0.00375,
+      "jump_button_fraction": 0.0,
+      "reverse_throttle_fraction": 0.007239583333333333,
+      "mean_ball_distance": 2356.060423583984
+    },
+    {
+      "arm": "learning_v2",
+      "seed": 41717,
+      "width": 512,
+      "training_transitions": 1048576,
+      "evaluation_seconds": 20.0,
+      "evaluated_player_seconds": 1280.0,
+      "touches": 11,
+      "moving_toward_ball_fraction": 0.09328125,
+      "jump_button_fraction": 0.6178645833333334,
+      "reverse_throttle_fraction": 0.0,
+      "mean_ball_distance": 3028.0317655436197
+    }
+  ],
+  "limitations": [
+    "One paired seed; no statistical superiority claim.",
+    "Two training segments per arm; simulator reset at resume is recorded.",
+    "Matched 128 updates and 1,048,576 learner transitions, width 512.",
+    "Twenty-second greedy open-play checks are behavioral diagnostics, not WDL confirmation."
+  ]
+}

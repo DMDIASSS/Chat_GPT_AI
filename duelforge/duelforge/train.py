@@ -8,6 +8,7 @@ import torch
 from torch.distributions import Categorical
 from .runtime import ROOT,config,validate,batch,device,save,load,atomic_json,source_hashes,actor_sha,lock,sha,CONTRACT
 from .model import ActorCritic
+from .learning import entropy_coefficient,bootstrap_parts,evaluation_summary
 from .execution import make_optimizer,configure_optimizer,checked_step
 
 
@@ -109,7 +110,7 @@ def _train(folder,cfg,minutes,max_updates):
         if name not in frozen:
             data=load(folder/'history'/name,dev)
             with torch.random.fork_rng(devices=[]):m=ActorCritic(cfg['width']).to(dev).eval()
-            m.load_state_dict(data['model']);frozen[name]=torch.jit.script(m)
+            m.load_state_dict(data['model']);frozen[name]=torch.jit.script(m.actor)
         return frozen[name]
     def assign(indices):
         pool=history[-cfg['league']['max_history']:]
@@ -131,7 +132,7 @@ def _train(folder,cfg,minutes,max_updates):
         while not stopping and not (folder/'STOP').exists():
             if max_updates is not None and session_updates>=max_updates:break
             if minutes is not None and time.perf_counter()-start>=minutes*60:break
-            t0=time.perf_counter();parts=np.zeros((2,3),np.float64);touches=np.zeros(2,np.int64);goals=np.zeros(2,np.int64);timeouts_pending=[];episode_resets=0;history_rows=0;behavior=np.zeros(5,np.float64);model.eval()
+            t0=time.perf_counter();parts=np.zeros((2,3),np.float64);touches=np.zeros(2,np.int64);goals=np.zeros(2,np.int64);timeouts_pending=[];episode_resets=0;history_rows=0;behavior=np.zeros(5,np.float64);control_stats=np.zeros(3,np.float64);bootstrap_sum=np.zeros((2,2),np.float64);entropy_coef=entropy_coefficient(cfg,count);model.eval()
             for t in range(T):
                 obs[t]=raw['obs'];masks[t]=raw['mask'];learner[t]=True
                 with torch.inference_mode():
@@ -144,9 +145,9 @@ def _train(folder,cfg,minutes,max_updates):
                         if name=='nexto':
                             sub={k:raw[k][ix] for k in ('world','pads')}
                             actions[t,ix,cols]=nexto.act(sub,locations,cols);continue
-                        hx=torch.as_tensor(raw['obs'][ix,cols],device=dev);hm=torch.as_tensor(raw['mask'][ix,cols],device=dev);hl=frozen_model(name)(hx,hm)[0]
+                        hx=torch.as_tensor(raw['obs'][ix,cols],device=dev);hm=torch.as_tensor(raw['mask'][ix,cols],device=dev);hl=frozen_model(name)(hx).masked_fill(~hm,-1e9)
                         actions[t,ix,cols]=torch.multinomial(hl.softmax(-1),1).squeeze(1).cpu().numpy()
-                raw=env.step(actions[t]);rewards[t]=raw['rewards'];terminal[t]=raw['terminated'][:,None];truncated[t]=raw['truncated'][:,None];timeouts[t]=0
+                before=raw;raw=env.step(actions[t]);extra=bootstrap_parts(cfg,before,raw,count);bootstrap_sum+=extra.sum(0);rewards[t]=raw['rewards']+extra.sum(-1);control_stats+=evaluation_summary(cfg,raw['final_world'],actions[t]);terminal[t]=raw['terminated'][:,None];truncated[t]=raw['truncated'][:,None];timeouts[t]=0
                 ix=np.flatnonzero(raw['truncated'])
                 if len(ix):timeouts_pending.append((t,ix,raw['final_obs'][ix].reshape(-1,109),raw['final_mask'][ix].reshape(-1,90)))
                 parts+=raw['reward_parts'].sum(0);touches+=raw['info'][:,1:3].sum(0).astype(np.int64);g=raw['info'][:,0];goals+=[np.count_nonzero(g>0),np.count_nonzero(g<0)];physics+=int(raw['info'][:,3].sum());arena_decisions+=E;player_decisions+=E*2
@@ -169,7 +170,7 @@ def _train(folder,cfg,minutes,max_updates):
                 for k in range(0,len(index),p['batch_size']):
                     idx=torch.as_tensor(index[k:k+p['batch_size']],device=dev if cache else 'cpu');x,l,a,old,ad,ret=[v.index_select(0,idx).to(dev,non_blocking=True) for v in data]
                     logits,v=model(x,l);d=Categorical(logits=logits,validate_args=False);delta=d.log_prob(a)-old;ratio=delta.exp();kl=((ratio-1)-delta).mean();entropy=d.entropy().mean()
-                    policy=-torch.minimum(ratio*ad,ratio.clamp(1-p['clip'],1+p['clip'])*ad).mean();value=.5*(v-ret).square().mean();loss=policy+p['value']*value-p['entropy']*entropy
+                    policy=-torch.minimum(ratio*ad,ratio.clamp(1-p['clip'],1+p['clip'])*ad).mean();value=.5*(v-ret).square().mean();loss=policy+p['value']*value-entropy_coef*entropy
                     okay,norm=checked_step(loss,kl,model,optimizer,p['max_grad_norm'],p['target_kl'])
                     if not okay:early=True;break
                     consumed+=len(idx);stats.append(torch.stack([loss.detach(),kl.detach(),entropy.detach(),norm]).cpu().numpy())
@@ -180,7 +181,8 @@ def _train(folder,cfg,minutes,max_updates):
                 (folder/'history').mkdir(exist_ok=True);name=f'{count:016d}.pt';save(folder/'history'/name,{'model':model.state_dict(),'config':cfg,'learning_transitions':count});history.append(name);last_snapshot=count//cfg['league']['snapshot_every']
                 while len(history)>cfg['league']['max_history']:retired.add(history.pop(0))
             mean=np.mean(stats,axis=0) if stats else np.zeros(4);memory=rss_mb();gpu_alloc=torch.cuda.max_memory_allocated(dev)/2**20 if dev.type=='cuda' else 0;gpu_res=torch.cuda.memory_reserved(dev)/2**20 if dev.type=='cuda' else 0
-            metric={'state':'training','update':updates,'learning_transitions':count,'optimizer_examples':consumed,'training_wall_seconds':prior_wall+time.perf_counter()-start,'speed/learner_transitions_per_second':samples/elapsed,'speed/rollout_player_decisions_per_second':T*E*2/collect,'speed/collection_seconds':collect,'speed/ppo_seconds':optimize,'train/loss':float(mean[0]),'train/KL':float(mean[1]),'train/entropy_nats':float(mean[2]),'train/gradient_norm':float(mean[3]),'train/optimizer_minibatches':len(stats),'train/KL_early_stop':early,'game/touches_blue':int(touches[0]),'game/touches_orange':int(touches[1]),'game/goals_blue':int(goals[0]),'game/goals_orange':int(goals[1]),'game/resets':episode_resets,'game/ball_distance_mean':float(behavior[0]/T),'game/car_speed_mean':float(behavior[1]/T),'game/backward_fraction':float(behavior[2]/T),'game/airborne_fraction':float(behavior[3]/T),'game/aerial_table_action_fraction':float(behavior[4]/T),'league/history_size':len(history),'league/frozen_rows':int((~learner).sum()),'resource/trainer_rss_mb':memory,'resource/cuda_allocated_peak_mb':gpu_alloc,'resource/cuda_reserved_mb':gpu_res,'execution':cfg.get('execution','torchscript'),'optimizer':opt_name,'device':str(dev),'physics_ticks':physics,'arena_decisions':arena_decisions,'player_decisions':player_decisions,'rollout_cache_gpu':cache}
+            legal_max=float(np.log(np.maximum(1,masks.reshape(-1,90)[index].sum(-1))).mean());normalized_entropy=float(mean[2])/max(legal_max,1e-6)
+            metric={'train/entropy_coefficient':entropy_coef,'train/legal_entropy_max_nats':legal_max,'train/entropy_fraction_of_legal_max':normalized_entropy,'game/reverse_throttle_fraction':float(control_stats[0]/T),'game/jump_button_fraction':float(control_stats[1]/T),'game/forward_drive_fraction':float(control_stats[2]/T),'reward/bootstrap/approach':float(bootstrap_sum[:,0].sum()),'reward/bootstrap/new_contact':float(bootstrap_sum[:,1].sum()),'state':'training','update':updates,'learning_transitions':count,'optimizer_examples':consumed,'training_wall_seconds':prior_wall+time.perf_counter()-start,'speed/learner_transitions_per_second':samples/elapsed,'speed/rollout_player_decisions_per_second':T*E*2/collect,'speed/collection_seconds':collect,'speed/ppo_seconds':optimize,'train/loss':float(mean[0]),'train/KL':float(mean[1]),'train/entropy_nats':float(mean[2]),'train/gradient_norm':float(mean[3]),'train/optimizer_minibatches':len(stats),'train/KL_early_stop':early,'game/touches_blue':int(touches[0]),'game/touches_orange':int(touches[1]),'game/goals_blue':int(goals[0]),'game/goals_orange':int(goals[1]),'game/resets':episode_resets,'game/ball_distance_mean':float(behavior[0]/T),'game/car_speed_mean':float(behavior[1]/T),'game/backward_fraction':float(behavior[2]/T),'game/airborne_fraction':float(behavior[3]/T),'game/aerial_table_action_fraction':float(behavior[4]/T),'league/history_size':len(history),'league/frozen_rows':int((~learner).sum()),'resource/trainer_rss_mb':memory,'resource/cuda_allocated_peak_mb':gpu_alloc,'resource/cuda_reserved_mb':gpu_res,'execution':cfg.get('execution','torchscript'),'optimizer':opt_name,'device':str(dev),'physics_ticks':physics,'arena_decisions':arena_decisions,'player_decisions':player_decisions,'rollout_cache_gpu':cache}
             for a in (0,1):
                 for j,name in enumerate(('goal','potential','impulse')):metric[f'reward/{"blue" if a==0 else "orange"}/{name}']=float(parts[a,j])
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metric,allow_nan=False)+'\n')
@@ -188,7 +190,7 @@ def _train(folder,cfg,minutes,max_updates):
             if wb:
                 try:wb.log({k:v for k,v in metric.items() if isinstance(v,(int,float,bool))},step=count)
                 except Exception as ex:print('WANDB_LOG_UNAVAILABLE:',type(ex).__name__,flush=True);wb=None
-            print(f'UPDATE {updates}: {count:,} learner transitions | {samples/elapsed:,.0f}/s end-to-end | touches {int(touches.sum())} goals {int(goals.sum())} | KL {float(mean[1]):.4f} | collect {collect:.2f}s / PPO {optimize:.2f}s | {dev}',flush=True)
+            print(f'UPDATE {updates}: {count:,} learner transitions | {samples/elapsed:,.0f}/s end-to-end | touches {int(touches.sum())} goals {int(goals.sum())} | KL {float(mean[1]):.4f} | collect {collect:.2f}s / PPO {optimize:.2f}s | entropy {float(mean[2]):.2f}/{legal_max:.2f}, coef {entropy_coef:.4f} | {dev}',flush=True)
             if gpu_alloc>cfg['max_cuda_allocated_mb'] or gpu_res>cfg['max_cuda_reserved_mb'] or (memory is not None and memory>cfg['max_trainer_rss_mb']):
                 print('RESOURCE_GUARD_PAUSE: configured memory target exceeded; saving completed update.',flush=True);stopping=True
             if time.perf_counter()-last_save>=cfg['checkpoint_every_seconds']:persist();last_save=time.perf_counter()

@@ -1,0 +1,50 @@
+{
+  "random_decisions": 1600,
+  "arenas": 8,
+  "array_hashes_equal": true,
+  "array_hashes": {
+    "world": "a87bf254c0a3d883a54a1632726e62d66cb3b1d07fddd383da7c3492a5006f9f",
+    "pads": "798df8cdbdaa8f507d955e9340f4ed306587dc555900eca07a8627d5d0e40880",
+    "obs": "6286cc7febe587328ee4670a846189c903524bdb698976023f82290a4514aa5c",
+    "mask": "23c272041f1efee2c8018eab9edd125d42984d901b0989cfb7f11a468d4c4452",
+    "final_world": "55bd321a78527ba11f608937aa61a87edf7334ef7d782a91976f277f83b0922a",
+    "rewards": "fbeb66a689afd83b8163a2f90b45641817c248f9d3e2c3086a3eb3b3e06da355",
+    "reward_parts": "a09bd3e50d26a8f375714c0ea0f2374ef5fa1a91eeda0e6d80c44656cba2023f",
+    "info": "f9e81421f5628c8eeb2d657f36fdc43ef2ac57f8da0eeee55fda36cfe3083db7",
+    "terminated": "59ec91dcb7dc65b5f928091cb0e25c26729a0a4453ebe7d8244fc1ceae7d9712",
+    "truncated": "663ff46fd90bda57a4c91ac5a6685b63c638ae0bc0a731b944ad016d1a1d960f"
+  },
+  "contact_decisions": 22,
+  "matched_interleaved_collection_player_decisions_s": {
+    "old": 93843.0491794605,
+    "new": 94469.6738093213,
+    "ratio": 1.006677368599378
+  },
+  "raw_repetitions": [
+    {
+      "library": "/tmp/df_native_gold",
+      "player_decisions_s": 93843.0491794605
+    },
+    {
+      "library": "/tmp/dfbuild3",
+      "player_decisions_s": 94469.6738093213
+    },
+    {
+      "library": "/tmp/dfbuild3",
+      "player_decisions_s": 94671.2085419013
+    },
+    {
+      "library": "/tmp/df_native_gold",
+      "player_decisions_s": 65350.111041848475
+    },
+    {
+      "library": "/tmp/df_native_gold",
+      "player_decisions_s": 93970.37963597638
+    },
+    {
+      "library": "/tmp/dfbuild3",
+      "player_decisions_s": 94309.72432054108
+    }
+  ],
+  "scope": "CPU server. Raw native physics/features/masks/rewards only. Not learner SPS or laptop GPU speed."
+}
