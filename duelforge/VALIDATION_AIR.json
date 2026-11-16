@@ -1,0 +1,14 @@
+{
+  "tests": "82 passed, 1 optional Nexto-assets skipped",
+  "physical_jump_and_elevated_contact_test": true,
+  "score_and_concede_signs_physically_tested": true,
+  "small_cpu_pilot": "Rejected as aerial improvement; 51.56% to 18.75% contact, jump use stayed 100%. Motivated baseline diagnosis and source-opponent retention.",
+  "user_confirmed_actor_improvement_verified": false,
+  "main_weights_overwritten": false,
+  "goal_rewards": {
+    "score": 1,
+    "concede": -1,
+    "same_frame_contact_bonus_on_concession": 0
+  },
+  "windows_live_match_verified": false
+}

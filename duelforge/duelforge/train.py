@@ -88,7 +88,10 @@ def _train(folder,cfg,minutes,max_updates,stop_at_transitions=None,external_stop
     env=batch(cfg,seed=seed)
     if cfg.get('acquisition'):
         from .acquisition import AcquisitionBatch
-        env=AcquisitionBatch(env,cfg,seed)
+        if cfg.get('air_recovery'):
+            from .air_recovery import AirBatch
+            env=AirBatch(env,cfg,seed)
+        else:env=AcquisitionBatch(env,cfg,seed)
     raw=env.observe();E=cfg['n_envs'];T=cfg['ppo']['steps'];p=cfg['ppo'];locations=env.pad_locations()
     folder.joinpath('STOP').unlink(missing_ok=True);stopping=False
     def stop_requested():return (folder/'STOP').exists() or (external_stop_file is not None and Path(external_stop_file).exists())
@@ -200,7 +203,7 @@ def _train(folder,cfg,minutes,max_updates,stop_at_transitions=None,external_stop
             if cfg.get('predictive',{}).get('enabled'):
                 metric.update({'predictive/'+key:value for key,value in env.reward.last.items()});metric['speed/reward_seconds_per_call']=env.reward_seconds/max(1,env.reward_calls)
             for a in (0,1):
-                for j,name in enumerate((('goal','contact_approach' if cfg['acquisition']['stage']=='contact' else 'possession','first_contact') if cfg.get('acquisition') else ('goal','potential','impulse'))):metric[f'reward/{"blue" if a==0 else "orange"}/{name}']=float(parts[a,j])
+                for j,name in enumerate((('goal','mixed_task_shaping' if cfg.get('air_recovery') else 'contact_approach' if cfg['acquisition']['stage']=='contact' else 'possession','first_contact') if cfg.get('acquisition') else ('goal','potential','impulse'))):metric[f'reward/{"blue" if a==0 else "orange"}/{name}']=float(parts[a,j])
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metric,allow_nan=False)+'\n')
             atomic_json(folder/'status.json',metric)
             if wb:

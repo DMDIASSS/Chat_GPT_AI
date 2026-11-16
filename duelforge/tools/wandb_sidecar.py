@@ -79,7 +79,7 @@ def run(root,wandb_module=None,max_polls=None,interval=3.):
                         old=json.loads(hint.read_text()) if hint.is_file() else {}
                         run_id=ids.get(folder.name) or old.get('id') or wandb_module.util.generate_id()
                         ids[folder.name]=run_id;atomic(idsfile,ids)
-                        wb=wandb_module.init(project=cfg['wandb']['project'],name=folder.name,id=run_id,
+                        wb=wandb_module.init(project=cfg['wandb']['project'],name=cfg['wandb'].get('name',folder.name),id=run_id,
                             resume='allow',reinit='create_new',config=cfg,dir=str(folder),
                             mode=os.environ.get('WANDB_MODE','online'),
                             settings=wandb_module.Settings(init_timeout=15))
