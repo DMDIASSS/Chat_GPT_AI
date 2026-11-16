@@ -1,0 +1,14 @@
+{
+  "resume": true,
+  "initial_unchanged": true,
+  "updates": 37,
+  "learning_transitions": 597472,
+  "headless_watch_frames": 40,
+  "nexto_headless_watch_frames": 20,
+  "balanced_evaluation_games": 24,
+  "export_action_agreement": 1.0,
+  "rlbot_v5_sdk_diagnose": "DUELFORGE_V5_MODEL_SDK_LOAD_PASS; no live match connection tested",
+  "actor_cpu_inference_ms_mean": 0.23931589333490896,
+  "report_generated_without_weights_or_credentials": true,
+  "scope": "Engineering integration checks on CPU. No competitive improvement claim; no actual Rocket League client connection."
+}

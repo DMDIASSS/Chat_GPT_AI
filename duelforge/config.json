@@ -1,0 +1,50 @@
+{
+  "version": "duelforge-prototype-v1",
+  "seed": 41011,
+  "device": "auto",
+  "n_envs": 64,
+  "native_threads": 2,
+  "torch_threads": 2,
+  "width": 512,
+  "tick_skip": 8,
+  "action_delay": 7,
+  "episode_seconds": 90,
+  "no_touch_seconds": 20,
+  "rewards": {
+    "goal": 1,
+    "potential": 0.25,
+    "impulse": 0.05
+  },
+  "ppo": {
+    "steps": 256,
+    "epochs": 2,
+    "batch_size": 1024,
+    "learning_rate": 0.0001,
+    "gamma": 0.995,
+    "gae_lambda": 0.95,
+    "clip": 0.2,
+    "entropy": 0.01,
+    "value": 0.5,
+    "max_grad_norm": 0.5,
+    "target_kl": 0.02
+  },
+  "league": {
+    "snapshot_every": 500000,
+    "max_history": 8,
+    "history_fraction": 0.25,
+    "nexto_fraction": 0.0
+  },
+  "checkpoint_every_seconds": 60,
+  "auto_evaluate_every": 1000000,
+  "auto_eval_games_per_context": 8,
+  "auto_eval_seconds": 30,
+  "rollout_cache_mb": 256,
+  "max_cuda_allocated_mb": 2560,
+  "max_cuda_reserved_mb": 3072,
+  "max_trainer_rss_mb": 8192,
+  "wandb": {
+    "enabled": true,
+    "project": "duelforge"
+  },
+  "execution": "torchscript"
+}

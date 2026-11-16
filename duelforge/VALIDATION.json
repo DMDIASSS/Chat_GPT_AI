@@ -1,42 +1,85 @@
 {
-  "status": "phase_1_feasibility_only",
-  "unit_tests": {
-    "passed": 8,
-    "runner": "Python unittest; reward formulas and finite model contracts"
+  "version": "0.2-extended-prototype",
+  "date_utc": "2026-11-16",
+  "native_windows": {
+    "status": "success",
+    "workflow_url": "https://github.com/DMDIASSS/Chat_GPT_AI/actions/runs/43794475171",
+    "commit": "3c642e07914834911562bf5fc67222bb4e6d44d1",
+    "artifact_id": 14193149570,
+    "binary": "duelforge/_native.cp311-win_amd64.pyd",
+    "binary_sha256": "ac3339c5a8e19d019f73fa200f5731cb765e722ee80b8b4daab2883d0870cace",
+    "binary_bytes": 791040,
+    "checks": [
+      "MSVC x64 build",
+      "CPython 3.11 import",
+      "native/Python 90-action table and contract",
+      "native/Python 109 observation and mask parity"
+    ]
   },
-  "compiled_native_audit": {
-    "original_ggl_gae": "two faults reproduced in real LibTorch/ASan harness",
-    "minimal_patch": "two isolated fixtures corrected; complete PPO learner not certified"
+  "linux_cpu_tests": {
+    "passed": 29,
+    "failed": 0,
+    "seconds": 7.93,
+    "coverage": [
+      "native/Python actions/features/masks",
+      "worker RNG determinism",
+      "five balanced kickoffs",
+      "delay and exact tick budget",
+      "reward reference, goal terminal and timeout handling",
+      "GAE timeout/terminal/tail row alignment",
+      "resume, optimizer and frozen opponent exclusion",
+      "trainer lock and atomic fork failure",
+      "paired-color evaluation, uncertainty and immutable candidate pins",
+      "actual gameplay recording and inspector",
+      "source/PT/LT and real RLBot SDK import",
+      "Nexto upstream features, logits and action agreement",
+      "RLBot packet/boost cooldown conversion and action clock",
+      "pilot pause routing"
+    ]
   },
-  "probes_run": [
-    "three synthetic model inference/backward/Adam probes, CPU FP32",
-    "warmed serial raw RocketSim binding physics probe",
-    "bounded Python-runtime discovery and benchmark/report ZIP launcher path on Linux"
-  ],
-  "server_runtime": {
-    "python": "3.11",
-    "torch": "2.9.1+cpu",
+  "bounded_full_model_training": {
+    "device": "CPU",
     "cuda_available": false,
-    "torch_threads": 2
+    "parameters": 1216091,
+    "arenas": 64,
+    "training_budget_seconds": 90,
+    "completed_updates": 36,
+    "learner_transitions": 583264,
+    "wall_clock_speed_scope": "Complete training loop including collection and PPO; CPU server, not user GPU",
+    "median_learner_transitions_per_second": 6311.055098134572,
+    "competitive_strength_verified": false
+  },
+  "integration": {
+    "resume": true,
+    "initial_unchanged": true,
+    "updates": 37,
+    "learning_transitions": 597472,
+    "headless_watch_frames": 40,
+    "nexto_headless_watch_frames": 20,
+    "balanced_evaluation_games": 24,
+    "export_action_agreement": 1.0,
+    "rlbot_v5_sdk_diagnose": "DUELFORGE_V5_MODEL_SDK_LOAD_PASS; no live match connection tested",
+    "actor_cpu_inference_ms_mean": 0.23931589333490896,
+    "report_generated_without_weights_or_credentials": true,
+    "scope": "Engineering integration checks on CPU. No competitive improvement claim; no actual Rocket League client connection."
+  },
+  "browser_inspector": {
+    "actual_recording_loaded": true,
+    "slider_and_play_pass": true,
+    "javascript_errors": 0,
+    "served_over": "loopback HTTP; direct HTML also contains no external dependencies"
+  },
+  "setup": {
+    "existing_python_reused": true,
+    "native_feature_action_verify": true,
+    "cuda_torch_installed_or_moved": false
   },
   "not_run": [
-    "actual game bot training",
-    "target GTX 1650 CUDA measurements",
-    "full GGL or Rust trainer build",
-    "live Windows batch execution",
-    "RocketSimVis GUI connection",
-    "RewardServer/BakkesMod runtime integration",
-    "RLBot game-client match"
+    "GTX 1650 complete training throughput and thermal profile",
+    "RocketSimVis graphical startup on user Windows PC",
+    "Actual Rocket League RLBot v5 client match",
+    "2000-game held-out strength confirmation",
+    "Multi-hour competitive learning experiment"
   ],
-  "training_started": false,
-  "old_models_imported": false,
-  "primary_docs": [
-    "ARCHITECTURE.md",
-    "REWARDS.md",
-    "FIRST_EXPERIMENT.json",
-    "research/GGL_CORRECTNESS_AUDIT.md",
-    "research/VISUALIZATION_AND_REWARDSERVER.md",
-    "research/OPPONENTS_AND_EVALUATION.md"
-  ],
-  "approval_boundary": "The supplied prompt requires approval of architecture, experiment and resource requirements before expensive training"
+  "claims": "Engineering checks passed. No pretrained competitive actor or measured competitive improvement is included."
 }

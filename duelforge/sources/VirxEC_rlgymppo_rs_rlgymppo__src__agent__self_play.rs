@@ -1,0 +1,336 @@
+use std::fs;
+use std::path::PathBuf;
+
+use burn::prelude::*;
+use rand::Rng;
+use rand::rngs::SmallRng;
+
+use super::model::Actic;
+use super::skill_tracker::SkillRating;
+
+/// Configuration for saving policy versions and training against old
+/// versions (self-play).
+///
+/// When `train_against_old_versions` is enabled, the collector will
+/// occasionally use a randomly-chosen saved policy version as the
+/// opponent for one team.  This provides a natural curriculum:  the
+/// current policy learns to beat increasingly strong versions of itself.
+#[derive(Clone, Debug)]
+pub struct SelfPlayConfig {
+    /// Whether to periodically snapshot the current policy.
+    /// Automatically enabled when `train_against_old_versions` is true.
+    pub save_policy_versions: bool,
+    /// Number of timesteps between saving a new policy version.
+    pub ts_per_version: u64,
+    /// Maximum number of old versions to keep in memory.
+    pub max_old_versions: usize,
+    /// Maximum number of policy versions retained on disk.
+    ///
+    /// `None` preserves every saved version. `Some(n)` retains the newest
+    /// `n` version directories independently of `max_old_versions`.
+    pub max_saved_versions: Option<usize>,
+    /// Whether to occasionally train against old versions (self-play).
+    pub train_against_old_versions: bool,
+    /// Probability (0.0 – 1.0) that a given training iteration will
+    /// use an old version as the opponent.
+    pub train_against_old_chance: f32,
+}
+
+impl Default for SelfPlayConfig {
+    fn default() -> Self {
+        Self {
+            save_policy_versions: false,
+            ts_per_version: 25_000_000,
+            max_old_versions: 32,
+            max_saved_versions: Some(32),
+            train_against_old_versions: false,
+            train_against_old_chance: 0.15,
+        }
+    }
+}
+
+/// A snapshot of the policy network saved at a particular timestep.
+/// Uses `Module::clone()` for a deep copy so later mutations of the
+/// original network do not affect the stored version.
+#[derive(Clone, Debug)]
+pub struct PolicyVersion {
+    pub timesteps: u64,
+    pub model: Actic,
+    /// Frozen Elo ratings at the time this version was created.
+    pub ratings: SkillRating,
+}
+
+impl PolicyVersion {
+    /// Deep-copy the model into a frozen version snapshot.
+    /// Optionally records the current skill ratings.
+    pub fn from_model(model: &Actic, timesteps: u64, ratings: SkillRating) -> Self {
+        // Burn's Module derive provides Clone, which does a true
+        // deep-copy (independent parameter buffers).
+        Self {
+            timesteps,
+            model: model.clone(),
+            ratings,
+        }
+    }
+}
+
+/// Manages a sliding window of saved policy versions for self-play.
+pub struct VersionManager {
+    pub versions: Vec<PolicyVersion>,
+    config: SelfPlayConfig,
+    #[allow(dead_code)]
+    save_folder: PathBuf,
+}
+
+impl VersionManager {
+    pub fn new(save_folder: PathBuf, config: SelfPlayConfig) -> Self {
+        Self {
+            versions: Vec::new(),
+            config,
+            save_folder,
+        }
+    }
+
+    /// Whether any saved versions exist.
+    pub fn is_empty(&self) -> bool {
+        self.versions.is_empty()
+    }
+
+    /// Return a uniformly-random index into `self.versions`.
+    pub fn random_index(&self, rng: &mut SmallRng) -> usize {
+        rng.next_u32() as usize % self.versions.len()
+    }
+
+    /// Called after every training iteration.  Snapshots a new version
+    /// when crossing a `ts_per_version` boundary, and prunes the oldest
+    /// version when the sliding window is full.
+    ///
+    /// `cur_ratings`, when provided, is frozen into the new version
+    /// (the skill tracker's current Elo ratings).
+    pub fn on_iteration(
+        &mut self,
+        model: &Actic,
+        cur_timesteps: u64,
+        prev_timesteps: u64,
+        cur_ratings: Option<&SkillRating>,
+    ) {
+        if !self.config.save_policy_versions {
+            return;
+        }
+
+        let crossed = cur_timesteps / self.config.ts_per_version
+            > prev_timesteps / self.config.ts_per_version;
+        if crossed || prev_timesteps == 0 {
+            #[cfg(not(feature = "tui"))]
+            println!(" > Saving policy version at {cur_timesteps} ts ...");
+
+            let version = PolicyVersion::from_model(
+                model,
+                cur_timesteps,
+                cur_ratings.cloned().unwrap_or_default(),
+            );
+            self.persist_version(&version);
+            self.versions.push(version);
+
+            while self.versions.len() > self.config.max_old_versions {
+                self.versions.remove(0);
+            }
+            self.prune_saved_versions();
+
+            #[cfg(not(feature = "tui"))]
+            println!(
+                " > Saved policy version at {cur_timesteps} ts ({} versions now)",
+                self.versions.len()
+            );
+        }
+    }
+
+    // ── Disk persistence ─────────────────────────────────────────
+
+    /// Persist in-memory versions and enforce the independent disk-retention
+    /// policy. New versions are also persisted immediately by `on_iteration`.
+    pub fn save_versions(&self) {
+        for version in &self.versions {
+            self.persist_version(version);
+        }
+        self.prune_saved_versions();
+    }
+
+    fn persist_version(&self, version: &PolicyVersion) {
+        let path = self.save_folder.join(version.timesteps.to_string());
+
+        if path.exists() {
+            // The version directory already exists. Keep the frozen model
+            // files untouched, but always refresh `stats.toml` so updated
+            // Elo ratings survive autosave and restart.
+            let stats_toml = toml::to_string_pretty(&version.ratings).unwrap();
+            fs::write(path.join("stats.toml"), stats_toml).unwrap();
+            return;
+        }
+
+        fs::create_dir_all(&path).unwrap();
+
+        version
+            .model
+            .actor
+            .clone()
+            .save_file(path.join("actor.bpk"))
+            .unwrap();
+        version
+            .model
+            .critic
+            .clone()
+            .save_file(path.join("critic.bpk"))
+            .unwrap();
+        if let Some(ref head) = version.model.shared_head {
+            head.clone()
+                .save_file(path.join("shared_head.bpk"))
+                .unwrap();
+        }
+
+        let stats_toml = toml::to_string_pretty(&version.ratings).unwrap();
+        fs::write(path.join("stats.toml"), stats_toml).unwrap();
+
+        #[cfg(not(feature = "tui"))]
+        println!(" > Persisted policy version {} to disk", version.timesteps);
+    }
+
+    fn prune_saved_versions(&self) {
+        let Some(max_saved_versions) = self.config.max_saved_versions else {
+            return;
+        };
+
+        let Ok(entries) = fs::read_dir(&self.save_folder) else {
+            return;
+        };
+        let mut versions: Vec<(u64, PathBuf)> = entries
+            .flatten()
+            .filter_map(|entry| {
+                entry
+                    .file_type()
+                    .ok()
+                    .filter(|file_type| file_type.is_dir())?;
+                let timestep = entry.file_name().to_str()?.parse::<u64>().ok()?;
+                Some((timestep, entry.path()))
+            })
+            .collect();
+        versions.sort_unstable_by_key(|(timestep, _)| *timestep);
+
+        let remove_count = versions.len().saturating_sub(max_saved_versions);
+        for (_, path) in versions.into_iter().take(remove_count) {
+            let _ = fs::remove_dir_all(&path);
+            #[cfg(not(feature = "tui"))]
+            println!(" > Removed old policy version {}", path.display());
+        }
+    }
+
+    /// Load previously-saved versions from `save_folder`.  A template
+    /// model is required to create new network instances (the weights
+    /// are replaced from disk).  Versions whose timestep exceeds
+    /// `cur_timesteps` are skipped to avoid loading checkpoints that
+    /// are newer than the current model.
+    pub fn load_versions(&mut self, template: &Actic, _device: &Device, cur_timesteps: u64) {
+        self.versions.clear();
+
+        if !self.save_folder.exists() {
+            return;
+        }
+
+        // Discover numbered directories.
+        let mut timesteps: Vec<u64> = Vec::new();
+        if let Ok(entries) = fs::read_dir(&self.save_folder) {
+            for entry in entries.flatten() {
+                if !entry.file_type().is_ok_and(|t| t.is_dir()) {
+                    continue;
+                }
+                if let Some(name) = entry.file_name().to_str()
+                    && let Ok(ts) = name.parse::<u64>()
+                {
+                    if ts <= cur_timesteps {
+                        timesteps.push(ts);
+                    } else {
+                        #[cfg(not(feature = "tui"))]
+                        eprintln!(
+                            " > Warning: policy version {ts} is newer than current model \
+                             ({cur_timesteps}) – skipping"
+                        );
+                    }
+                }
+            }
+        }
+
+        timesteps.sort();
+
+        for ts in timesteps {
+            let path = self.save_folder.join(ts.to_string());
+            for component in ["actor", "critic", "shared_head"] {
+                let legacy = path.join(format!("{component}.mpk.gz"));
+                if legacy.is_file() && !path.join(format!("{component}.bpk")).is_file() {
+                    panic!(
+                        "Found legacy policy-version checkpoint {}. Burn 0.22 cannot load .mpk.gz; convert it with Burn 0.21 before loading versions.",
+                        legacy.display()
+                    );
+                }
+            }
+
+            // Destructure the template so we can move individual fields.
+            let Actic {
+                actor: t_actor,
+                critic: t_critic,
+                shared_head: t_head,
+            } = template.clone();
+
+            let actor = t_actor
+                .clone()
+                .try_load_file(path.join("actor.bpk"))
+                .unwrap_or_else(|error| {
+                    panic!("Failed to load actor policy version {}: {error}", ts)
+                });
+            let critic = t_critic
+                .clone()
+                .try_load_file(path.join("critic.bpk"))
+                .unwrap_or_else(|error| {
+                    panic!("Failed to load critic policy version {}: {error}", ts)
+                });
+            let shared_head = t_head.map(|head| {
+                head.clone()
+                    .try_load_file(path.join("shared_head.bpk"))
+                    .unwrap_or_else(|error| {
+                        panic!("Failed to load shared-head policy version {}: {error}", ts)
+                    })
+            });
+
+            // Attempt to load frozen skill ratings.
+            let ratings = fs::read_to_string(path.join("stats.toml"))
+                .ok()
+                .and_then(|s| toml::from_str::<SkillRating>(&s).ok())
+                .unwrap_or_default();
+
+            self.versions.push(PolicyVersion {
+                timesteps: ts,
+                model: Actic {
+                    actor,
+                    critic,
+                    shared_head,
+                },
+                ratings,
+            });
+        }
+
+        // Enforce the sliding window.
+        while self.versions.len() > self.config.max_old_versions {
+            self.versions.remove(0);
+        }
+
+        if !self.versions.is_empty() {
+            #[cfg(not(feature = "tui"))]
+            println!(
+                " > Loaded {} policy version(s) from disk (range {} – {})",
+                self.versions.len(),
+                self.versions.first().unwrap().timesteps,
+                self.versions.last().unwrap().timesteps
+            );
+        }
+    }
+}
+

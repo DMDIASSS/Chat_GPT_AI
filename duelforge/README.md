@@ -1,41 +1,47 @@
-# DuelForge — a new Rocket League 1v1 research project
+# DuelForge 0.2 — extended test prototype
 
-**This download is the Phase 1 research/feasibility package. It is not a trained bot or a complete trainer.** The supplied prompt explicitly asks for an architecture and resource proposal before expensive training. No existing bot or reward configuration was imported, and no long training was started.
+A fresh Octane 1v1 bot with native RocketSim collection and a 1,216,091-parameter dense actor/critic. Includes bounded training, full checkpoints, history self-play, optional Nexto, actual gameplay viewing, a frame inspector, evaluation, reports and RLBot v5 export.
 
-Read **ARCHITECTURE.md** first. **FIRST_EXPERIMENT.json** specifies the proposed 90-minute budget and approval boundary. **REWARDS.md** defines a fresh, small reward experiment with precise formulas/exploits. **research/** contains source pins, actual GigaLearn GAE audit findings, visualization/RewardServer feasibility, opponent contracts and evaluation rules. **results/** contains actual server microbenchmarks and validation results.
+**This is a working research prototype, not a pretrained competitive bot.** No old project weights are included. Short training tests establish pipeline correctness; playing strength after hours or days is unverified.
 
-## Contents verified here
+## Install and first test
 
-- Inspected source and exact revisions for native/Python/Rust framework candidates, RocketSim viewers and RewardServer.
-- Compiled and ran the archived GigaLearn GAE function unchanged in an isolated real-LibTorch harness: reproduced reversed timeout bootstraps and an AddressSanitizer terminal read overflow. A minimal patch corrects those isolated fixtures; it is not a complete learner certification.
-- Ran bounded synthetic forward/backward/Adam comparisons for three 1–3M parameter models. These are CPU measurements on the research machine, not GTX 1650 or game-training SPS.
-- Ran a warmed physics-only RocketSim-binding probe. This excludes observations, rewards and learning.
-- Ran eight mathematical/model unit tests. No measured playing-strength improvement, trained policy, live RewardServer plugin, graphical viewer connection or RLBot game-client test is claimed.
+1. Extract the ZIP into `E:\Downloads` so the project is `E:\Downloads\chat_gpt_ai\duelforge`. Windows treats `chat_gpt_ai` and `Chat_GPT_AI` as the same folder. If your extraction program adds another outer folder, move the included `duelforge` folder into your existing `Chat_GPT_AI` folder. Existing Gigaforge and AttentionForge projects remain separate.
+2. Close other trainers. Run **0_SETUP.bat** once. It finds an existing 64-bit Python 3.11 with Torch/NumPy, prefers CUDA, reuses Soccar collision meshes, and checks native/Python feature and action agreement. It does not install or move CUDA/Torch. Check the printed runtime, CUDA device and `VERIFY_PASS`.
+3. Open **DUELFORGE.bat**, choose **1**. The first start creates a fresh model in `runs/duel01`; later starts resume its model, Adam state and counters. Each session saves and stops after about 60 minutes. Finish the current rollout/update before expecting a pause to complete.
+4. For a first behavior check, train for **10–15 minutes**, then use **2_PAUSE.bat** in another console, or press Ctrl+C in training. Wait for `PAUSED_AND_SAVED`. The menu's choice 2 is useful when the trainer is in another console; the training menu itself is occupied while it trains.
+5. In the menu choose **3** to watch kickoffs or **4** to watch open play. **Blue is your learned policy; orange is its frozen random initial policy. Both are Octane.** No training happens during watch. Both being poor at first is expected; orange is a control, not a teacher.
+6. Choose **8** for the last recording's frame inspector: scrub real simulated poses, actions, contacts, ball velocity/spin, policy probabilities, critic estimate and reward components. The inspector opens through a local loopback server; press Enter in its console when finished.
+7. Choose **5** for a quick balanced-color validation panel, then **6** to make a report ZIP. Send the `DuelForge_report_duel01_*.zip` with your gameplay observations. Reports omit weights, credentials, W&B files and environments.
 
-## Optional laptop benchmark — no game training
+Judge early changes by ball contacts, useful movement and open-play interaction. A win against the initial random policy does not establish strong play. You can resume another bounded session without reinstalling. Do not leave multiple trainers running together on the laptop.
 
-Extract into E:\Downloads so `chat_gpt_ai\duelforge` sits next to your existing `attention_skills` and `gigaforge` folders. It does not replace them.
+## Viewer and stronger opponent
 
-Run **RUN_BENCHMARK_ONLY.bat**. It uses `py -3.11` to locate an existing Torch runtime in bounded nearby project folders, preferring a CUDA-capable environment. It does not install CUDA/Torch, scan your drives, read keys or resume old training. It prints the device and GPU name and writes **DuelForge_preflight_*.zip** inside duelforge. This ZIP contains the local model timing/resource measurements and can be shared for architecture selection.
+Watch uses **RocketSimVis** and actual live simulation, not replay playback. An existing nearby viewer is reused; otherwise its pinned source and GUI-only dependencies are installed once in `third_party/RocketSimVis/.venv`. Torch/CUDA are untouched. FOV 110, distance 270, height 100 are set in the launched viewer. A viewer startup error is printed instead of silently running an invisible match. The browser frame inspector is also available separately from the 3D window.
 
-If the Windows Python launcher is unavailable, use your existing Python directly:
+Menu **10** downloads checksum-verified Nexto assets. **11** watches against Nexto, and **12** evaluates against it. This uses Nexto's neural controls, with its stock scripted kickoff disabled. Nexto remains frozen. Default training does not use it. **13** creates a separate `duel_nexto01` fork with 20% Nexto opponent assignments and resumes that fork; it preserves `duel01`. To reopen that fork's menu, run `_RUN.bat menu --run duel_nexto01`.
 
-```
-"E:\Downloads\Chat_GPT_AI\gigaforge\.venv_native\Scripts\python.exe" tools\preflight.py --python "E:\Downloads\Chat_GPT_AI\gigaforge\.venv_native\Scripts\python.exe"
-```
+The optional **14** runs six sequential ten-minute A/B training blocks with three paired initialization seeds, contact-impulse reward 0 versus 0.05, within a 90-minute session budget. It tests an early-learning hypothesis, not a strong-bot claim. Normal start is the simpler first test.
 
-The probe runs short synthetic tensor updates on disposable randomly initialized models; it does not teach a game bot or save weights. Expect roughly tens of seconds to a few minutes depending on imports/runtime discovery. GPU speed remains unknown until this local probe runs, and this probe alone still does not measure a complete training pipeline.
+## Export
 
-Tests with an existing Python containing Torch:
+After pausing, choose **7**. A unique folder is created under `exports/` with `actor.lt`, `actor.pt`, both TOMLs and the Python inference wrapper. Run that folder's **INSTALL_V5.bat** once, then **DIAGNOSE_V5.bat**, and import **bot.portable.bot.toml** into RLBot v5 for a normal 1v1 match. The isolated wrapper reuses existing Torch/NumPy when available; on another PC it can install CPU inference dependencies. Export does not need a running trainer.
 
-```
-python -m unittest discover -s tests -v
-```
+Here `.lt` and `.pt` are TorchScript read by the included wrapper. They are not GGL native parameter archives and must not be dropped into a different bot's reader. RLBot v4 `.cfg` is not included in this prototype. Source/PT/LT logits and selected actions are checked at export. The SDK, packet conversion and action clock were tested; an actual Rocket League game-client match must still be tested on your PC.
 
-The optional `tools/physics_probe.py` needs existing RocketSim Python bindings and collision meshes; it never downloads game assets. The GAE sanitizer reproducer is an optional Linux development harness documented separately and is not run by the Windows benchmark.
+## Logs, evaluation and configuration
 
-## Proposed implementation after research review
+Local `metrics.jsonl` includes real learner transitions/s, collection/PPO time, goals, contacts, reward sums, KL, entropy, backward/airborne fractions and memory. W&B uses the SDK's existing login if available, in a new `duelforge` project; local logging continues without it. No keys are collected in reports.
 
-Fresh Octane policy; native RocketSim collection; small audited LibTorch PPO core; ~1.22M-parameter dense baseline; full observation/action/delay parity; outcome-first rewards; history self-play; independent confidence-aware evaluation; asynchronous RocketSimVis/reward inspection; atomic checkpoints, watch/report/pause and RLBot v5 native inference export.
+Training starts with mixed kickoff and varied ground states. Default rewards are goal ±1, a small goal-progress potential difference and a contact-gated ball-impulse bonus. They are new experimental hypotheses, not recovered Chronos/Galactus training rewards. There is no scripted driving, kickoff, half-flip or aerial controller. Details and failure modes are in **PROTOTYPE_GUIDE.md** and **ARCHITECTURE.md**.
 
-The Windows build, local GPU profile, complete collector/optimizer benchmark and live-client smoke test remain work for the implementation phases. Nothing here promises a pro-level bot in a fixed number of hours. The first controlled pilot tests whether the foundation learns correctly and whether the proposed bootstrap term helps.
+Configs are frozen per run. Change root `config.json` only for a new run: `_RUN.bat train --run experiment02 --minutes 60`. Never silently alter an existing run. Exact model/config/hash records and full optimizer checkpoints are preserved. Physics restarts on resume; resume is not bit-for-bit continuation of an in-flight episode.
+
+Automatic validation every approximately one million learner transitions uses a small discovery panel against the initial model. Menu **15** watches the exact pinned best open-play validation candidate; it is unverified. Menu **16** runs 2,000 fresh paired-color games, 100 simulated seconds each, against the frozen initial policy. Draws score half, and 95% intervals use seed-pair blocks. No candidate silently replaces another model, and repeated validation is not an independent strength confirmation.
+
+## Verification and development
+
+**VALIDATION.json** records what ran here, including a Windows native build/import/parity job, 29 tests, a full-size bounded CPU training check and browser inspector checks. This server has no CUDA or Rocket League client; local GPU throughput, thermals, 3D GUI startup and live RLBot deployment remain local checks. CPU rates and synthetic GPU examples/s are not interchangeable.
+
+The included Windows native extension is for **CPython 3.11, Windows x64**. See **BUILD_NATIVE.md** for reproducible native source builds. `python -m pytest -q tests` runs the tests with Torch, NumPy, pytest, the native module and existing Soccar meshes; Nexto/SDK checks require those optional dependencies. `research/PHASE1_ARCHITECTURE.md` and the source audit are historical research records; this README describes the implemented version.

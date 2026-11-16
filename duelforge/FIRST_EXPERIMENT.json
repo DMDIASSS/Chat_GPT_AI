@@ -1,19 +1,120 @@
 {
   "id": "duelforge-pilot-001",
-  "status": "proposal_requires_approval_before_game_training",
+  "status": "implemented_optional_bounded_pilot_after_user_approval",
   "primary_question": "Does a small physically contact-gated impulse bootstrap improve early learning compared with goal plus potential alone, with identical architecture, seeds and compute?",
   "total_wall_budget_minutes": 90,
-  "budget_breakdown_minutes": {"local_profile": 10, "contract_and_integration_gates": 20, "sequential_training_blocks": 60},
-  "training_blocks": {"arms": ["goal_potential_only", "goal_potential_plus_impulse_0.05"], "paired_seeds": [41011, 41017, 41023], "minutes_per_arm_seed": 10, "parallel_trainers": 1},
-  "proposed_stack": "pinned RocketSim C++ + audited GigaLearn-derived native collector + LibTorch PPO; full-stack benchmark gate before final selection",
-  "network": {"observation_size": 109, "actions": 90, "separate_actor_and_critic": true, "hidden_sizes_each": [512,512,512], "layer_norm": true, "activation": "relu", "total_parameters": 1216091, "initialization": "fresh random; no old bot weights"},
-  "physics": {"mode": "1v1", "learner_hitbox": "Octane", "hz": 120, "decision_ticks": 8, "action_delay_ticks": 7, "contract_status": "must pass native and deployment clock parity gates"},
-  "start_settings": {"arenas": 64, "native_workers_to_compare": [1,2,3], "torch_cpu_threads_to_compare": [1,2], "rollout_decisions_per_arena": 256, "epochs": 2, "minibatch_candidates": [1024,2048], "learning_rate": 0.0001, "gamma": 0.995, "gae_lambda": 0.95, "clip": 0.2, "entropy_nats_coefficient": 0.01, "kl_update_stop": 0.02, "precision": "FP32"},
-  "resource_admission_targets": {"cuda_allocated_gib_max": 2.5, "cuda_reserved_gib_max": 3, "trainer_rss_gib_max": 8, "initial_persistent_data_gb_target": 2, "note": "Targets to measure and enforce after integration; not claims of measured GTX 1650 consumption"},
-  "opponents": {"pilot": "current self-play plus a small frozen random-initialization checkpoint pool; assignments only on episode resets", "later": "historical snapshots and verified compatible fixed bots, with fresh-seed independent evaluation"},
-  "gates": ["GAE terminal/timeout/tail and per-row bootstrap tests", "complete rollout used exactly once as declared", "old-policy opponent rows excluded from learner loss/count", "blue/orange action/observation symmetry", "120Hz simulator and delay queue parity", "fixed opponent native versus published inference action agreement", "finite losses/gradients/parameters", "no significant resource pressure"],
-  "metrics": ["physical_ticks_per_second", "arena_decisions_per_second", "learner_transitions_collected_per_second", "learner_transitions_consumed_per_wall_second", "minibatch_examples_processed_per_second", "collection_vs_optimizer_wall_seconds", "actual_contacts_and_whiffs", "non_kickoff_goals_and_concessions", "legal_action_entropy", "KL", "reward_component_sums", "resource_peaks"],
-  "stop_conditions": ["any contract failure", "nonfinite update", "unsafe resource pressure", "90 minute total wall budget"],
-  "claims_not_allowed": ["90 minutes proves superiority over Nexto or strong humans", "synthetic model examples/s equals end-to-end SPS", "high reward or contact drill success proves match strength", "unrun RLBot deployment or RewardServer integration works"],
-  "next_approval": "A multi-hour or overnight continuation needs a separate budget after reviewing this pilot"
+  "budget_breakdown_minutes": {
+    "local_profile": 10,
+    "contract_and_integration_gates": 20,
+    "sequential_training_blocks": 60
+  },
+  "training_blocks": {
+    "arms": [
+      "goal_potential_only",
+      "goal_potential_plus_impulse_0.05"
+    ],
+    "paired_seeds": [
+      41011,
+      41017,
+      41023
+    ],
+    "minutes_per_arm_seed": 10,
+    "parallel_trainers": 1
+  },
+  "proposed_stack": "pinned native C++ RocketSim collector + fixed-horizon PyTorch/LibTorch PPO; archived GGL PPO not imported",
+  "network": {
+    "observation_size": 109,
+    "actions": 90,
+    "separate_actor_and_critic": true,
+    "hidden_sizes_each": [
+      512,
+      512,
+      512
+    ],
+    "layer_norm": true,
+    "activation": "relu",
+    "total_parameters": 1216091,
+    "initialization": "fresh random; no old bot weights"
+  },
+  "physics": {
+    "mode": "1v1",
+    "learner_hitbox": "Octane",
+    "hz": 120,
+    "decision_ticks": 8,
+    "action_delay_ticks": 7,
+    "contract_status": "Native/Python and SDK packet/action-clock parity tested; live game-client verification remains local"
+  },
+  "start_settings": {
+    "arenas": 64,
+    "native_workers_to_compare": [
+      1,
+      2,
+      3
+    ],
+    "torch_cpu_threads_to_compare": [
+      1,
+      2
+    ],
+    "rollout_decisions_per_arena": 256,
+    "epochs": 2,
+    "minibatch_candidates": [
+      1024,
+      2048
+    ],
+    "learning_rate": 0.0001,
+    "gamma": 0.995,
+    "gae_lambda": 0.95,
+    "clip": 0.2,
+    "entropy_nats_coefficient": 0.01,
+    "kl_update_stop": 0.02,
+    "precision": "FP32"
+  },
+  "resource_admission_targets": {
+    "cuda_allocated_gib_max": 2.5,
+    "cuda_reserved_gib_max": 3,
+    "trainer_rss_gib_max": 8,
+    "initial_persistent_data_gb_target": 2,
+    "note": "Targets to measure and enforce after integration; not claims of measured GTX 1650 consumption"
+  },
+  "opponents": {
+    "pilot": "current self-play plus a small frozen random-initialization checkpoint pool; assignments only on episode resets",
+    "later": "historical snapshots and verified compatible fixed bots, with fresh-seed independent evaluation"
+  },
+  "gates": [
+    "GAE terminal/timeout/tail and per-row bootstrap tests",
+    "complete rollout used exactly once as declared",
+    "old-policy opponent rows excluded from learner loss/count",
+    "blue/orange action/observation symmetry",
+    "120Hz simulator and delay queue parity",
+    "fixed opponent native versus published inference action agreement",
+    "finite losses/gradients/parameters",
+    "no significant resource pressure"
+  ],
+  "metrics": [
+    "physical_ticks_per_second",
+    "arena_decisions_per_second",
+    "learner_transitions_collected_per_second",
+    "learner_transitions_consumed_per_wall_second",
+    "minibatch_examples_processed_per_second",
+    "collection_vs_optimizer_wall_seconds",
+    "actual_contacts_and_whiffs",
+    "non_kickoff_goals_and_concessions",
+    "legal_action_entropy",
+    "KL",
+    "reward_component_sums",
+    "resource_peaks"
+  ],
+  "stop_conditions": [
+    "any contract failure",
+    "nonfinite update",
+    "unsafe resource pressure",
+    "90 minute total wall budget"
+  ],
+  "claims_not_allowed": [
+    "90 minutes proves superiority over Nexto or strong humans",
+    "synthetic model examples/s equals end-to-end SPS",
+    "high reward or contact drill success proves match strength",
+    "unrun RLBot deployment or RewardServer integration works"
+  ],
+  "next_approval": "Inspect results before deciding on longer experiments; each prototype invocation stays bounded."
 }

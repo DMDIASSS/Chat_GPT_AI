@@ -1,0 +1,332 @@
+## rlgymppo-rs
+
+A Rust implementation of Proximal Policy Optimization (PPO) for Rocket League
+training, built on [RocketSim v3](https://github.com/ZealanL/RocketSim/tree/v3-rust) +
+[rocketsim_viewer](https://crates.io/crates/rocketsim_viewer) via
+[RLGym-rs](https://github.com/VirxEC/rlgym_rs).
+
+For an existing bot, see the [downstream migration guide](MIGRATING_DOWNSTREAM.md).
+It covers RocketSim 0.3, the replacement for RLViser, Docker viewer networking,
+and Burn 0.22.
+
+### Project structure
+
+The workspace is split into nine crates:
+
+| Crate | Purpose |
+|---|---|
+| `rlgymppo` | Core PPO learner, multi-threaded environment runner, and training loop. |
+| `rlgymppo-model` | Runtime-device policy/model definitions and checkpoint-compatible inference loading. |
+| `rlgymppo-nexto` | Nexto model inference, observation builder, action table, and pre-generated model weights. |
+| `rlgymppo-rlbot` | RLBot v5 agent that runs trained policies with Burn Flex and RocketSim state enrichment. |
+| `rlgymppo-utils` | Reusable RLGym observation builders, action parsers, and shared-info traits, without depending on the PPO learner. |
+| `rlgymppo-tui` | Terminal-based dashboard that renders live training metrics (ratatui). |
+| `rlgymppo-wandb` | Weights & Biases integration via an embedded Python interpreter (pyo3). |
+| `rlgymppo-trainer` | Bundled training example with shared logic, self-play, and skill tracking. |
+| `rlgymppo-transfer` | Transfer-learning example that pretends `rlgymppo-trainer` is the parent model. |
+
+`rlgymppo-utils` contains the shared `DefaultObs`, `AdvancedObs`, and
+`DefaultAction` implementations used by the trainer. It re-exports `rlgym` and
+RocketSim types so inference applications can reuse the same observation and
+action logic without depending on the PPO training stack.
+
+### Quick start
+
+Burn 0.22 requires Rust 1.95 or later.
+
+See [`rlgymppo-trainer/examples/run.rs`](rlgymppo-trainer/examples/run.rs) for a
+complete training example. The core logic lives in
+[`rlgymppo-trainer/src/lib.rs`](rlgymppo-trainer/src/lib.rs). It includes:
+
+- A custom `SharedInfo` that tracks player metrics (distance to ball, speed,
+  boost, air time, demo status, touch height)
+- 1v1, 2v2, and 3v3 random game selection
+- Several state setters (kickoff, random positions) weighted by probability
+- Combined rewards (air time, face ball, velocity to ball)
+- Terminal conditions (goal scored, random game end, no-touch timeout)
+- `SelfPlayConfig` for policy versioning
+- `SkillTrackerConfig` for optional Elo ratings against saved previous policy versions and the fixed Nexto baseline
+
+Run with your chosen backend (replace `torch` with `cuda`, `wgpu`, `metal`, etc.):
+
+```sh
+cargo run -p rlgymppo-trainer --example run --features torch
+```
+
+At a high level, training looks like this:
+
+```rust
+use burn::tensor::Device;
+
+#[allow(deprecated)] // Keep the LibTorch backend.
+let config = LearnerConfig {
+    num_pools: 1,
+    num_threads_per_pool: 4,
+    num_games_per_pool: 256,
+    ppo: PpoLearnerConfig {
+        timesteps_per_iteration: 80_000,
+        batch_size: 40_000,
+        mini_batch_size: 10_000,
+        gpu_timestep_buffer_size: 40_000,
+        epochs: 1,
+        learning_rate: 1.5e-4,
+        entropy_scale: 0.036,
+        ..Default::default()
+    },
+    shared_head_layer_sizes: vec![256; 2],
+    policy_layer_sizes: vec![256; 3],
+    critic_layer_sizes: vec![256; 3],
+    timesteps_per_save: 10_000_000,
+    checkpoints_limit: Some(10),
+    self_play: SelfPlayConfig {
+        save_policy_versions: true,
+        ts_per_version: 100_000_000,
+        ..Default::default()
+    },
+    skill_tracker: SkillTrackerConfig {
+        enabled: true,
+        // Some(mmr) enables Nexto evals. None disables only Nexto.
+        nexto_mmr: Some(1500.0),
+        ..Default::default()
+    },
+    device: Device::libtorch_cuda(0).autodiff(),
+    render_device: Device::libtorch(),
+    wandb_project_name: Some("rlgym-ppo".into()),
+    wandb_run_name: Some("ppo-bot-v1".into()),
+    ..Default::default()
+};
+
+let mut learner = config.init(create_env, rlgymppo::default_adamw_optimizer());
+learner.load();    // resume from checkpoint if one exists
+learner.learn();   // train forever (or until num_additional_iterations)
+```
+
+### Burn 0.22 checkpoints
+
+New checkpoints use burnpack files: `actor.bpk`, `critic.bpk`, and
+`shared_head.bpk` when a shared head is configured. Optimizer state and regen
+anchors also use `.bpk` files. Checkpoints saved by this version can resume
+training with optimizer state.
+
+Burn 0.22 cannot read legacy `.mpk` or `.mpk.gz` files. Renaming them does not
+convert them. Load model weights with the original Burn 0.21 model and recorder.
+Export each component through `burn-store` to burnpack or SafeTensors. Import
+the weights into the matching Burn 0.22 component, then save it as `.bpk`.
+Keep parameter paths and shapes unchanged. Compare outputs before resuming.
+See the [Burn migration guide](https://burn.dev/books/burn/migrating-to-0.22.html#migrating-checkpoints).
+
+This process does not convert legacy optimizer state. Start with fresh optimizer
+state after converting the weights. Keep an unchanged copy of the old checkpoint.
+Use a separate checkpoint directory for the converted run.
+
+### Skill tracking
+
+`SkillTrackerConfig::default()` is disabled and sets `nexto_mmr` to
+`Some(1500.0)`. Set `enabled` to `true` to run evaluations. When enabled,
+periodic evaluations run the current policy against a randomly selected saved
+previous policy version and against Nexto when `nexto_mmr` is `Some`.
+
+Old-version matches use two-sided Elo. Both sides update their ratings. Each
+saved policy version keeps its own rating. Nexto is the only fixed bot; its
+MMR stays at `nexto_mmr`. Set `skill_tracker.nexto_mmr` to `Some(value)` to
+change it.
+
+Set `nexto_mmr` to `None` to disable Nexto. The Nexto model is not loaded.
+Old-version comparisons still run when `enabled` is `true`. They require policy
+version saving (`SelfPlayConfig.save_policy_versions`) and can continue when it
+is enabled. Set `enabled` to `false` to disable all evaluations.
+
+The `rlgymppo-nexto` crate contains the Rust observation and action functions
+and a pre-generated Burn model. The generated model source and BurnPack
+weights are committed in `rlgymppo-nexto/nexto/`. Normal builds do not run
+model conversion or code generation and do not need the original model files.
+
+### Viewer setup
+
+Visualization uses `rocketsim_vis` through RLGym's default-enabled `vis`
+feature. The viewer runs as a separate process. Install the matching viewer
+release and make `rocketsim-viewer` available on `PATH`:
+
+```sh
+cargo install --locked rocketsim_viewer --version 0.3.1
+```
+
+For local training, the renderer starts or reuses the viewer. You can set
+`ROCKETSIM_VIEWER` to its executable path.
+
+For Docker training, install and start the viewer on the host instead:
+
+```sh
+rocketsim-viewer --bind 0.0.0.0 39201
+```
+
+Set `LearnerConfig::render_viewer_addr` to the host's numeric `IP:port` as
+seen from the container. For the supplied devcontainer, which uses host
+networking, use:
+
+```rust
+render: true,
+render_viewer_addr: Some("127.0.0.1:39201".into()),
+```
+
+This setting connects through TCP with `Env::set_net_vis`. It does not start
+a viewer inside the container. With bridge networking, use a reachable host
+IP and allow TCP port `39201` through the firewall. Expose or forward the port
+if the viewer runs in a separate container. Bind to a specific interface when
+possible. Do not expose the viewer port to untrusted networks.
+
+The renderer applies viewer car controls and reset, dribble, and ball launch
+requests. It runs at real-time speed. The old RLViser pause and speed controls
+are not available in the new RLGym API.
+
+### Training controls
+
+While training, you can press:
+
+| Key | Action |
+|---|---|
+| `Q` | Quit |
+| `S` | Quick-save a checkpoint |
+| `R` | Toggle the RocketSim visualizer on/off |
+| `D` | Toggle deterministic mode for the renderer |
+
+If the `tui` feature is enabled, these are shown in the status bar of the
+terminal dashboard. Without `tui`, you type the letter and press enter.
+
+### Logging & metrics
+
+**Weights & Biases** — Enable the `wandb` feature and set a project name in
+`LearnerConfig`. The embedded Python interpreter calls `wandb.init()` and
+`wandb.log()` directly. You'll also need the `_WANDB_CORE_PATH` environment
+variable — see [wandb integration](#wandb-integration) below. Skill ratings use
+`Rating/{mode}` for the current policy. All metrics use `Cumulative/steps` as
+the chart axis.
+
+**Terminal dashboard** — Enable the `tui` feature for a live-updating ratatui
+dashboard that organizes metrics into groups (Collect, GAE, Loss, Update,
+Timing, Throughput, Cumulative).
+
+**Reward metrics** — Reward components with names starting with `Reward/` are
+automatically tracked. Configure sampling with `reward_sample_interval` and
+`add_rewards_to_metrics` in `PpoLearnerConfig`.
+
+### Checkpoints
+
+Models, optimizer states, and training stats are saved to the folder specified
+by `checkpoints_folder` (defaults to `./checkpoints`). On restart, `learner.load()`
+resumes from the latest checkpoint — safe to call unconditionally.
+
+### Transfer learning: policy distillation
+
+Use `learner.transfer_learn(...)` to distill a trained teacher into a smaller
+student policy. The student acts in the environment. The frozen teacher
+(described by `TeacherConfig`) scores the same states. The student's actor
+and shared head learn to match the teacher's action distribution. The loss
+uses mean absolute difference or forward KL divergence, scaled by `loss_scale`.
+
+**This loop trains the policy only.** It does not train the student critic,
+compute a value loss, or run PPO updates. Rewards are metrics only. A new
+critic stays untrained. It is not copied from the teacher. Checkpoints retain
+the critic and its optimizer for resume compatibility. Keep the critic shape
+unchanged when resuming an existing run.
+
+The dashboard header shows **Policy distillation**. When plasticity logging
+is enabled, `Update/actor ...` and `Update/head ...` report weight norm,
+stable rank, and dormant fraction. The head metrics are absent if the student
+has no shared head. Distillation does not compute or report critic diagnostics.
+Normal PPO retains its actor and critic diagnostics.
+
+The teacher and student must share the same action space, but the observation
+space may differ: pass an old (teacher) obs builder factory to
+`init_with_old_obs` and it runs alongside the student's obs builder in the
+collector, scoring the same game states with a different layout. Everything
+else (actions, rewards, terminals, shared info) must be identical.
+
+```rust
+// same obs space: nothing extra needed at init
+let mut learner = config.init(create_env, default_adamw_optimizer::<B>());
+
+// different obs space: the teacher's obs builder, run in lockstep
+let mut learner = config.init_with_old_obs(
+    create_env,
+    default_adamw_optimizer::<B>(),
+    || Box::new(OldObs) as Box<dyn Obs<SharedInfo>>,
+);
+
+learner.load(); // resume an earlier distillation run if one exists
+learner.transfer_learn(
+    TeacherConfig {
+        models_path: PathBuf::from("checkpoints"), // the big model
+        policy_layer_sizes: vec![256; 3],
+        shared_head_layer_sizes: vec![256; 2],
+        norm: NormSelection::RmsNorm,
+    },
+    TransferLearnConfig::default(), // distillation hyperparameters
+);
+```
+
+`TeacherConfig` describes the teacher (its `policy_layer_sizes`,
+`shared_head_layer_sizes`, and `norm`); its observation size is probed
+automatically from the old obs builder. `models_path` may point directly at a
+checkpoint folder (containing `actor.bpk`) or at a directory of timestamped
+checkpoints (the latest is used). Keep it distinct from the folder this run
+saves its own checkpoints to. The distillation hyperparameters (learning rate,
+batch sizes, epochs, loss) live in `TransferLearnConfig`.
+
+Use a small policy configuration and monitor `Transfer/loss` and
+`Transfer/accuracy` (argmax agreement with the teacher). The deployed policy
+parameter count includes the actor and shared head. It excludes the critic
+and teacher. A larger critic does not improve distillation.
+
+PPO fine-tuning is a separate, optional phase. There is no automatic transition.
+To start it, save the run and stop with `Q`. Resume with `learner.load()` and
+call `learner.learn()` instead. Keep the student architecture and observations
+compatible with the checkpoint. The new critic still needs value training.
+
+The `rlgymppo-transfer` crate bundles a ready-to-run transfer-learning
+example that pretends `rlgymppo-trainer` is the parent model: it loads the
+model trained by the trainer's `run` example (architecture, checkpoint folder,
+and obs builder are copied from the trainer) and distills it into a smaller
+student that observes with `DefaultObs<1>` (53 floats) instead of the parent's
+`DefaultObs<3>` (141 floats):
+
+```sh
+cargo run -p rlgymppo-transfer --example transfer_learn --features torch
+```
+
+### wandb integration
+
+The environment variable `_WANDB_CORE_PATH` must be set. The easiest way to do
+this is `pip install wandb`, then find where wandb was installed and set
+`_WANDB_CORE_PATH` to the directory containing the `wandb-core` binary
+(e.g. `/path/to/venv/lib/python3.12/site-packages/wandb/bin`).
+
+### Backends
+
+The project uses [Burn](https://burn.dev) 0.22. The examples require exactly
+one backend feature. Model and tensor APIs use runtime `burn::tensor::Device`
+values instead of backend type parameters.
+
+| Feature | Backend | Device types |
+|---|---|---|
+| `torch` | LibTorch (`burn-tch`) | `Device::libtorch_cuda(N)`, `Device::libtorch()` |
+| `cuda` | Pure Rust CUDA | `Device::cuda(N)` |
+| `metal` | Apple Metal | `Device::metal(Default::default())` |
+| `rocm` | AMD ROCm | `Device::rocm(N)` |
+| `wgpu` | Cross-platform GPU | `Device::wgpu(Default::default())` |
+| `flex` | CPU fallback | `Device::flex()` |
+
+The `torch` feature still uses `burn-tch`. Burn 0.22 deprecates this backend.
+The examples suppress its deprecation warnings while support is retained.
+Burn 0.22 removed Candle.
+
+Call `.autodiff()` on a training device. Learner initialization also enables
+autodiff on its training device. Use a plain device for inference.
+Use explicit device constructors: `Device::default()` can change its backend
+when Cargo features change.
+
+To point Rust to your LibTorch installation, you may need to set environment
+variables like `LIBTORCH`, `LIBTORCH_INCLUDE`, and `LIBTORCH_LIB`. See
+[tch-rs docs](https://github.com/LaurentMazare/tch-rs?tab=readme-ov-file#getting-started)
+for help getting started.
+

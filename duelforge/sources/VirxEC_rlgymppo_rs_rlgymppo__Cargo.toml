@@ -1,0 +1,39 @@
+[package]
+name = "rlgymppo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+arrayvec = { workspace = true }
+burn = { version = "0.22.0", features = ["autodiff"] }
+crossterm = { workspace = true, optional = true }
+hashbrown = "0.16.1"
+parking_lot = "0.12.4"
+rand = { workspace = true }
+rayon = { workspace = true }
+rlgym = { workspace = true }
+rlgymppo-model = { path = "../rlgymppo-model" }
+rlgymppo-nexto = { path = "../rlgymppo-nexto" }
+rlgymppo-tui = { path = "../rlgymppo-tui", optional = true }
+rlgymppo-utils = { path = "../rlgymppo-utils" }
+rlgymppo-wandb = { path = "../rlgymppo-wandb", optional = true }
+rustc-hash = { workspace = true }
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = "1.0"
+toml = { version = "1.1.2", features = ["preserve_order"] }
+
+[features]
+default = ["tui", "wandb"]
+tui = ["dep:crossterm", "dep:rlgymppo-tui"]
+wandb = ["dep:rlgymppo-wandb"]
+
+fusion = ["burn/fusion"]
+
+# backends
+cuda = ["burn/cuda"]
+flex = ["burn/flex"]
+metal = ["burn/metal"]
+rocm = ["burn/rocm"]
+torch = ["burn/tch"]
+wgpu = ["burn/wgpu"]
+

@@ -1,0 +1,48 @@
+cmake_minimum_required(VERSION 3.25)
+project(reward_server LANGUAGES CXX)
+
+get_filename_component(RS_KIT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+
+set(RS_FRAMEWORK_ROOT "" CACHE PATH "Root of a GigaLearnCPP checkout (provides RLGymCPP, RocketSim and nlohmann/json)")
+set(RS_FRAMEWORK_TARGET GigaLearnCPP CACHE STRING "Existing library target that provides the RLGymCPP and RocketSim sources")
+set(RS_INTEGRATION_SOURCES "${RS_KIT_ROOT}/examples/user_reward_example.cpp" CACHE STRING
+    "Sources defining rs::CreateUserReward and rs::CreateEvalExtension")
+set(RS_EXTRA_SOURCES "" CACHE STRING "Additional sources linked into reward_server")
+set(RS_EXTRA_INCLUDES "" CACHE STRING "Additional include directories")
+set(RS_EXTRA_DEFINITIONS "" CACHE STRING "Additional compile definitions")
+set(RS_EXTRA_LIBRARIES "" CACHE STRING "Additional link libraries")
+
+if(NOT RS_FRAMEWORK_ROOT)
+    message(FATAL_ERROR "Set RS_FRAMEWORK_ROOT to the root of a GigaLearnCPP checkout")
+endif()
+if(NOT TARGET ${RS_FRAMEWORK_TARGET})
+    message(FATAL_ERROR "Target ${RS_FRAMEWORK_TARGET} does not exist; add reward_server as a subdirectory after your GigaLearnCPP target, or set RS_FRAMEWORK_TARGET")
+endif()
+
+add_executable(reward_server
+        main.cpp
+        session.cpp
+        replay_cli.cpp
+        reward_eval.cpp
+        ${RS_KIT_ROOT}/rlpr/RLPRExporter.cpp
+        ${RS_INTEGRATION_SOURCES}
+        ${RS_EXTRA_SOURCES}
+)
+
+set_target_properties(reward_server PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON LINKER_LANGUAGE CXX)
+
+target_include_directories(reward_server PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${RS_KIT_ROOT}
+        ${RS_FRAMEWORK_ROOT}/src/public
+        ${RS_FRAMEWORK_ROOT}/RLGymCPP/src
+        ${RS_FRAMEWORK_ROOT}/RLGymCPP/RocketSim/src
+        ${RS_FRAMEWORK_ROOT}/RLGymCPP/thread_pool
+        ${RS_FRAMEWORK_ROOT}/libsrc/json
+        ${RS_EXTRA_INCLUDES}
+)
+
+target_link_libraries(reward_server PRIVATE ${RS_FRAMEWORK_TARGET} ${RS_EXTRA_LIBRARIES} ws2_32)
+
+target_compile_definitions(reward_server PRIVATE _CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN NOMINMAX ${RS_EXTRA_DEFINITIONS})
+
