@@ -1,0 +1,117 @@
+{
+  "version": "ground-flip-v1",
+  "full_suite": {
+    "passed": 110,
+    "skipped": 1,
+    "seconds": 172.86,
+    "skip": "Optional pinned Nexto weights not installed"
+  },
+  "final_targeted_suite": {
+    "passed": 11,
+    "seconds": 88.03,
+    "includes": "Latest continuation guard and warmup pin behavior"
+  },
+  "physics_calibration": {
+    "passed": true,
+    "recipe": {
+      "version": "ground-flip-v1",
+      "ticks": 264,
+      "distance_min": 2240.0,
+      "distance_max": 2260.0,
+      "drill_fraction": 0.5,
+      "drill_entropy": 0.02,
+      "failure_scale": 1.0,
+      "failure_floor": 0.01
+    },
+    "drive": {
+      "kind": "drive",
+      "trials": 64,
+      "contacts": 0,
+      "successes": 0,
+      "physical_flips": 0,
+      "peak_active_car_boost": 0.0,
+      "peak_active_boost_control": 0.0,
+      "jump_at_decision": 14,
+      "jump_hold_decisions": 1
+    },
+    "single_jump": {
+      "kind": "jump",
+      "trials": 64,
+      "contacts": 0,
+      "successes": 0,
+      "physical_flips": 0,
+      "peak_active_car_boost": 0.0,
+      "peak_active_boost_control": 0.0,
+      "jump_at_decision": 14,
+      "jump_hold_decisions": 1
+    },
+    "jump_release_dodge": {
+      "kind": "flip",
+      "trials": 64,
+      "contacts": 64,
+      "successes": 64,
+      "physical_flips": 64,
+      "peak_active_car_boost": 0.0,
+      "peak_active_boost_control": 0.0,
+      "jump_at_decision": 14,
+      "jump_hold_decisions": 1
+    },
+    "scope": "Concrete physical witnesses, not a proof over every imaginable control sequence. Calibrated against straight full throttle and jump controls."
+  },
+  "additional_negative_controls": "Single-jump timing sweep: 9 launch times x 3 hold durations x 8 balanced cases; no contacts or flips before deadline.",
+  "pipeline": {
+    "automatic_warmup_then_ppo_then_evaluation": true,
+    "headless_watch_frames": 120,
+    "actual_flip_frames": 25,
+    "boost_control_ever_used": false,
+    "source_preserved": true,
+    "export": {
+      "agent_id": "DMDIASSS/DuelForge_03_trajectory_739caab0b7df",
+      "actor_lt_sha256": "739caab0b7df5cb2cf82f80e47d2b351a441a813f444023f351f39b96eca13e4",
+      "actor_pt_sha256": "739caab0b7df5cb2cf82f80e47d2b351a441a813f444023f351f39b96eca13e4",
+      "source_checkpoint_sha256": "8d01805880a00c6f7af5f62f2125dc8bfe99770c9eaabdccf48d71c5a619dd4e",
+      "learning_transitions": 1005505,
+      "source_export_logits_max_abs_difference": 0.0,
+      "action_agreement": 1.0,
+      "hitbox": "Octane",
+      "format": "TorchScript actor.pt and actor.lt, read by the included RLBot v5 Python wrapper; NOT GGL native parameter archives",
+      "live_rlbot_match_verified": false
+    },
+    "scope": "Linux CPU smoke actor. No live Windows/Rocket League client match was executed."
+  },
+  "warmup_accepted_pin_verified": true,
+  "source_and_critic_body_preservation_tested": true,
+  "rejected_pilot": "500k pure PPO steps did not discover a physical flip; final design adds verified native demonstrations before PPO.",
+  "training": {
+    "new_run": "flip01",
+    "source": "Exact tested jump01 candidate",
+    "warmup_updates": 300,
+    "rl_budget_per_launcher": 500000,
+    "ball": "On ground, 2240-2260 units away",
+    "deadline_seconds": 2.2,
+    "starting_boost": 0,
+    "boost_actions": "disabled throughout drills",
+    "success": "Actual directional flip followed by physical contact before deadline",
+    "success_penalty": 0,
+    "miss_penalty": "-clip(final_center_distance / initial_center_distance, 0.01, 1)",
+    "arena_allocation": "50% independent drills / 50% ordinary matches",
+    "parked_rows": "Excluded from loss and learner transitions",
+    "entropy": {
+      "drill": 0.02,
+      "normal": 0.003
+    }
+  },
+  "compatibility": {
+    "native_binary_changes": false,
+    "new_dependencies": [],
+    "preserves": [
+      "contact01",
+      "potential01",
+      "jump01",
+      "air01",
+      "held01"
+    ],
+    "export": "Existing RLBot v5 LT+TOML Python wrapper and TorchScript PT; no drill restrictions in exported match policy"
+  },
+  "limitations": "Linux CPU smoke actors only. No Windows executable or actual Rocket League client match was run here. Strong-bot improvement on user weights and a formal held-out 2000-game promotion test remain unverified."
+}

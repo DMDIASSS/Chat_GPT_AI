@@ -7,8 +7,10 @@ from .runtime import ROOT,model,batch,device,pin,sha,atomic_json
 from .learning import bootstrap_parts
 
 
-def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=None,checkpoint=None,held_drills=False):
+def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=None,checkpoint=None,held_drills=False,flip_drills=False):
     folder=Path(folder)
+    if held_drills and flip_drills:raise ValueError('Choose one drill type')
+    if flip_drills and opponent!='self':raise ValueError('Flip drill parks the other car; use opponent=self')
     if not 0<seconds<=600:raise ValueError('Watch duration must be 0..600 seconds')
     actor,ck,path=model(folder,checkpoint=checkpoint);cfg=copy.deepcopy(ck['config']);dev=device(cfg);torch.set_num_threads(cfg['torch_threads']);actor.to(dev)
     other=None;nexto=None
@@ -27,9 +29,15 @@ def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=N
         if ck.get('held_curriculum'):env.restore_curriculum(ck['held_curriculum'])
         raw=env.observe()
         print('STATIONARY DRILLS: ball sleeps in air until contact; both cars use neural actors. Training scaffold, not a regulation match.',flush=True)
+    if flip_drills:
+        from .ground_flip import GroundFlipBatch
+        env=GroundFlipBatch(env,cfg,cfg['seed'],force=True,color=0);raw=env.observe()
+        label='parked neutral car (drill only)';opphash=None
+        print('GROUND FLIP: BLUE attempts 2240-2260 units in 2.2s without boost. ORANGE is parked. Zero penalty only for physical flip followed by actual contact.',flush=True)
     if cfg.get('predictive',{}).get('enabled'):env.reward.capture_details=True
     print('LIVE WATCH: BLUE = learned actor,',ck['learning_transitions'],'transitions; ORANGE =',label,'; both Octane. No training. Ctrl+C saves the recording.',flush=True)
     metadata={'potential_debug_fields':['blue_phi_before','blue_phi_next_used','eta_blue_seconds','eta_orange_seconds','blue_goal_threat','geometry_warning'],'predictive':cfg.get('predictive',{}),'bootstrap':cfg.get('bootstrap',{}),'model_sha256':ck['_source_sha256'],'learning_transitions':ck['learning_transitions'],'opponent':label,'opponent_sha256':opphash,'scene':scene,'physics_hz':120,'tick_skip':8,'action_delay':7,'rewards':cfg['rewards'],'recording_cap_frames':1800,'note':'Actual native gameplay transitions, not replay imitation or a scripted controller. Top-down inspector is diagnostic, not the 3D viewer.'}
+    metadata['ground_flip_scaffold']=flip_drills
     metadata['stationary_air_scaffold']=held_drills
     metadata['held_curriculum']=ck.get('held_curriculum') if held_drills else None
     try:
@@ -43,6 +51,8 @@ def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=N
                 if cfg.get('predictive',{}).get('enabled'):
                     d=env.reward.last_details;debug=[float(d['before'][0]),float(d['after'][0]),float(d['eta'][0,0]),float(d['eta'][0,1]),float(d['threat'][0]),float(not d['quality'][0])]
                 records.append({'potential_debug':debug,'time':ticks/120,'world':raw['final_world'][0].tolist(),'pads':raw['final_pads'][0].tolist(),'before_world':before['world'][0].tolist(),'before_pads':before['pads'][0].tolist(),'touches':raw['info'][0,1:3].astype(bool).tolist(),'obs_blue':before['obs'][0,0].tolist(),'actions':ac[0].tolist(),'top_actions':[[int(i),float(probabilities[i])] for i in top],'value_blue':v,'reward_parts':(np.concatenate([raw['reward_parts'][0],bootstrap_parts(cfg,before,raw,ck['learning_transitions'])[0]],axis=-1) if cfg.get('bootstrap',{}).get('enabled') else raw['reward_parts'][0]).tolist(),'goal':g,'score':score.copy(),'ticks':dt,'reset':bool(raw['terminated'][0] or raw['truncated'][0])})
+                if flip_drills and raw['flip_drill']['completed'][0]:
+                    d=raw['flip_drill'];print('FLIP_TRIAL: success',bool(d['success'][0]),'physical flip',bool(d['flipped'][0]),'distance',round(float(d['distance'][0]),1),'penalty',round(float(d['penalty'][0]),3),flush=True)
                 if viewer:viewer.send(raw,locations)
                 if k%75==0 or g:print('WATCH:',round(ticks/120,1),'seconds; score',score,'touches',contacts,flush=True)
                 if not headless:time.sleep(max(0,ticks/120-(time.perf_counter()-start)))

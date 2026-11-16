@@ -86,7 +86,10 @@ def _train(folder,cfg,minutes,max_updates,stop_at_transitions=None,external_stop
         model=compiled
     seed=(cfg['seed']+session_index*104729)%(0x40000000);session_index+=1
     env=batch(cfg,seed=seed)
-    if cfg.get('held_ball'):
+    if cfg.get('flip_drill'):
+        from .ground_flip import GroundFlipBatch
+        env=GroundFlipBatch(env,cfg,seed)
+    elif cfg.get('held_ball'):
         from .held_ball import HeldBallBatch
         env=HeldBallBatch(env,cfg,seed)
         if previous and previous.get('held_curriculum'):env.restore_curriculum(previous['held_curriculum'])
@@ -132,6 +135,7 @@ def _train(folder,cfg,minutes,max_updates,stop_at_transitions=None,external_stop
         for i in indices:
             r=np.random.random();nf=cfg['league'].get('nexto_fraction',0)
             opponent[i]='nexto' if nexto is not None and r<nf else str(np.random.choice(pool)) if pool and r<nf+cfg['league']['history_fraction'] else None
+            if cfg.get('flip_drill') and env.drill[i]:opponent[i]=None
             side[i]=np.random.randint(2)
             if opponent[i] not in (None,'nexto'):frozen_model(opponent[i])
         active={x for x in opponent if x is not None};keep=set(pool)|active
@@ -148,10 +152,10 @@ def _train(folder,cfg,minutes,max_updates,stop_at_transitions=None,external_stop
             if max_updates is not None and session_updates>=max_updates:break
             if stop_at_transitions is not None and count>=stop_at_transitions:break
             if minutes is not None and time.perf_counter()-start>=minutes*60:break
-            held_counts={k:0 for k in ('completed_held','successful_held','completed_released','successful_released','elevated_contacts')};t0=time.perf_counter();parts=np.zeros((2,3),np.float64);touches=np.zeros(2,np.int64);goals=np.zeros(2,np.int64);timeouts_pending=[];episode_resets=0;history_rows=0;behavior=np.zeros(5,np.float64);control_stats=np.zeros(3,np.float64);bootstrap_sum=np.zeros((2,2),np.float64);entropy_coef=entropy_coefficient(cfg,count);model.eval()
+            flip_counts={k:0 for k in ('completed_trials','successes','physical_flips','nonflip_contacts','failure_distance_sum')};held_counts={k:0 for k in ('completed_held','successful_held','completed_released','successful_released','elevated_contacts')};t0=time.perf_counter();parts=np.zeros((2,3),np.float64);touches=np.zeros(2,np.int64);goals=np.zeros(2,np.int64);timeouts_pending=[];episode_resets=0;history_rows=0;behavior=np.zeros(5,np.float64);control_stats=np.zeros(3,np.float64);bootstrap_sum=np.zeros((2,2),np.float64);entropy_coef=entropy_coefficient(cfg,count);model.eval()
             for t in range(T):
-                obs[t]=raw['obs'];masks[t]=raw['mask'];learner[t]=True
-                entropy_weights[t]=env.entropy_coefficients() if cfg.get('held_ball') else entropy_coef
+                obs[t]=raw['obs'];masks[t]=raw['mask'];learner[t]=env.learner_rows() if cfg.get('flip_drill') else True
+                entropy_weights[t]=env.entropy_coefficients() if (cfg.get('held_ball') or cfg.get('flip_drill')) else entropy_coef
                 with torch.inference_mode():
                     x=torch.as_tensor(raw['obs'].reshape(-1,109),device=dev);legal=torch.as_tensor(raw['mask'].reshape(-1,90),device=dev);logits,v=model(x,legal)
                     probs=logits.softmax(-1);a=torch.multinomial(probs,1).squeeze(1);lp=logits.log_softmax(-1).gather(1,a[:,None]).squeeze(1)
@@ -173,6 +177,8 @@ def _train(folder,cfg,minutes,max_updates,stop_at_transitions=None,external_stop
                 done=np.flatnonzero(raw['terminated']|raw['truncated']);episode_resets+=len(done);assign(done)
                 if cfg.get('held_ball'):
                     for key in held_counts:held_counts[key]+=env.last[key]
+                if cfg.get('flip_drill'):
+                    for key in flip_counts:flip_counts[key]+=env.last[key]
                 if stop_requested():stopping=True
             # Actor weights stayed fixed. Value all timeouts before any optimizer step.
             x=np.concatenate([raw['obs'].reshape(-1,109)]+[item[2] for item in timeouts_pending]);lm=np.concatenate([raw['mask'].reshape(-1,90)]+[item[3] for item in timeouts_pending]);vs=[]
@@ -203,6 +209,14 @@ def _train(folder,cfg,minutes,max_updates,stop_at_transitions=None,external_stop
             mean=np.mean(stats,axis=0) if stats else np.zeros(4);memory=rss_mb();gpu_alloc=torch.cuda.max_memory_allocated(dev)/2**20 if dev.type=='cuda' else 0;gpu_res=torch.cuda.memory_reserved(dev)/2**20 if dev.type=='cuda' else 0
             legal_max=float(np.log(np.maximum(1,masks.reshape(-1,90)[index].sum(-1))).mean());normalized_entropy=float(mean[2])/max(legal_max,1e-6)
             metric={'train/entropy_coefficient':entropy_coef,'train/legal_entropy_max_nats':legal_max,'train/entropy_fraction_of_legal_max':normalized_entropy,'game/reverse_throttle_fraction':float(control_stats[0]/T),'game/jump_button_fraction':float(control_stats[1]/T),'game/forward_drive_fraction':float(control_stats[2]/T),'reward/bootstrap/approach':float(bootstrap_sum[:,0].sum()),'reward/bootstrap/new_contact':float(bootstrap_sum[:,1].sum()),'state':'training','update':updates,'learning_transitions':count,'optimizer_examples':consumed,'training_wall_seconds':prior_wall+time.perf_counter()-start,'speed/learner_transitions_per_second':samples/elapsed,'speed/rollout_player_decisions_per_second':T*E*2/collect,'speed/collection_seconds':collect,'speed/ppo_seconds':optimize,'train/loss':float(mean[0]),'train/KL':float(mean[1]),'train/entropy_nats':float(mean[2]),'train/gradient_norm':float(mean[3]),'train/optimizer_minibatches':len(stats),'train/KL_early_stop':early,'game/touches_blue':int(touches[0]),'game/touches_orange':int(touches[1]),'game/goals_blue':int(goals[0]),'game/goals_orange':int(goals[1]),'game/resets':episode_resets,'game/ball_distance_mean':float(behavior[0]/T),'game/car_speed_mean':float(behavior[1]/T),'game/backward_fraction':float(behavior[2]/T),'game/airborne_fraction':float(behavior[3]/T),'game/aerial_table_action_fraction':float(behavior[4]/T),'league/history_size':len(history),'league/frozen_rows':int((~learner).sum()),'resource/trainer_rss_mb':memory,'resource/cuda_allocated_peak_mb':gpu_alloc,'resource/cuda_reserved_mb':gpu_res,'execution':cfg.get('execution','torchscript'),'optimizer':opt_name,'device':str(dev),'physics_ticks':physics,'arena_decisions':arena_decisions,'player_decisions':player_decisions,'rollout_cache_gpu':cache}
+            if cfg.get('flip_drill'):
+                metric.update({'flip/'+key:value for key,value in flip_counts.items()})
+                metric['flip/success_fraction']=flip_counts['successes']/max(1,flip_counts['completed_trials'])
+                metric['flip/parked_rows']=int(env.drill.sum())*T
+                metric['league/frozen_rows']-=metric['flip/parked_rows']
+                metric['train/entropy_base_coefficient']=entropy_coef
+                metric['train/entropy_coefficient']=float(entropy_weights.reshape(-1)[index].mean())
+                metric['train/drill_entropy_coefficient']=cfg['flip_drill']['drill_entropy']
             if cfg.get('held_ball'):
                 metric.update({'held/'+key:value for key,value in held_counts.items()})
                 for task in ('held','released'):
@@ -218,7 +232,7 @@ def _train(folder,cfg,minutes,max_updates,stop_at_transitions=None,external_stop
             if cfg.get('predictive',{}).get('enabled'):
                 metric.update({'predictive/'+key:value for key,value in env.reward.last.items()});metric['speed/reward_seconds_per_call']=env.reward_seconds/max(1,env.reward_calls)
             for a in (0,1):
-                for j,name in enumerate((('goal','mixed_task_shaping' if (cfg.get('air_recovery') or cfg.get('held_ball')) else 'contact_approach' if cfg['acquisition']['stage']=='contact' else 'possession','first_contact') if cfg.get('acquisition') else ('goal','potential','impulse'))):metric[f'reward/{"blue" if a==0 else "orange"}/{name}']=float(parts[a,j])
+                for j,name in enumerate((('goal','mixed_task_shaping' if (cfg.get('air_recovery') or cfg.get('held_ball') or cfg.get('flip_drill')) else 'contact_approach' if cfg['acquisition']['stage']=='contact' else 'possession','first_contact') if cfg.get('acquisition') else ('goal','potential','impulse'))):metric[f'reward/{"blue" if a==0 else "orange"}/{name}']=float(parts[a,j])
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metric,allow_nan=False)+'\n')
             atomic_json(folder/'status.json',metric)
             if wb:

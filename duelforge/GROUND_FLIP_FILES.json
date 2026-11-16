@@ -1,0 +1,20 @@
+{
+  "duelforge/train.py": "623b00c6ce83bc06a0c93459c68053beab51b777d946bbac8432f45a2eb19062",
+  "duelforge/watch.py": "ad115121c28a923249e757604afc8c4d615e76cdd2d2f9a51865726f9725a0ea",
+  "duelforge/ground_flip.py": "199493d5fa8f0a6bb9cfd08a700291a283d7c297b321552eafeb43e674578782",
+  "duelforge/flip_experiment.py": "cf850297df5c891562c3b7dee49fa6fba4ef308c0e905f14e9c2d7c3175edda0",
+  "duelforge/flip_bootstrap.py": "e877e8ec4de41ced941312a0f88e1f1fb3681062b87a55b8b561d2bd10037048",
+  "tools/ground_flip.py": "4a5199b93aacc543dec59ccb60a86e403c5bae9780c24b37252715e0fcdda6b3",
+  "tests/test_ground_flip.py": "d640f2f21105ad57e5b88eeaf4989c8d91e194fd1f9865ae8c75511dc5fc7ac7",
+  "GROUND_FLIP.md": "5598e0e5f4dcfadc6c6ca2c65f28905fa13381f6de84345625f68c4416d180fe",
+  "GROUND_FLIP_VALIDATION.json": "6ef0374702c38ec760c0a8b99a35d7f253adee80c43d0fd603f0857ba4a859d2",
+  "results/ground_flip_pilot.json": "d52c588ef8e1c3ad9f61bbdaeca36a2bb2de08fb3165a202611aac413d554c90",
+  "_GROUND_FLIP.bat": "fa0e2d3c38e5be1094bf5e75a051c606749f705b4a9db01a42e537a703c066e3",
+  "63_START_NO_BOOST_FLIP.bat": "561a96ec1ddb3d1db42939128aa2026504cb9c166372a8c6cf8284d0fd4e499b",
+  "64_WATCH_NO_BOOST_FLIP.bat": "5b5a4a893268d9d47f0361323c80cf2124a77c11fa74d77de15a05bfa1910ba0",
+  "65_WATCH_FLIP_MODEL_MATCH.bat": "ea102481a20b5ff680e9b5cfaca7d1677dfc821aaf780ffabdf832be6ddc432c",
+  "66_REPORT_NO_BOOST_FLIP.bat": "9699ed6644ea90f41c0aa652d57f58990cf622e01b9918962f62bf02bcf0683b",
+  "67_PAUSE_NO_BOOST_FLIP.bat": "c67a31cf9dae8fd7a72e5c7ccd20f298d3a7f60c543829f3a56a812944385405",
+  "68_EXPORT_NO_BOOST_FLIP.bat": "6535df890dbc285968e6da556e5e2dd21656d770696248a3728e75eb75accefc",
+  "69_EVALUATE_NO_BOOST_FLIP.bat": "873b5ef86f757f25e2a703a96e415830eb6eb0dcf2bc4eb20b9d92b9e387d4aa"
+}
