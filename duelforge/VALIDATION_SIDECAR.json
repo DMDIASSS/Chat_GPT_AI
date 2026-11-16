@@ -1,0 +1,8 @@
+{
+  "tests": "67 passed, 1 optional Nexto-assets test skipped",
+  "native_goal_sign_cases": 6,
+  "online_upload_tested": false,
+  "windows_terminal_launch_tested": false,
+  "weight_or_objective_changes": false,
+  "trajectory_failed_gate_pauses": true
+}

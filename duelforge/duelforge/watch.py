@@ -18,6 +18,7 @@ def watch(folder,seconds=120,opponent='initial',scene=-2,headless=False,frames=N
     elif opponent=='self':other=actor;label='same frozen learned actor';opphash=ck['_source_sha256']
     else:
         op=folder/'initial.pt' if opponent=='initial' else Path(opponent);other,d,_=model(folder,checkpoint=op,dev=dev);label=(json.loads((folder/'baseline.json').read_text())['label'] if (folder/'baseline.json').is_file() else 'frozen initial policy') if opponent=='initial' else str(op);opphash=d['_source_sha256']
+    if opponent=='initial' and cfg.get('acquisition'):label='frozen curriculum-start parent (unchanged)'
     from .viewer import Viewer
     viewer=None if headless else Viewer();env=batch(cfg,n=1,seconds=seconds+10);env.scene(scene);raw=env.observe();locations=env.pad_locations();records=deque(maxlen=1800);start=time.perf_counter();ticks=0;k=0;score=[0,0];contacts=[0,0];output=folder/'watch'/str(time.time_ns());output.mkdir(parents=True)
     if cfg.get('predictive',{}).get('enabled'):env.reward.capture_details=True
