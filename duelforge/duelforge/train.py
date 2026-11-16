@@ -53,13 +53,13 @@ def rss_mb():
         except Exception:return None
 
 
-def train(folder,cfg=None,minutes=60,max_updates=None):
+def train(folder,cfg=None,minutes=60,max_updates=None,stop_at_transitions=None,external_stop_file=None):
     folder=Path(folder)
     if minutes is not None and not 0<minutes<=90:raise ValueError('Prototype training sessions are bounded to 0..90 minutes; resume later for more')
-    with lock(folder):return _train(folder,cfg,minutes,max_updates)
+    with lock(folder):return _train(folder,cfg,minutes,max_updates,stop_at_transitions,external_stop_file)
 
 
-def _train(folder,cfg,minutes,max_updates):
+def _train(folder,cfg,minutes,max_updates,stop_at_transitions=None,external_stop_file=None):
     checkpoint=folder/'latest.pt';previous=None
     if checkpoint.is_file():
         previous=load(checkpoint);saved_cfg=previous['config']
@@ -82,8 +82,13 @@ def _train(folder,cfg,minutes,max_updates):
         if any(p is not q for p,q in zip(model.parameters(),compiled.parameters())):raise RuntimeError('Scripted parameters detached from optimizer')
         model=compiled
     seed=(cfg['seed']+session_index*104729)%(0x40000000);session_index+=1
-    env=batch(cfg,seed=seed);raw=env.observe();E=cfg['n_envs'];T=cfg['ppo']['steps'];p=cfg['ppo'];locations=env.pad_locations()
+    env=batch(cfg,seed=seed)
+    if cfg.get('acquisition'):
+        from .acquisition import AcquisitionBatch
+        env=AcquisitionBatch(env,cfg,seed)
+    raw=env.observe();E=cfg['n_envs'];T=cfg['ppo']['steps'];p=cfg['ppo'];locations=env.pad_locations()
     folder.joinpath('STOP').unlink(missing_ok=True);stopping=False
+    def stop_requested():return (folder/'STOP').exists() or (external_stop_file is not None and Path(external_stop_file).exists())
     def stop(*_):
         nonlocal stopping
         stopping=True;(folder/'STOP').write_text('interrupt requested\n');print('PAUSE_REQUESTED: finishing the fixed rollout/update and saving.',flush=True)
@@ -129,8 +134,9 @@ def _train(folder,cfg,minutes,max_updates):
     error=False
     print(f'TRAINING: {dev}; {E} native arenas; {sum(x.numel() for x in model.parameters()):,} parameters; Octane 1v1; 120Hz physics / 15Hz decisions; session limit {minutes} minutes. Ctrl+C or 2_PAUSE.bat saves.',flush=True)
     try:
-        while not stopping and not (folder/'STOP').exists():
+        while not stopping and not stop_requested():
             if max_updates is not None and session_updates>=max_updates:break
+            if stop_at_transitions is not None and count>=stop_at_transitions:break
             if minutes is not None and time.perf_counter()-start>=minutes*60:break
             t0=time.perf_counter();parts=np.zeros((2,3),np.float64);touches=np.zeros(2,np.int64);goals=np.zeros(2,np.int64);timeouts_pending=[];episode_resets=0;history_rows=0;behavior=np.zeros(5,np.float64);control_stats=np.zeros(3,np.float64);bootstrap_sum=np.zeros((2,2),np.float64);entropy_coef=entropy_coefficient(cfg,count);model.eval()
             for t in range(T):
@@ -153,7 +159,7 @@ def _train(folder,cfg,minutes,max_updates):
                 parts+=raw['reward_parts'].sum(0);touches+=raw['info'][:,1:3].sum(0).astype(np.int64);g=raw['info'][:,0];goals+=[np.count_nonzero(g>0),np.count_nonzero(g<0)];physics+=int(raw['info'][:,3].sum());arena_decisions+=E;player_decisions+=E*2
                 cars=raw['final_world'][:,1:];distance=np.linalg.norm(cars[:,:,:3]-raw['final_world'][:,0:1,:3],axis=-1).mean();speed=np.linalg.norm(cars[:,:,3:6],axis=-1).mean();back=(np.sum(cars[:,:,3:6]*cars[:,:,9:12],-1)<-300).mean();air=(cars[:,:,16]<.5).mean();jump=(actions[t]>=24).mean();behavior+=[distance,speed,back,air,jump]
                 done=np.flatnonzero(raw['terminated']|raw['truncated']);episode_resets+=len(done);assign(done)
-                if (folder/'STOP').exists():stopping=True
+                if stop_requested():stopping=True
             # Actor weights stayed fixed. Value all timeouts before any optimizer step.
             x=np.concatenate([raw['obs'].reshape(-1,109)]+[item[2] for item in timeouts_pending]);lm=np.concatenate([raw['mask'].reshape(-1,90)]+[item[3] for item in timeouts_pending]);vs=[]
             with torch.inference_mode():
@@ -183,10 +189,15 @@ def _train(folder,cfg,minutes,max_updates):
             mean=np.mean(stats,axis=0) if stats else np.zeros(4);memory=rss_mb();gpu_alloc=torch.cuda.max_memory_allocated(dev)/2**20 if dev.type=='cuda' else 0;gpu_res=torch.cuda.memory_reserved(dev)/2**20 if dev.type=='cuda' else 0
             legal_max=float(np.log(np.maximum(1,masks.reshape(-1,90)[index].sum(-1))).mean());normalized_entropy=float(mean[2])/max(legal_max,1e-6)
             metric={'train/entropy_coefficient':entropy_coef,'train/legal_entropy_max_nats':legal_max,'train/entropy_fraction_of_legal_max':normalized_entropy,'game/reverse_throttle_fraction':float(control_stats[0]/T),'game/jump_button_fraction':float(control_stats[1]/T),'game/forward_drive_fraction':float(control_stats[2]/T),'reward/bootstrap/approach':float(bootstrap_sum[:,0].sum()),'reward/bootstrap/new_contact':float(bootstrap_sum[:,1].sum()),'state':'training','update':updates,'learning_transitions':count,'optimizer_examples':consumed,'training_wall_seconds':prior_wall+time.perf_counter()-start,'speed/learner_transitions_per_second':samples/elapsed,'speed/rollout_player_decisions_per_second':T*E*2/collect,'speed/collection_seconds':collect,'speed/ppo_seconds':optimize,'train/loss':float(mean[0]),'train/KL':float(mean[1]),'train/entropy_nats':float(mean[2]),'train/gradient_norm':float(mean[3]),'train/optimizer_minibatches':len(stats),'train/KL_early_stop':early,'game/touches_blue':int(touches[0]),'game/touches_orange':int(touches[1]),'game/goals_blue':int(goals[0]),'game/goals_orange':int(goals[1]),'game/resets':episode_resets,'game/ball_distance_mean':float(behavior[0]/T),'game/car_speed_mean':float(behavior[1]/T),'game/backward_fraction':float(behavior[2]/T),'game/airborne_fraction':float(behavior[3]/T),'game/aerial_table_action_fraction':float(behavior[4]/T),'league/history_size':len(history),'league/frozen_rows':int((~learner).sum()),'resource/trainer_rss_mb':memory,'resource/cuda_allocated_peak_mb':gpu_alloc,'resource/cuda_reserved_mb':gpu_res,'execution':cfg.get('execution','torchscript'),'optimizer':opt_name,'device':str(dev),'physics_ticks':physics,'arena_decisions':arena_decisions,'player_decisions':player_decisions,'rollout_cache_gpu':cache}
+            if cfg.get('acquisition'):
+                metric.update({'acquisition/'+k:v for k,v in env.last.items()})
+                from .acquisition import adapt_learning_rate
+                metric['train/learning_rate_used']=optimizer.param_groups[0]['lr']
+                metric['train/learning_rate_next']=adapt_learning_rate(optimizer,cfg,max(float(mean[1]),p['target_kl']*1.5) if early else float(mean[1]))
             if cfg.get('predictive',{}).get('enabled'):
                 metric.update({'predictive/'+key:value for key,value in env.reward.last.items()});metric['speed/reward_seconds_per_call']=env.reward_seconds/max(1,env.reward_calls)
             for a in (0,1):
-                for j,name in enumerate(('goal','potential','impulse')):metric[f'reward/{"blue" if a==0 else "orange"}/{name}']=float(parts[a,j])
+                for j,name in enumerate((('goal','contact_approach' if cfg['acquisition']['stage']=='contact' else 'possession','first_contact') if cfg.get('acquisition') else ('goal','potential','impulse'))):metric[f'reward/{"blue" if a==0 else "orange"}/{name}']=float(parts[a,j])
             with (folder/'metrics.jsonl').open('a',encoding='utf8') as f:f.write(json.dumps(metric,allow_nan=False)+'\n')
             atomic_json(folder/'status.json',metric)
             if wb:
@@ -203,7 +214,7 @@ def _train(folder,cfg,minutes,max_updates):
                 if wb:
                     try:wb.log({'eval/score_rate_vs_initial':result['overall']['score_rate'],'eval/open_play_score':result['contexts']['open_play']['score_rate']},step=count)
                     except Exception:pass
-                if cfg.get('predictive',{}).get('enabled') and result['overall']['score_interval_95'][1]<.45:
+                if (cfg.get('predictive',{}).get('enabled') or cfg.get('acquisition')) and result['overall']['score_interval_95'][1]<.45:
                     print('PARENT_REGRESSION_PAUSE: validation upper score bound below 45%; experiment saved, trained parent preserved.',flush=True);stopping=True
                 model.train()
     except BaseException:

@@ -1,0 +1,38 @@
+{
+  "training_started": false,
+  "checkpoints_opened": false,
+  "results": [
+    {
+      "stage": "native",
+      "arenas": 128,
+      "decisions_per_arena": 120,
+      "seconds": 3.625090456996986,
+      "player_decisions_per_second": 8474.271294584012,
+      "scope": "CPU native simulation + feature/reward/reset collection; excludes neural inference/PPO. Not end-to-end learner SPS."
+    },
+    {
+      "stage": "contact",
+      "arenas": 128,
+      "decisions_per_arena": 120,
+      "seconds": 4.259955945999536,
+      "player_decisions_per_second": 7211.342180392432,
+      "scope": "CPU native simulation + feature/reward/reset collection; excludes neural inference/PPO. Not end-to-end learner SPS."
+    },
+    {
+      "stage": "possession",
+      "arenas": 128,
+      "decisions_per_arena": 120,
+      "seconds": 4.08404651699675,
+      "player_decisions_per_second": 7521.951542949198,
+      "scope": "CPU native simulation + feature/reward/reset collection; excludes neural inference/PPO. Not end-to-end learner SPS."
+    },
+    {
+      "stage": "trajectory",
+      "arenas": 128,
+      "decisions_per_arena": 120,
+      "seconds": 4.708642220997717,
+      "player_decisions_per_second": 6524.173755017368,
+      "scope": "CPU native simulation + feature/reward/reset collection; excludes neural inference/PPO. Not end-to-end learner SPS."
+    }
+  ]
+}

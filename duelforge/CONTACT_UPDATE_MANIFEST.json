@@ -1,0 +1,28 @@
+{
+  "kind": "DuelForge incremental contact/possession curriculum update",
+  "contains_models": false,
+  "contains_dependencies": false,
+  "native_engine_changed": false,
+  "files": {
+    "39_PROFILE_CONTACT_CURRICULUM.bat": "d687e060fd38e804ab5ff0b87ddfb007635d2058e6e8599115794a61bc82b837",
+    "38_EXPORT_CONTACT_CURRICULUM.bat": "277e89ae901b4ed049f69f353ce8db95e24c3109b6b5d6d06c5a1ceb6487fea1",
+    "37_EVALUATE_CONTACT_CURRICULUM.bat": "b6813ecb5e590d89936a7b8e6fe0143733a13aaf94ba9f2b3bb8416bd25c0811",
+    "36_REPORT_CONTACT_CURRICULUM.bat": "5ad1f2b79abceba627b9bbd1e6c1afcc7a7f2efcdb11d925ac70cecee20f2b02",
+    "35_WATCH_CONTACT_CURRICULUM.bat": "3bffc56098c692d232bbc6b12e3c9335e1787e2d25cb8fb669bb459ba07d3ce1",
+    "34_PAUSE_CONTACT_CURRICULUM.bat": "79ded75cf6b0d2e287358a9d768c2671e8014a9c8f834aa02de293186b141f76",
+    "33_START_CONTACT_CURRICULUM.bat": "2cbc05cb3d5fb03d711d4af52d78e4f73cfc402afbbf85a85465741786fb993d",
+    "VALIDATION_CONTACT.json": "d7409dcdf323030b2da59f0760fa8844a75a2c78634662e2baafcd982914e15b",
+    "CONTACT_CURRICULUM.md": "d139b50de3c706b54bce1d50c1cc910667c5c57815352bfa2f697d11e90cf853",
+    "results/contact_stage_smoke.json": "0ea13c49135894ba9de3648503a7957d5e65b1177f15031e6afac41b3a59adcd",
+    "results/contact_collection_profile.json": "a31cd7f31f4d618a3835456301bc72a7006783f9f27083f395a9e18f65d6c1d9",
+    "results/contact_pilot_results.json": "c92bfa2007e5a64fc7d35df88789688d5983e144391ae8ef2dc3e0d4728fb194",
+    "tests/test_acquisition.py": "b1cf2508da3062f72c4bbef75c188a48020077ad0716b8b8ccd4b897967c4722",
+    "tools/contact_reward_pilot.py": "723b0d6dbd78c80cc09b262985155948969c5055ff79e0b0e6d36918f1a1fdee",
+    "tools/contact_curriculum.py": "6cf4429121c596310066946bfdfdc10a02980e8447a6437afc633f08df909191",
+    "duelforge/report.py": "d19133043cd800ab0e36d788ceb6df628c2a78fb8774e12962be0b9f8e3bc10d",
+    "duelforge/train.py": "8f26c9f22dcfbd94fcd3086aa52106e37d8be09677abdc9a262bf5933291ffd8",
+    "duelforge/acquisition_profile.py": "ae0c394e55d3e4acda26e8375bbd37ec695c234848548ec2f8a484d1cf2d43e8",
+    "duelforge/acquisition_experiment.py": "98ee2ddc6a61cf9c4f608d497af09d4e22040d1c60b34168509db4e2cc9845d3",
+    "duelforge/acquisition.py": "4eace4cf7191df48bc535ebbb8079221d0bf0c8d4609ebee5b1ec3223c5842c0"
+  }
+}

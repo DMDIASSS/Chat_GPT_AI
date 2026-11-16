@@ -1,0 +1,21 @@
+{
+  "scope": "Native collection, two real PPO updates per later stage, export/logit checks, headless watch and report, with small CPU policy. Not strength validation.",
+  "results": [
+    {
+      "stage": "possession",
+      "starting_steps": 503808,
+      "ending_steps": 512000,
+      "finite_ppo": true,
+      "export": "/tmp/df_acquisition/exports/possession_0000000000512000_412ba44275",
+      "report": "/tmp/df_acquisition/DuelForge_report_possession_1794830428640909821.zip"
+    },
+    {
+      "stage": "trajectory",
+      "starting_steps": 512000,
+      "ending_steps": 520192,
+      "finite_ppo": true,
+      "export": "/tmp/df_acquisition/exports/trajectory_0000000000520192_6023670028",
+      "report": "/tmp/df_acquisition/DuelForge_report_trajectory_1794830433777663954.zip"
+    }
+  ]
+}

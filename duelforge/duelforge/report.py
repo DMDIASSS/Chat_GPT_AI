@@ -9,7 +9,7 @@ def report(folder):
     target=ROOT/f'DuelForge_report_{folder.name}_{time.time_ns()}.zip';included=[];omitted=[];size=0;cap=24*1024*1024
     paths=[p for p in folder.glob('*.json') if p.name not in ('wandb-settings.json',)]+list(folder.glob('*.jsonl'))
     for clip in sorted((folder/'watch').glob('*'),reverse=True)[:2]:paths+=list(clip.glob('metadata.json'))+list(clip.glob('contact_diagnostics.json'))+list(clip.glob('frames.npz'))
-    sources=list((ROOT/'duelforge').glob('*.py'))+list((ROOT/'native').glob('*'))+[ROOT/'config.json',ROOT/'PROTOTYPE_GUIDE.md',ROOT/'VALIDATION.json',ROOT/'config_learning.json',ROOT/'config_potential.json',ROOT/'POTENTIAL_EXPERIMENT.md',ROOT/'results/stage_profile.json']
+    sources=list((ROOT/'duelforge').glob('*.py'))+list((ROOT/'native').glob('*'))+[ROOT/'config.json',ROOT/'PROTOTYPE_GUIDE.md',ROOT/'VALIDATION.json',ROOT/'config_learning.json',ROOT/'config_potential.json',ROOT/'POTENTIAL_EXPERIMENT.md',ROOT/'results/stage_profile.json',ROOT/'CONTACT_CURRICULUM.md',ROOT/'tools/contact_curriculum.py']
     manifest={'run':folder.name,'generated_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'python':platform.python_version(),'torch':torch.__version__,'cuda':torch.cuda.is_available(),'gpu':torch.cuda.get_device_name() if torch.cuda.is_available() else None,'latest_checkpoint_sha256':sha(folder/'latest.pt') if (folder/'latest.pt').is_file() else None,'source_hashes':source_hashes(),'scope':'No model weights, W&B directory, API keys, netrc, process environment or installed packages included. Last two watch recordings may be included within 24 MiB raw cap.'}
     with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as z:
         for p in dict.fromkeys(paths):

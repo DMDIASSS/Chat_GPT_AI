@@ -1,0 +1,38 @@
+{
+  "tests": "57 passed, 1 skipped (optional Nexto assets absent)",
+  "platform": "Linux CPU preparation machine; Windows GPU execution not tested here",
+  "native_engine": "unchanged existing C++ RocketSim module; no Windows rebuild needed",
+  "checks": [
+    "native actual-contact terminal/reset separation",
+    "time-scaled zero-sum bounded possession reward",
+    "side symmetry",
+    "ground-drill-only jump mask; full-control skill checks",
+    "actor/Adam transfer and frozen-parent preservation",
+    "PPO fixed rollout/timeout behavior",
+    "additional-step caps and explicit pause/resume",
+    "all three objective-stage transitions",
+    "report generation",
+    "source/PT/LT logit and argmax agreement",
+    "headless native neural gameplay watch",
+    "small CPU matched-control pilots and collection profiling"
+  ],
+  "learning_evidence": {
+    "final_small_model_steps_per_arm": 503808,
+    "final_contact_success": 0.125,
+    "final_goal_only_control_success": 0.03125,
+    "initial_contact_success": 0.046875,
+    "sample_size_per_check": 64,
+    "independent_color_pairs": 32,
+    "held_out_promotion": false,
+    "interpretation": "Improved contact in one small-model discovery pilot, but below 85% readiness. Default warm-starts the user trained potential01 actor. No guarantee of mastery in 500k steps or stronger match play."
+  },
+  "original_artifacts_modified_by_preparation": false,
+  "main_bot_training_performed_locally": false,
+  "scripted_controller_in_export": false,
+  "known_limits": [
+    "Approximate reachability/ball forecast",
+    "Small discovery gate panels are noisy",
+    "Forked objectives can regress playing strength; parent baseline and prior stages remain preserved",
+    "Live Windows RLBot v5 loading must be checked on the user PC"
+  ]
+}
