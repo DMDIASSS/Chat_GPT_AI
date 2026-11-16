@@ -100,7 +100,7 @@ def run(root,wandb_module=None,max_polls=None,interval=3.):
                     batch,next_offset=rows(folder/'metrics.jsonl',offset)
                     sent=0
                     for row in batch:
-                        step=int(row['learning_transitions'])
+                        step=int(row.get('logging_step',row['learning_transitions']))
                         if step<remote_floor:continue
                         wb.log({k:v for k,v in row.items() if isinstance(v,(int,float,bool))},step=step)
                         remote_floor=step+1;sent+=1

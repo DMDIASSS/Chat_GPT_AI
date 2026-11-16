@@ -1,0 +1,20 @@
+{
+  "tests": "88 passed, 1 optional Nexto-assets skipped",
+  "teacher_actions_legal_under_native_masks": true,
+  "teacher_success_filtered": true,
+  "early_actor_and_critic_frozen": true,
+  "changed_ppo_moments_only_cleared": true,
+  "resumable_supervised_optimizer": true,
+  "small_cpu_regression_test": {
+    "source_easy_contacts": 0,
+    "candidate_easy_contacts": 63,
+    "heldout_trials": 64,
+    "wider_contacts": 24,
+    "wider_trials": 64,
+    "match_check": "200 draws, 0 goals; uninformative about playing strength"
+  },
+  "user_model_skill_improvement_verified": false,
+  "online_windows_run_verified": false,
+  "original_confirmed_weights_modified": false,
+  "failed_air_trial_resume_blocked": true
+}

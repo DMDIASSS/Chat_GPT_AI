@@ -76,6 +76,14 @@ def start(root=None,source=None,steps=500_000):
         source=folder/ref['actor_path']
     folder=setup(root,source) if not root.exists() else setup(root,root/'baseline.pt')
     with lock(root):
+        results=sorted(root.glob('air_result_*.json'))
+        if results:
+            last=json.loads(results[-1].read_text());after=last.get('after',{})
+            if after.get('checkpoint_sha256')==sha(folder/'latest.pt') and after.get('elevated_contact_rate')==0 and after.get('jump_used_rate')==0:
+                state=json.loads((root/'curriculum.json').read_text());state['status']='air_recovery_failed_jump_gate'
+                atomic_json(root/'curriculum.json',state)
+                print('AIR_RECOVERY_STOPPED: the last trial learned no jump/contact skill. Preserve results; use 50_BOOTSTRAP_JUMP_SKILL.bat.',flush=True)
+                report(root);return state
         root.joinpath('STOP').unlink(missing_ok=True)
         ck=load(folder/'latest.pt');count=ck['learning_transitions'];target=count+steps
         # Compare source and student on exactly the same discovery cases.
