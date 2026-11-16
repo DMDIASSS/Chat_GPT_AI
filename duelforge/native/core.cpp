@@ -43,11 +43,10 @@ void encode_one(const float*w,const float*p,const int*inv,float*out,bool*mask,in
   if(c.jump&&(can||turtle))ok=true;if(c.boost&&ego[15]<=0)ok=false;mask[j]=ok;}
 }
 struct Env{
- Arena*arena;Car*cars[2];std::mt19937 rng;std::default_random_engine physics;int goal=-1,ticks=0,noTouch=0,scene=-1,forced=-1;float potential=0;bool anchored=false;Vec anchor;CarControls previous[2];
+ Arena*arena;Car*cars[2];std::mt19937 rng;std::default_random_engine physics;int goal=-1,ticks=0,noTouch=0,scene=-1,forced=-1;float potential=0;CarControls previous[2];
  Env(unsigned seed):rng(seed),physics(seed){ArenaConfig cfg;cfg.noBallRot=false;arena=Arena::Create(GameMode::SOCCAR,cfg,120);cars[0]=arena->AddCar(Team::BLUE,CAR_CONFIG_OCTANE);cars[1]=arena->AddCar(Team::ORANGE,CAR_CONFIG_OCTANE);arena->SetGoalScoreCallback([](Arena*,Team t,void*ptr){((Env*)ptr)->goal=int(t);},this);}
  ~Env(){delete arena;}
- void hold(){auto b=arena->ball->GetState();b.pos=anchor;b.vel=Vec(0,0,0);b.angVel=Vec(0,0,0);arena->ball->SetState(b);}
- void reset(){anchored=false;Math::GetRandEngine()=physics;arena->ResetToRandomKickoff(int(rng()%1000000000));scene=forced>=0?forced:forced==-2?int(rng()%5):((rng()%100<40)?int(rng()%5):5);
+ void reset(){Math::GetRandEngine()=physics;arena->ResetToRandomKickoff(int(rng()%1000000000));scene=forced>=0?forced:forced==-2?int(rng()%5):((rng()%100<40)?int(rng()%5):5);
   BallState ball;
   if(scene<5){int keys[5]={4,0,1,2,3};auto sp=RLConst::CAR_SPAWN_LOCATIONS_SOCCAR[keys[scene]];
    for(int a=0;a<2;a++){CarState s;s.pos={sp.x*(a?-1.f:1.f),sp.y*(a?-1.f:1.f),17};s.rotMat=Angle(sp.yawAng+(a?3.14159265f:0),0,0).ToRotMat();s.boost=33;cars[a]->SetState(s);}ball.pos={0,0,94};
@@ -81,7 +80,7 @@ public:
   auto wp=w.mutable_data(),pp=p.mutable_data(),op=o.mutable_data(),fwp=fw.mutable_data(),fpp=fp.mutable_data(),fop=fo.mutable_data(),rp=r.mutable_data(),cp=parts.mutable_data(),ip=info.mutable_data();auto mp=m.mutable_data(),fmp=fm.mutable_data(),te=term.mutable_data(),tr=trunc.mutable_data();std::fill(wp,wp+w.size(),0.f);std::fill(fwp,fwp+fw.size(),0.f);
   {py::gil_scoped_release release;pool.run(n,[&](int i){auto&e=*envs[i];Math::GetRandEngine()=e.physics;auto before=e.arena->ball->GetState();bool hits[2]={false,false};uint64_t begin=e.arena->tickCount;
    int limit=bp?int(std::min<int64_t>(skip,bp[i])):skip;for(int k=0;k<limit;k++){if(k==delay)for(int a=0;a<2;a++){e.previous[a]=acts[ap[i*2+a]];e.cars[a]->controls=e.previous[a];}
-    if(e.anchored)e.hold();e.arena->Step(1);if(e.anchored)e.hold();e.ticks++;e.noTouch++;
+    e.arena->Step(1);e.ticks++;e.noTouch++;
     if(e.goal>=0)break;
    }
    // BallHitInfo keeps the latest contact tick. Reading it once after the
@@ -98,14 +97,6 @@ public:
  }
  void scene(int kind){if(kind< -2||kind>6)throw std::invalid_argument("scene must be -1 mixed, 0..4 kickoffs, 5 open play, 6 elevated target");for(auto&e:envs){e->forced=kind;e->reset();}}
  void set_scene(int i,int kind){if(i<0||i>=n||kind< -2||kind>6)throw std::invalid_argument("scene/index");envs[i]->forced=kind;envs[i]->reset();}
- void hold_ball(int i,py::object position){
-  if(i<0||i>=n)throw std::invalid_argument("arena index");auto&e=*envs[i];
-  if(position.is_none()){e.anchored=false;return;}
-  auto a=py::array_t<float,py::array::c_style|py::array::forcecast>::ensure(position);
-  if(!a||a.ndim()!=1||a.size()!=3)throw std::invalid_argument("anchor position must have 3 values");
-  const float*p=a.data();if(!std::isfinite(p[0])||!std::isfinite(p[1])||!std::isfinite(p[2])||std::abs(p[0])>3500||std::abs(p[1])>4400||p[2]<93.15f||p[2]>1700)throw std::invalid_argument("unsafe anchor position");
-  e.anchor=Vec(p[0],p[1],p[2]);e.anchored=true;e.hold();e.potential=phi(e.anchor);
- }
  void reset_one(int i){if(i<0||i>=n)throw std::invalid_argument("arena index");envs[i]->reset();}
  void inject(int i,py::array_t<float,py::array::c_style|py::array::forcecast>data){if(i<0||i>=n||data.ndim()!=2||data.shape(0)!=3||data.shape(1)!=32)throw std::invalid_argument("state shape");auto&e=*envs[i];e.reset();auto p=data.data();BallState b;b.pos={p[0],p[1],p[2]};b.vel={p[3],p[4],p[5]};b.angVel={p[6],p[7],p[8]};e.arena->ball->SetState(b);
   for(int a=0;a<2;a++){auto q=p+(a+1)*32;CarState s;s.pos={q[0],q[1],q[2]};s.vel={q[3],q[4],q[5]};s.angVel={q[6],q[7],q[8]};Vec f(q[9],q[10],q[11]),u(q[12],q[13],q[14]);if(f.Length()<.99f||u.Length()<.99f||std::abs(f.Dot(u))>.01)throw std::invalid_argument("state orientation must be orthonormal");s.rotMat=RotMat(f,u.Cross(f),u);s.boost=q[15];e.cars[a]->SetState(s);}e.potential=phi(b.pos);}
@@ -116,7 +107,7 @@ py::tuple encode_public(py::array_t<float,py::array::c_style|py::array::forcecas
  py::array_t<float>o({n,2,109});py::array_t<bool>m({n,2,90});auto acts=table();for(int i=0;i<n;i++)for(int a=0;a<2;a++)encode_one(w.data()+i*96,p.data()+i*68,inv,o.mutable_data()+(i*2+a)*109,m.mutable_data()+(i*2+a)*90,a,acts);return py::make_tuple(o,m);
 }
 #include "potential.h"
-PYBIND11_MODULE(_native,m){m.attr("contract")="duelforge-109-v1-octane-120hz-skip8-delay7";m.attr("version")=1;m.attr("ball_anchor_v1")=true;m.def("predictive_estimate",&predictive_estimate);m.def("encode",&encode_public);
+PYBIND11_MODULE(_native,m){m.attr("contract")="duelforge-109-v1-octane-120hz-skip8-delay7";m.attr("version")=1;m.def("predictive_estimate",&predictive_estimate);m.def("encode",&encode_public);
  m.def("action_table",[]{auto a=table();py::array_t<float>x({90,8});for(int i=0;i<90;i++)control(x.mutable_data()+8*i,a[i]);return x;});
- py::class_<Batch>(m,"Batch").def(py::init<std::string,int,int,unsigned,int,int,float,float,float,float>()).def("observe",&Batch::observe).def("step",&Batch::step,py::arg("actions"),py::arg("remaining_ticks")=py::none()).def("pad_locations",&Batch::locations).def("scene",&Batch::scene).def("set_scene",&Batch::set_scene).def("reset_one",&Batch::reset_one).def("inject",&Batch::inject).def("hold_ball",&Batch::hold_ball,py::arg("index"),py::arg("position")=py::none());
+ py::class_<Batch>(m,"Batch").def(py::init<std::string,int,int,unsigned,int,int,float,float,float,float>()).def("observe",&Batch::observe).def("step",&Batch::step,py::arg("actions"),py::arg("remaining_ticks")=py::none()).def("pad_locations",&Batch::locations).def("scene",&Batch::scene).def("set_scene",&Batch::set_scene).def("reset_one",&Batch::reset_one).def("inject",&Batch::inject);
 }

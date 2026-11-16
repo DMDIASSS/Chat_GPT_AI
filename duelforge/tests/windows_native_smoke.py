@@ -23,6 +23,3 @@ r=estimate_reference(w,c);f=dict(_native.predictive_estimate(w,3.,16,.6,.8,.2))
 for name in ('eta','phi','intercept','threat'):np.testing.assert_allclose(f[name],r[name],atol=2e-4,rtol=2e-4)
 for name in ('reachable','prediction_quality'):np.testing.assert_array_equal(f[name],r[name])
 print('DUELFORGE_WINDOWS_NATIVE_INTERCEPTION_REFERENCE_PARITY_PASS')
-
-assert _native.ball_anchor_v1 and hasattr(_native.Batch,'hold_ball')
-print('DUELFORGE_WINDOWS_TRAINING_BALL_ANCHOR_API_PASS')
