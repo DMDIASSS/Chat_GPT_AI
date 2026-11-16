@@ -4,20 +4,40 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
 def candidates(explicit=None):
+    # Bound discovery to this project, known siblings, and existing hint files.
+    # Never scan a drive or read credentials. Historical CUDA paths are included.
     out=[Path(explicit)] if explicit else []
+    def hint(folder):
+        for name in ('runtime_python_cuda.txt','runtime_python.txt'):
+            file=folder/name
+            if file.is_file():
+                try:
+                    value=file.read_text(encoding='utf-8-sig').strip()
+                    if value and '\n' not in value:out.append(Path(value))
+                except OSError:pass
+        for file in (folder/'runtime_selection.json',folder/'results/runtime_selection.json'):
+            if not file.is_file():continue
+            try:
+                data=json.loads(file.read_text(encoding='utf-8-sig'))
+                for row in data.get('candidates_tested',[]):
+                    if row.get('cuda') and row.get('python'):out.append(Path(row['python']))
+                if data.get('selected'):out.append(Path(data['selected']))
+            except (OSError,ValueError,TypeError):pass
+    hint(ROOT)
     for parent in (ROOT.parent,ROOT.parent.parent):
-        for project in ('gigaforge','attention_skills','attention_forge','novaforge','NovaForge'):
-            folder=parent/project
-            for env in ('.venv_native','.venv','.venv_gpu'):
-                out.extend([folder/env/'Scripts/python.exe',folder/env/'bin/python'])
-            hint=folder/'runtime_python.txt'
-            if hint.is_file():
-                value=hint.read_text(encoding='utf-8-sig').strip()
-                if '\n' not in value and value:out.append(Path(value))
-    out.append(Path(sys.executable));unique=[]
+        for project in ('gigaforge','attention_skills','attention_forge','attentionforge','novaforge','NovaForge','duelforge'):
+            folder=parent/project;hint(folder)
+            for env in ('.venv_native','.venv_gpu','.venv','.venv_cuda','venv'):
+                for rel in ('Scripts/python.exe','bin/python'):out.append(folder/env/rel)
+            if folder.is_dir():
+                for env in sorted(folder.glob('.venv*'))[:12]:
+                    if env.is_dir():out.extend([env/'Scripts/python.exe',env/'bin/python'])
+    out.append(Path(sys.executable));unique=[];seen=set()
     for p in out:
-        if p.is_file() and p not in unique:unique.append(p)
-    return unique[:18]
+        if not (p.is_file() or (explicit and p==Path(explicit))):continue
+        key=str(p.resolve()).casefold() if sys.platform=='win32' else str(p.resolve())
+        if key not in seen:unique.append(p);seen.add(key)
+    return unique
 
 def run(explicit=None):
     rows=[];chosen=None;cpu=None
