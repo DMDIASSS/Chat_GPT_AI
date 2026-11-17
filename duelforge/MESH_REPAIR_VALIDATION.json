@@ -1,0 +1,12 @@
+{
+  "unit_tests": {
+    "passed": 4
+  },
+  "live_integration": "Official download, checksum, all 16 files identical to installed known meshes, RocketSim Soccar arena load and step passed",
+  "archive_sha256": "3be8e9d2f1cfb6514e0e3d455fb33ff95e26eb7c399f819fff0258025cf4d501",
+  "package": "rlgym-rocket-league==2.0.1",
+  "packages_installed": false,
+  "native_binary_changed": false,
+  "training_started": false,
+  "models_modified": false
+}
